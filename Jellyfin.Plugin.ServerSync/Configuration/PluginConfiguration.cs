@@ -36,11 +36,6 @@ public class PluginConfiguration : BasePluginConfiguration
     // Unit for MaxDownloadSpeed (KB, MB, GB).
     public string DownloadSpeedUnit { get; set; } = "MB";
 
-    // MaxDownloadSpeedMbps
-    // Maximum download speed in MB/s (0 = unlimited). Kept for backward compatibility.
-    [Obsolete("Use MaxDownloadSpeed and DownloadSpeedUnit instead")]
-    public int MaxDownloadSpeedMbps { get; set; } = 0;
-
     // GetMaxDownloadSpeedBytes
     // Calculates the max download speed in bytes per second.
     public long GetMaxDownloadSpeedBytes()

@@ -22,6 +22,11 @@ public class SyncItem
 
     public DateTime SourceModifyDate { get; set; }
 
+    // SourceETag
+    // ETag from source server, derived from file's DateModified.
+    // Used to detect actual file changes without re-downloading.
+    public string? SourceETag { get; set; }
+
     public string? LocalItemId { get; set; }
 
     public string? LocalPath { get; set; }

@@ -160,6 +160,19 @@ public class DownloadMissingContentTask : IScheduledTask
                     return;
                 }
 
+                // Pre-download validation: Check if local file already exists with matching size
+                // This prevents unnecessary downloads and file overwrites
+                if (ShouldSkipDownload(item, database, out var skipReason))
+                {
+                    _logger.LogInformation(
+                        "SKIPPED: {FileName} ({Size}) - {Reason}",
+                        fileName,
+                        fileSize,
+                        skipReason);
+                    Interlocked.Increment(ref successCount);
+                    return;
+                }
+
                 var (success, errorMessage) = await DownloadItemAsync(
                     client,
                     item,
@@ -170,7 +183,13 @@ public class DownloadMissingContentTask : IScheduledTask
 
                 if (success)
                 {
-                    database.UpdateStatus(item.SourceItemId, SyncStatus.Synced, localPath: item.LocalPath);
+                    // Pass ETag and size to ensure they're preserved after sync
+                    database.UpdateStatus(
+                        item.SourceItemId,
+                        SyncStatus.Synced,
+                        localPath: item.LocalPath,
+                        sourceETag: item.SourceETag,
+                        sourceSize: item.SourceSize);
                     Interlocked.Increment(ref successCount);
                     _logger.LogInformation(
                         "DOWNLOADED: {FileName} ({Size}) -> {LocalPath}",
@@ -367,6 +386,57 @@ public class DownloadMissingContentTask : IScheduledTask
         }
         catch
         {
+            return false;
+        }
+    }
+
+    // ShouldSkipDownload
+    // Pre-download validation to check if file already exists and is valid.
+    // Returns true if download should be skipped (file is already valid).
+    private bool ShouldSkipDownload(SyncItem item, SyncDatabase database, out string skipReason)
+    {
+        skipReason = string.Empty;
+
+        if (string.IsNullOrEmpty(item.LocalPath))
+        {
+            return false;
+        }
+
+        // Check if local file exists
+        if (!File.Exists(item.LocalPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            var localInfo = new FileInfo(item.LocalPath);
+
+            // If sizes match, the file is likely valid - mark as synced and skip download
+            if (item.SourceSize > 0 && localInfo.Length == item.SourceSize)
+            {
+                // Update status to Synced since file is already valid, preserve ETag
+                database.UpdateStatus(
+                    item.SourceItemId,
+                    SyncStatus.Synced,
+                    localPath: item.LocalPath,
+                    sourceETag: item.SourceETag,
+                    sourceSize: item.SourceSize);
+                skipReason = $"Local file already exists with matching size ({FormatBytes(localInfo.Length)})";
+                return true;
+            }
+
+            // Size mismatch - needs re-download, don't skip
+            _logger.LogDebug(
+                "Local file exists but size differs: local={LocalSize}, source={SourceSize} for {FileName}",
+                localInfo.Length,
+                item.SourceSize,
+                Path.GetFileName(item.LocalPath));
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to check local file {LocalPath}", item.LocalPath);
             return false;
         }
     }

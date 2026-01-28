@@ -1,0 +1,159 @@
+<!-- Sync Items Section -->
+<div class="sectionTitleContainer">
+    <h2 class="sectionTitle">Sync Items</h2>
+</div>
+
+<!-- Status Cards at top of Sync Items section -->
+<div id="syncStatusSummary" class="statusCards">
+    <div class="statusCard statusCard-synced" id="statusGroupSynced" title="">
+        <span class="statusCard-count" id="syncedCount">0</span>
+        <span class="statusCard-label">Synced</span>
+    </div>
+    <div class="statusCard statusCard-queued" id="statusGroupQueued" title="">
+        <span class="statusCard-count" id="queuedCount">0</span>
+        <span class="statusCard-label">Queued</span>
+    </div>
+    <div class="statusCard statusCard-errored" id="statusGroupErrored" title="">
+        <span class="statusCard-count" id="erroredCount">0</span>
+        <span class="statusCard-label">Errored</span>
+    </div>
+    <div class="statusCard statusCard-ignored" id="statusGroupIgnored" title="">
+        <span class="statusCard-count" id="ignoredCount">0</span>
+        <span class="statusCard-label">Ignored</span>
+    </div>
+    <div class="statusCard statusCard-pending" id="statusGroupPending" title="" style="display: none;">
+        <span class="statusCard-count" id="pendingCount">0</span>
+        <span class="statusCard-label">Pending</span>
+    </div>
+    <div class="statusCard statusCard-pendingDeletion" id="statusGroupPendingDeletion" title="" style="display: none;">
+        <span class="statusCard-count" id="pendingDeletionCount">0</span>
+        <span class="statusCard-label">Pending Deletion</span>
+    </div>
+</div>
+
+<!-- Sync Stats -->
+<div id="healthDashboard" class="healthDashboard">
+    <div class="healthRow">
+        <div class="healthCard">
+            <span class="healthLabel">Last Sync</span>
+            <span class="healthValue" id="healthLastSync">Never</span>
+        </div>
+        <div class="healthCard">
+            <span class="healthLabel">Disk Space</span>
+            <span class="healthValue" id="healthDiskSpace">--</span>
+        </div>
+        <div class="healthCard">
+            <span class="healthLabel">Queued Size</span>
+            <span class="healthValue" id="healthQueuedSize">--</span>
+        </div>
+    </div>
+</div>
+
+<!-- Action Buttons Row -->
+<div class="syncActionButtonRow">
+    <button is="emby-button" type="button" id="btnRefreshItems" class="raised syncActionButton">
+        <span>Refresh</span>
+    </button>
+    <button is="emby-button" type="button" id="btnTriggerSync" class="raised button-primary syncActionButton">
+        <span>Sync</span>
+    </button>
+    <button is="emby-button" type="button" id="btnRetryErrors" class="raised syncActionButton">
+        <span>Retry Errors</span>
+    </button>
+    <button is="emby-button" type="button" id="btnResetDatabase" class="raised button-destructive syncActionButton">
+        <span>Reset Database</span>
+    </button>
+</div>
+
+<!-- Table Header Row -->
+<div class="syncTableHeader">
+    <label class="selectAllContainer">
+        <input type="checkbox" id="chkSelectAll" />
+        <span>Select All</span>
+    </label>
+    <span id="selectedCount" class="selectedCount">0 selected</span>
+    <button is="emby-button" type="button" id="btnBulkIgnore" class="raised syncHeaderButton" disabled>
+        <span>Ignore</span>
+    </button>
+    <button is="emby-button" type="button" id="btnBulkQueue" class="raised button-primary syncHeaderButton" disabled>
+        <span>Queue</span>
+    </button>
+    <button is="emby-button" type="button" id="btnBulkDelete" class="raised button-destructive syncHeaderButton" title="Delete from local server only" disabled>
+        <span>Delete</span>
+    </button>
+    <select is="emby-select" id="selStatusFilter" class="statusFilter">
+        <option value="">All</option>
+        <option value="Synced">Synced</option>
+        <option value="Queued">Queued</option>
+        <option value="Errored">Errored</option>
+        <option value="Ignored">Ignored</option>
+        <option value="Pending" id="optPending" style="display: none;">Pending</option>
+        <option value="PendingDeletion" id="optPendingDeletion" style="display: none;">Pending Deletion</option>
+    </select>
+    <button is="emby-button" type="button" id="btnReloadTable" class="reloadTableButton" title="Reload table data">
+        <span class="reloadIcon">&#x21bb;</span>
+    </button>
+</div>
+
+<div id="syncItemsContainer" style="max-height: 400px; overflow-y: auto;">
+    <!-- Items populated dynamically -->
+</div>
+
+<!-- Separator line at bottom of content section -->
+<div class="contentSectionSeparator"></div>
+
+<!-- Item Detail Modal -->
+<div id="itemDetailModal" class="dialog" style="display: none;">
+    <div class="dialogContent" style="max-width: 600px; position: relative;">
+        <button type="button" id="btnModalClose" class="dialogCloseBtn" title="Close">&times;</button>
+        <h2 id="modalTitle" style="margin-top: 0; padding-right: 32px;"></h2>
+        <div id="modalContent" style="margin: 16px 0;">
+            <div style="margin-bottom: 12px;">
+                <div style="opacity: 0.7; margin-bottom: 4px;">Status</div>
+                <div id="modalStatus"></div>
+            </div>
+            <div id="modalErrorSection" style="margin-bottom: 12px; display: none;">
+                <div style="opacity: 0.7; margin-bottom: 4px;">Error</div>
+                <div id="modalError" class="errorMessage"></div>
+            </div>
+            <div id="modalRetrySection" style="margin-bottom: 12px; display: none;">
+                <div style="opacity: 0.7; margin-bottom: 4px;">Retry Count</div>
+                <div id="modalRetryCount"></div>
+            </div>
+            <div style="margin-bottom: 12px;">
+                <div style="opacity: 0.7; margin-bottom: 4px;">Size</div>
+                <div id="modalSize"></div>
+            </div>
+            <div style="margin-bottom: 12px;">
+                <div style="opacity: 0.7; margin-bottom: 4px;">Source Path</div>
+                <div id="modalSourcePath" style="word-break: break-all;"></div>
+            </div>
+            <div style="margin-bottom: 12px;">
+                <div style="opacity: 0.7; margin-bottom: 4px;">Local Path</div>
+                <div id="modalLocalPath" style="word-break: break-all;"></div>
+                <div id="modalLocalPathNote" class="fieldDescription" style="margin-top: 4px;"></div>
+            </div>
+            <div id="modalLastSyncSection" style="margin-bottom: 12px; display: none;">
+                <div style="opacity: 0.7; margin-bottom: 4px;">Last Sync</div>
+                <div id="modalLastSync"></div>
+            </div>
+            <div id="modalCompanionFilesSection" style="margin-bottom: 12px; display: none;">
+                <div style="opacity: 0.7; margin-bottom: 4px;">Companion Files</div>
+                <div id="modalCompanionFiles" style="word-break: break-all;"></div>
+            </div>
+        </div>
+        <div class="modalButtonRow">
+            <button is="emby-button" type="button" id="btnModalIgnore" class="raised modalButton">
+                <span>Ignore</span>
+            </button>
+            <button is="emby-button" type="button" id="btnModalQueue" class="raised button-primary modalButton">
+                <span>Queue</span>
+            </button>
+        </div>
+        <div id="modalDeleteRow" class="modalDeleteRow">
+            <button is="emby-button" type="button" id="btnModalDelete" class="raised button-destructive modalDeleteButton" title="Delete from local server only">
+                <span>Delete</span>
+            </button>
+        </div>
+    </div>
+</div>

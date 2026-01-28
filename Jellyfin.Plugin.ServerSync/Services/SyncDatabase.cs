@@ -15,7 +15,7 @@ namespace Jellyfin.Plugin.ServerSync.Services;
 // SQLite database for tracking sync items between servers.
 public class SyncDatabase : IDisposable
 {
-    private const int CurrentSchemaVersion = 2;
+    private const int CurrentSchemaVersion = 3;
 
     private readonly ILogger<SyncDatabase> _logger;
     private readonly string _dbPath;
@@ -133,6 +133,7 @@ public class SyncDatabase : IDisposable
                 SourceSize INTEGER NOT NULL,
                 SourceCreateDate TEXT NOT NULL,
                 SourceModifyDate TEXT NOT NULL,
+                SourceETag TEXT,
                 LocalItemId TEXT,
                 LocalPath TEXT,
                 StatusDate TEXT NOT NULL,
@@ -188,6 +189,23 @@ public class SyncDatabase : IDisposable
                 idxCmd.Transaction = transaction;
                 idxCmd.CommandText = "CREATE INDEX IF NOT EXISTS idx_local_path ON SyncItems(LocalPath)";
                 idxCmd.ExecuteNonQuery();
+            }
+
+            if (fromVersion < 3)
+            {
+                // Add SourceETag column for reliable change detection
+                try
+                {
+                    using var cmd = _connection.CreateCommand();
+                    cmd.Transaction = transaction;
+                    cmd.CommandText = "ALTER TABLE SyncItems ADD COLUMN SourceETag TEXT";
+                    cmd.ExecuteNonQuery();
+                    _logger.LogInformation("Added SourceETag column for change detection");
+                }
+                catch (SqliteException ex) when (ex.Message.Contains("duplicate column", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogDebug("SourceETag column already exists, skipping");
+                }
             }
 
             SetSchemaVersion(CurrentSchemaVersion);
@@ -352,11 +370,11 @@ public class SyncDatabase : IDisposable
         command.CommandText = @"
             INSERT INTO SyncItems (
                 SourceLibraryId, LocalLibraryId, SourceItemId, SourcePath, SourceSize,
-                SourceCreateDate, SourceModifyDate, LocalItemId, LocalPath, StatusDate, Status,
+                SourceCreateDate, SourceModifyDate, SourceETag, LocalItemId, LocalPath, StatusDate, Status,
                 LastSyncTime, ErrorMessage, RetryCount
             ) VALUES (
                 @sourceLibraryId, @localLibraryId, @sourceItemId, @sourcePath, @sourceSize,
-                @sourceCreateDate, @sourceModifyDate, @localItemId, @localPath, @statusDate, @status,
+                @sourceCreateDate, @sourceModifyDate, @sourceETag, @localItemId, @localPath, @statusDate, @status,
                 @lastSyncTime, @errorMessage, @retryCount
             )
             ON CONFLICT(SourceItemId) DO UPDATE SET
@@ -366,6 +384,7 @@ public class SyncDatabase : IDisposable
                 SourceSize = @sourceSize,
                 SourceCreateDate = @sourceCreateDate,
                 SourceModifyDate = @sourceModifyDate,
+                SourceETag = @sourceETag,
                 LocalItemId = @localItemId,
                 LocalPath = @localPath,
                 StatusDate = @statusDate,
@@ -382,6 +401,7 @@ public class SyncDatabase : IDisposable
         command.Parameters.AddWithValue("@sourceSize", item.SourceSize);
         command.Parameters.AddWithValue("@sourceCreateDate", item.SourceCreateDate.ToString("o"));
         command.Parameters.AddWithValue("@sourceModifyDate", item.SourceModifyDate.ToString("o"));
+        command.Parameters.AddWithValue("@sourceETag", item.SourceETag ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@localItemId", item.LocalItemId ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@localPath", item.LocalPath ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@statusDate", item.StatusDate.ToString("o"));
@@ -394,8 +414,15 @@ public class SyncDatabase : IDisposable
     }
 
     // UpdateStatus
-    // Updates the status of a sync item with optional error message.
-    public void UpdateStatus(string sourceItemId, SyncStatus status, string? localItemId = null, string? localPath = null, string? errorMessage = null)
+    // Updates the status of a sync item with optional fields.
+    public void UpdateStatus(
+        string sourceItemId,
+        SyncStatus status,
+        string? localItemId = null,
+        string? localPath = null,
+        string? errorMessage = null,
+        string? sourceETag = null,
+        long? sourceSize = null)
     {
         EnsureConnection();
 
@@ -415,6 +442,16 @@ public class SyncDatabase : IDisposable
         if (localPath != null)
         {
             setClauses.Add("LocalPath = @localPath");
+        }
+
+        if (sourceETag != null)
+        {
+            setClauses.Add("SourceETag = @sourceETag");
+        }
+
+        if (sourceSize.HasValue)
+        {
+            setClauses.Add("SourceSize = @sourceSize");
         }
 
         if (status == SyncStatus.Synced)
@@ -447,6 +484,16 @@ public class SyncDatabase : IDisposable
         if (localPath != null)
         {
             command.Parameters.AddWithValue("@localPath", localPath);
+        }
+
+        if (sourceETag != null)
+        {
+            command.Parameters.AddWithValue("@sourceETag", sourceETag);
+        }
+
+        if (sourceSize.HasValue)
+        {
+            command.Parameters.AddWithValue("@sourceSize", sourceSize.Value);
         }
 
         command.Parameters.AddWithValue("@errorMessage", errorMessage ?? (object)DBNull.Value);
@@ -568,6 +615,12 @@ public class SyncDatabase : IDisposable
 
         try
         {
+            var etagOrdinal = reader.GetOrdinal("SourceETag");
+            if (!reader.IsDBNull(etagOrdinal))
+            {
+                item.SourceETag = reader.GetString(etagOrdinal);
+            }
+
             var lastSyncOrdinal = reader.GetOrdinal("LastSyncTime");
             if (!reader.IsDBNull(lastSyncOrdinal))
             {

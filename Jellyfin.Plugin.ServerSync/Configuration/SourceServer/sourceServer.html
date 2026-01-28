@@ -1,0 +1,37 @@
+<!-- Source Server Configuration Section -->
+<div class="sectionTitleContainer">
+    <h2 class="sectionTitle">Source Server</h2>
+</div>
+
+<div class="inputContainer">
+    <label for="txtSourceServerUrl">Server URL:</label>
+    <input is="emby-input" type="text" id="txtSourceServerUrl" placeholder="http://server:8096" />
+    <div class="fieldDescription">URL of the source Jellyfin server to sync from.</div>
+</div>
+
+<!-- API Key Authentication -->
+<div class="inputContainer">
+    <label for="txtSourceServerApiKey">API Key:</label>
+    <input is="emby-input" type="password" id="txtSourceServerApiKey" />
+    <div class="fieldDescription">Generate one in the source server's Dashboard &gt; API Keys.</div>
+</div>
+
+<div id="serverInfoContainer" style="display: none; margin-bottom: 16px; padding: 12px; background: rgba(0,0,0,0.3); border-radius: 4px;">
+    <div style="display: flex; gap: 24px;">
+        <div>
+            <span style="opacity: 0.7;">Server:</span>
+            <span id="txtSourceServerName"></span>
+            <span style="opacity: 0.5;">(<span id="txtSourceServerId"></span>)</span>
+        </div>
+    </div>
+</div>
+
+<div class="sourceServerButtonRow">
+    <button is="emby-button" type="button" id="btnSaveServer" class="raised button-primary sourceServerButton">
+        <span>Save</span>
+    </button>
+    <button is="emby-button" type="button" id="btnTestConnection" class="raised sourceServerButton">
+        <span>Test</span>
+    </button>
+</div>
+<span id="connectionStatus" style="display: block; margin-bottom: 16px;"></span>

@@ -317,30 +317,32 @@ public class UpdateSyncTablesTask : IScheduledTask
         var sourceItemId = item.Id!.Value.ToString("N", CultureInfo.InvariantCulture);
         var sourceSize = GetItemSize(item);
         var sourceCreateDate = item.DateCreated?.DateTime ?? DateTime.UtcNow;
-        var sourceModifyDate = item.DateCreated?.DateTime ?? DateTime.UtcNow;
+        // ETag is derived from the file's DateModified, making it reliable for change detection
+        var sourceETag = item.Etag;
         var localPath = TranslatePath(item.Path!, mapping.SourceRootPath, mapping.LocalRootPath);
 
         var existingItem = existingItems.GetValueOrDefault(sourceItemId);
 
         if (existingItem != null)
         {
-            ProcessExistingItem(database, existingItem, item.Path!, sourceSize, sourceCreateDate, sourceModifyDate, localPath, detectUpdatedFiles);
+            ProcessExistingItem(database, existingItem, item.Path!, sourceSize, sourceCreateDate, sourceETag, localPath, detectUpdatedFiles);
         }
         else
         {
-            ProcessNewItem(database, mapping, sourceItemId, item.Path!, sourceSize, sourceCreateDate, sourceModifyDate, localPath, requireApproval);
+            ProcessNewItem(database, mapping, sourceItemId, item.Path!, sourceSize, sourceCreateDate, sourceETag, localPath, requireApproval);
         }
     }
 
     // ProcessExistingItem
     // Updates an existing sync item based on source changes.
+    // Uses ETag for reliable change detection - ETag is derived from the file's DateModified.
     private void ProcessExistingItem(
         SyncDatabase database,
         SyncItem existingItem,
         string sourcePath,
         long sourceSize,
         DateTime sourceCreateDate,
-        DateTime sourceModifyDate,
+        string? sourceETag,
         string localPath,
         bool detectUpdatedFiles)
     {
@@ -358,7 +360,7 @@ public class UpdateSyncTablesTask : IScheduledTask
             existingItem.SourcePath = sourcePath;
             existingItem.SourceSize = sourceSize;
             existingItem.SourceCreateDate = sourceCreateDate;
-            existingItem.SourceModifyDate = sourceModifyDate;
+            existingItem.SourceETag = sourceETag;
             existingItem.LocalPath = localPath;
             database.Upsert(existingItem);
             _logger.LogInformation("Restored {FileName} (reappeared on source)", Path.GetFileName(sourcePath));
@@ -368,12 +370,12 @@ public class UpdateSyncTablesTask : IScheduledTask
         // Pending items stay pending but update metadata
         if (existingItem.Status == SyncStatus.Pending)
         {
-            if (existingItem.SourceSize != sourceSize || existingItem.SourcePath != sourcePath)
+            if (existingItem.SourceSize != sourceSize || existingItem.SourcePath != sourcePath || existingItem.SourceETag != sourceETag)
             {
                 existingItem.SourcePath = sourcePath;
                 existingItem.SourceSize = sourceSize;
                 existingItem.SourceCreateDate = sourceCreateDate;
-                existingItem.SourceModifyDate = sourceModifyDate;
+                existingItem.SourceETag = sourceETag;
                 existingItem.LocalPath = localPath;
                 database.Upsert(existingItem);
             }
@@ -381,7 +383,10 @@ public class UpdateSyncTablesTask : IScheduledTask
             return;
         }
 
-        var sourceChanged = existingItem.SourceSize != sourceSize || existingItem.SourcePath != sourcePath;
+        // Check for source changes using size, path, or ETag
+        var sourceChanged = existingItem.SourceSize != sourceSize ||
+                            existingItem.SourcePath != sourcePath ||
+                            (sourceETag != null && existingItem.SourceETag != sourceETag);
 
         // Queued items stay queued but update metadata if changed
         if (existingItem.Status == SyncStatus.Queued)
@@ -391,7 +396,7 @@ public class UpdateSyncTablesTask : IScheduledTask
                 existingItem.SourcePath = sourcePath;
                 existingItem.SourceSize = sourceSize;
                 existingItem.SourceCreateDate = sourceCreateDate;
-                existingItem.SourceModifyDate = sourceModifyDate;
+                existingItem.SourceETag = sourceETag;
                 existingItem.LocalPath = localPath;
                 database.Upsert(existingItem);
             }
@@ -399,36 +404,27 @@ public class UpdateSyncTablesTask : IScheduledTask
             return;
         }
 
-        // Source changed - mark as queued
+        // Source changed (size, path, or ETag) - mark as queued
         if (sourceChanged)
         {
+            var oldETag = existingItem.SourceETag; // Capture before updating
             existingItem.SourcePath = sourcePath;
             existingItem.SourceSize = sourceSize;
             existingItem.SourceCreateDate = sourceCreateDate;
-            existingItem.SourceModifyDate = sourceModifyDate;
+            existingItem.SourceETag = sourceETag;
             existingItem.LocalPath = localPath;
             existingItem.Status = SyncStatus.Queued;
             existingItem.StatusDate = DateTime.UtcNow;
             database.Upsert(existingItem);
-            _logger.LogInformation("Re-queued {FileName} (source changed)", Path.GetFileName(sourcePath));
+            _logger.LogInformation("Re-queued {FileName} (source changed, ETag: {OldETag} -> {NewETag})",
+                Path.GetFileName(sourcePath), oldETag ?? "null", sourceETag ?? "null");
             return;
         }
 
-        // Check if synced items need re-syncing based on detectUpdatedFiles setting
+        // For Synced items with detectUpdatedFiles enabled, verify local file integrity
+        // Note: ETag changes are already caught by sourceChanged above
         if (existingItem.Status == SyncStatus.Synced && detectUpdatedFiles)
         {
-            // Check if source was modified after we last synced
-            if (sourceModifyDate > existingItem.StatusDate)
-            {
-                existingItem.SourceModifyDate = sourceModifyDate;
-                existingItem.Status = SyncStatus.Queued;
-                existingItem.StatusDate = DateTime.UtcNow;
-                database.Upsert(existingItem);
-                _logger.LogInformation("Re-queued {FileName} (source modified after sync)", Path.GetFileName(sourcePath));
-                return;
-            }
-
-            // Check if local file exists and matches size
             try
             {
                 if (File.Exists(localPath))
@@ -439,7 +435,8 @@ public class UpdateSyncTablesTask : IScheduledTask
                         existingItem.Status = SyncStatus.Queued;
                         existingItem.StatusDate = DateTime.UtcNow;
                         database.Upsert(existingItem);
-                        _logger.LogInformation("Re-queued {FileName} (local size mismatch)", Path.GetFileName(localPath));
+                        _logger.LogInformation("Re-queued {FileName} (local size {LocalSize} != source size {SourceSize})",
+                            Path.GetFileName(localPath), localInfo.Length, sourceSize);
                     }
                 }
                 else
@@ -467,7 +464,7 @@ public class UpdateSyncTablesTask : IScheduledTask
         string sourcePath,
         long sourceSize,
         DateTime sourceCreateDate,
-        DateTime sourceModifyDate,
+        string? sourceETag,
         string localPath,
         bool requireApproval)
     {
@@ -479,7 +476,8 @@ public class UpdateSyncTablesTask : IScheduledTask
             SourcePath = sourcePath,
             SourceSize = sourceSize,
             SourceCreateDate = sourceCreateDate,
-            SourceModifyDate = sourceModifyDate,
+            SourceModifyDate = sourceCreateDate, // Default to create date, ETag is the reliable change indicator
+            SourceETag = sourceETag,
             LocalPath = localPath,
             StatusDate = DateTime.UtcNow,
             Status = requireApproval ? SyncStatus.Pending : SyncStatus.Queued
