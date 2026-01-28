@@ -1,12 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.IO;
 using System.Linq;
 using System.Net.Mime;
 using System.Threading.Tasks;
+using Jellyfin.Plugin.ServerSync.Configuration;
 using Jellyfin.Plugin.ServerSync.Models;
 using Jellyfin.Plugin.ServerSync.Services;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Model.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -21,8 +24,15 @@ public class TestConnectionRequest
     [Required]
     public string ServerUrl { get; set; } = string.Empty;
 
-    [Required]
-    public string ApiKey { get; set; } = string.Empty;
+    public AuthenticationMethod AuthMethod { get; set; } = AuthenticationMethod.ApiKey;
+
+    public string? ApiKey { get; set; }
+
+    public string? Username { get; set; }
+
+    public string? Password { get; set; }
+
+    public string? CachedAccessToken { get; set; }
 }
 
 // TestConnectionResponse
@@ -36,6 +46,8 @@ public class TestConnectionResponse
     public string? ServerId { get; set; }
 
     public string? Message { get; set; }
+
+    public string? AccessToken { get; set; }
 }
 
 // LibraryDto
@@ -77,6 +89,12 @@ public class SyncItemDto
 
     public DateTime StatusDate { get; set; }
 
+    public DateTime? LastSyncTime { get; set; }
+
+    public string? ErrorMessage { get; set; }
+
+    public int RetryCount { get; set; }
+
     public string? SourceServerUrl { get; set; }
 
     public string? SourceServerId { get; set; }
@@ -99,6 +117,67 @@ public class SyncStatusResponse
     public int PendingDeletion { get; set; }
 }
 
+// CapabilitiesResponse
+// Plugin capabilities for the UI.
+public class CapabilitiesResponse
+{
+    public bool CanDeleteItems { get; set; }
+
+    public bool SupportsCompanionFiles { get; set; }
+
+    public bool SupportsBandwidthScheduling { get; set; }
+}
+
+// SyncStatsResponse
+// Detailed sync statistics for health dashboard.
+public class SyncStatsResponse
+{
+    public int TotalItems { get; set; }
+
+    public int SyncedItems { get; set; }
+
+    public int QueuedItems { get; set; }
+
+    public int ErroredItems { get; set; }
+
+    public int PendingItems { get; set; }
+
+    public int IgnoredItems { get; set; }
+
+    public int PendingDeletionItems { get; set; }
+
+    public long TotalSyncedBytes { get; set; }
+
+    public long TotalQueuedBytes { get; set; }
+
+    public DateTime? LastSyncTime { get; set; }
+
+    public DateTime? LastSyncStartTime { get; set; }
+
+    public DateTime? LastSyncEndTime { get; set; }
+
+    public long FreeDiskSpaceBytes { get; set; }
+
+    public long MinimumRequiredBytes { get; set; }
+
+    public bool HasSufficientDiskSpace { get; set; }
+}
+
+// DiskSpaceInfo
+// Information about disk space availability.
+public class DiskSpaceInfo
+{
+    public long FreeBytes { get; set; }
+
+    public long TotalBytes { get; set; }
+
+    public long RequiredBytes { get; set; }
+
+    public bool IsSufficient { get; set; }
+
+    public string Path { get; set; } = string.Empty;
+}
+
 // UpdateItemStatusRequest
 // Request to update an item's status.
 public class UpdateItemStatusRequest
@@ -118,6 +197,34 @@ public class BulkItemsRequest
     public List<string> SourceItemIds { get; set; } = new();
 }
 
+// ValidateUrlRequest
+// Request to validate a server URL.
+public class ValidateUrlRequest
+{
+    [Required]
+    public string Url { get; set; } = string.Empty;
+}
+
+// ValidateUrlResponse
+// Response from URL validation.
+public class ValidateUrlResponse
+{
+    public bool IsValid { get; set; }
+
+    public string? Message { get; set; }
+
+    public string? NormalizedUrl { get; set; }
+}
+
+// ConfigurationValidationResponse
+// Response from configuration validation.
+public class ConfigurationValidationResponse
+{
+    public bool IsValid { get; set; }
+
+    public List<string> Errors { get; set; } = new();
+}
+
 // ConfigurationController
 // API controller for Server Sync plugin operations.
 // NOTE: This controller ONLY operates on the LOCAL server. It NEVER modifies the source server.
@@ -129,32 +236,92 @@ public class BulkItemsRequest
 public class ConfigurationController : ControllerBase
 {
     private readonly ILibraryManager _libraryManager;
+    private readonly ITaskManager _taskManager;
 
-    public ConfigurationController(ILibraryManager libraryManager)
+    public ConfigurationController(ILibraryManager libraryManager, ITaskManager taskManager)
     {
         _libraryManager = libraryManager;
+        _taskManager = taskManager;
     }
 
     // TestConnection
-    // Tests connection to the source server.
+    // Tests connection to the source server with support for both auth methods.
     [HttpPost("TestConnection")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<TestConnectionResponse>> TestConnection([FromBody] TestConnectionRequest request)
     {
-        using var client = new SourceServerClient(
-            Plugin.Instance!.LoggerFactory.CreateLogger<SourceServerClient>(),
-            request.ServerUrl,
-            request.ApiKey);
+        var plugin = Plugin.Instance!;
 
-        var result = await client.TestConnectionAsync().ConfigureAwait(false);
-
-        return Ok(new TestConnectionResponse
+        // Validate URL first
+        var urlValidation = ValidateServerUrl(request.ServerUrl);
+        if (!urlValidation.IsValid)
         {
-            Success = result.ServerName != null,
-            ServerName = result.ServerName,
-            ServerId = result.ServerId,
-            Message = result.ServerName != null ? "Connection successful" : "Failed to connect to server"
-        });
+            return Ok(new TestConnectionResponse
+            {
+                Success = false,
+                Message = urlValidation.Message
+            });
+        }
+
+        SourceServerClient client;
+
+        if (request.AuthMethod == AuthenticationMethod.UserCredentials)
+        {
+            if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
+            {
+                return Ok(new TestConnectionResponse
+                {
+                    Success = false,
+                    Message = "Username and password are required for user credential authentication"
+                });
+            }
+
+            client = new SourceServerClient(
+                plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
+                urlValidation.NormalizedUrl!,
+                request.Username,
+                request.Password,
+                request.CachedAccessToken);
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(request.ApiKey))
+            {
+                return Ok(new TestConnectionResponse
+                {
+                    Success = false,
+                    Message = "API key is required for API key authentication"
+                });
+            }
+
+            client = new SourceServerClient(
+                plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
+                urlValidation.NormalizedUrl!,
+                request.ApiKey);
+        }
+
+        using (client)
+        {
+            var result = await client.TestConnectionAsync().ConfigureAwait(false);
+
+            return Ok(new TestConnectionResponse
+            {
+                Success = result.Success,
+                ServerName = result.ServerName,
+                ServerId = result.ServerId,
+                Message = result.Success ? "Connection successful" : result.ErrorMessage ?? "Failed to connect to server",
+                AccessToken = result.AccessToken
+            });
+        }
+    }
+
+    // ValidateUrl
+    // Validates a server URL format and accessibility.
+    [HttpPost("ValidateUrl")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<ValidateUrlResponse> ValidateUrl([FromBody] ValidateUrlRequest request)
+    {
+        return Ok(ValidateServerUrl(request.Url));
     }
 
     // GetSourceLibraries
@@ -163,19 +330,38 @@ public class ConfigurationController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<LibraryDto>>> GetSourceLibraries([FromBody] TestConnectionRequest request)
     {
-        using var client = new SourceServerClient(
-            Plugin.Instance!.LoggerFactory.CreateLogger<SourceServerClient>(),
-            request.ServerUrl,
-            request.ApiKey);
+        var plugin = Plugin.Instance!;
 
-        var libraries = await client.GetLibrariesAsync().ConfigureAwait(false);
+        SourceServerClient client;
 
-        return Ok(libraries.Select(l => new LibraryDto
+        if (request.AuthMethod == AuthenticationMethod.UserCredentials)
         {
-            Id = l.ItemId ?? string.Empty,
-            Name = l.Name ?? string.Empty,
-            Locations = l.Locations?.ToList() ?? new List<string>()
-        }).ToList());
+            client = new SourceServerClient(
+                plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
+                request.ServerUrl,
+                request.Username ?? string.Empty,
+                request.Password ?? string.Empty,
+                request.CachedAccessToken);
+        }
+        else
+        {
+            client = new SourceServerClient(
+                plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
+                request.ServerUrl,
+                request.ApiKey ?? string.Empty);
+        }
+
+        using (client)
+        {
+            var libraries = await client.GetLibrariesAsync().ConfigureAwait(false);
+
+            return Ok(libraries.Select(l => new LibraryDto
+            {
+                Id = l.ItemId ?? string.Empty,
+                Name = l.Name ?? string.Empty,
+                Locations = l.Locations?.ToList() ?? new List<string>()
+            }).ToList());
+        }
     }
 
     // GetSyncItems
@@ -207,6 +393,9 @@ public class ConfigurationController : ControllerBase
             LocalItemId = i.LocalItemId,
             Status = i.Status.ToString(),
             StatusDate = i.StatusDate,
+            LastSyncTime = i.LastSyncTime,
+            ErrorMessage = i.ErrorMessage,
+            RetryCount = i.RetryCount,
             SourceServerUrl = config.SourceServerUrl,
             SourceServerId = config.SourceServerId
         }).ToList());
@@ -237,6 +426,159 @@ public class ConfigurationController : ControllerBase
         });
     }
 
+    // GetSyncStats
+    // Gets detailed sync statistics for health dashboard.
+    [HttpGet("Stats")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<SyncStatsResponse> GetSyncStats()
+    {
+        var plugin = Plugin.Instance;
+        if (plugin == null)
+        {
+            return NotFound();
+        }
+
+        var config = plugin.Configuration;
+        var stats = plugin.Database.GetSyncStats();
+        var diskInfo = GetDiskSpaceForLibraries();
+
+        return Ok(new SyncStatsResponse
+        {
+            TotalItems = stats.StatusCounts.Values.Sum(),
+            SyncedItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Synced, 0),
+            QueuedItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Queued, 0),
+            ErroredItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Errored, 0),
+            PendingItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Pending, 0),
+            IgnoredItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Ignored, 0),
+            PendingDeletionItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.PendingDeletion, 0),
+            TotalSyncedBytes = stats.TotalSyncedBytes,
+            TotalQueuedBytes = stats.TotalQueuedBytes,
+            LastSyncTime = stats.LastSyncTime,
+            LastSyncStartTime = config.LastSyncStartTime,
+            LastSyncEndTime = config.LastSyncEndTime,
+            FreeDiskSpaceBytes = diskInfo?.FreeBytes ?? 0,
+            MinimumRequiredBytes = (long)config.MinimumFreeDiskSpaceGb * 1024 * 1024 * 1024,
+            HasSufficientDiskSpace = diskInfo?.IsSufficient ?? true
+        });
+    }
+
+    // GetDiskSpace
+    // Gets disk space information for configured library paths.
+    [HttpGet("DiskSpace")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<List<DiskSpaceInfo>> GetDiskSpace()
+    {
+        var plugin = Plugin.Instance;
+        if (plugin == null)
+        {
+            return NotFound();
+        }
+
+        var config = plugin.Configuration;
+        var requiredBytes = (long)config.MinimumFreeDiskSpaceGb * 1024 * 1024 * 1024;
+        var results = new List<DiskSpaceInfo>();
+
+        foreach (var mapping in config.LibraryMappings.Where(m => m.IsEnabled && !string.IsNullOrEmpty(m.LocalRootPath)))
+        {
+            try
+            {
+                var driveInfo = new DriveInfo(Path.GetPathRoot(mapping.LocalRootPath) ?? mapping.LocalRootPath);
+                results.Add(new DiskSpaceInfo
+                {
+                    Path = mapping.LocalRootPath,
+                    FreeBytes = driveInfo.AvailableFreeSpace,
+                    TotalBytes = driveInfo.TotalSize,
+                    RequiredBytes = requiredBytes,
+                    IsSufficient = driveInfo.AvailableFreeSpace >= requiredBytes
+                });
+            }
+            catch
+            {
+                results.Add(new DiskSpaceInfo
+                {
+                    Path = mapping.LocalRootPath,
+                    FreeBytes = 0,
+                    TotalBytes = 0,
+                    RequiredBytes = requiredBytes,
+                    IsSufficient = false
+                });
+            }
+        }
+
+        return Ok(results);
+    }
+
+    // TriggerSync
+    // Manually triggers the sync task.
+    [HttpPost("TriggerSync")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult TriggerSync()
+    {
+        var downloadTask = _taskManager.ScheduledTasks
+            .FirstOrDefault(t => t.ScheduledTask.Key == "ServerSyncDownloadContent");
+
+        if (downloadTask == null)
+        {
+            return NotFound("Download task not found");
+        }
+
+        _taskManager.Execute(downloadTask, new TaskOptions());
+
+        return Ok(new { Message = "Sync task started" });
+    }
+
+    // TriggerRefresh
+    // Manually triggers the refresh sync table task.
+    [HttpPost("TriggerRefresh")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult TriggerRefresh()
+    {
+        var refreshTask = _taskManager.ScheduledTasks
+            .FirstOrDefault(t => t.ScheduledTask.Key == "ServerSyncUpdateTables");
+
+        if (refreshTask == null)
+        {
+            return NotFound("Refresh task not found");
+        }
+
+        _taskManager.Execute(refreshTask, new TaskOptions());
+
+        return Ok(new { Message = "Refresh task started" });
+    }
+
+    // RetryErroredItems
+    // Resets errored items for retry.
+    [HttpPost("RetryErroredItems")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult RetryErroredItems([FromBody] BulkItemsRequest? request = null)
+    {
+        var plugin = Plugin.Instance;
+        if (plugin == null)
+        {
+            return NotFound();
+        }
+
+        if (request?.SourceItemIds?.Count > 0)
+        {
+            foreach (var itemId in request.SourceItemIds)
+            {
+                plugin.Database.UpdateStatus(itemId, SyncStatus.Queued);
+            }
+        }
+        else
+        {
+            var erroredItems = plugin.Database.GetByStatus(SyncStatus.Errored);
+            foreach (var item in erroredItems)
+            {
+                plugin.Database.UpdateStatus(item.SourceItemId, SyncStatus.Queued);
+            }
+        }
+
+        return Ok();
+    }
+
     // UpdateItemStatus
     // Updates the status of a sync item.
     [HttpPost("UpdateItemStatus")]
@@ -262,6 +604,7 @@ public class ConfigurationController : ControllerBase
     // Marks multiple items as ignored.
     [HttpPost("IgnoreItems")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult IgnoreItems([FromBody] BulkItemsRequest request)
     {
         var plugin = Plugin.Instance;
@@ -270,18 +613,34 @@ public class ConfigurationController : ControllerBase
             return NotFound();
         }
 
-        foreach (var itemId in request.SourceItemIds)
+        if (request?.SourceItemIds == null || request.SourceItemIds.Count == 0)
         {
-            plugin.Database.UpdateStatus(itemId, SyncStatus.Ignored);
+            return BadRequest("No items specified");
         }
 
-        return Ok();
+        var successCount = 0;
+        foreach (var itemId in request.SourceItemIds)
+        {
+            try
+            {
+                plugin.Database.UpdateStatus(itemId, SyncStatus.Ignored);
+                successCount++;
+            }
+            catch (Exception ex)
+            {
+                plugin.LoggerFactory.CreateLogger<ConfigurationController>()
+                    .LogWarning(ex, "Failed to update status for item {ItemId}", itemId);
+            }
+        }
+
+        return Ok(new { Updated = successCount });
     }
 
     // QueueItems
     // Moves items to Queued status (works for Pending, Ignored, Errored, and Synced items).
     [HttpPost("QueueItems")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult QueueItems([FromBody] BulkItemsRequest request)
     {
         var plugin = Plugin.Instance;
@@ -290,12 +649,27 @@ public class ConfigurationController : ControllerBase
             return NotFound();
         }
 
-        foreach (var itemId in request.SourceItemIds)
+        if (request?.SourceItemIds == null || request.SourceItemIds.Count == 0)
         {
-            plugin.Database.UpdateStatus(itemId, SyncStatus.Queued);
+            return BadRequest("No items specified");
         }
 
-        return Ok();
+        var successCount = 0;
+        foreach (var itemId in request.SourceItemIds)
+        {
+            try
+            {
+                plugin.Database.UpdateStatus(itemId, SyncStatus.Queued);
+                successCount++;
+            }
+            catch (Exception ex)
+            {
+                plugin.LoggerFactory.CreateLogger<ConfigurationController>()
+                    .LogWarning(ex, "Failed to update status for item {ItemId}", itemId);
+            }
+        }
+
+        return Ok(new { Updated = successCount });
     }
 
     // DeleteLocalItems
@@ -303,12 +677,18 @@ public class ConfigurationController : ControllerBase
     // This NEVER touches the source server. Companion files are also deleted.
     [HttpPost("DeleteLocalItems")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult DeleteLocalItems([FromBody] BulkItemsRequest request)
     {
         var plugin = Plugin.Instance;
         if (plugin == null)
         {
             return NotFound();
+        }
+
+        if (request?.SourceItemIds == null || request.SourceItemIds.Count == 0)
+        {
+            return BadRequest("No items specified");
         }
 
         var logger = plugin.LoggerFactory.CreateLogger<ConfigurationController>();
@@ -339,7 +719,7 @@ public class ConfigurationController : ControllerBase
                             localItem.GetParent(),
                             notifyParentItem: true);
 
-                        logger.LogInformation("Deleted local item {FileName}", System.IO.Path.GetFileName(item.LocalPath));
+                        logger.LogInformation("Deleted local item {FileName}", Path.GetFileName(item.LocalPath));
                         deletedCount++;
                     }
                     else
@@ -350,7 +730,7 @@ public class ConfigurationController : ControllerBase
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex, "Failed to delete local item {FileName}", System.IO.Path.GetFileName(item.LocalPath));
+                    logger.LogError(ex, "Failed to delete local item {FileName}", Path.GetFileName(item.LocalPath));
                     failedCount++;
                     continue;
                 }
@@ -368,6 +748,7 @@ public class ConfigurationController : ControllerBase
     // Use this to stop tracking items without affecting the local files.
     [HttpPost("RemoveFromTracking")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult RemoveFromTracking([FromBody] BulkItemsRequest request)
     {
         var plugin = Plugin.Instance;
@@ -376,11 +757,294 @@ public class ConfigurationController : ControllerBase
             return NotFound();
         }
 
-        foreach (var sourceItemId in request.SourceItemIds)
+        if (request?.SourceItemIds == null || request.SourceItemIds.Count == 0)
         {
-            plugin.Database.Delete(sourceItemId);
+            return BadRequest("No items specified");
         }
 
-        return Ok();
+        var successCount = 0;
+        foreach (var sourceItemId in request.SourceItemIds)
+        {
+            try
+            {
+                plugin.Database.Delete(sourceItemId);
+                successCount++;
+            }
+            catch (Exception ex)
+            {
+                plugin.LoggerFactory.CreateLogger<ConfigurationController>()
+                    .LogWarning(ex, "Failed to remove tracking for item {ItemId}", sourceItemId);
+            }
+        }
+
+        return Ok(new { Removed = successCount });
+    }
+
+    // GetCapabilities
+    // Returns the plugin capabilities including whether deletion is supported.
+    [HttpGet("Capabilities")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<CapabilitiesResponse> GetCapabilities()
+    {
+        try
+        {
+            // Deletion is supported if we have access to the library manager
+            // which is injected via DI - if we got here, we have it
+            var canDelete = _libraryManager != null;
+
+            return Ok(new CapabilitiesResponse
+            {
+                CanDeleteItems = canDelete,
+                SupportsCompanionFiles = true,
+                SupportsBandwidthScheduling = true
+            });
+        }
+        catch (Exception)
+        {
+            // Return safe defaults if anything fails
+            return Ok(new CapabilitiesResponse
+            {
+                CanDeleteItems = false,
+                SupportsCompanionFiles = true,
+                SupportsBandwidthScheduling = true
+            });
+        }
+    }
+
+    // ResolveLocalItemIds
+    // Attempts to find and store the local Jellyfin item IDs for synced items.
+    // This is needed for delete operations to work properly.
+    [HttpPost("ResolveLocalItemIds")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult ResolveLocalItemIds()
+    {
+        var plugin = Plugin.Instance;
+        if (plugin == null)
+        {
+            return NotFound();
+        }
+
+        var logger = plugin.LoggerFactory.CreateLogger<ConfigurationController>();
+
+        try
+        {
+            var syncedItems = plugin.Database.GetByStatus(SyncStatus.Synced);
+            var resolvedCount = 0;
+            var alreadyResolvedCount = 0;
+
+            foreach (var item in syncedItems)
+            {
+                // Skip if already has LocalItemId
+                if (!string.IsNullOrEmpty(item.LocalItemId))
+                {
+                    alreadyResolvedCount++;
+                    continue;
+                }
+
+                if (string.IsNullOrEmpty(item.LocalPath))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    // Try to find the item in Jellyfin by path
+                    var localItem = _libraryManager.FindByPath(item.LocalPath, isFolder: false);
+                    if (localItem != null)
+                    {
+                        plugin.Database.UpdateStatus(
+                            item.SourceItemId,
+                            item.Status,
+                            localPath: item.LocalPath,
+                            localItemId: localItem.Id.ToString());
+                        resolvedCount++;
+                        logger.LogDebug("Resolved LocalItemId for {FileName}", Path.GetFileName(item.LocalPath));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Failed to resolve LocalItemId for {FileName}", Path.GetFileName(item.LocalPath));
+                }
+            }
+
+            logger.LogInformation("Resolved {Count} local item IDs, {AlreadyResolved} already resolved", resolvedCount, alreadyResolvedCount);
+            return Ok(new { Resolved = resolvedCount, AlreadyResolved = alreadyResolvedCount });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to resolve local item IDs");
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+
+    // ResetSyncDatabase
+    // Deletes all items from the sync database and recreates it with the latest schema.
+    [HttpPost("ResetSyncDatabase")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult ResetSyncDatabase()
+    {
+        var plugin = Plugin.Instance;
+        if (plugin == null)
+        {
+            return NotFound();
+        }
+
+        var logger = plugin.LoggerFactory.CreateLogger<ConfigurationController>();
+
+        try
+        {
+            plugin.Database.ResetDatabase();
+            logger.LogInformation("Sync database has been reset");
+            return Ok(new { Success = true, Message = "Database reset successfully" });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to reset sync database");
+            return StatusCode(500, new { Success = false, Error = ex.Message });
+        }
+    }
+
+    // ValidateServerUrl
+    // Validates and normalizes a server URL.
+    private static ValidateUrlResponse ValidateServerUrl(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return new ValidateUrlResponse
+            {
+                IsValid = false,
+                Message = "URL cannot be empty"
+            };
+        }
+
+        // Check for path traversal attempts
+        if (url.Contains("..", StringComparison.Ordinal) || url.Contains("./", StringComparison.Ordinal))
+        {
+            return new ValidateUrlResponse
+            {
+                IsValid = false,
+                Message = "URL contains invalid path sequences"
+            };
+        }
+
+        // Try to parse as URI
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            return new ValidateUrlResponse
+            {
+                IsValid = false,
+                Message = "Invalid URL format"
+            };
+        }
+
+        // Only allow HTTP and HTTPS
+        if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+        {
+            return new ValidateUrlResponse
+            {
+                IsValid = false,
+                Message = "Only HTTP and HTTPS URLs are allowed"
+            };
+        }
+
+        // Check for localhost variants that might be intentional
+        var isLocalhost = uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+                          uri.Host.Equals("127.0.0.1", StringComparison.Ordinal) ||
+                          uri.Host.Equals("::1", StringComparison.Ordinal);
+
+        // Normalize the URL
+        var normalizedUrl = $"{uri.Scheme}://{uri.Host}";
+        if (!uri.IsDefaultPort)
+        {
+            normalizedUrl += $":{uri.Port}";
+        }
+
+        return new ValidateUrlResponse
+        {
+            IsValid = true,
+            NormalizedUrl = normalizedUrl,
+            Message = isLocalhost ? "Warning: Using localhost URL. Make sure this is intentional." : null
+        };
+    }
+
+    // ValidateConfiguration
+    // Validates the current plugin configuration.
+    [HttpGet("ValidateConfiguration")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<ConfigurationValidationResponse> ValidateConfiguration()
+    {
+        var plugin = Plugin.Instance;
+        if (plugin == null)
+        {
+            return NotFound();
+        }
+
+        var errors = plugin.Configuration.ValidateConfiguration();
+
+        return Ok(new ConfigurationValidationResponse
+        {
+            IsValid = errors.Count == 0,
+            Errors = errors
+        });
+    }
+
+    // SanitizeConfiguration
+    // Sanitizes configuration values to valid ranges.
+    [HttpPost("SanitizeConfiguration")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult SanitizeConfiguration()
+    {
+        var plugin = Plugin.Instance;
+        if (plugin == null)
+        {
+            return NotFound();
+        }
+
+        plugin.Configuration.SanitizeValues();
+        plugin.SaveConfiguration();
+
+        return Ok(new { Message = "Configuration sanitized" });
+    }
+
+    // GetDiskSpaceForLibraries
+    // Gets the minimum disk space info across all configured library paths.
+    private DiskSpaceInfo? GetDiskSpaceForLibraries()
+    {
+        var plugin = Plugin.Instance;
+        if (plugin == null)
+        {
+            return null;
+        }
+
+        var config = plugin.Configuration;
+        var requiredBytes = (long)config.MinimumFreeDiskSpaceGb * 1024 * 1024 * 1024;
+        DiskSpaceInfo? minSpaceInfo = null;
+
+        foreach (var mapping in config.LibraryMappings.Where(m => m.IsEnabled && !string.IsNullOrEmpty(m.LocalRootPath)))
+        {
+            try
+            {
+                var driveInfo = new DriveInfo(Path.GetPathRoot(mapping.LocalRootPath) ?? mapping.LocalRootPath);
+                var info = new DiskSpaceInfo
+                {
+                    Path = mapping.LocalRootPath,
+                    FreeBytes = driveInfo.AvailableFreeSpace,
+                    TotalBytes = driveInfo.TotalSize,
+                    RequiredBytes = requiredBytes,
+                    IsSufficient = driveInfo.AvailableFreeSpace >= requiredBytes
+                };
+
+                if (minSpaceInfo == null || info.FreeBytes < minSpaceInfo.FreeBytes)
+                {
+                    minSpaceInfo = info;
+                }
+            }
+            catch
+            {
+                // Skip paths that can't be accessed
+            }
+        }
+
+        return minSpaceInfo;
     }
 }

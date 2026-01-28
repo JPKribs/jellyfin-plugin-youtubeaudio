@@ -18,6 +18,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages, IDisposable
     private readonly ILogger<Plugin> _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly IApplicationPaths _applicationPaths;
+    private readonly object _databaseLock = new();
     private SyncDatabase? _database;
     private bool _disposed;
 
@@ -52,10 +53,18 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages, IDisposable
     {
         get
         {
-            _database ??= new SyncDatabase(
-                _loggerFactory.CreateLogger<SyncDatabase>(),
-                _applicationPaths.DataPath);
-            return _database;
+            if (_database != null)
+            {
+                return _database;
+            }
+
+            lock (_databaseLock)
+            {
+                _database ??= new SyncDatabase(
+                    _loggerFactory.CreateLogger<SyncDatabase>(),
+                    _applicationPaths.DataPath);
+                return _database;
+            }
         }
     }
 

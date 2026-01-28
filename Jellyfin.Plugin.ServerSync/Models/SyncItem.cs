@@ -29,4 +29,10 @@ public class SyncItem
     public DateTime StatusDate { get; set; }
 
     public SyncStatus Status { get; set; }
+
+    public DateTime? LastSyncTime { get; set; }
+
+    public string? ErrorMessage { get; set; }
+
+    public int RetryCount { get; set; }
 }

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Plugin.ServerSync.Configuration;
 using Jellyfin.Plugin.ServerSync.Models;
 using Jellyfin.Plugin.ServerSync.Services;
 using MediaBrowser.Controller.Library;
@@ -25,7 +26,7 @@ public class DownloadMissingContentTask : IScheduledTask
         _libraryManager = libraryManager;
     }
 
-    public string Name => "Download Missing Content";
+    public string Name => "Sync Missing Content";
 
     public string Key => "ServerSyncDownloadContent";
 
@@ -48,15 +49,24 @@ public class DownloadMissingContentTask : IScheduledTask
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(config.SourceServerUrl) || string.IsNullOrWhiteSpace(config.SourceServerApiKey))
+        // Validate authentication configuration
+        if (!HasValidAuthConfiguration(config))
         {
+            _logger.LogError("Sync skipped: no valid authentication configured");
+            return;
+        }
+
+        // Validate disk space before starting
+        if (!HasSufficientDiskSpace(config, out var diskSpaceMessage))
+        {
+            _logger.LogError("Sync skipped: {Message}", diskSpaceMessage);
             return;
         }
 
         var database = plugin.Database;
 
         var itemsToSync = database.GetByStatus(SyncStatus.Queued)
-            .Concat(database.GetByStatus(SyncStatus.Errored))
+            .Concat(database.GetErroredItemsForRetry(maxRetries: 3))
             .ToList();
 
         if (itemsToSync.Count == 0)
@@ -64,18 +74,26 @@ public class DownloadMissingContentTask : IScheduledTask
             return;
         }
 
+        // Update sync timestamps
+        config.LastSyncStartTime = DateTime.UtcNow;
+        plugin.SaveConfiguration();
+
         _logger.LogInformation("Starting download of {Count} items", itemsToSync.Count);
 
-        using var client = new SourceServerClient(
-            plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
-            config.SourceServerUrl,
-            config.SourceServerApiKey);
+        using var client = CreateSourceServerClient(config, plugin);
 
         var connectionResult = await client.TestConnectionAsync(cancellationToken).ConfigureAwait(false);
-        if (connectionResult.ServerName == null)
+        if (!connectionResult.Success)
         {
-            _logger.LogError("Failed to connect to source server at {SourceUrl}", config.SourceServerUrl);
+            _logger.LogError("Failed to connect to source server: {Message}", connectionResult.ErrorMessage);
             return;
+        }
+
+        // Save access token if using user credentials
+        if (config.AuthMethod == AuthenticationMethod.UserCredentials && !string.IsNullOrEmpty(connectionResult.AccessToken))
+        {
+            config.SourceServerAccessToken = connectionResult.AccessToken;
+            plugin.SaveConfiguration();
         }
 
         var tempPath = plugin.GetTempDownloadPath();
@@ -85,13 +103,12 @@ public class DownloadMissingContentTask : IScheduledTask
         var processedItems = 0;
         var successCount = 0;
         var failCount = 0;
+        var skippedCount = 0;
 
         var maxConcurrent = Math.Max(1, config.MaxConcurrentDownloads);
         using var semaphore = new SemaphoreSlim(maxConcurrent);
 
-        var speedLimitBytesPerSecond = config.MaxDownloadSpeedMbps > 0
-            ? config.MaxDownloadSpeedMbps * 1024L * 1024L
-            : 0L;
+        var speedLimitBytesPerSecond = config.GetEffectiveDownloadSpeedBytes();
 
         var downloadTasks = itemsToSync.Select(async item =>
         {
@@ -103,7 +120,35 @@ public class DownloadMissingContentTask : IScheduledTask
                     return;
                 }
 
-                var success = await DownloadItemAsync(
+                // Validate path before downloading
+                var pathValidation = ValidatePath(item, config, database);
+                if (!pathValidation.IsValid)
+                {
+                    _logger.LogWarning("Skipping {FileName}: {Message}", Path.GetFileName(item.LocalPath), pathValidation.Message);
+                    database.UpdateStatus(item.SourceItemId, SyncStatus.Errored, errorMessage: pathValidation.Message);
+                    Interlocked.Increment(ref failCount);
+                    return;
+                }
+
+                // Check disk space before each download
+                if (!HasSufficientDiskSpaceForItem(item, config))
+                {
+                    _logger.LogWarning("Skipping {FileName}: insufficient disk space", Path.GetFileName(item.LocalPath));
+                    database.UpdateStatus(item.SourceItemId, SyncStatus.Errored, errorMessage: "Insufficient disk space");
+                    Interlocked.Increment(ref failCount);
+                    return;
+                }
+
+                // Check write permissions
+                if (!HasWritePermission(item.LocalPath))
+                {
+                    _logger.LogWarning("Skipping {FileName}: no write permission to target directory", Path.GetFileName(item.LocalPath));
+                    database.UpdateStatus(item.SourceItemId, SyncStatus.Errored, errorMessage: "No write permission to target directory");
+                    Interlocked.Increment(ref failCount);
+                    return;
+                }
+
+                var (success, errorMessage) = await DownloadItemAsync(
                     client,
                     item,
                     tempPath,
@@ -119,7 +164,7 @@ public class DownloadMissingContentTask : IScheduledTask
                 }
                 else
                 {
-                    database.UpdateStatus(item.SourceItemId, SyncStatus.Errored);
+                    database.UpdateStatus(item.SourceItemId, SyncStatus.Errored, errorMessage: errorMessage);
                     Interlocked.Increment(ref failCount);
                 }
 
@@ -132,9 +177,32 @@ public class DownloadMissingContentTask : IScheduledTask
             }
         });
 
-        await Task.WhenAll(downloadTasks).ConfigureAwait(false);
+        try
+        {
+            await Task.WhenAll(downloadTasks).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogInformation("Download task was cancelled");
+        }
+        catch (Exception ex)
+        {
+            // Log but don't throw - some downloads may have succeeded
+            _logger.LogError(ex, "Error during parallel download execution");
+        }
 
-        _logger.LogInformation("Download complete: {Success} succeeded, {Failed} failed", successCount, failCount);
+        // Update sync timestamps
+        config.LastSyncEndTime = DateTime.UtcNow;
+        try
+        {
+            plugin.SaveConfiguration();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to save sync end time");
+        }
+
+        _logger.LogInformation("Download complete: {Success} succeeded, {Failed} failed, {Skipped} skipped", successCount, failCount, skippedCount);
 
         if (successCount > 0)
         {
@@ -149,9 +217,190 @@ public class DownloadMissingContentTask : IScheduledTask
         }
     }
 
+    // CreateSourceServerClient
+    // Creates a source server client based on authentication configuration.
+    private static SourceServerClient CreateSourceServerClient(PluginConfiguration config, Plugin plugin)
+    {
+        if (config.AuthMethod == AuthenticationMethod.UserCredentials)
+        {
+            return new SourceServerClient(
+                plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
+                config.SourceServerUrl,
+                config.SourceServerUsername,
+                config.SourceServerPassword,
+                config.SourceServerAccessToken);
+        }
+
+        return new SourceServerClient(
+            plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
+            config.SourceServerUrl,
+            config.SourceServerApiKey);
+    }
+
+    // HasValidAuthConfiguration
+    // Checks if valid authentication is configured.
+    private static bool HasValidAuthConfiguration(PluginConfiguration config)
+    {
+        if (string.IsNullOrWhiteSpace(config.SourceServerUrl))
+        {
+            return false;
+        }
+
+        return config.AuthMethod switch
+        {
+            AuthenticationMethod.ApiKey => !string.IsNullOrWhiteSpace(config.SourceServerApiKey),
+            AuthenticationMethod.UserCredentials => !string.IsNullOrWhiteSpace(config.SourceServerUsername) &&
+                                                    !string.IsNullOrWhiteSpace(config.SourceServerPassword),
+            _ => false
+        };
+    }
+
+    // HasSufficientDiskSpace
+    // Checks if there's sufficient disk space across all library paths.
+    private bool HasSufficientDiskSpace(PluginConfiguration config, out string message)
+    {
+        message = string.Empty;
+        var requiredBytes = (long)config.MinimumFreeDiskSpaceGb * 1024 * 1024 * 1024;
+
+        foreach (var mapping in config.LibraryMappings.Where(m => m.IsEnabled && !string.IsNullOrEmpty(m.LocalRootPath)))
+        {
+            try
+            {
+                var driveInfo = new DriveInfo(Path.GetPathRoot(mapping.LocalRootPath) ?? mapping.LocalRootPath);
+                if (driveInfo.AvailableFreeSpace < requiredBytes)
+                {
+                    message = $"Insufficient disk space on {mapping.LocalRootPath}: {FormatBytes(driveInfo.AvailableFreeSpace)} free, {config.MinimumFreeDiskSpaceGb} GB required";
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to check disk space for {Path}", mapping.LocalRootPath);
+            }
+        }
+
+        return true;
+    }
+
+    // HasSufficientDiskSpaceForItem
+    // Checks if there's sufficient disk space for a specific item.
+    private static bool HasSufficientDiskSpaceForItem(SyncItem item, PluginConfiguration config)
+    {
+        if (string.IsNullOrEmpty(item.LocalPath) || item.SourceSize <= 0)
+        {
+            return true;
+        }
+
+        try
+        {
+            var pathRoot = Path.GetPathRoot(item.LocalPath);
+            if (string.IsNullOrEmpty(pathRoot))
+            {
+                return true;
+            }
+
+            var driveInfo = new DriveInfo(pathRoot);
+            var requiredBytes = (long)config.MinimumFreeDiskSpaceGb * 1024 * 1024 * 1024;
+
+            // Need enough space for the file plus the minimum reserve
+            return driveInfo.AvailableFreeSpace >= item.SourceSize + requiredBytes;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    // HasWritePermission
+    // Checks if write permission exists for the target directory.
+    private static bool HasWritePermission(string? filePath)
+    {
+        if (string.IsNullOrEmpty(filePath))
+        {
+            return false;
+        }
+
+        var directory = Path.GetDirectoryName(filePath);
+        if (string.IsNullOrEmpty(directory))
+        {
+            return false;
+        }
+
+        try
+        {
+            // Try to create the directory if it doesn't exist
+            if (!Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+                return true;
+            }
+
+            // Try to create a temp file to test write permission
+            var testFile = Path.Combine(directory, $".write_test_{Guid.NewGuid():N}");
+            try
+            {
+                using (File.Create(testFile, 1, FileOptions.DeleteOnClose))
+                {
+                    return true;
+                }
+            }
+            finally
+            {
+                if (File.Exists(testFile))
+                {
+                    try
+                    {
+                        File.Delete(testFile);
+                    }
+                    catch
+                    {
+                        // Ignore cleanup errors
+                    }
+                }
+            }
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    // ValidatePath
+    // Validates the local path for an item.
+    private static (bool IsValid, string? Message) ValidatePath(SyncItem item, PluginConfiguration config, SyncDatabase database)
+    {
+        if (string.IsNullOrEmpty(item.LocalPath))
+        {
+            return (false, "No local path configured");
+        }
+
+        // Check for path traversal
+        var normalizedPath = Path.GetFullPath(item.LocalPath);
+        if (!normalizedPath.Equals(item.LocalPath, StringComparison.OrdinalIgnoreCase))
+        {
+            // Path was normalized, check if it's still within allowed boundaries
+            var isWithinLibrary = config.LibraryMappings
+                .Where(m => m.IsEnabled && !string.IsNullOrEmpty(m.LocalRootPath))
+                .Any(m => normalizedPath.StartsWith(m.LocalRootPath, StringComparison.OrdinalIgnoreCase));
+
+            if (!isWithinLibrary)
+            {
+                return (false, "Path traversal detected - path escapes library boundaries");
+            }
+        }
+
+        // Check for path collision
+        if (database.CheckPathCollision(item.LocalPath, item.SourceItemId))
+        {
+            return (false, "Path collision - another item is already using this path");
+        }
+
+        return (true, null);
+    }
+
     // DownloadItemAsync
     // Downloads a single item and its companion files from the source server to the local path.
-    private async Task<bool> DownloadItemAsync(
+    private async Task<(bool Success, string? ErrorMessage)> DownloadItemAsync(
         SourceServerClient client,
         SyncItem item,
         string tempPath,
@@ -162,7 +411,7 @@ public class DownloadMissingContentTask : IScheduledTask
         if (string.IsNullOrEmpty(item.LocalPath))
         {
             _logger.LogWarning("Item {SourceItemId} has no local path configured", item.SourceItemId);
-            return false;
+            return (false, "No local path configured");
         }
 
         var tempFileName = $"{item.SourceItemId}_{Path.GetFileName(item.LocalPath)}";
@@ -175,8 +424,9 @@ public class DownloadMissingContentTask : IScheduledTask
 
             if (sourceStream == null)
             {
-                _logger.LogError("Failed to download {FileName}: no response from server", Path.GetFileName(item.LocalPath));
-                return false;
+                var errorMsg = "No response from server";
+                _logger.LogError("Failed to download {FileName}: {Error}", Path.GetFileName(item.LocalPath), errorMsg);
+                return (false, errorMsg);
             }
 
             using (var fileStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
@@ -187,13 +437,13 @@ public class DownloadMissingContentTask : IScheduledTask
             var downloadedInfo = new FileInfo(tempFilePath);
             if (item.SourceSize > 0 && downloadedInfo.Length != item.SourceSize)
             {
+                var errorMsg = $"Size mismatch (expected {item.SourceSize}, got {downloadedInfo.Length})";
                 _logger.LogError(
-                    "Download failed for {FileName}: size mismatch (expected {Expected}, got {Actual})",
+                    "Download failed for {FileName}: {Error}",
                     Path.GetFileName(item.LocalPath),
-                    item.SourceSize,
-                    downloadedInfo.Length);
+                    errorMsg);
                 File.Delete(tempFilePath);
-                return false;
+                return (false, errorMsg);
             }
 
             var targetDir = Path.GetDirectoryName(item.LocalPath);
@@ -202,12 +452,9 @@ public class DownloadMissingContentTask : IScheduledTask
                 Directory.CreateDirectory(targetDir);
             }
 
-            if (File.Exists(item.LocalPath))
-            {
-                File.Delete(item.LocalPath);
-            }
-
-            File.Move(tempFilePath, item.LocalPath);
+            // Use atomic move with overwrite to avoid race conditions
+            // This is safer than delete-then-move as it's a single operation
+            MoveFileWithOverwrite(tempFilePath, item.LocalPath);
 
             if (includeCompanionFiles)
             {
@@ -220,7 +467,7 @@ public class DownloadMissingContentTask : IScheduledTask
                     cancellationToken).ConfigureAwait(false);
             }
 
-            return true;
+            return (true, null);
         }
         catch (Exception ex)
         {
@@ -238,7 +485,7 @@ public class DownloadMissingContentTask : IScheduledTask
                 }
             }
 
-            return false;
+            return (false, ex.Message);
         }
     }
 
@@ -284,12 +531,8 @@ public class DownloadMissingContentTask : IScheduledTask
                         await CopyWithSpeedLimitAsync(stream, fileStream, speedLimitBytesPerSecond, cancellationToken).ConfigureAwait(false);
                     }
 
-                    if (File.Exists(targetPath))
-                    {
-                        File.Delete(targetPath);
-                    }
-
-                    File.Move(tempFilePath, targetPath);
+                    // Use atomic move with overwrite
+                    MoveFileWithOverwrite(tempFilePath, targetPath);
                     _logger.LogInformation("Downloaded companion file {FileName}", companion.FileName);
                 }
                 catch (Exception ex)
@@ -341,6 +584,51 @@ public class DownloadMissingContentTask : IScheduledTask
                 }
             }
         }
+    }
+
+    // MoveFileWithOverwrite
+    // Moves a file with atomic overwrite semantics where possible.
+    // Falls back to delete-then-move with retry on failure.
+    private void MoveFileWithOverwrite(string sourcePath, string destinationPath)
+    {
+        const int maxRetries = 3;
+        const int retryDelayMs = 100;
+
+        for (var attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                // .NET 6+ File.Move supports overwrite parameter
+                File.Move(sourcePath, destinationPath, overwrite: true);
+                return;
+            }
+            catch (IOException ex) when (attempt < maxRetries)
+            {
+                _logger.LogWarning(ex, "File move attempt {Attempt}/{MaxRetries} failed for {Destination}, retrying",
+                    attempt, maxRetries, Path.GetFileName(destinationPath));
+                Thread.Sleep(retryDelayMs * attempt);
+            }
+        }
+
+        // Final attempt - if this fails, let the exception propagate
+        File.Move(sourcePath, destinationPath, overwrite: true);
+    }
+
+    // FormatBytes
+    // Formats bytes to human-readable string.
+    private static string FormatBytes(long bytes)
+    {
+        string[] units = { "B", "KB", "MB", "GB", "TB" };
+        double size = bytes;
+        var unitIndex = 0;
+
+        while (size >= 1024 && unitIndex < units.Length - 1)
+        {
+            size /= 1024;
+            unitIndex++;
+        }
+
+        return $"{size:F2} {units[unitIndex]}";
     }
 
     public IEnumerable<TaskTriggerInfo> GetDefaultTriggers()

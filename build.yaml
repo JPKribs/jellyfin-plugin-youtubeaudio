@@ -14,5 +14,8 @@ category: "General"
 owner: "JPKribs"
 artifacts:
 - "Jellyfin.Plugin.ServerSync.dll"
-changelog: >
-  Initial release with support for parent-child and peer server relationships.
+changelog:
+  fixes:
+  - Stuff here
+  improvements:
+  - Stuff here

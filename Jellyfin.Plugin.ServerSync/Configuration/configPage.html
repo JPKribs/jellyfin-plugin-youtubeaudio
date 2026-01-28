@@ -24,31 +24,58 @@
                         <div class="fieldDescription">URL of the source Jellyfin server to sync from.</div>
                     </div>
 
+                    <!-- Authentication Method Selection -->
                     <div class="inputContainer">
-                        <label for="txtSourceServerApiKey">API Key:</label>
-                        <input is="emby-input" type="password" id="txtSourceServerApiKey" />
-                        <div class="fieldDescription">API key for authenticating with the source server.</div>
+                        <label for="selAuthMethod">Authentication Method:</label>
+                        <select is="emby-select" id="selAuthMethod">
+                            <option value="">Select authentication method...</option>
+                            <option value="0">API Key</option>
+                            <option value="1">Username &amp; Password</option>
+                        </select>
                     </div>
 
-                    <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 16px;">
-                        <button is="emby-button" type="button" id="btnTestConnection" class="raised button-primary">
-                            <span>Test Connection</span>
-                        </button>
-                        <span id="connectionStatus"></span>
+                    <!-- API Key Authentication -->
+                    <div id="apiKeyAuthContainer" style="display: none;">
+                        <div class="inputContainer">
+                            <label for="txtSourceServerApiKey">API Key:</label>
+                            <input is="emby-input" type="password" id="txtSourceServerApiKey" />
+                            <div class="fieldDescription">Generate one in the source server's Dashboard &gt; API Keys.</div>
+                        </div>
+                    </div>
+
+                    <!-- Username/Password Authentication -->
+                    <div id="userAuthContainer" style="display: none;">
+                        <div class="inputContainer">
+                            <label for="txtSourceServerUsername">Username:</label>
+                            <input is="emby-input" type="text" id="txtSourceServerUsername" />
+                            <div class="fieldDescription">Username for the source server.</div>
+                        </div>
+                        <div class="inputContainer">
+                            <label for="txtSourceServerPassword">Password:</label>
+                            <input is="emby-input" type="password" id="txtSourceServerPassword" />
+                            <div class="fieldDescription">Password for the source server.</div>
+                        </div>
                     </div>
 
                     <div id="serverInfoContainer" style="display: none; margin-bottom: 16px; padding: 12px; background: rgba(0,0,0,0.3); border-radius: 4px;">
                         <div style="display: flex; gap: 24px;">
                             <div>
-                                <span style="opacity: 0.7;">Server Name:</span>
+                                <span style="opacity: 0.7;">Server:</span>
                                 <span id="txtSourceServerName"></span>
-                            </div>
-                            <div>
-                                <span style="opacity: 0.7;">Server ID:</span>
-                                <span id="txtSourceServerId"></span>
+                                <span style="opacity: 0.5;">(<span id="txtSourceServerId"></span>)</span>
                             </div>
                         </div>
                     </div>
+
+                    <div class="sourceServerButtonRow">
+                        <button is="emby-button" type="button" id="btnSaveServer" class="raised button-primary sourceServerButton">
+                            <span>Save</span>
+                        </button>
+                        <button is="emby-button" type="button" id="btnTestConnection" class="raised sourceServerButton">
+                            <span>Test</span>
+                        </button>
+                    </div>
+                    <span id="connectionStatus" style="display: block; margin-bottom: 16px;"></span>
 
                     <!-- Tab Navigation -->
                     <div class="tabSeparator"></div>
@@ -67,6 +94,7 @@
 
                     <!-- Content Tab -->
                     <div id="tabContent" class="tabPanel">
+                        <!-- Enable Content Sync - always visible -->
                         <div class="inputContainer">
                             <label class="checkboxContainer">
                                 <input is="emby-checkbox" type="checkbox" id="chkEnableContentSync" />
@@ -75,130 +103,225 @@
                             <div class="fieldDescription">Enable syncing content from the source server.</div>
                         </div>
 
-                        <div class="inputContainer">
-                            <label class="checkboxContainer">
-                                <input is="emby-checkbox" type="checkbox" id="chkIncludeExtras" />
-                                <span>Include Companion Files</span>
-                            </label>
-                            <div class="fieldDescription">Also download external subtitles and other companion files when available.</div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="checkboxContainer">
-                                <input is="emby-checkbox" type="checkbox" id="chkRequireApproval" />
-                                <span>Require Approval to Sync</span>
-                            </label>
-                            <div class="fieldDescription">When enabled, new items will be set to Pending status until manually approved.</div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="checkboxContainer">
-                                <input is="emby-checkbox" type="checkbox" id="chkDetectUpdatedFiles" />
-                                <span>Detect Updated Files</span>
-                            </label>
-                            <div class="fieldDescription">Re-queue files if the source file size differs or if the source was modified after last sync.</div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="checkboxContainer">
-                                <input is="emby-checkbox" type="checkbox" id="chkDeleteIfMissing" />
-                                <span>Delete if Missing from Source</span>
-                            </label>
-                            <div class="fieldDescription">Delete local files when they no longer exist on the source server. If Require Approval is enabled, items will be marked for deletion approval first. Deletions only affect this local server, never the source.</div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label for="txtMaxConcurrentDownloads">Max Concurrent Downloads:</label>
-                            <input is="emby-input" type="number" id="txtMaxConcurrentDownloads" min="1" max="10" />
-                            <div class="fieldDescription">Maximum number of simultaneous downloads (1-10).</div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label for="txtMaxDownloadSpeed">Max Download Speed (MB/s):</label>
-                            <input is="emby-input" type="number" id="txtMaxDownloadSpeed" min="0" />
-                            <div class="fieldDescription">Maximum download speed in MB/s. Set to 0 for unlimited.</div>
-                        </div>
-
-                        <!-- Library Mappings -->
-                        <div class="sectionTitleContainer">
-                            <h2 class="sectionTitle">Library Mappings</h2>
-                        </div>
-
-                        <div id="libraryMappingsContainer">
-                            <!-- Populated dynamically -->
-                        </div>
-
-                        <button is="emby-button" type="button" id="btnAddMapping" class="raised button-primary" style="margin-top: 8px;">
-                            <span>Add Mapping</span>
-                        </button>
-
-                        <!-- Sync Status -->
-                        <div class="sectionTitleContainer">
-                            <h2 class="sectionTitle">Sync Status</h2>
-                        </div>
-
-                        <div id="syncStatusSummary" class="statusCards">
-                            <div class="statusCard statusCard-synced" id="statusGroupSynced" title="">
-                                <span class="statusCard-count" id="syncedCount">0</span>
-                                <span class="statusCard-label">Synced</span>
+                        <!-- Collapsible content section - hidden when Enable Content Sync is unchecked -->
+                        <div id="contentSyncSettings">
+                            <div class="inputContainer">
+                                <label class="checkboxContainer">
+                                    <input is="emby-checkbox" type="checkbox" id="chkDetectUpdatedFiles" />
+                                    <span>Detect Updated Files</span>
+                                </label>
+                                <div class="fieldDescription">Re-queue files if the source file size differs or if the source was modified after last sync.</div>
                             </div>
-                            <div class="statusCard statusCard-queued" id="statusGroupQueued" title="">
-                                <span class="statusCard-count" id="queuedCount">0</span>
-                                <span class="statusCard-label">Queued</span>
-                            </div>
-                            <div class="statusCard statusCard-ignored" id="statusGroupIgnored" title="">
-                                <span class="statusCard-count" id="ignoredCount">0</span>
-                                <span class="statusCard-label">Ignored</span>
-                            </div>
-                            <div class="statusCard statusCard-pending" id="statusGroupPending" title="" style="display: none;">
-                                <span class="statusCard-count" id="pendingCount">0</span>
-                                <span class="statusCard-label">Pending</span>
-                            </div>
-                            <div class="statusCard statusCard-pendingDeletion" id="statusGroupPendingDeletion" title="" style="display: none;">
-                                <span class="statusCard-count" id="pendingDeletionCount">0</span>
-                                <span class="statusCard-label">Pending Deletion</span>
-                            </div>
-                        </div>
 
-                        <!-- Sync Items -->
-                        <div class="sectionTitleContainer">
-                            <h2 class="sectionTitle">Sync Items</h2>
-                        </div>
+                            <div class="inputContainer">
+                                <label class="checkboxContainer">
+                                    <input is="emby-checkbox" type="checkbox" id="chkIncludeExtras" />
+                                    <span>Include Companion Files</span>
+                                </label>
+                                <div class="fieldDescription">Also download external subtitles and other companion files when available.</div>
+                            </div>
 
-                        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 16px;">
-                            <select is="emby-select" id="selStatusFilter" style="width: auto;">
-                                <option value="">All</option>
-                                <option value="Synced">Synced</option>
-                                <option value="Queued">Queued</option>
-                                <option value="Errored">Errored</option>
-                                <option value="Ignored">Ignored</option>
-                                <option value="Pending" id="optPending" style="display: none;">Pending</option>
-                                <option value="PendingDeletion" id="optPendingDeletion" style="display: none;">Pending Deletion</option>
-                            </select>
-                            <button is="emby-button" type="button" id="btnRefreshItems" class="raised">
-                                <span>Refresh</span>
+                            <div class="inputContainer">
+                                <label class="checkboxContainer">
+                                    <input is="emby-checkbox" type="checkbox" id="chkRequireApproval" />
+                                    <span>Require Approval to Sync</span>
+                                </label>
+                                <div class="fieldDescription">When enabled, new items will be set to Pending status until manually approved.</div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="checkboxContainer">
+                                    <input is="emby-checkbox" type="checkbox" id="chkDeleteIfMissing" />
+                                    <span id="lblDeleteIfMissing">Delete if Missing from Source</span>
+                                </label>
+                                <div class="fieldDescription">Remove local files when they no longer exist on the source.</div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label for="txtMaxConcurrentDownloads">Max Concurrent Downloads:</label>
+                                <input is="emby-input" type="number" id="txtMaxConcurrentDownloads" min="1" max="10" />
+                                <div class="fieldDescription">Maximum number of simultaneous downloads (1-10).</div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label for="txtMaxDownloadSpeed">Max Download Speed:</label>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <input is="emby-input" type="number" id="txtMaxDownloadSpeed" min="0" style="flex: 1;" />
+                                    <select is="emby-select" id="selDownloadSpeedUnit" style="width: auto;">
+                                        <option value="KB">KB/s</option>
+                                        <option value="MB" selected>MB/s</option>
+                                        <option value="GB">GB/s</option>
+                                    </select>
+                                </div>
+                                <div class="fieldDescription">Maximum download speed. Set to 0 for unlimited.</div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label for="txtMinFreeDiskSpace">Minimum Free Disk Space (GB):</label>
+                                <input is="emby-input" type="number" id="txtMinFreeDiskSpace" min="1" max="1000" />
+                                <div class="fieldDescription">Downloads will pause when free disk space falls below this threshold.</div>
+                            </div>
+
+                            <!-- Bandwidth Scheduling -->
+                            <div class="sectionTitleContainer">
+                                <h2 class="sectionTitle">Bandwidth Scheduling</h2>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="checkboxContainer">
+                                    <input is="emby-checkbox" type="checkbox" id="chkEnableBandwidthScheduling" />
+                                    <span>Enable Bandwidth Scheduling</span>
+                                </label>
+                                <div class="fieldDescription">Use an alternate download speed during scheduled hours.</div>
+                            </div>
+
+                            <div id="bandwidthScheduleContainer" class="nested-settings" style="display: none;">
+                                <div class="inputContainer" style="display: flex; gap: 16px; align-items: center;">
+                                    <div>
+                                        <label for="txtScheduledStartHour">Start Hour:</label>
+                                        <input is="emby-input" type="number" id="txtScheduledStartHour" min="0" max="23" style="width: 80px;" />
+                                    </div>
+                                    <div>
+                                        <label for="txtScheduledEndHour">End Hour:</label>
+                                        <input is="emby-input" type="number" id="txtScheduledEndHour" min="0" max="24" style="width: 80px;" />
+                                    </div>
+                                </div>
+                                <div class="fieldDescription">24-hour format. Set 22 to 6 for overnight scheduling.</div>
+
+                                <div class="inputContainer">
+                                    <label for="txtScheduledDownloadSpeed">Scheduled Download Speed:</label>
+                                    <div style="display: flex; gap: 8px; align-items: center;">
+                                        <input is="emby-input" type="number" id="txtScheduledDownloadSpeed" min="0" style="flex: 1;" />
+                                        <select is="emby-select" id="selScheduledDownloadSpeedUnit" style="width: auto;">
+                                            <option value="KB">KB/s</option>
+                                            <option value="MB" selected>MB/s</option>
+                                            <option value="GB">GB/s</option>
+                                        </select>
+                                    </div>
+                                    <div class="fieldDescription">Download speed during scheduled hours. Set to 0 for unlimited.</div>
+                                </div>
+                            </div>
+
+                            <!-- Library Mappings -->
+                            <div class="sectionTitleContainer">
+                                <h2 class="sectionTitle">Library Mappings</h2>
+                            </div>
+
+                            <div id="libraryMappingsContainer">
+                                <!-- Populated dynamically -->
+                            </div>
+
+                            <button is="emby-button" type="button" id="btnAddMapping" class="raised button-primary" style="margin-top: 8px;">
+                                <span>Add Mapping</span>
                             </button>
-                        </div>
 
-                        <div id="bulkActionsContainer" style="display: flex; gap: 8px; align-items: center; margin-bottom: 16px;">
-                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
-                                <input type="checkbox" id="chkSelectAll" />
-                                <span>Select All</span>
-                            </label>
-                            <span id="selectedCount" style="margin-left: 8px;">0 selected</span>
-                            <button is="emby-button" type="button" id="btnBulkIgnore" class="raised" style="margin-left: 8px;">
-                                <span>Ignore</span>
-                            </button>
-                            <button is="emby-button" type="button" id="btnBulkQueue" class="raised button-primary">
-                                <span>Queue</span>
-                            </button>
-                            <button is="emby-button" type="button" id="btnBulkDelete" class="raised button-destructive" title="Delete from local server only">
-                                <span>Delete</span>
-                            </button>
-                        </div>
+                            <!-- Save Button -->
+                            <div class="inputContainer" style="margin-top: 24px;">
+                                <button is="emby-button" type="submit" class="raised button-submit block">
+                                    <span>Save</span>
+                                </button>
+                            </div>
 
-                        <div id="syncItemsContainer" style="max-height: 400px; overflow-y: auto;">
-                            <!-- Items populated dynamically -->
+                            <!-- Sync Items Section -->
+                            <div class="sectionTitleContainer">
+                                <h2 class="sectionTitle">Sync Items</h2>
+                            </div>
+
+                            <!-- Status Cards at top of Sync Items section -->
+                            <div id="syncStatusSummary" class="statusCards">
+                                <div class="statusCard statusCard-synced" id="statusGroupSynced" title="">
+                                    <span class="statusCard-count" id="syncedCount">0</span>
+                                    <span class="statusCard-label">Synced</span>
+                                </div>
+                                <div class="statusCard statusCard-queued" id="statusGroupQueued" title="">
+                                    <span class="statusCard-count" id="queuedCount">0</span>
+                                    <span class="statusCard-label">Queued</span>
+                                </div>
+                                <div class="statusCard statusCard-errored" id="statusGroupErrored" title="">
+                                    <span class="statusCard-count" id="erroredCount">0</span>
+                                    <span class="statusCard-label">Errored</span>
+                                </div>
+                                <div class="statusCard statusCard-ignored" id="statusGroupIgnored" title="">
+                                    <span class="statusCard-count" id="ignoredCount">0</span>
+                                    <span class="statusCard-label">Ignored</span>
+                                </div>
+                                <div class="statusCard statusCard-pending" id="statusGroupPending" title="" style="display: none;">
+                                    <span class="statusCard-count" id="pendingCount">0</span>
+                                    <span class="statusCard-label">Pending</span>
+                                </div>
+                                <div class="statusCard statusCard-pendingDeletion" id="statusGroupPendingDeletion" title="" style="display: none;">
+                                    <span class="statusCard-count" id="pendingDeletionCount">0</span>
+                                    <span class="statusCard-label">Pending Deletion</span>
+                                </div>
+                            </div>
+
+                            <!-- Sync Stats -->
+                            <div id="healthDashboard" class="healthDashboard">
+                                <div class="healthRow">
+                                    <div class="healthCard">
+                                        <span class="healthLabel">Last Sync</span>
+                                        <span class="healthValue" id="healthLastSync">Never</span>
+                                    </div>
+                                    <div class="healthCard">
+                                        <span class="healthLabel">Disk Space</span>
+                                        <span class="healthValue" id="healthDiskSpace">--</span>
+                                    </div>
+                                    <div class="healthCard">
+                                        <span class="healthLabel">Queued Size</span>
+                                        <span class="healthValue" id="healthQueuedSize">--</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Action Buttons Row -->
+                            <div class="syncActionButtonRow">
+                                <button is="emby-button" type="button" id="btnRefreshItems" class="raised syncActionButton">
+                                    <span>Refresh</span>
+                                </button>
+                                <button is="emby-button" type="button" id="btnTriggerSync" class="raised button-primary syncActionButton">
+                                    <span>Sync</span>
+                                </button>
+                                <button is="emby-button" type="button" id="btnRetryErrors" class="raised syncActionButton">
+                                    <span>Retry Errors</span>
+                                </button>
+                                <button is="emby-button" type="button" id="btnResetDatabase" class="raised button-destructive syncActionButton">
+                                    <span>Reset Database</span>
+                                </button>
+                            </div>
+
+                            <!-- Table Header Row -->
+                            <div class="syncTableHeader">
+                                <label class="selectAllContainer">
+                                    <input type="checkbox" id="chkSelectAll" />
+                                    <span>Select All</span>
+                                </label>
+                                <span id="selectedCount" class="selectedCount">0 selected</span>
+                                <button is="emby-button" type="button" id="btnBulkIgnore" class="raised syncHeaderButton" disabled>
+                                    <span>Ignore</span>
+                                </button>
+                                <button is="emby-button" type="button" id="btnBulkQueue" class="raised button-primary syncHeaderButton" disabled>
+                                    <span>Queue</span>
+                                </button>
+                                <button is="emby-button" type="button" id="btnBulkDelete" class="raised button-destructive syncHeaderButton" title="Delete from local server only" disabled>
+                                    <span>Delete</span>
+                                </button>
+                                <select is="emby-select" id="selStatusFilter" class="statusFilter">
+                                    <option value="">All</option>
+                                    <option value="Synced">Synced</option>
+                                    <option value="Queued">Queued</option>
+                                    <option value="Errored">Errored</option>
+                                    <option value="Ignored">Ignored</option>
+                                    <option value="Pending" id="optPending" style="display: none;">Pending</option>
+                                    <option value="PendingDeletion" id="optPendingDeletion" style="display: none;">Pending Deletion</option>
+                                </select>
+                            </div>
+
+                            <div id="syncItemsContainer" style="max-height: 400px; overflow-y: auto;">
+                                <!-- Items populated dynamically -->
+                            </div>
+
+                            <!-- Separator line at bottom of content section -->
+                            <div class="contentSectionSeparator"></div>
                         </div>
                     </div>
 
@@ -212,14 +335,6 @@
                         <div style="padding: 16px; opacity: 0.7;">Users sync feature coming soon.</div>
                     </div>
 
-                    <!-- Save Button -->
-                    <div class="sectionTitleContainer"></div>
-
-                    <div class="inputContainer">
-                        <button is="emby-button" type="submit" class="raised button-submit block">
-                            <span>Save</span>
-                        </button>
-                    </div>
                 </div>
             </form>
         </div>
@@ -235,6 +350,14 @@
                     <div style="opacity: 0.7; margin-bottom: 4px;">Status</div>
                     <div id="modalStatus"></div>
                 </div>
+                <div id="modalErrorSection" style="margin-bottom: 12px; display: none;">
+                    <div style="opacity: 0.7; margin-bottom: 4px;">Error</div>
+                    <div id="modalError" class="errorMessage"></div>
+                </div>
+                <div id="modalRetrySection" style="margin-bottom: 12px; display: none;">
+                    <div style="opacity: 0.7; margin-bottom: 4px;">Retry Count</div>
+                    <div id="modalRetryCount"></div>
+                </div>
                 <div style="margin-bottom: 12px;">
                     <div style="opacity: 0.7; margin-bottom: 4px;">Size</div>
                     <div id="modalSize"></div>
@@ -248,19 +371,25 @@
                     <div id="modalLocalPath" style="word-break: break-all;"></div>
                     <div id="modalLocalPathNote" class="fieldDescription" style="margin-top: 4px;"></div>
                 </div>
+                <div id="modalLastSyncSection" style="margin-bottom: 12px; display: none;">
+                    <div style="opacity: 0.7; margin-bottom: 4px;">Last Sync</div>
+                    <div id="modalLastSync"></div>
+                </div>
                 <div id="modalCompanionFilesSection" style="margin-bottom: 12px; display: none;">
                     <div style="opacity: 0.7; margin-bottom: 4px;">Companion Files</div>
                     <div id="modalCompanionFiles" style="word-break: break-all;"></div>
                 </div>
             </div>
-            <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                <button is="emby-button" type="button" id="btnModalIgnore" class="raised">
+            <div class="modalButtonRow">
+                <button is="emby-button" type="button" id="btnModalIgnore" class="raised modalButton">
                     <span>Ignore</span>
                 </button>
-                <button is="emby-button" type="button" id="btnModalQueue" class="raised button-primary">
+                <button is="emby-button" type="button" id="btnModalQueue" class="raised button-primary modalButton">
                     <span>Queue</span>
                 </button>
-                <button is="emby-button" type="button" id="btnModalDelete" class="raised button-destructive" title="Delete from local server only">
+            </div>
+            <div id="modalDeleteRow" class="modalDeleteRow">
+                <button is="emby-button" type="button" id="btnModalDelete" class="raised button-destructive modalDeleteButton" title="Delete from local server only">
                     <span>Delete</span>
                 </button>
             </div>
@@ -333,14 +462,51 @@
             background-color: #c9302c !important;
         }
 
+        /* Health Dashboard */
+        .healthDashboard {
+            padding: 16px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+        .healthRow {
+            display: flex;
+            gap: 16px;
+        }
+        .healthCard {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .healthLabel {
+            font-size: 0.85em;
+            opacity: 0.7;
+        }
+        .healthValue {
+            font-size: 1.1em;
+            font-weight: 500;
+        }
+        .healthValue.warning {
+            color: #f0ad4e;
+        }
+        .healthValue.error {
+            color: #d9534f;
+        }
+        .healthValue.success {
+            color: #5cb85c;
+        }
+
         /* Status cards */
         .statusCards {
             display: flex;
             gap: 12px;
             margin-bottom: 16px;
+            flex-wrap: wrap;
         }
         .statusCard {
             flex: 1;
+            min-width: 80px;
             padding: 12px 16px;
             border-radius: 8px;
             text-align: center;
@@ -364,6 +530,10 @@
             background: rgba(240, 173, 78, 0.2);
             color: #f0ad4e;
         }
+        .statusCard-errored {
+            background: rgba(217, 83, 79, 0.2);
+            color: #d9534f;
+        }
         .statusCard-ignored {
             background: rgba(153, 153, 153, 0.2);
             color: #999;
@@ -375,6 +545,17 @@
         .statusCard-pendingDeletion {
             background: rgba(217, 83, 79, 0.2);
             color: #d9534f;
+        }
+
+        /* Error message styling */
+        .errorMessage {
+            background: rgba(217, 83, 79, 0.2);
+            color: #d9534f;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9em;
+            word-break: break-all;
         }
 
         /* Sync items list */
@@ -411,6 +592,14 @@
         .syncItemPath.notExists {
             color: #9b59b6;
             font-style: italic;
+        }
+        .syncItemError {
+            font-size: 0.75em;
+            color: #d9534f;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
         }
         .syncItemStatus {
             padding: 2px 8px;
@@ -495,6 +684,93 @@
             padding-left: 1em;
             border-left: 2px solid rgba(85, 85, 85, 0.3);
         }
+
+        /* Content section separator line */
+        .contentSectionSeparator {
+            border-bottom: 1px solid #555;
+            margin-top: 24px;
+            margin-bottom: 16px;
+        }
+
+        /* Modal button layout */
+        .modalButtonRow {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .modalButton {
+            flex: 1;
+            text-align: center;
+            justify-content: center;
+        }
+        .modalDeleteRow {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        .modalDeleteButton {
+            width: 100%;
+            text-align: center;
+            justify-content: center;
+        }
+
+        /* Source Server button row */
+        .sourceServerButtonRow {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .sourceServerButton {
+            flex: 1;
+            text-align: center;
+            justify-content: center;
+        }
+
+        /* Sync Action Button Row */
+        .syncActionButtonRow {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .syncActionButton {
+            flex: 1;
+            text-align: center;
+            justify-content: center;
+        }
+
+        /* Sync Table Header */
+        .syncTableHeader {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 4px;
+        }
+        .selectAllContainer {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+        }
+        .selectedCount {
+            margin-left: 8px;
+            opacity: 0.7;
+            min-width: 80px;
+        }
+        .syncHeaderButton {
+            padding: 4px 12px !important;
+            min-width: auto !important;
+        }
+        .syncHeaderButton:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .statusFilter {
+            margin-left: auto;
+            width: auto !important;
+        }
     </style>
 
     <script type="text/javascript">
@@ -507,13 +783,15 @@
             sourceLibraries: [],
             localLibraries: [],
             currentModalItem: null,
+            capabilities: null,
 
             init: function() {
                 var self = this;
 
+                document.getElementById('btnSaveServer').addEventListener('click', function() { self.saveServerConfig(); });
                 document.getElementById('btnTestConnection').addEventListener('click', function() { self.testConnection(); });
                 document.getElementById('btnAddMapping').addEventListener('click', function() { self.addMapping(); });
-                document.getElementById('btnRefreshItems').addEventListener('click', function() { self.loadSyncItems(); });
+                document.getElementById('btnRefreshItems').addEventListener('click', function() { self.refreshSyncTable(); });
                 document.getElementById('selStatusFilter').addEventListener('change', function() { self.loadSyncItems(); });
 
                 document.getElementById('btnBulkIgnore').addEventListener('click', function() { self.bulkIgnore(); });
@@ -526,13 +804,30 @@
                 document.getElementById('btnModalDelete').addEventListener('click', function() { self.modalDelete(); });
                 document.getElementById('btnModalClose').addEventListener('click', function() { self.closeModal(); });
 
+                document.getElementById('chkEnableContentSync').addEventListener('change', function() {
+                    self.updateContentSyncVisibility(this.checked);
+                });
+
                 document.getElementById('chkDeleteIfMissing').addEventListener('change', function() {
                     self.updateDeletionVisibility(this.checked);
                 });
 
                 document.getElementById('chkRequireApproval').addEventListener('change', function() {
                     self.updatePendingVisibility(this.checked);
+                    self.updateDeleteIfMissingLabel(this.checked);
                 });
+
+                document.getElementById('selAuthMethod').addEventListener('change', function() {
+                    self.updateAuthMethodVisibility(this.value);
+                });
+
+                document.getElementById('chkEnableBandwidthScheduling').addEventListener('change', function() {
+                    self.updateBandwidthSchedulingVisibility(this.checked);
+                });
+
+                document.getElementById('btnTriggerSync').addEventListener('click', function() { self.triggerSync(); });
+                document.getElementById('btnRetryErrors').addEventListener('click', function() { self.retryErrors(); });
+                document.getElementById('btnResetDatabase').addEventListener('click', function() { self.resetDatabase(); });
 
                 document.getElementById('ServerSyncConfigForm').addEventListener('submit', function(e) {
                     e.preventDefault();
@@ -547,7 +842,10 @@
                     });
                 });
 
-                self.loadConfig();
+                // Load capabilities first, then config
+                self.loadCapabilities().then(function() {
+                    self.loadConfig();
+                });
             },
 
             switchTab: function(tabId) {
@@ -569,6 +867,59 @@
                 document.getElementById('optPendingDeletion').style.display = deleteIfMissing ? 'block' : 'none';
             },
 
+            updateAuthMethodVisibility: function(authMethod) {
+                var isApiKey = authMethod === '0';
+                var isUserAuth = authMethod === '1';
+                document.getElementById('apiKeyAuthContainer').style.display = isApiKey ? 'block' : 'none';
+                document.getElementById('userAuthContainer').style.display = isUserAuth ? 'block' : 'none';
+            },
+
+            updateBandwidthSchedulingVisibility: function(enabled) {
+                document.getElementById('bandwidthScheduleContainer').style.display = enabled ? 'block' : 'none';
+            },
+
+            updateContentSyncVisibility: function(enabled) {
+                document.getElementById('contentSyncSettings').style.display = enabled ? 'block' : 'none';
+            },
+
+            updateDeleteIfMissingLabel: function(requireApproval) {
+                var label = document.getElementById('lblDeleteIfMissing');
+                label.textContent = requireApproval ? 'Track if missing from source' : 'Delete if Missing from Source';
+            },
+
+            loadCapabilities: function() {
+                var self = this;
+                return ApiClient.fetch({
+                    url: ApiClient.getUrl('ServerSync/Capabilities'),
+                    type: 'GET',
+                    dataType: 'json'
+                }).then(function(capabilities) {
+                    self.capabilities = capabilities;
+                    self.updateDeleteCapabilityVisibility(capabilities.CanDeleteItems);
+                }).catch(function() {
+                    // Default to hiding delete options if we can't check capabilities
+                    self.capabilities = { CanDeleteItems: false };
+                    self.updateDeleteCapabilityVisibility(false);
+                });
+            },
+
+            updateDeleteCapabilityVisibility: function(canDelete) {
+                // Hide/show delete-related UI elements based on capability
+                var deleteIfMissingContainer = document.getElementById('chkDeleteIfMissing').closest('.inputContainer');
+                var bulkDeleteBtn = document.getElementById('btnBulkDelete');
+                var modalDeleteRow = document.getElementById('modalDeleteRow');
+
+                if (deleteIfMissingContainer) {
+                    deleteIfMissingContainer.style.display = canDelete ? 'block' : 'none';
+                }
+                if (bulkDeleteBtn) {
+                    bulkDeleteBtn.style.display = canDelete ? 'inline-block' : 'none';
+                }
+                if (modalDeleteRow) {
+                    modalDeleteRow.style.display = canDelete ? 'block' : 'none';
+                }
+            },
+
             loadConfig: function() {
                 var self = this;
 
@@ -581,9 +932,38 @@
                     document.getElementById('chkDetectUpdatedFiles').checked = config.DetectUpdatedFiles !== false;
                     document.getElementById('chkDeleteIfMissing').checked = config.DeleteIfMissingFromSource || false;
                     document.getElementById('txtMaxConcurrentDownloads').value = config.MaxConcurrentDownloads || 2;
-                    document.getElementById('txtMaxDownloadSpeed').value = config.MaxDownloadSpeedMbps || 0;
+                    document.getElementById('txtMaxDownloadSpeed').value = config.MaxDownloadSpeed || 0;
+                    document.getElementById('selDownloadSpeedUnit').value = config.DownloadSpeedUnit || 'MB';
+                    document.getElementById('txtMinFreeDiskSpace').value = config.MinimumFreeDiskSpaceGb || 10;
                     document.getElementById('txtSourceServerUrl').value = config.SourceServerUrl || '';
                     document.getElementById('txtSourceServerApiKey').value = config.SourceServerApiKey || '';
+                    document.getElementById('txtSourceServerUsername').value = config.SourceServerUsername || '';
+                    // Show placeholder if we have a token (don't expose stored password)
+                    if (config.SourceServerAccessToken && config.AuthMethod === 'UserCredentials') {
+                        document.getElementById('txtSourceServerPassword').value = '';
+                        document.getElementById('txtSourceServerPassword').placeholder = '••••••••••••';
+                    } else {
+                        document.getElementById('txtSourceServerPassword').value = '';
+                        document.getElementById('txtSourceServerPassword').placeholder = '';
+                    }
+                    // AuthMethod may come as string enum name or integer from server
+                    var authMethodValue = '';
+                    if (config.AuthMethod === 'ApiKey' || config.AuthMethod === 0) {
+                        authMethodValue = '0';
+                    } else if (config.AuthMethod === 'UserCredentials' || config.AuthMethod === 1) {
+                        authMethodValue = '1';
+                    }
+                    document.getElementById('selAuthMethod').value = authMethodValue;
+                    document.getElementById('chkEnableBandwidthScheduling').checked = config.EnableBandwidthScheduling || false;
+                    document.getElementById('txtScheduledStartHour').value = config.ScheduledStartHour || 0;
+                    document.getElementById('txtScheduledEndHour').value = config.ScheduledEndHour || 6;
+                    document.getElementById('txtScheduledDownloadSpeed').value = config.ScheduledDownloadSpeed || 0;
+                    document.getElementById('selScheduledDownloadSpeedUnit').value = config.ScheduledDownloadSpeedUnit || 'MB';
+
+                    self.updateAuthMethodVisibility(authMethodValue);
+                    self.updateBandwidthSchedulingVisibility(config.EnableBandwidthScheduling);
+                    self.updateContentSyncVisibility(config.EnableContentSync);
+                    self.updateDeleteIfMissingLabel(config.RequireApprovalToSync);
 
                     if (config.SourceServerName || config.SourceServerId) {
                         document.getElementById('txtSourceServerName').textContent = config.SourceServerName || 'Unknown';
@@ -594,17 +974,19 @@
                     self.updatePendingVisibility(config.RequireApprovalToSync);
                     self.updateDeletionVisibility(config.DeleteIfMissingFromSource);
 
-                    // Fetch local libraries first, then render mappings
-                    self.fetchLocalLibraries().then(function() {
+                    // Fetch libraries then render mappings
+                    var libraryPromises = [self.fetchLocalLibraries()];
+                    if (config.SourceServerUrl && (config.SourceServerApiKey || (config.SourceServerUsername && config.SourceServerPassword))) {
+                        libraryPromises.push(self.fetchSourceLibraries());
+                    }
+
+                    Promise.all(libraryPromises).then(function() {
                         self.renderMappings(config.LibraryMappings || []);
                     });
 
                     self.loadSyncStatus();
                     self.loadSyncItems();
-
-                    if (config.SourceServerUrl && config.SourceServerApiKey) {
-                        self.fetchSourceLibraries(config.SourceServerUrl, config.SourceServerApiKey);
-                    }
+                    self.loadHealthStats();
                 });
             },
 
@@ -618,9 +1000,23 @@
                 config.DetectUpdatedFiles = document.getElementById('chkDetectUpdatedFiles').checked;
                 config.DeleteIfMissingFromSource = document.getElementById('chkDeleteIfMissing').checked;
                 config.MaxConcurrentDownloads = parseInt(document.getElementById('txtMaxConcurrentDownloads').value, 10) || 2;
-                config.MaxDownloadSpeedMbps = parseInt(document.getElementById('txtMaxDownloadSpeed').value, 10) || 0;
+                config.MaxDownloadSpeed = parseInt(document.getElementById('txtMaxDownloadSpeed').value, 10) || 0;
+                config.DownloadSpeedUnit = document.getElementById('selDownloadSpeedUnit').value;
+                config.MinimumFreeDiskSpaceGb = parseInt(document.getElementById('txtMinFreeDiskSpace').value, 10) || 10;
                 config.SourceServerUrl = document.getElementById('txtSourceServerUrl').value;
                 config.SourceServerApiKey = document.getElementById('txtSourceServerApiKey').value;
+                config.SourceServerUsername = document.getElementById('txtSourceServerUsername').value;
+                // Only save password if entered (don't overwrite with empty if we have a token)
+                var passwordField = document.getElementById('txtSourceServerPassword');
+                if (passwordField.value) {
+                    config.SourceServerPassword = passwordField.value;
+                }
+                config.AuthMethod = parseInt(document.getElementById('selAuthMethod').value, 10) || 0;
+                config.EnableBandwidthScheduling = document.getElementById('chkEnableBandwidthScheduling').checked;
+                config.ScheduledStartHour = parseInt(document.getElementById('txtScheduledStartHour').value, 10) || 0;
+                config.ScheduledEndHour = parseInt(document.getElementById('txtScheduledEndHour').value, 10) || 6;
+                config.ScheduledDownloadSpeed = parseInt(document.getElementById('txtScheduledDownloadSpeed').value, 10) || 0;
+                config.ScheduledDownloadSpeedUnit = document.getElementById('selScheduledDownloadSpeedUnit').value;
                 config.LibraryMappings = self.collectMappings();
 
                 ApiClient.updatePluginConfiguration(self.pluginId, config).then(function() {
@@ -635,12 +1031,28 @@
             testConnection: function() {
                 var self = this;
                 var url = document.getElementById('txtSourceServerUrl').value;
-                var apiKey = document.getElementById('txtSourceServerApiKey').value;
+                var authMethod = document.getElementById('selAuthMethod').value;
                 var statusEl = document.getElementById('connectionStatus');
 
-                if (!url || !apiKey) {
-                    statusEl.innerHTML = '<span style="color: #d9534f;">Please enter URL and API key</span>';
-                    return;
+                var requestData = {
+                    ServerUrl: url,
+                    AuthMethod: parseInt(authMethod, 10)
+                };
+
+                if (authMethod === '0') {
+                    requestData.ApiKey = document.getElementById('txtSourceServerApiKey').value;
+                    if (!url || !requestData.ApiKey) {
+                        statusEl.innerHTML = '<span style="color: #d9534f;">Please enter URL and API key</span>';
+                        return;
+                    }
+                } else {
+                    requestData.Username = document.getElementById('txtSourceServerUsername').value;
+                    requestData.Password = document.getElementById('txtSourceServerPassword').value;
+                    requestData.CachedAccessToken = self.currentConfig ? self.currentConfig.SourceServerAccessToken : null;
+                    if (!url || !requestData.Username || !requestData.Password) {
+                        statusEl.innerHTML = '<span style="color: #d9534f;">Please enter URL, username, and password</span>';
+                        return;
+                    }
                 }
 
                 statusEl.textContent = 'Testing...';
@@ -649,7 +1061,7 @@
                     url: ApiClient.getUrl('ServerSync/TestConnection'),
                     type: 'POST',
                     contentType: 'application/json',
-                    data: JSON.stringify({ ServerUrl: url, ApiKey: apiKey }),
+                    data: JSON.stringify(requestData),
                     dataType: 'json'
                 }).then(function(response) {
                     if (response && response.Success) {
@@ -661,9 +1073,17 @@
                         if (self.currentConfig) {
                             self.currentConfig.SourceServerName = response.ServerName;
                             self.currentConfig.SourceServerId = response.ServerId;
+                            if (response.AccessToken) {
+                                self.currentConfig.SourceServerAccessToken = response.AccessToken;
+                                // Clear password field and show placeholder after getting token
+                                document.getElementById('txtSourceServerPassword').value = '';
+                                document.getElementById('txtSourceServerPassword').placeholder = '••••••••••••';
+                                // Clear stored password since we have token
+                                self.currentConfig.SourceServerPassword = '';
+                            }
                         }
 
-                        self.fetchSourceLibraries(url, apiKey);
+                        self.fetchSourceLibraries();
                     } else {
                         statusEl.innerHTML = '<span style="color: #d9534f;">' + self.escapeHtml((response && response.Message) || 'Connection failed') + '</span>';
                     }
@@ -672,17 +1092,58 @@
                 });
             },
 
-            fetchSourceLibraries: function(url, apiKey) {
+            saveServerConfig: function() {
                 var self = this;
-                ApiClient.fetch({
+                var config = self.currentConfig || {};
+
+                config.SourceServerUrl = document.getElementById('txtSourceServerUrl').value;
+                config.AuthMethod = parseInt(document.getElementById('selAuthMethod').value, 10) || 0;
+                config.SourceServerApiKey = document.getElementById('txtSourceServerApiKey').value;
+                config.SourceServerUsername = document.getElementById('txtSourceServerUsername').value;
+
+                // Only save password if entered (don't overwrite with empty if we have a token)
+                var passwordField = document.getElementById('txtSourceServerPassword');
+                if (passwordField.value) {
+                    config.SourceServerPassword = passwordField.value;
+                }
+
+                ApiClient.updatePluginConfiguration(self.pluginId, config).then(function() {
+                    Dashboard.alert('Server settings saved');
+                }).catch(function(err) {
+                    console.error('Failed to save server config:', err);
+                    Dashboard.alert('Failed to save server settings');
+                });
+            },
+
+            fetchSourceLibraries: function() {
+                var self = this;
+                var url = document.getElementById('txtSourceServerUrl').value;
+                var authMethod = document.getElementById('selAuthMethod').value;
+
+                var requestData = {
+                    ServerUrl: url,
+                    AuthMethod: parseInt(authMethod, 10) || 0
+                };
+
+                if (authMethod === '0') {
+                    requestData.ApiKey = document.getElementById('txtSourceServerApiKey').value;
+                } else {
+                    requestData.Username = document.getElementById('txtSourceServerUsername').value;
+                    requestData.Password = document.getElementById('txtSourceServerPassword').value;
+                    requestData.CachedAccessToken = self.currentConfig ? self.currentConfig.SourceServerAccessToken : null;
+                }
+
+                return ApiClient.fetch({
                     url: ApiClient.getUrl('ServerSync/GetSourceLibraries'),
                     type: 'POST',
                     contentType: 'application/json',
-                    data: JSON.stringify({ ServerUrl: url, ApiKey: apiKey }),
+                    data: JSON.stringify(requestData),
                     dataType: 'json'
                 }).then(function(libraries) {
                     self.sourceLibraries = libraries || [];
-                    self.updateLibrarySelects();
+                }).catch(function(err) {
+                    console.error('Failed to fetch source libraries:', err);
+                    self.sourceLibraries = [];
                 });
             },
 
@@ -703,6 +1164,143 @@
                 }).catch(function() {
                     self.localLibraries = [];
                 });
+            },
+
+            loadHealthStats: function() {
+                var self = this;
+
+                ApiClient.fetch({
+                    url: ApiClient.getUrl('ServerSync/Stats'),
+                    type: 'GET',
+                    dataType: 'json'
+                }).then(function(stats) {
+                    // Last sync time
+                    var lastSyncEl = document.getElementById('healthLastSync');
+                    if (stats.LastSyncEndTime) {
+                        var lastSync = new Date(stats.LastSyncEndTime);
+                        lastSyncEl.textContent = self.formatRelativeTime(lastSync);
+                        lastSyncEl.className = 'healthValue success';
+                    } else {
+                        lastSyncEl.textContent = 'Never';
+                        lastSyncEl.className = 'healthValue';
+                    }
+
+                    // Disk space
+                    var diskSpaceEl = document.getElementById('healthDiskSpace');
+                    if (stats.FreeDiskSpaceBytes > 0) {
+                        var freeSpace = self.formatSize(stats.FreeDiskSpaceBytes);
+                        diskSpaceEl.textContent = freeSpace + ' free';
+                        if (stats.HasSufficientDiskSpace) {
+                            diskSpaceEl.className = 'healthValue success';
+                        } else {
+                            diskSpaceEl.className = 'healthValue error';
+                        }
+                    } else {
+                        diskSpaceEl.textContent = 'Unknown';
+                        diskSpaceEl.className = 'healthValue';
+                    }
+
+                    // Queued size
+                    var queuedSizeEl = document.getElementById('healthQueuedSize');
+                    queuedSizeEl.textContent = self.formatSize(stats.TotalQueuedBytes);
+                    queuedSizeEl.className = stats.QueuedItems > 0 ? 'healthValue warning' : 'healthValue';
+                }).catch(function() {
+                    // Ignore errors
+                });
+            },
+
+            triggerSync: function() {
+                var self = this;
+                var btn = document.getElementById('btnTriggerSync');
+                btn.disabled = true;
+                btn.querySelector('span').textContent = 'Starting...';
+
+                ApiClient.fetch({
+                    url: ApiClient.getUrl('ServerSync/TriggerSync'),
+                    type: 'POST'
+                }).then(function() {
+                    Dashboard.alert('Sync task started');
+                    btn.querySelector('span').textContent = 'Sync';
+                    btn.disabled = false;
+                }).catch(function() {
+                    Dashboard.alert('Failed to start sync task');
+                    btn.querySelector('span').textContent = 'Sync';
+                    btn.disabled = false;
+                });
+            },
+
+            refreshSyncTable: function() {
+                var self = this;
+                var btn = document.getElementById('btnRefreshItems');
+                btn.disabled = true;
+                btn.querySelector('span').textContent = 'Refreshing...';
+
+                ApiClient.fetch({
+                    url: ApiClient.getUrl('ServerSync/TriggerRefresh'),
+                    type: 'POST'
+                }).then(function() {
+                    Dashboard.alert('Refresh task started');
+                    btn.querySelector('span').textContent = 'Refresh';
+                    btn.disabled = false;
+                    // Also reload the items display
+                    self.loadSyncStatus();
+                    self.loadSyncItems();
+                    self.loadHealthStats();
+                }).catch(function() {
+                    Dashboard.alert('Failed to start refresh task');
+                    btn.querySelector('span').textContent = 'Refresh';
+                    btn.disabled = false;
+                });
+            },
+
+            retryErrors: function() {
+                var self = this;
+
+                ApiClient.fetch({
+                    url: ApiClient.getUrl('ServerSync/RetryErroredItems'),
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({})
+                }).then(function() {
+                    Dashboard.alert('Errored items queued for retry');
+                    self.loadSyncStatus();
+                    self.loadSyncItems();
+                }).catch(function() {
+                    Dashboard.alert('Failed to retry errored items');
+                });
+            },
+
+            resetDatabase: function() {
+                var self = this;
+
+                if (!confirm('Are you sure you want to reset the sync database?\n\nThis will delete ALL tracking data and you will need to re-sync everything. This cannot be undone.')) {
+                    return;
+                }
+
+                ApiClient.fetch({
+                    url: ApiClient.getUrl('ServerSync/ResetSyncDatabase'),
+                    type: 'POST'
+                }).then(function() {
+                    Dashboard.alert('Sync database has been reset');
+                    self.loadSyncStatus();
+                    self.loadSyncItems();
+                    self.loadHealthStats();
+                }).catch(function() {
+                    Dashboard.alert('Failed to reset sync database');
+                });
+            },
+
+            formatRelativeTime: function(date) {
+                var now = new Date();
+                var diff = now - date;
+                var minutes = Math.floor(diff / 60000);
+                var hours = Math.floor(minutes / 60);
+                var days = Math.floor(hours / 24);
+
+                if (days > 0) return days + ' day' + (days > 1 ? 's' : '') + ' ago';
+                if (hours > 0) return hours + ' hour' + (hours > 1 ? 's' : '') + ' ago';
+                if (minutes > 0) return minutes + ' minute' + (minutes > 1 ? 's' : '') + ' ago';
+                return 'Just now';
             },
 
             updateLibrarySelects: function() {
@@ -904,7 +1502,8 @@
                     dataType: 'json'
                 }).then(function(status) {
                     var syncedCount = status.Synced || 0;
-                    var queuedCount = (status.Queued || 0) + (status.Errored || 0);
+                    var queuedCount = status.Queued || 0;
+                    var erroredCount = status.Errored || 0;
                     var ignoredCount = status.Ignored || 0;
                     var pendingCount = status.Pending || 0;
                     var pendingDeletionCount = status.PendingDeletion || 0;
@@ -913,7 +1512,10 @@
                     document.getElementById('statusGroupSynced').setAttribute('title', 'Synced: ' + syncedCount);
 
                     document.getElementById('queuedCount').textContent = queuedCount;
-                    document.getElementById('statusGroupQueued').setAttribute('title', 'Queued: ' + (status.Queued || 0) + '\nErrored: ' + (status.Errored || 0));
+                    document.getElementById('statusGroupQueued').setAttribute('title', 'Queued: ' + queuedCount);
+
+                    document.getElementById('erroredCount').textContent = erroredCount;
+                    document.getElementById('statusGroupErrored').setAttribute('title', 'Errored: ' + erroredCount);
 
                     document.getElementById('ignoredCount').textContent = ignoredCount;
                     document.getElementById('statusGroupIgnored').setAttribute('title', 'Ignored: ' + ignoredCount);
@@ -958,11 +1560,17 @@
                             localPathDisplay = '(will sync to) ' + localPathDisplay;
                         }
 
+                        var errorPreview = '';
+                        if (item.Status === 'Errored' && item.ErrorMessage) {
+                            errorPreview = '<div class="syncItemError" title="' + self.escapeHtml(item.ErrorMessage) + '">' + self.escapeHtml(item.ErrorMessage) + '</div>';
+                        }
+
                         return '<div class="syncItem" data-id="' + item.SourceItemId + '">' +
                             '<input type="checkbox" class="syncItemCheckbox" data-id="' + item.SourceItemId + '" />' +
                             '<div class="syncItemInfo">' +
                                 '<div class="syncItemName" title="' + self.escapeHtml(item.SourcePath) + '">' + self.escapeHtml(self.getFileName(item.SourcePath)) + '</div>' +
                                 '<div class="syncItemPath' + localPathClass + '" title="' + self.escapeHtml(item.LocalPath || '') + '">' + self.escapeHtml(localPathDisplay) + '</div>' +
+                                errorPreview +
                             '</div>' +
                             '<div class="syncItemStatus ' + item.Status + '">' + item.Status + '</div>' +
                         '</div>';
@@ -991,7 +1599,11 @@
 
             updateBulkActionsVisibility: function() {
                 var count = this.selectedItems.size;
+                var hasSelection = count > 0;
                 document.getElementById('selectedCount').textContent = count + ' selected';
+                document.getElementById('btnBulkIgnore').disabled = !hasSelection;
+                document.getElementById('btnBulkQueue').disabled = !hasSelection;
+                document.getElementById('btnBulkDelete').disabled = !hasSelection;
             },
 
             toggleSelectAll: function(checked) {
@@ -1048,6 +1660,7 @@
             bulkAction: function(endpoint) {
                 var self = this;
                 var ids = Array.from(this.selectedItems);
+                if (ids.length === 0) return;
 
                 ApiClient.fetch({
                     url: ApiClient.getUrl('ServerSync/' + endpoint),
@@ -1058,6 +1671,10 @@
                     self.selectedItems.clear();
                     self.loadSyncStatus();
                     self.loadSyncItems();
+                    Dashboard.alert(ids.length + ' item(s) updated');
+                }).catch(function(err) {
+                    console.error('Bulk action failed:', err);
+                    Dashboard.alert('Failed to update items');
                 });
             },
 
@@ -1072,6 +1689,34 @@
                 document.getElementById('modalStatus').textContent = item.Status;
                 document.getElementById('modalSize').textContent = self.formatSize(item.SourceSize);
                 document.getElementById('modalSourcePath').textContent = item.SourcePath;
+
+                // Error message
+                var errorSection = document.getElementById('modalErrorSection');
+                if (item.Status === 'Errored' && item.ErrorMessage) {
+                    document.getElementById('modalError').textContent = item.ErrorMessage;
+                    errorSection.style.display = 'block';
+                } else {
+                    errorSection.style.display = 'none';
+                }
+
+                // Retry count
+                var retrySection = document.getElementById('modalRetrySection');
+                if (item.RetryCount > 0) {
+                    document.getElementById('modalRetryCount').textContent = item.RetryCount;
+                    retrySection.style.display = 'block';
+                } else {
+                    retrySection.style.display = 'none';
+                }
+
+                // Last sync time
+                var lastSyncSection = document.getElementById('modalLastSyncSection');
+                if (item.LastSyncTime) {
+                    var lastSync = new Date(item.LastSyncTime);
+                    document.getElementById('modalLastSync').textContent = lastSync.toLocaleString();
+                    lastSyncSection.style.display = 'block';
+                } else {
+                    lastSyncSection.style.display = 'none';
+                }
 
                 var localPathEl = document.getElementById('modalLocalPath');
                 var localPathNoteEl = document.getElementById('modalLocalPathNote');
@@ -1151,6 +1796,10 @@
                     self.closeModal();
                     self.loadSyncStatus();
                     self.loadSyncItems();
+                    Dashboard.alert('Item status updated to ' + status);
+                }).catch(function(err) {
+                    console.error('Failed to update item status:', err);
+                    Dashboard.alert('Failed to update item status');
                 });
             },
 
