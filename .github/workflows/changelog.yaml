@@ -99,14 +99,20 @@ jobs:
           with open('build.yaml', 'r') as f:
               data = yaml.safe_load(f)
 
-          changelog = data.get('changelog', {})
+          changelog = data.get('changelog', '')
           output = []
 
-          for category, items in changelog.items():
-              if isinstance(items, list):
-                  output.append(f"\n## {category.capitalize()}")
-                  for item in items:
-                      output.append(f"- {item}")
+          # Handle both string and dict formats
+          if isinstance(changelog, str):
+              # Simple string changelog
+              output.append(changelog.strip())
+          elif isinstance(changelog, dict):
+              # Categorized changelog
+              for category, items in changelog.items():
+                  if isinstance(items, list):
+                      output.append(f"\n## {category.capitalize()}")
+                      for item in items:
+                          output.append(f"- {item}")
 
           print('\n'.join(output))
           PYEOF
