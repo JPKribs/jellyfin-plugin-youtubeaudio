@@ -6,37 +6,13 @@ using MediaBrowser.Model.Plugins;
 
 namespace Jellyfin.Plugin.ServerSync.Configuration;
 
-// AuthenticationMethod
-// Defines how to authenticate with the source server.
-public enum AuthenticationMethod
-{
-    ApiKey = 0,
-    UserCredentials = 1
-}
-
 // PluginConfiguration
 // Configuration settings for the Server Sync plugin.
 public class PluginConfiguration : BasePluginConfiguration
 {
     public string SourceServerUrl { get; set; } = string.Empty;
 
-    // AuthMethod
-    // The authentication method to use (ApiKey or UserCredentials).
-    public AuthenticationMethod AuthMethod { get; set; } = AuthenticationMethod.ApiKey;
-
     public string SourceServerApiKey { get; set; } = string.Empty;
-
-    // SourceServerUsername
-    // Username for user credential authentication.
-    public string SourceServerUsername { get; set; } = string.Empty;
-
-    // SourceServerPassword
-    // Password for user credential authentication (stored encrypted by Jellyfin).
-    public string SourceServerPassword { get; set; } = string.Empty;
-
-    // SourceServerAccessToken
-    // Cached access token from user authentication (auto-populated).
-    public string SourceServerAccessToken { get; set; } = string.Empty;
 
     public string SourceServerName { get; set; } = string.Empty;
 
@@ -158,15 +134,6 @@ public class PluginConfiguration : BasePluginConfiguration
     // Timestamp when the last sync completed.
     public DateTime? LastSyncEndTime { get; set; }
 
-    // GetEffectiveToken
-    // Returns the appropriate token based on authentication method.
-    public string GetEffectiveToken()
-    {
-        return AuthMethod == AuthenticationMethod.ApiKey
-            ? SourceServerApiKey
-            : SourceServerAccessToken;
-    }
-
     // ValidateConfiguration
     // Validates configuration values and returns a list of validation errors.
     public List<string> ValidateConfiguration()
@@ -191,14 +158,9 @@ public class PluginConfiguration : BasePluginConfiguration
                 errors.Add("Source server URL is required when content sync is enabled");
             }
 
-            if (AuthMethod == AuthenticationMethod.ApiKey && string.IsNullOrWhiteSpace(SourceServerApiKey))
+            if (string.IsNullOrWhiteSpace(SourceServerApiKey))
             {
-                errors.Add("API key is required when using API key authentication");
-            }
-
-            if (AuthMethod == AuthenticationMethod.UserCredentials && string.IsNullOrWhiteSpace(SourceServerUsername))
-            {
-                errors.Add("Username is required when using user credential authentication");
+                errors.Add("API key is required for authentication");
             }
         }
 

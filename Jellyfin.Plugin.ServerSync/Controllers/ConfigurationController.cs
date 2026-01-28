@@ -24,15 +24,8 @@ public class TestConnectionRequest
     [Required]
     public string ServerUrl { get; set; } = string.Empty;
 
-    public AuthenticationMethod AuthMethod { get; set; } = AuthenticationMethod.ApiKey;
-
-    public string? ApiKey { get; set; }
-
-    public string? Username { get; set; }
-
-    public string? Password { get; set; }
-
-    public string? CachedAccessToken { get; set; }
+    [Required]
+    public string ApiKey { get; set; } = string.Empty;
 }
 
 // TestConnectionResponse
@@ -46,8 +39,6 @@ public class TestConnectionResponse
     public string? ServerId { get; set; }
 
     public string? Message { get; set; }
-
-    public string? AccessToken { get; set; }
 }
 
 // LibraryDto
@@ -245,7 +236,7 @@ public class ConfigurationController : ControllerBase
     }
 
     // TestConnection
-    // Tests connection to the source server with support for both auth methods.
+    // Tests connection to the source server using API key authentication.
     [HttpPost("TestConnection")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<TestConnectionResponse>> TestConnection([FromBody] TestConnectionRequest request)
@@ -263,56 +254,29 @@ public class ConfigurationController : ControllerBase
             });
         }
 
-        SourceServerClient client;
-
-        if (request.AuthMethod == AuthenticationMethod.UserCredentials)
+        if (string.IsNullOrWhiteSpace(request.ApiKey))
         {
-            if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
-            {
-                return Ok(new TestConnectionResponse
-                {
-                    Success = false,
-                    Message = "Username and password are required for user credential authentication"
-                });
-            }
-
-            client = new SourceServerClient(
-                plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
-                urlValidation.NormalizedUrl!,
-                request.Username,
-                request.Password,
-                request.CachedAccessToken);
-        }
-        else
-        {
-            if (string.IsNullOrWhiteSpace(request.ApiKey))
-            {
-                return Ok(new TestConnectionResponse
-                {
-                    Success = false,
-                    Message = "API key is required for API key authentication"
-                });
-            }
-
-            client = new SourceServerClient(
-                plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
-                urlValidation.NormalizedUrl!,
-                request.ApiKey);
-        }
-
-        using (client)
-        {
-            var result = await client.TestConnectionAsync().ConfigureAwait(false);
-
             return Ok(new TestConnectionResponse
             {
-                Success = result.Success,
-                ServerName = result.ServerName,
-                ServerId = result.ServerId,
-                Message = result.Success ? "Connection successful" : result.ErrorMessage ?? "Failed to connect to server",
-                AccessToken = result.AccessToken
+                Success = false,
+                Message = "API key is required"
             });
         }
+
+        using var client = new SourceServerClient(
+            plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
+            urlValidation.NormalizedUrl!,
+            request.ApiKey);
+
+        var result = await client.TestConnectionAsync().ConfigureAwait(false);
+
+        return Ok(new TestConnectionResponse
+        {
+            Success = result.Success,
+            ServerName = result.ServerName,
+            ServerId = result.ServerId,
+            Message = result.Success ? "Connection successful" : result.ErrorMessage ?? "Failed to connect to server"
+        });
     }
 
     // ValidateUrl
@@ -332,36 +296,19 @@ public class ConfigurationController : ControllerBase
     {
         var plugin = Plugin.Instance!;
 
-        SourceServerClient client;
+        using var client = new SourceServerClient(
+            plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
+            request.ServerUrl,
+            request.ApiKey);
 
-        if (request.AuthMethod == AuthenticationMethod.UserCredentials)
-        {
-            client = new SourceServerClient(
-                plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
-                request.ServerUrl,
-                request.Username ?? string.Empty,
-                request.Password ?? string.Empty,
-                request.CachedAccessToken);
-        }
-        else
-        {
-            client = new SourceServerClient(
-                plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
-                request.ServerUrl,
-                request.ApiKey ?? string.Empty);
-        }
+        var libraries = await client.GetLibrariesAsync().ConfigureAwait(false);
 
-        using (client)
+        return Ok(libraries.Select(l => new LibraryDto
         {
-            var libraries = await client.GetLibrariesAsync().ConfigureAwait(false);
-
-            return Ok(libraries.Select(l => new LibraryDto
-            {
-                Id = l.ItemId ?? string.Empty,
-                Name = l.Name ?? string.Empty,
-                Locations = l.Locations?.ToList() ?? new List<string>()
-            }).ToList());
-        }
+            Id = l.ItemId ?? string.Empty,
+            Name = l.Name ?? string.Empty,
+            Locations = l.Locations?.ToList() ?? new List<string>()
+        }).ToList());
     }
 
     // GetSyncItems
@@ -694,14 +641,21 @@ public class ConfigurationController : ControllerBase
         var logger = plugin.LoggerFactory.CreateLogger<ConfigurationController>();
         var deletedCount = 0;
         var failedCount = 0;
+        var skippedCount = 0;
+
+        logger.LogInformation("Starting deletion of {Count} items from local server", request.SourceItemIds.Count);
 
         foreach (var sourceItemId in request.SourceItemIds)
         {
             var item = plugin.Database.GetBySourceItemId(sourceItemId);
             if (item == null)
             {
+                logger.LogWarning("SKIPPED DELETE: Item {SourceItemId} not found in tracking database", sourceItemId);
+                skippedCount++;
                 continue;
             }
+
+            var fileName = Path.GetFileName(item.LocalPath);
 
             // Only delete if there's a local item ID (meaning Jellyfin knows about it)
             if (!string.IsNullOrEmpty(item.LocalItemId) && Guid.TryParse(item.LocalItemId, out var localItemGuid))
@@ -719,28 +673,55 @@ public class ConfigurationController : ControllerBase
                             localItem.GetParent(),
                             notifyParentItem: true);
 
-                        logger.LogInformation("Deleted local item {FileName}", Path.GetFileName(item.LocalPath));
+                        logger.LogInformation(
+                            "DELETED: {FileName} - Local path: {LocalPath}",
+                            fileName,
+                            item.LocalPath);
                         deletedCount++;
                     }
                     else
                     {
                         // Item not found in Jellyfin, just remove from tracking
-                        logger.LogWarning("Local item {LocalItemId} not found in Jellyfin, removing from tracking", item.LocalItemId);
+                        logger.LogWarning(
+                            "SKIPPED DELETE: {FileName} - Item not found in Jellyfin library (LocalItemId: {LocalItemId}), removing from tracking only",
+                            fileName,
+                            item.LocalItemId);
+                        skippedCount++;
                     }
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex, "Failed to delete local item {FileName}", Path.GetFileName(item.LocalPath));
+                    logger.LogError(
+                        ex,
+                        "FAILED DELETE: {FileName} - {Error}. Local path: {LocalPath}",
+                        fileName,
+                        ex.Message,
+                        item.LocalPath);
                     failedCount++;
                     continue;
                 }
+            }
+            else
+            {
+                logger.LogWarning(
+                    "SKIPPED DELETE: {FileName} - No local item ID, removing from tracking only. Source path: {SourcePath}",
+                    fileName,
+                    item.SourcePath);
+                skippedCount++;
             }
 
             // Remove from our tracking database
             plugin.Database.Delete(sourceItemId);
         }
 
-        return Ok(new { Deleted = deletedCount, Failed = failedCount });
+        logger.LogInformation(
+            "Deletion task complete: {Deleted} deleted, {Failed} failed, {Skipped} skipped out of {Total} items",
+            deletedCount,
+            failedCount,
+            skippedCount,
+            request.SourceItemIds.Count);
+
+        return Ok(new { Deleted = deletedCount, Failed = failedCount, Skipped = skippedCount });
     }
 
     // RemoveFromTracking

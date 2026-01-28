@@ -6,7 +6,6 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
-using Jellyfin.Plugin.ServerSync.Configuration;
 using Jellyfin.Sdk;
 using Jellyfin.Sdk.Generated.Models;
 using Microsoft.Extensions.Logging;
@@ -40,13 +39,12 @@ public class ConnectionTestResult
 
     public string? ServerId { get; set; }
 
-    public string? AccessToken { get; set; }
-
     public string? ErrorMessage { get; set; }
 }
 
 // SourceServerClient
 // Client for communicating with the source Jellyfin server using the official SDK.
+// Uses API key authentication only.
 public class SourceServerClient : IDisposable
 {
     private const string ClientName = "Jellyfin Server Sync";
@@ -59,25 +57,19 @@ public class SourceServerClient : IDisposable
 
     private readonly ILogger<SourceServerClient> _logger;
     private readonly string _serverUrl;
-    private readonly AuthenticationMethod _authMethod;
-    private readonly string? _apiKey;
-    private readonly string? _username;
-    private readonly string? _password;
-    private string? _accessToken;
+    private readonly string _apiKey;
     private readonly HttpClient _httpClient;
     private readonly JellyfinSdkSettings _sdkSettings;
     private JellyfinApiClient? _apiClient;
     private bool _disposed;
 
-    // SourceServerClient (API Key)
-    // Creates client using API key authentication (recommended).
+    // SourceServerClient
+    // Creates client using API key authentication.
     public SourceServerClient(ILogger<SourceServerClient> logger, string serverUrl, string apiKey)
     {
         _logger = logger;
         _serverUrl = serverUrl.TrimEnd('/');
-        _authMethod = AuthenticationMethod.ApiKey;
         _apiKey = apiKey;
-        _accessToken = apiKey;
         _httpClient = new HttpClient
         {
             Timeout = DefaultTimeout
@@ -93,126 +85,12 @@ public class SourceServerClient : IDisposable
         _sdkSettings.SetAccessToken(_apiKey);
     }
 
-    // SourceServerClient (User Credentials)
-    // Creates client using username/password authentication.
-    public SourceServerClient(
-        ILogger<SourceServerClient> logger,
-        string serverUrl,
-        string username,
-        string password,
-        string? cachedAccessToken = null)
-    {
-        _logger = logger;
-        _serverUrl = serverUrl.TrimEnd('/');
-        _authMethod = AuthenticationMethod.UserCredentials;
-        _username = username;
-        _password = password;
-        _accessToken = cachedAccessToken;
-        _httpClient = new HttpClient
-        {
-            Timeout = DefaultTimeout
-        };
-
-        _sdkSettings = new JellyfinSdkSettings();
-        _sdkSettings.SetServerUrl(_serverUrl);
-        _sdkSettings.Initialize(
-            clientName: ClientName,
-            clientVersion: ClientVersion,
-            deviceName: DeviceName,
-            deviceId: DeviceId);
-
-        if (!string.IsNullOrEmpty(cachedAccessToken))
-        {
-            _sdkSettings.SetAccessToken(cachedAccessToken);
-        }
-    }
-
-    // AuthenticateAsync
-    // Authenticates with the server using username/password and returns the access token.
-    public async Task<ConnectionTestResult> AuthenticateAsync(CancellationToken cancellationToken = default)
-    {
-        if (_authMethod == AuthenticationMethod.ApiKey)
-        {
-            return new ConnectionTestResult
-            {
-                Success = true,
-                AccessToken = _apiKey,
-                ErrorMessage = "API key authentication does not require explicit authentication"
-            };
-        }
-
-        try
-        {
-            var client = GetApiClient();
-            var authResult = await client.Users.AuthenticateByName.PostAsync(
-                new AuthenticateUserByName
-                {
-                    Username = _username,
-                    Pw = _password
-                },
-                cancellationToken: cancellationToken).ConfigureAwait(false);
-
-            if (authResult?.AccessToken == null)
-            {
-                return new ConnectionTestResult
-                {
-                    Success = false,
-                    ErrorMessage = "Authentication failed: No access token received"
-                };
-            }
-
-            _accessToken = authResult.AccessToken;
-            _sdkSettings.SetAccessToken(_accessToken);
-
-            _logger.LogInformation("Successfully authenticated with source server as user {Username}", _username);
-
-            return new ConnectionTestResult
-            {
-                Success = true,
-                ServerName = authResult.ServerId,
-                AccessToken = _accessToken
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to authenticate with source server");
-            return new ConnectionTestResult
-            {
-                Success = false,
-                ErrorMessage = $"Authentication failed: {ex.Message}"
-            };
-        }
-    }
-
-    // AccessToken
-    // Gets the current access token (API key or authenticated token).
-    public string? AccessToken => _accessToken;
-
     // TestConnectionAsync
     // Tests connection to the source server and returns server info.
     public async Task<ConnectionTestResult> TestConnectionAsync(CancellationToken cancellationToken = default)
     {
-        return await TestConnectionInternalAsync(0, cancellationToken).ConfigureAwait(false);
-    }
-
-    // TestConnectionInternalAsync
-    // Internal implementation with retry depth tracking to prevent infinite recursion.
-    private async Task<ConnectionTestResult> TestConnectionInternalAsync(int retryDepth, CancellationToken cancellationToken)
-    {
-        const int maxRetryDepth = 1; // Only allow one re-authentication attempt
-
         try
         {
-            // If using user credentials and no access token, authenticate first
-            if (_authMethod == AuthenticationMethod.UserCredentials && string.IsNullOrEmpty(_accessToken))
-            {
-                var authResult = await AuthenticateAsync(cancellationToken).ConfigureAwait(false);
-                if (!authResult.Success)
-                {
-                    return authResult;
-                }
-            }
-
             var client = GetApiClient();
             var info = await client.System.Info.Public.GetAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
 
@@ -220,8 +98,7 @@ public class SourceServerClient : IDisposable
             {
                 Success = true,
                 ServerName = info?.ServerName,
-                ServerId = info?.Id,
-                AccessToken = _accessToken
+                ServerId = info?.Id
             };
         }
         catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
@@ -253,16 +130,6 @@ public class SourceServerClient : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to connect to source server");
-
-            // If token might be expired and using user credentials, try re-authenticating (only once)
-            if (_authMethod == AuthenticationMethod.UserCredentials && !string.IsNullOrEmpty(_accessToken) && retryDepth < maxRetryDepth)
-            {
-                _logger.LogInformation("Attempting to re-authenticate with source server (attempt {Attempt})", retryDepth + 1);
-                _accessToken = null;
-                _sdkSettings.SetAccessToken(string.Empty);
-                return await TestConnectionInternalAsync(retryDepth + 1, cancellationToken).ConfigureAwait(false);
-            }
-
             return new ConnectionTestResult
             {
                 Success = false,
@@ -277,7 +144,6 @@ public class SourceServerClient : IDisposable
     {
         try
         {
-            await EnsureAuthenticatedAsync(cancellationToken).ConfigureAwait(false);
             var client = GetApiClient();
             var folders = await client.Library.VirtualFolders.GetAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
             return folders ?? new List<VirtualFolderInfo>();
@@ -299,7 +165,6 @@ public class SourceServerClient : IDisposable
     {
         try
         {
-            await EnsureAuthenticatedAsync(cancellationToken).ConfigureAwait(false);
             var client = GetApiClient();
             return await client.Items.GetAsync(
                 config =>
@@ -326,7 +191,6 @@ public class SourceServerClient : IDisposable
     {
         try
         {
-            await EnsureAuthenticatedAsync(cancellationToken).ConfigureAwait(false);
             var client = GetApiClient();
             var result = await client.Items.GetAsync(
                 config =>
@@ -357,8 +221,6 @@ public class SourceServerClient : IDisposable
     {
         try
         {
-            await EnsureAuthenticatedAsync(cancellationToken).ConfigureAwait(false);
-
             var url = $"{_serverUrl}/Items/{itemId}/Download";
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             AddAuthorizationHeader(request);
@@ -421,8 +283,6 @@ public class SourceServerClient : IDisposable
     {
         try
         {
-            await EnsureAuthenticatedAsync(cancellationToken).ConfigureAwait(false);
-
             var encodedPath = Uri.EscapeDataString(filePath);
             var url = $"{_serverUrl}/Videos/{itemId}/Subtitles/Stream?mediaSourceId={itemId}&path={encodedPath}";
 
@@ -450,25 +310,11 @@ public class SourceServerClient : IDisposable
         }
     }
 
-    // EnsureAuthenticatedAsync
-    // Ensures the client is authenticated before making API calls.
-    private async Task EnsureAuthenticatedAsync(CancellationToken cancellationToken)
-    {
-        if (_authMethod == AuthenticationMethod.UserCredentials && string.IsNullOrEmpty(_accessToken))
-        {
-            var result = await AuthenticateAsync(cancellationToken).ConfigureAwait(false);
-            if (!result.Success)
-            {
-                throw new InvalidOperationException($"Authentication failed: {result.ErrorMessage}");
-            }
-        }
-    }
-
     // AddAuthorizationHeader
     // Adds the MediaBrowser authorization header to HTTP requests.
     private void AddAuthorizationHeader(HttpRequestMessage request)
     {
-        var authValue = $"MediaBrowser Client=\"{ClientName}\", Device=\"{DeviceName}\", DeviceId=\"{DeviceId}\", Version=\"{ClientVersion}\", Token=\"{_accessToken}\"";
+        var authValue = $"MediaBrowser Client=\"{ClientName}\", Device=\"{DeviceName}\", DeviceId=\"{DeviceId}\", Version=\"{ClientVersion}\", Token=\"{_apiKey}\"";
         request.Headers.Authorization = new AuthenticationHeaderValue("MediaBrowser", authValue);
     }
 

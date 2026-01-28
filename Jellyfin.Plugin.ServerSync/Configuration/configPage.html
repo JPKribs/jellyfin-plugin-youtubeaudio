@@ -24,37 +24,11 @@
                         <div class="fieldDescription">URL of the source Jellyfin server to sync from.</div>
                     </div>
 
-                    <!-- Authentication Method Selection -->
-                    <div class="inputContainer">
-                        <label for="selAuthMethod">Authentication Method:</label>
-                        <select is="emby-select" id="selAuthMethod">
-                            <option value="">Select authentication method...</option>
-                            <option value="0">API Key</option>
-                            <option value="1">Username &amp; Password</option>
-                        </select>
-                    </div>
-
                     <!-- API Key Authentication -->
-                    <div id="apiKeyAuthContainer" style="display: none;">
-                        <div class="inputContainer">
-                            <label for="txtSourceServerApiKey">API Key:</label>
-                            <input is="emby-input" type="password" id="txtSourceServerApiKey" />
-                            <div class="fieldDescription">Generate one in the source server's Dashboard &gt; API Keys.</div>
-                        </div>
-                    </div>
-
-                    <!-- Username/Password Authentication -->
-                    <div id="userAuthContainer" style="display: none;">
-                        <div class="inputContainer">
-                            <label for="txtSourceServerUsername">Username:</label>
-                            <input is="emby-input" type="text" id="txtSourceServerUsername" />
-                            <div class="fieldDescription">Username for the source server.</div>
-                        </div>
-                        <div class="inputContainer">
-                            <label for="txtSourceServerPassword">Password:</label>
-                            <input is="emby-input" type="password" id="txtSourceServerPassword" />
-                            <div class="fieldDescription">Password for the source server.</div>
-                        </div>
+                    <div class="inputContainer">
+                        <label for="txtSourceServerApiKey">API Key:</label>
+                        <input is="emby-input" type="password" id="txtSourceServerApiKey" />
+                        <div class="fieldDescription">Generate one in the source server's Dashboard &gt; API Keys.</div>
                     </div>
 
                     <div id="serverInfoContainer" style="display: none; margin-bottom: 16px; padding: 12px; background: rgba(0,0,0,0.3); border-radius: 4px;">
@@ -817,10 +791,6 @@
                     self.updateDeleteIfMissingLabel(this.checked);
                 });
 
-                document.getElementById('selAuthMethod').addEventListener('change', function() {
-                    self.updateAuthMethodVisibility(this.value);
-                });
-
                 document.getElementById('chkEnableBandwidthScheduling').addEventListener('change', function() {
                     self.updateBandwidthSchedulingVisibility(this.checked);
                 });
@@ -865,13 +835,6 @@
             updateDeletionVisibility: function(deleteIfMissing) {
                 document.getElementById('statusGroupPendingDeletion').style.display = deleteIfMissing ? 'block' : 'none';
                 document.getElementById('optPendingDeletion').style.display = deleteIfMissing ? 'block' : 'none';
-            },
-
-            updateAuthMethodVisibility: function(authMethod) {
-                var isApiKey = authMethod === '0';
-                var isUserAuth = authMethod === '1';
-                document.getElementById('apiKeyAuthContainer').style.display = isApiKey ? 'block' : 'none';
-                document.getElementById('userAuthContainer').style.display = isUserAuth ? 'block' : 'none';
             },
 
             updateBandwidthSchedulingVisibility: function(enabled) {
@@ -937,30 +900,12 @@
                     document.getElementById('txtMinFreeDiskSpace').value = config.MinimumFreeDiskSpaceGb || 10;
                     document.getElementById('txtSourceServerUrl').value = config.SourceServerUrl || '';
                     document.getElementById('txtSourceServerApiKey').value = config.SourceServerApiKey || '';
-                    document.getElementById('txtSourceServerUsername').value = config.SourceServerUsername || '';
-                    // Show placeholder if we have a token (don't expose stored password)
-                    if (config.SourceServerAccessToken && config.AuthMethod === 'UserCredentials') {
-                        document.getElementById('txtSourceServerPassword').value = '';
-                        document.getElementById('txtSourceServerPassword').placeholder = '••••••••••••';
-                    } else {
-                        document.getElementById('txtSourceServerPassword').value = '';
-                        document.getElementById('txtSourceServerPassword').placeholder = '';
-                    }
-                    // AuthMethod may come as string enum name or integer from server
-                    var authMethodValue = '';
-                    if (config.AuthMethod === 'ApiKey' || config.AuthMethod === 0) {
-                        authMethodValue = '0';
-                    } else if (config.AuthMethod === 'UserCredentials' || config.AuthMethod === 1) {
-                        authMethodValue = '1';
-                    }
-                    document.getElementById('selAuthMethod').value = authMethodValue;
                     document.getElementById('chkEnableBandwidthScheduling').checked = config.EnableBandwidthScheduling || false;
                     document.getElementById('txtScheduledStartHour').value = config.ScheduledStartHour || 0;
                     document.getElementById('txtScheduledEndHour').value = config.ScheduledEndHour || 6;
                     document.getElementById('txtScheduledDownloadSpeed').value = config.ScheduledDownloadSpeed || 0;
                     document.getElementById('selScheduledDownloadSpeedUnit').value = config.ScheduledDownloadSpeedUnit || 'MB';
 
-                    self.updateAuthMethodVisibility(authMethodValue);
                     self.updateBandwidthSchedulingVisibility(config.EnableBandwidthScheduling);
                     self.updateContentSyncVisibility(config.EnableContentSync);
                     self.updateDeleteIfMissingLabel(config.RequireApprovalToSync);
@@ -976,7 +921,7 @@
 
                     // Fetch libraries then render mappings
                     var libraryPromises = [self.fetchLocalLibraries()];
-                    if (config.SourceServerUrl && (config.SourceServerApiKey || (config.SourceServerUsername && config.SourceServerPassword))) {
+                    if (config.SourceServerUrl && config.SourceServerApiKey) {
                         libraryPromises.push(self.fetchSourceLibraries());
                     }
 
@@ -1005,13 +950,6 @@
                 config.MinimumFreeDiskSpaceGb = parseInt(document.getElementById('txtMinFreeDiskSpace').value, 10) || 10;
                 config.SourceServerUrl = document.getElementById('txtSourceServerUrl').value;
                 config.SourceServerApiKey = document.getElementById('txtSourceServerApiKey').value;
-                config.SourceServerUsername = document.getElementById('txtSourceServerUsername').value;
-                // Only save password if entered (don't overwrite with empty if we have a token)
-                var passwordField = document.getElementById('txtSourceServerPassword');
-                if (passwordField.value) {
-                    config.SourceServerPassword = passwordField.value;
-                }
-                config.AuthMethod = parseInt(document.getElementById('selAuthMethod').value, 10) || 0;
                 config.EnableBandwidthScheduling = document.getElementById('chkEnableBandwidthScheduling').checked;
                 config.ScheduledStartHour = parseInt(document.getElementById('txtScheduledStartHour').value, 10) || 0;
                 config.ScheduledEndHour = parseInt(document.getElementById('txtScheduledEndHour').value, 10) || 6;
@@ -1031,29 +969,18 @@
             testConnection: function() {
                 var self = this;
                 var url = document.getElementById('txtSourceServerUrl').value;
-                var authMethod = document.getElementById('selAuthMethod').value;
+                var apiKey = document.getElementById('txtSourceServerApiKey').value;
                 var statusEl = document.getElementById('connectionStatus');
+
+                if (!url || !apiKey) {
+                    statusEl.innerHTML = '<span style="color: #d9534f;">Please enter URL and API key</span>';
+                    return;
+                }
 
                 var requestData = {
                     ServerUrl: url,
-                    AuthMethod: parseInt(authMethod, 10)
+                    ApiKey: apiKey
                 };
-
-                if (authMethod === '0') {
-                    requestData.ApiKey = document.getElementById('txtSourceServerApiKey').value;
-                    if (!url || !requestData.ApiKey) {
-                        statusEl.innerHTML = '<span style="color: #d9534f;">Please enter URL and API key</span>';
-                        return;
-                    }
-                } else {
-                    requestData.Username = document.getElementById('txtSourceServerUsername').value;
-                    requestData.Password = document.getElementById('txtSourceServerPassword').value;
-                    requestData.CachedAccessToken = self.currentConfig ? self.currentConfig.SourceServerAccessToken : null;
-                    if (!url || !requestData.Username || !requestData.Password) {
-                        statusEl.innerHTML = '<span style="color: #d9534f;">Please enter URL, username, and password</span>';
-                        return;
-                    }
-                }
 
                 statusEl.textContent = 'Testing...';
 
@@ -1073,14 +1000,6 @@
                         if (self.currentConfig) {
                             self.currentConfig.SourceServerName = response.ServerName;
                             self.currentConfig.SourceServerId = response.ServerId;
-                            if (response.AccessToken) {
-                                self.currentConfig.SourceServerAccessToken = response.AccessToken;
-                                // Clear password field and show placeholder after getting token
-                                document.getElementById('txtSourceServerPassword').value = '';
-                                document.getElementById('txtSourceServerPassword').placeholder = '••••••••••••';
-                                // Clear stored password since we have token
-                                self.currentConfig.SourceServerPassword = '';
-                            }
                         }
 
                         self.fetchSourceLibraries();
@@ -1097,15 +1016,7 @@
                 var config = self.currentConfig || {};
 
                 config.SourceServerUrl = document.getElementById('txtSourceServerUrl').value;
-                config.AuthMethod = parseInt(document.getElementById('selAuthMethod').value, 10) || 0;
                 config.SourceServerApiKey = document.getElementById('txtSourceServerApiKey').value;
-                config.SourceServerUsername = document.getElementById('txtSourceServerUsername').value;
-
-                // Only save password if entered (don't overwrite with empty if we have a token)
-                var passwordField = document.getElementById('txtSourceServerPassword');
-                if (passwordField.value) {
-                    config.SourceServerPassword = passwordField.value;
-                }
 
                 ApiClient.updatePluginConfiguration(self.pluginId, config).then(function() {
                     Dashboard.alert('Server settings saved');
@@ -1118,20 +1029,12 @@
             fetchSourceLibraries: function() {
                 var self = this;
                 var url = document.getElementById('txtSourceServerUrl').value;
-                var authMethod = document.getElementById('selAuthMethod').value;
+                var apiKey = document.getElementById('txtSourceServerApiKey').value;
 
                 var requestData = {
                     ServerUrl: url,
-                    AuthMethod: parseInt(authMethod, 10) || 0
+                    ApiKey: apiKey
                 };
-
-                if (authMethod === '0') {
-                    requestData.ApiKey = document.getElementById('txtSourceServerApiKey').value;
-                } else {
-                    requestData.Username = document.getElementById('txtSourceServerUsername').value;
-                    requestData.Password = document.getElementById('txtSourceServerPassword').value;
-                    requestData.CachedAccessToken = self.currentConfig ? self.currentConfig.SourceServerAccessToken : null;
-                }
 
                 return ApiClient.fetch({
                     url: ApiClient.getUrl('ServerSync/GetSourceLibraries'),

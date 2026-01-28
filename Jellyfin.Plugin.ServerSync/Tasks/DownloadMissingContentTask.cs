@@ -78,7 +78,11 @@ public class DownloadMissingContentTask : IScheduledTask
         config.LastSyncStartTime = DateTime.UtcNow;
         plugin.SaveConfiguration();
 
-        _logger.LogInformation("Starting download of {Count} items", itemsToSync.Count);
+        var totalBytes = itemsToSync.Sum(i => i.SourceSize);
+        _logger.LogInformation(
+            "Starting download of {Count} items ({TotalSize})",
+            itemsToSync.Count,
+            FormatBytes(totalBytes));
 
         using var client = CreateSourceServerClient(config, plugin);
 
@@ -89,13 +93,6 @@ public class DownloadMissingContentTask : IScheduledTask
             return;
         }
 
-        // Save access token if using user credentials
-        if (config.AuthMethod == AuthenticationMethod.UserCredentials && !string.IsNullOrEmpty(connectionResult.AccessToken))
-        {
-            config.SourceServerAccessToken = connectionResult.AccessToken;
-            plugin.SaveConfiguration();
-        }
-
         var tempPath = plugin.GetTempDownloadPath();
         Directory.CreateDirectory(tempPath);
 
@@ -103,7 +100,6 @@ public class DownloadMissingContentTask : IScheduledTask
         var processedItems = 0;
         var successCount = 0;
         var failCount = 0;
-        var skippedCount = 0;
 
         var maxConcurrent = Math.Max(1, config.MaxConcurrentDownloads);
         using var semaphore = new SemaphoreSlim(maxConcurrent);
@@ -120,11 +116,19 @@ public class DownloadMissingContentTask : IScheduledTask
                     return;
                 }
 
+                var fileName = Path.GetFileName(item.LocalPath);
+                var fileSize = FormatBytes(item.SourceSize);
+
                 // Validate path before downloading
                 var pathValidation = ValidatePath(item, config, database);
                 if (!pathValidation.IsValid)
                 {
-                    _logger.LogWarning("Skipping {FileName}: {Message}", Path.GetFileName(item.LocalPath), pathValidation.Message);
+                    _logger.LogWarning(
+                        "SKIPPED: {FileName} ({Size}) - {Reason}. Source: {SourcePath}",
+                        fileName,
+                        fileSize,
+                        pathValidation.Message,
+                        item.SourcePath);
                     database.UpdateStatus(item.SourceItemId, SyncStatus.Errored, errorMessage: pathValidation.Message);
                     Interlocked.Increment(ref failCount);
                     return;
@@ -133,7 +137,11 @@ public class DownloadMissingContentTask : IScheduledTask
                 // Check disk space before each download
                 if (!HasSufficientDiskSpaceForItem(item, config))
                 {
-                    _logger.LogWarning("Skipping {FileName}: insufficient disk space", Path.GetFileName(item.LocalPath));
+                    _logger.LogWarning(
+                        "SKIPPED: {FileName} ({Size}) - Insufficient disk space. Target: {LocalPath}",
+                        fileName,
+                        fileSize,
+                        item.LocalPath);
                     database.UpdateStatus(item.SourceItemId, SyncStatus.Errored, errorMessage: "Insufficient disk space");
                     Interlocked.Increment(ref failCount);
                     return;
@@ -142,7 +150,11 @@ public class DownloadMissingContentTask : IScheduledTask
                 // Check write permissions
                 if (!HasWritePermission(item.LocalPath))
                 {
-                    _logger.LogWarning("Skipping {FileName}: no write permission to target directory", Path.GetFileName(item.LocalPath));
+                    _logger.LogWarning(
+                        "SKIPPED: {FileName} ({Size}) - No write permission to target directory. Target: {LocalPath}",
+                        fileName,
+                        fileSize,
+                        item.LocalPath);
                     database.UpdateStatus(item.SourceItemId, SyncStatus.Errored, errorMessage: "No write permission to target directory");
                     Interlocked.Increment(ref failCount);
                     return;
@@ -160,12 +172,22 @@ public class DownloadMissingContentTask : IScheduledTask
                 {
                     database.UpdateStatus(item.SourceItemId, SyncStatus.Synced, localPath: item.LocalPath);
                     Interlocked.Increment(ref successCount);
-                    _logger.LogInformation("Downloaded {FileName}", Path.GetFileName(item.LocalPath));
+                    _logger.LogInformation(
+                        "DOWNLOADED: {FileName} ({Size}) -> {LocalPath}",
+                        fileName,
+                        fileSize,
+                        item.LocalPath);
                 }
                 else
                 {
                     database.UpdateStatus(item.SourceItemId, SyncStatus.Errored, errorMessage: errorMessage);
                     Interlocked.Increment(ref failCount);
+                    _logger.LogError(
+                        "FAILED: {FileName} ({Size}) - {Error}. Source: {SourcePath}",
+                        fileName,
+                        fileSize,
+                        errorMessage,
+                        item.SourcePath);
                 }
 
                 var processed = Interlocked.Increment(ref processedItems);
@@ -202,7 +224,11 @@ public class DownloadMissingContentTask : IScheduledTask
             _logger.LogWarning(ex, "Failed to save sync end time");
         }
 
-        _logger.LogInformation("Download complete: {Success} succeeded, {Failed} failed, {Skipped} skipped", successCount, failCount, skippedCount);
+        _logger.LogInformation(
+            "Download task complete: {Success} succeeded, {Failed} failed out of {Total} items",
+            successCount,
+            failCount,
+            totalItems);
 
         if (successCount > 0)
         {
@@ -218,19 +244,9 @@ public class DownloadMissingContentTask : IScheduledTask
     }
 
     // CreateSourceServerClient
-    // Creates a source server client based on authentication configuration.
+    // Creates a source server client using API key authentication.
     private static SourceServerClient CreateSourceServerClient(PluginConfiguration config, Plugin plugin)
     {
-        if (config.AuthMethod == AuthenticationMethod.UserCredentials)
-        {
-            return new SourceServerClient(
-                plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
-                config.SourceServerUrl,
-                config.SourceServerUsername,
-                config.SourceServerPassword,
-                config.SourceServerAccessToken);
-        }
-
         return new SourceServerClient(
             plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
             config.SourceServerUrl,
@@ -241,18 +257,8 @@ public class DownloadMissingContentTask : IScheduledTask
     // Checks if valid authentication is configured.
     private static bool HasValidAuthConfiguration(PluginConfiguration config)
     {
-        if (string.IsNullOrWhiteSpace(config.SourceServerUrl))
-        {
-            return false;
-        }
-
-        return config.AuthMethod switch
-        {
-            AuthenticationMethod.ApiKey => !string.IsNullOrWhiteSpace(config.SourceServerApiKey),
-            AuthenticationMethod.UserCredentials => !string.IsNullOrWhiteSpace(config.SourceServerUsername) &&
-                                                    !string.IsNullOrWhiteSpace(config.SourceServerPassword),
-            _ => false
-        };
+        return !string.IsNullOrWhiteSpace(config.SourceServerUrl) &&
+               !string.IsNullOrWhiteSpace(config.SourceServerApiKey);
     }
 
     // HasSufficientDiskSpace
@@ -410,7 +416,6 @@ public class DownloadMissingContentTask : IScheduledTask
     {
         if (string.IsNullOrEmpty(item.LocalPath))
         {
-            _logger.LogWarning("Item {SourceItemId} has no local path configured", item.SourceItemId);
             return (false, "No local path configured");
         }
 
@@ -424,9 +429,7 @@ public class DownloadMissingContentTask : IScheduledTask
 
             if (sourceStream == null)
             {
-                var errorMsg = "No response from server";
-                _logger.LogError("Failed to download {FileName}: {Error}", Path.GetFileName(item.LocalPath), errorMsg);
-                return (false, errorMsg);
+                return (false, "No response from server");
             }
 
             using (var fileStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
@@ -437,11 +440,7 @@ public class DownloadMissingContentTask : IScheduledTask
             var downloadedInfo = new FileInfo(tempFilePath);
             if (item.SourceSize > 0 && downloadedInfo.Length != item.SourceSize)
             {
-                var errorMsg = $"Size mismatch (expected {item.SourceSize}, got {downloadedInfo.Length})";
-                _logger.LogError(
-                    "Download failed for {FileName}: {Error}",
-                    Path.GetFileName(item.LocalPath),
-                    errorMsg);
+                var errorMsg = $"Size mismatch: expected {FormatBytes(item.SourceSize)}, got {FormatBytes(downloadedInfo.Length)}";
                 File.Delete(tempFilePath);
                 return (false, errorMsg);
             }
@@ -471,8 +470,6 @@ public class DownloadMissingContentTask : IScheduledTask
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Download failed for {FileName}", Path.GetFileName(item.LocalPath));
-
             if (File.Exists(tempFilePath))
             {
                 try

@@ -55,14 +55,9 @@ public class UpdateSyncTablesTask : IScheduledTask
             return;
         }
 
-        // Validate authentication based on method
-        var hasValidAuth = config.AuthMethod == AuthenticationMethod.ApiKey
-            ? !string.IsNullOrWhiteSpace(config.SourceServerApiKey)
-            : !string.IsNullOrWhiteSpace(config.SourceServerUsername);
-
-        if (!hasValidAuth)
+        if (string.IsNullOrWhiteSpace(config.SourceServerApiKey))
         {
-            _logger.LogWarning("Sync table update skipped: authentication not configured");
+            _logger.LogWarning("Sync table update skipped: API key not configured");
             return;
         }
 
@@ -75,71 +70,41 @@ public class UpdateSyncTablesTask : IScheduledTask
 
         _logger.LogInformation("Starting sync table update from {SourceUrl}", config.SourceServerUrl);
 
-        SourceServerClient client;
-        if (config.AuthMethod == AuthenticationMethod.UserCredentials)
+        using var client = new SourceServerClient(
+            plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
+            config.SourceServerUrl,
+            config.SourceServerApiKey);
+
+        var connectionResult = await client.TestConnectionAsync(cancellationToken).ConfigureAwait(false);
+        if (!connectionResult.Success)
         {
-            client = new SourceServerClient(
-                plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
-                config.SourceServerUrl,
-                config.SourceServerUsername,
-                config.SourceServerPassword ?? string.Empty,
-                config.SourceServerAccessToken);
-        }
-        else
-        {
-            client = new SourceServerClient(
-                plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
-                config.SourceServerUrl,
-                config.SourceServerApiKey);
+            _logger.LogError("Failed to connect to source server at {SourceUrl}: {Error}",
+                config.SourceServerUrl, connectionResult.ErrorMessage ?? "Unknown error");
+            return;
         }
 
-        using (client)
+        var database = plugin.Database;
+        var totalMappings = enabledMappings.Count;
+        var processedMappings = 0;
+
+        var requireApproval = config.RequireApprovalToSync;
+        var detectUpdatedFiles = config.DetectUpdatedFiles;
+        var deleteIfMissing = config.DeleteIfMissingFromSource;
+
+        foreach (var mapping in enabledMappings)
         {
-            var connectionResult = await client.TestConnectionAsync(cancellationToken).ConfigureAwait(false);
-            if (!connectionResult.Success)
+            if (cancellationToken.IsCancellationRequested)
             {
-                _logger.LogError("Failed to connect to source server at {SourceUrl}: {Error}",
-                    config.SourceServerUrl, connectionResult.ErrorMessage ?? "Unknown error");
-                return;
+                break;
             }
 
-            // Save access token if using user credentials
-            if (config.AuthMethod == AuthenticationMethod.UserCredentials && !string.IsNullOrEmpty(connectionResult.AccessToken))
-            {
-                config.SourceServerAccessToken = connectionResult.AccessToken;
-                try
-                {
-                    plugin.SaveConfiguration();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to save access token");
-                }
-            }
+            await ProcessLibraryAsync(client, database, mapping, requireApproval, detectUpdatedFiles, deleteIfMissing, cancellationToken).ConfigureAwait(false);
 
-            var database = plugin.Database;
-            var totalMappings = enabledMappings.Count;
-            var processedMappings = 0;
-
-            var requireApproval = config.RequireApprovalToSync;
-            var detectUpdatedFiles = config.DetectUpdatedFiles;
-            var deleteIfMissing = config.DeleteIfMissingFromSource;
-
-            foreach (var mapping in enabledMappings)
-            {
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    break;
-                }
-
-                await ProcessLibraryAsync(client, database, mapping, requireApproval, detectUpdatedFiles, deleteIfMissing, cancellationToken).ConfigureAwait(false);
-
-                processedMappings++;
-                progress.Report((double)processedMappings / totalMappings * 100);
-            }
-
-            _logger.LogInformation("Sync table update completed");
+            processedMappings++;
+            progress.Report((double)processedMappings / totalMappings * 100);
         }
+
+        _logger.LogInformation("Sync table update completed");
     }
 
     private async Task ProcessLibraryAsync(
