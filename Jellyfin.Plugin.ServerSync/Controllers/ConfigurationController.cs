@@ -235,6 +235,29 @@ public class ConfigurationController : ControllerBase
         _taskManager = taskManager;
     }
 
+    // SanitizeForLog
+    // Sanitizes user input to prevent log injection attacks.
+    // Removes control characters and truncates to prevent log flooding.
+    private static string SanitizeForLog(string? input)
+    {
+        if (string.IsNullOrEmpty(input))
+        {
+            return "[empty]";
+        }
+
+        // Remove control characters (newlines, tabs, etc.) that could forge log entries
+        var sanitized = new string(input.Where(c => !char.IsControl(c)).ToArray());
+
+        // Truncate to prevent log flooding
+        const int maxLength = 100;
+        if (sanitized.Length > maxLength)
+        {
+            sanitized = string.Concat(sanitized.AsSpan(0, maxLength), "...");
+        }
+
+        return sanitized;
+    }
+
     // TestConnection
     // Tests connection to the source server using API key authentication.
     [HttpPost("TestConnection")]
@@ -576,7 +599,7 @@ public class ConfigurationController : ControllerBase
             catch (Exception ex)
             {
                 plugin.LoggerFactory.CreateLogger<ConfigurationController>()
-                    .LogWarning(ex, "Failed to update status for item {ItemId}", itemId);
+                    .LogWarning(ex, "Failed to update status for item {ItemId}", SanitizeForLog(itemId));
             }
         }
 
@@ -612,7 +635,7 @@ public class ConfigurationController : ControllerBase
             catch (Exception ex)
             {
                 plugin.LoggerFactory.CreateLogger<ConfigurationController>()
-                    .LogWarning(ex, "Failed to update status for item {ItemId}", itemId);
+                    .LogWarning(ex, "Failed to update status for item {ItemId}", SanitizeForLog(itemId));
             }
         }
 
@@ -650,7 +673,7 @@ public class ConfigurationController : ControllerBase
             var item = plugin.Database.GetBySourceItemId(sourceItemId);
             if (item == null)
             {
-                logger.LogWarning("SKIPPED DELETE: Item {SourceItemId} not found in tracking database", sourceItemId);
+                logger.LogWarning("SKIPPED DELETE: Item {SourceItemId} not found in tracking database", SanitizeForLog(sourceItemId));
                 skippedCount++;
                 continue;
             }
@@ -754,7 +777,7 @@ public class ConfigurationController : ControllerBase
             catch (Exception ex)
             {
                 plugin.LoggerFactory.CreateLogger<ConfigurationController>()
-                    .LogWarning(ex, "Failed to remove tracking for item {ItemId}", sourceItemId);
+                    .LogWarning(ex, "Failed to remove tracking for item {ItemId}", SanitizeForLog(sourceItemId));
             }
         }
 

@@ -4,18 +4,26 @@ guid: "ebd650b5-6f4c-4ccb-b10d-23dffb3a7286"
 version: "10.11.1"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
-overview: "Keep multiple Jellyfin servers in sync."
+overview: "Sync media content from a source Jellyfin server to this server."
 description: >
-  Server Sync is a Jellyfin plugin that enables synchronization of media content between multiple Jellyfin servers.
-  Supports parent-child relationships where children sync back to the parent, and peer-to-peer relationships for
-  bi-directional synchronization. Features configurable sync modes including name-only, file size comparison,
-  and date-based matching with conflict resolution options.
+  Server Sync enables one-way content synchronization from a source Jellyfin server to a local server.
+  The plugin periodically scans the source server for media items (Movies, Episodes, Audio, Video)
+  and downloads missing or updated content. Features include library-to-library mapping with path
+  translation, ETag-based change detection, configurable approval workflows, bandwidth throttling
+  with time-based scheduling, and companion file support (subtitles, etc.).
 category: "General"
 owner: "JPKribs"
 artifacts:
 - "Jellyfin.Plugin.ServerSync.dll"
-changelog:
-  fixes:
-  - Stuff here
-  improvements:
-  - Stuff here
+changelog: >
+  Initial release of Server Sync plugin for Jellyfin 10.11.
+
+  Features:
+  - One-way sync from source server to local server
+  - Library-to-library mapping with path translation
+  - ETag-based change detection for reliable updates
+  - Configurable approval workflow for new content and deletions
+  - Bandwidth throttling with time-based scheduling
+  - Companion file support (subtitles, etc.)
+  - Automatic retry for failed downloads (up to 3 attempts)
+  - Pre-download validation to prevent unnecessary downloads
