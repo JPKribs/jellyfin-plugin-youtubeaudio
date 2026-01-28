@@ -6,6 +6,15 @@
     "overview": "Synchronize media content between Jellyfin servers",
     "owner": "JPKribs",
     "category": "General",
-    "versions": []
+    "versions": [
+      {
+        "version": "10.11.0",
+        "changelog": "",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-serversync/releases/download//jellyfin-plugin-serversync-10.11.0.zip",
+        "checksum": "Not Found",
+        "timestamp": "2026-01-28T12:41:16Z"
+      }
+    ]
   }
 ]
