@@ -88,7 +88,7 @@ public class SourceServerClient : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to connect to source server at {ServerUrl}", _serverUrl);
+            _logger.LogError(ex, "Failed to connect to source server");
             return new ConnectionTestResult();
         }
     }
@@ -208,21 +208,18 @@ public class SourceServerClient : IDisposable
                 return companions;
             }
 
-            foreach (var stream in mediaSource.MediaStreams)
-            {
-                if (stream.IsExternal == true && !string.IsNullOrEmpty(stream.Path))
-                {
-                    companions.Add(new CompanionFileInfo
+            companions.AddRange(
+                mediaSource.MediaStreams
+                    .Where(stream => stream.IsExternal == true && !string.IsNullOrEmpty(stream.Path))
+                    .Select(stream => new CompanionFileInfo
                     {
-                        SourcePath = stream.Path,
-                        FileName = Path.GetFileName(stream.Path),
+                        SourcePath = stream.Path!,
+                        FileName = Path.GetFileName(stream.Path)!,
                         Language = stream.Language,
                         Codec = stream.Codec,
                         IsExternal = true,
                         StreamIndex = stream.Index ?? 0
-                    });
-                }
-            }
+                    }));
         }
         catch (Exception ex)
         {
