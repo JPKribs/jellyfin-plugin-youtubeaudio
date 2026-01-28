@@ -1,16 +1,18 @@
 ---
-name: "Template"
-guid: "eb5d7894-8eef-4b36-aa6f-5d124e828ce1"
-version: "1.0.0.0"
-targetAbi: "10.9.0.0"
-framework: "net8.0"
-overview: "Short description about your plugin"
+name: "Server Sync"
+guid: "ebd650b5-6f4c-4ccb-b10d-23dffb3a7286"
+version: "10.11.0"
+targetAbi: "10.11.0.0"
+framework: "net9.0"
+overview: "Keep multiple Jellyfin servers in sync."
 description: >
-  This is a longer description that can span more than one
-  line and include details about your plugin.
+  Server Sync is a Jellyfin plugin that enables synchronization of media content between multiple Jellyfin servers.
+  Supports parent-child relationships where children sync back to the parent, and peer-to-peer relationships for
+  bi-directional synchronization. Features configurable sync modes including name-only, file size comparison,
+  and date-based matching with conflict resolution options.
 category: "General"
-owner: "jellyfin"
+owner: "JPKribs"
 artifacts:
-- "Jellyfin.Plugin.Template.dll"
+- "Jellyfin.Plugin.ServerSync.dll"
 changelog: >
-  changelog
+  Initial release with support for parent-child and peer server relationships.

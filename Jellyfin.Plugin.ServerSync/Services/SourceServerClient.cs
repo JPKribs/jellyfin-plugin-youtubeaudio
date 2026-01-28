@@ -1,0 +1,287 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
+using Jellyfin.Sdk;
+using Jellyfin.Sdk.Generated.Models;
+using Microsoft.Extensions.Logging;
+
+namespace Jellyfin.Plugin.ServerSync.Services;
+
+// CompanionFileInfo
+// Information about a companion file (subtitle, etc.) for an item.
+public class CompanionFileInfo
+{
+    public string SourcePath { get; set; } = string.Empty;
+
+    public string FileName { get; set; } = string.Empty;
+
+    public string? Language { get; set; }
+
+    public string? Codec { get; set; }
+
+    public bool IsExternal { get; set; }
+
+    public int StreamIndex { get; set; }
+}
+
+// ConnectionTestResult
+// Result of a connection test containing server info.
+public class ConnectionTestResult
+{
+    public string? ServerName { get; set; }
+
+    public string? ServerId { get; set; }
+}
+
+// SourceServerClient
+// Client for communicating with the source Jellyfin server using the official SDK.
+public class SourceServerClient : IDisposable
+{
+    private const string ClientName = "Jellyfin Server Sync";
+    private const string ClientVersion = "1.0.0";
+    private const string DeviceName = "Server Sync Plugin";
+    private static readonly string DeviceId = "serversync-plugin-" + Environment.MachineName.ToLowerInvariant();
+
+    private readonly ILogger<SourceServerClient> _logger;
+    private readonly string _serverUrl;
+    private readonly string _apiKey;
+    private readonly HttpClient _httpClient;
+    private readonly JellyfinSdkSettings _sdkSettings;
+    private JellyfinApiClient? _apiClient;
+    private bool _disposed;
+
+    public SourceServerClient(ILogger<SourceServerClient> logger, string serverUrl, string apiKey)
+    {
+        _logger = logger;
+        _serverUrl = serverUrl.TrimEnd('/');
+        _apiKey = apiKey;
+        _httpClient = new HttpClient();
+
+        _sdkSettings = new JellyfinSdkSettings();
+        _sdkSettings.SetServerUrl(_serverUrl);
+        _sdkSettings.Initialize(
+            clientName: ClientName,
+            clientVersion: ClientVersion,
+            deviceName: DeviceName,
+            deviceId: DeviceId);
+        _sdkSettings.SetAccessToken(_apiKey);
+    }
+
+    // TestConnectionAsync
+    // Tests connection to the source server and returns server info.
+    public async Task<ConnectionTestResult> TestConnectionAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var client = GetApiClient();
+            var info = await client.System.Info.Public.GetAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+
+            return new ConnectionTestResult
+            {
+                ServerName = info?.ServerName,
+                ServerId = info?.Id
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to connect to source server at {ServerUrl}", _serverUrl);
+            return new ConnectionTestResult();
+        }
+    }
+
+    // GetLibrariesAsync
+    // Gets all libraries from the source server.
+    public async Task<List<VirtualFolderInfo>> GetLibrariesAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var client = GetApiClient();
+            var folders = await client.Library.VirtualFolders.GetAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            return folders ?? new List<VirtualFolderInfo>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get libraries from source server");
+            return new List<VirtualFolderInfo>();
+        }
+    }
+
+    // GetLibraryItemsAsync
+    // Gets items from a library with pagination support.
+    public async Task<BaseItemDtoQueryResult?> GetLibraryItemsAsync(
+        Guid libraryId,
+        int startIndex = 0,
+        int limit = 100,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var client = GetApiClient();
+            return await client.Items.GetAsync(
+                config =>
+                {
+                    config.QueryParameters.ParentId = libraryId;
+                    config.QueryParameters.Recursive = true;
+                    config.QueryParameters.IncludeItemTypes = new[] { BaseItemKind.Movie, BaseItemKind.Episode, BaseItemKind.Audio, BaseItemKind.Video };
+                    config.QueryParameters.Fields = new[] { ItemFields.Path, ItemFields.DateCreated, ItemFields.MediaSources };
+                    config.QueryParameters.StartIndex = startIndex;
+                    config.QueryParameters.Limit = limit;
+                },
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get items from library {LibraryId}", libraryId);
+            return null;
+        }
+    }
+
+    // GetItemDetailsAsync
+    // Gets detailed item info including media sources and streams.
+    public async Task<BaseItemDto?> GetItemDetailsAsync(Guid itemId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var client = GetApiClient();
+            var result = await client.Items.GetAsync(
+                config =>
+                {
+                    config.QueryParameters.Ids = new Guid?[] { itemId };
+                    config.QueryParameters.Fields = new[]
+                    {
+                        ItemFields.Path,
+                        ItemFields.DateCreated,
+                        ItemFields.MediaSources,
+                        ItemFields.MediaStreams
+                    };
+                },
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+
+            return result?.Items?.FirstOrDefault();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get item details for {ItemId}", itemId);
+            return null;
+        }
+    }
+
+    // DownloadFileAsync
+    // Downloads a file from the source server.
+    public async Task<Stream?> DownloadFileAsync(Guid itemId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var url = $"{_serverUrl}/Items/{itemId}/Download?api_key={_apiKey}";
+            var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to download item {ItemId}", itemId);
+            return null;
+        }
+    }
+
+    // GetCompanionFilesAsync
+    // Gets external companion files (subtitles, etc.) for an item.
+    public async Task<List<CompanionFileInfo>> GetCompanionFilesAsync(Guid itemId, CancellationToken cancellationToken = default)
+    {
+        var companions = new List<CompanionFileInfo>();
+
+        try
+        {
+            var item = await GetItemDetailsAsync(itemId, cancellationToken).ConfigureAwait(false);
+            if (item?.MediaSources == null || item.MediaSources.Count == 0)
+            {
+                return companions;
+            }
+
+            var mediaSource = item.MediaSources.FirstOrDefault();
+            if (mediaSource?.MediaStreams == null)
+            {
+                return companions;
+            }
+
+            foreach (var stream in mediaSource.MediaStreams)
+            {
+                if (stream.IsExternal == true && !string.IsNullOrEmpty(stream.Path))
+                {
+                    companions.Add(new CompanionFileInfo
+                    {
+                        SourcePath = stream.Path,
+                        FileName = Path.GetFileName(stream.Path),
+                        Language = stream.Language,
+                        Codec = stream.Codec,
+                        IsExternal = true,
+                        StreamIndex = stream.Index ?? 0
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get companion files for {ItemId}", itemId);
+        }
+
+        return companions;
+    }
+
+    // DownloadCompanionFileAsync
+    // Downloads an external subtitle or companion file by its path.
+    public async Task<Stream?> DownloadCompanionFileAsync(Guid itemId, string filePath, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var encodedPath = Uri.EscapeDataString(filePath);
+            var url = $"{_serverUrl}/Videos/{itemId}/Subtitles/Stream?api_key={_apiKey}&mediaSourceId={itemId}&path={encodedPath}";
+
+            var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                var directUrl = $"{_serverUrl}/Items/{itemId}/File?api_key={_apiKey}&path={encodedPath}";
+                response = await _httpClient.GetAsync(directUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            }
+
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to download companion file {FilePath} for {ItemId}", filePath, itemId);
+            return null;
+        }
+    }
+
+    private JellyfinApiClient GetApiClient()
+    {
+        if (_apiClient == null)
+        {
+            var authProvider = new JellyfinAuthenticationProvider(_sdkSettings);
+            var adapter = new JellyfinRequestAdapter(authProvider, _sdkSettings, _httpClient);
+            _apiClient = new JellyfinApiClient(adapter);
+        }
+
+        return _apiClient;
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!_disposed && disposing)
+        {
+            _httpClient.Dispose();
+            _disposed = true;
+        }
+    }
+}

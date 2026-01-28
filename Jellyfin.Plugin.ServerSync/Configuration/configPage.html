@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Server Sync</title>
+</head>
+<body>
+<div id="ServerSyncConfigPage" data-role="page" class="page type-interior pluginConfigurationPage">
+    <div data-role="content">
+        <div class="content-primary">
+            <form id="ServerSyncConfigForm">
+                <div class="verticalSection verticalSection-extrabottompadding">
+                    <div class="sectionTitleContainer flex align-items-center">
+                        <h1 class="sectionTitle">Server Sync</h1>
+                    </div>
+
+                    <!-- Source Server Configuration -->
+                    <div class="sectionTitleContainer">
+                        <h2 class="sectionTitle">Source Server</h2>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label for="txtSourceServerUrl">Server URL:</label>
+                        <input is="emby-input" type="text" id="txtSourceServerUrl" placeholder="http://server:8096" />
+                        <div class="fieldDescription">URL of the source Jellyfin server to sync from.</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label for="txtSourceServerApiKey">API Key:</label>
+                        <input is="emby-input" type="password" id="txtSourceServerApiKey" />
+                        <div class="fieldDescription">API key for authenticating with the source server.</div>
+                    </div>
+
+                    <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 16px;">
+                        <button is="emby-button" type="button" id="btnTestConnection" class="raised button-primary">
+                            <span>Test Connection</span>
+                        </button>
+                        <span id="connectionStatus"></span>
+                    </div>
+
+                    <div id="serverInfoContainer" style="display: none; margin-bottom: 16px; padding: 12px; background: rgba(0,0,0,0.3); border-radius: 4px;">
+                        <div style="display: flex; gap: 24px;">
+                            <div>
+                                <span style="opacity: 0.7;">Server Name:</span>
+                                <span id="txtSourceServerName"></span>
+                            </div>
+                            <div>
+                                <span style="opacity: 0.7;">Server ID:</span>
+                                <span id="txtSourceServerId"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab Navigation -->
+                    <div class="tabSeparator"></div>
+
+                    <div class="tabContainer" style="margin-bottom: 16px;">
+                        <button is="emby-button" type="button" class="tabButton raised active" data-tab="content">
+                            <span>Content</span>
+                        </button>
+                        <button is="emby-button" type="button" class="tabButton raised" data-tab="history" disabled>
+                            <span>History</span>
+                        </button>
+                        <button is="emby-button" type="button" class="tabButton raised" data-tab="users" disabled>
+                            <span>Users</span>
+                        </button>
+                    </div>
+
+                    <!-- Content Tab -->
+                    <div id="tabContent" class="tabPanel">
+                        <div class="inputContainer">
+                            <label class="checkboxContainer">
+                                <input is="emby-checkbox" type="checkbox" id="chkEnableContentSync" />
+                                <span>Enable Content Sync</span>
+                            </label>
+                            <div class="fieldDescription">Enable syncing content from the source server.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="checkboxContainer">
+                                <input is="emby-checkbox" type="checkbox" id="chkIncludeExtras" />
+                                <span>Include Companion Files</span>
+                            </label>
+                            <div class="fieldDescription">Also download external subtitles and other companion files when available.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="checkboxContainer">
+                                <input is="emby-checkbox" type="checkbox" id="chkRequireApproval" />
+                                <span>Require Approval to Sync</span>
+                            </label>
+                            <div class="fieldDescription">When enabled, new items will be set to Pending status until manually approved.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="checkboxContainer">
+                                <input is="emby-checkbox" type="checkbox" id="chkDetectUpdatedFiles" />
+                                <span>Detect Updated Files</span>
+                            </label>
+                            <div class="fieldDescription">Re-queue files if the source file size differs or if the source was modified after last sync.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="checkboxContainer">
+                                <input is="emby-checkbox" type="checkbox" id="chkDeleteIfMissing" />
+                                <span>Delete if Missing from Source</span>
+                            </label>
+                            <div class="fieldDescription">Delete local files when they no longer exist on the source server. If Require Approval is enabled, items will be marked for deletion approval first. Deletions only affect this local server, never the source.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label for="txtMaxConcurrentDownloads">Max Concurrent Downloads:</label>
+                            <input is="emby-input" type="number" id="txtMaxConcurrentDownloads" min="1" max="10" />
+                            <div class="fieldDescription">Maximum number of simultaneous downloads (1-10).</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label for="txtMaxDownloadSpeed">Max Download Speed (MB/s):</label>
+                            <input is="emby-input" type="number" id="txtMaxDownloadSpeed" min="0" />
+                            <div class="fieldDescription">Maximum download speed in MB/s. Set to 0 for unlimited.</div>
+                        </div>
+
+                        <!-- Library Mappings -->
+                        <div class="sectionTitleContainer">
+                            <h2 class="sectionTitle">Library Mappings</h2>
+                        </div>
+
+                        <div id="libraryMappingsContainer">
+                            <!-- Populated dynamically -->
+                        </div>
+
+                        <button is="emby-button" type="button" id="btnAddMapping" class="raised button-primary" style="margin-top: 8px;">
+                            <span>Add Mapping</span>
+                        </button>
+
+                        <!-- Sync Status -->
+                        <div class="sectionTitleContainer">
+                            <h2 class="sectionTitle">Sync Status</h2>
+                        </div>
+
+                        <div id="syncStatusSummary" class="statusCards">
+                            <div class="statusCard statusCard-synced" id="statusGroupSynced" title="">
+                                <span class="statusCard-count" id="syncedCount">0</span>
+                                <span class="statusCard-label">Synced</span>
+                            </div>
+                            <div class="statusCard statusCard-queued" id="statusGroupQueued" title="">
+                                <span class="statusCard-count" id="queuedCount">0</span>
+                                <span class="statusCard-label">Queued</span>
+                            </div>
+                            <div class="statusCard statusCard-ignored" id="statusGroupIgnored" title="">
+                                <span class="statusCard-count" id="ignoredCount">0</span>
+                                <span class="statusCard-label">Ignored</span>
+                            </div>
+                            <div class="statusCard statusCard-pending" id="statusGroupPending" title="" style="display: none;">
+                                <span class="statusCard-count" id="pendingCount">0</span>
+                                <span class="statusCard-label">Pending</span>
+                            </div>
+                            <div class="statusCard statusCard-pendingDeletion" id="statusGroupPendingDeletion" title="" style="display: none;">
+                                <span class="statusCard-count" id="pendingDeletionCount">0</span>
+                                <span class="statusCard-label">Pending Deletion</span>
+                            </div>
+                        </div>
+
+                        <!-- Sync Items -->
+                        <div class="sectionTitleContainer">
+                            <h2 class="sectionTitle">Sync Items</h2>
+                        </div>
+
+                        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 16px;">
+                            <select is="emby-select" id="selStatusFilter" style="width: auto;">
+                                <option value="">All</option>
+                                <option value="Synced">Synced</option>
+                                <option value="Queued">Queued</option>
+                                <option value="Errored">Errored</option>
+                                <option value="Ignored">Ignored</option>
+                                <option value="Pending" id="optPending" style="display: none;">Pending</option>
+                                <option value="PendingDeletion" id="optPendingDeletion" style="display: none;">Pending Deletion</option>
+                            </select>
+                            <button is="emby-button" type="button" id="btnRefreshItems" class="raised">
+                                <span>Refresh</span>
+                            </button>
+                        </div>
+
+                        <div id="bulkActionsContainer" style="display: flex; gap: 8px; align-items: center; margin-bottom: 16px;">
+                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                                <input type="checkbox" id="chkSelectAll" />
+                                <span>Select All</span>
+                            </label>
+                            <span id="selectedCount" style="margin-left: 8px;">0 selected</span>
+                            <button is="emby-button" type="button" id="btnBulkIgnore" class="raised" style="margin-left: 8px;">
+                                <span>Ignore</span>
+                            </button>
+                            <button is="emby-button" type="button" id="btnBulkQueue" class="raised button-primary">
+                                <span>Queue</span>
+                            </button>
+                            <button is="emby-button" type="button" id="btnBulkDelete" class="raised button-destructive" title="Delete from local server only">
+                                <span>Delete</span>
+                            </button>
+                        </div>
+
+                        <div id="syncItemsContainer" style="max-height: 400px; overflow-y: auto;">
+                            <!-- Items populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- History Tab (placeholder) -->
+                    <div id="tabHistory" class="tabPanel" style="display: none;">
+                        <div style="padding: 16px; opacity: 0.7;">History feature coming soon.</div>
+                    </div>
+
+                    <!-- Users Tab (placeholder) -->
+                    <div id="tabUsers" class="tabPanel" style="display: none;">
+                        <div style="padding: 16px; opacity: 0.7;">Users sync feature coming soon.</div>
+                    </div>
+
+                    <!-- Save Button -->
+                    <div class="sectionTitleContainer"></div>
+
+                    <div class="inputContainer">
+                        <button is="emby-button" type="submit" class="raised button-submit block">
+                            <span>Save</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Item Detail Modal -->
+    <div id="itemDetailModal" class="dialog" style="display: none;">
+        <div class="dialogContent" style="max-width: 600px; position: relative;">
+            <button type="button" id="btnModalClose" class="dialogCloseBtn" title="Close">&times;</button>
+            <h2 id="modalTitle" style="margin-top: 0; padding-right: 32px;"></h2>
+            <div id="modalContent" style="margin: 16px 0;">
+                <div style="margin-bottom: 12px;">
+                    <div style="opacity: 0.7; margin-bottom: 4px;">Status</div>
+                    <div id="modalStatus"></div>
+                </div>
+                <div style="margin-bottom: 12px;">
+                    <div style="opacity: 0.7; margin-bottom: 4px;">Size</div>
+                    <div id="modalSize"></div>
+                </div>
+                <div style="margin-bottom: 12px;">
+                    <div style="opacity: 0.7; margin-bottom: 4px;">Source Path</div>
+                    <div id="modalSourcePath" style="word-break: break-all;"></div>
+                </div>
+                <div style="margin-bottom: 12px;">
+                    <div style="opacity: 0.7; margin-bottom: 4px;">Local Path</div>
+                    <div id="modalLocalPath" style="word-break: break-all;"></div>
+                    <div id="modalLocalPathNote" class="fieldDescription" style="margin-top: 4px;"></div>
+                </div>
+                <div id="modalCompanionFilesSection" style="margin-bottom: 12px; display: none;">
+                    <div style="opacity: 0.7; margin-bottom: 4px;">Companion Files</div>
+                    <div id="modalCompanionFiles" style="word-break: break-all;"></div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                <button is="emby-button" type="button" id="btnModalIgnore" class="raised">
+                    <span>Ignore</span>
+                </button>
+                <button is="emby-button" type="button" id="btnModalQueue" class="raised button-primary">
+                    <span>Queue</span>
+                </button>
+                <button is="emby-button" type="button" id="btnModalDelete" class="raised button-destructive" title="Delete from local server only">
+                    <span>Delete</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* Section titles with bottom border - applies to both h1 and h2 */
+        .sectionTitleContainer .sectionTitle {
+            width: 100%;
+            border-bottom: 1px solid #555;
+            padding-bottom: 0.5em;
+            margin-bottom: 1em;
+        }
+
+        /* Server info container separator */
+        #serverInfoContainer {
+            border-bottom: 1px solid #555;
+            padding-bottom: 16px;
+        }
+
+        /* Tab separator line */
+        .tabSeparator {
+            border-bottom: 1px solid #555;
+            margin-bottom: 16px;
+        }
+
+        /* Tab navigation - fill width equally */
+        .tabContainer {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+        }
+        .tabButton {
+            flex: 1;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .tabButton span {
+            display: block;
+            width: 100%;
+            text-align: center;
+        }
+        .tabButton.active {
+            background-color: #00a4dc !important;
+            color: #fff !important;
+        }
+        .tabButton:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        /* Button styles - primary (blue), secondary (gray), destructive (red) */
+        .button-primary,
+        .button-submit {
+            background-color: #00a4dc !important;
+            color: #fff !important;
+        }
+        .button-primary:hover,
+        .button-submit:hover {
+            background-color: #0088cc !important;
+        }
+        .button-destructive {
+            background-color: #d9534f !important;
+            color: #fff !important;
+        }
+        .button-destructive:hover {
+            background-color: #c9302c !important;
+        }
+
+        /* Status cards */
+        .statusCards {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .statusCard {
+            flex: 1;
+            padding: 12px 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .statusCard-count {
+            display: block;
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+        .statusCard-label {
+            display: block;
+            font-size: 0.85em;
+            opacity: 0.9;
+        }
+        .statusCard-synced {
+            background: rgba(92, 184, 92, 0.2);
+            color: #5cb85c;
+        }
+        .statusCard-queued {
+            background: rgba(240, 173, 78, 0.2);
+            color: #f0ad4e;
+        }
+        .statusCard-ignored {
+            background: rgba(153, 153, 153, 0.2);
+            color: #999;
+        }
+        .statusCard-pending {
+            background: rgba(155, 89, 182, 0.2);
+            color: #9b59b6;
+        }
+        .statusCard-pendingDeletion {
+            background: rgba(217, 83, 79, 0.2);
+            color: #d9534f;
+        }
+
+        /* Sync items list */
+        .syncItem {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            cursor: pointer;
+        }
+        .syncItem:hover {
+            background: rgba(255,255,255,0.05);
+        }
+        .syncItemCheckbox {
+            margin-right: 12px;
+        }
+        .syncItemInfo {
+            flex: 1;
+            min-width: 0;
+        }
+        .syncItemName {
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .syncItemPath {
+            font-size: 0.85em;
+            opacity: 0.7;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .syncItemPath.notExists {
+            color: #9b59b6;
+            font-style: italic;
+        }
+        .syncItemStatus {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            margin-left: 12px;
+        }
+        .syncItemStatus.Synced { background: rgba(92, 184, 92, 0.2); color: #5cb85c; }
+        .syncItemStatus.Queued { background: rgba(240, 173, 78, 0.2); color: #f0ad4e; }
+        .syncItemStatus.Errored { background: rgba(217, 83, 79, 0.2); color: #d9534f; }
+        .syncItemStatus.Ignored { background: rgba(153, 153, 153, 0.2); color: #999; }
+        .syncItemStatus.Pending { background: rgba(155, 89, 182, 0.2); color: #9b59b6; }
+        .syncItemStatus.PendingDeletion { background: rgba(217, 83, 79, 0.2); color: #d9534f; }
+
+        /* Library mappings - 2 column layout */
+        .libraryMapping {
+            margin-bottom: 2em;
+            padding-bottom: 1em;
+            border-bottom: 1px solid #555;
+        }
+        .libraryMapping:last-child {
+            border-bottom: none;
+            margin-bottom: 1em;
+        }
+        .mappingGrid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0 24px;
+        }
+        .mappingHeader {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1em;
+        }
+        .mappingColumn {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Dialog/Modal styling */
+        .dialog {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+        .dialogContent {
+            background: var(--theme-background-primary, #1c1c1c);
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .dialogCloseBtn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            opacity: 0.7;
+            padding: 4px 8px;
+            line-height: 1;
+        }
+        .dialogCloseBtn:hover {
+            opacity: 1;
+        }
+
+        /* Nested settings with left border */
+        .nested-settings {
+            margin-left: 1.5em;
+            padding-left: 1em;
+            border-left: 2px solid rgba(85, 85, 85, 0.3);
+        }
+    </style>
+
+    <script type="text/javascript">
+        var ServerSyncConfig = {
+            pluginId: 'ebd650b5-6f4c-4ccb-b10d-23dffb3a7286',
+            currentConfig: null,
+            syncItems: [],
+            filteredItems: [],
+            selectedItems: new Set(),
+            sourceLibraries: [],
+            localLibraries: [],
+            currentModalItem: null,
+
+            init: function() {
+                var self = this;
+
+                document.getElementById('btnTestConnection').addEventListener('click', function() { self.testConnection(); });
+                document.getElementById('btnAddMapping').addEventListener('click', function() { self.addMapping(); });
+                document.getElementById('btnRefreshItems').addEventListener('click', function() { self.loadSyncItems(); });
+                document.getElementById('selStatusFilter').addEventListener('change', function() { self.loadSyncItems(); });
+
+                document.getElementById('btnBulkIgnore').addEventListener('click', function() { self.bulkIgnore(); });
+                document.getElementById('btnBulkQueue').addEventListener('click', function() { self.bulkQueue(); });
+                document.getElementById('btnBulkDelete').addEventListener('click', function() { self.bulkDelete(); });
+                document.getElementById('chkSelectAll').addEventListener('change', function() { self.toggleSelectAll(this.checked); });
+
+                document.getElementById('btnModalIgnore').addEventListener('click', function() { self.modalIgnore(); });
+                document.getElementById('btnModalQueue').addEventListener('click', function() { self.modalQueue(); });
+                document.getElementById('btnModalDelete').addEventListener('click', function() { self.modalDelete(); });
+                document.getElementById('btnModalClose').addEventListener('click', function() { self.closeModal(); });
+
+                document.getElementById('chkDeleteIfMissing').addEventListener('change', function() {
+                    self.updateDeletionVisibility(this.checked);
+                });
+
+                document.getElementById('chkRequireApproval').addEventListener('change', function() {
+                    self.updatePendingVisibility(this.checked);
+                });
+
+                document.getElementById('ServerSyncConfigForm').addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    self.saveConfig();
+                });
+
+                // Tab navigation
+                document.querySelectorAll('.tabButton').forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        if (this.disabled) return;
+                        self.switchTab(this.dataset.tab);
+                    });
+                });
+
+                self.loadConfig();
+            },
+
+            switchTab: function(tabId) {
+                document.querySelectorAll('.tabButton').forEach(function(btn) {
+                    btn.classList.toggle('active', btn.dataset.tab === tabId);
+                });
+                document.querySelectorAll('.tabPanel').forEach(function(panel) {
+                    panel.style.display = panel.id === 'tab' + tabId.charAt(0).toUpperCase() + tabId.slice(1) ? 'block' : 'none';
+                });
+            },
+
+            updatePendingVisibility: function(requireApproval) {
+                document.getElementById('statusGroupPending').style.display = requireApproval ? 'block' : 'none';
+                document.getElementById('optPending').style.display = requireApproval ? 'block' : 'none';
+            },
+
+            updateDeletionVisibility: function(deleteIfMissing) {
+                document.getElementById('statusGroupPendingDeletion').style.display = deleteIfMissing ? 'block' : 'none';
+                document.getElementById('optPendingDeletion').style.display = deleteIfMissing ? 'block' : 'none';
+            },
+
+            loadConfig: function() {
+                var self = this;
+
+                ApiClient.getPluginConfiguration(self.pluginId).then(function(config) {
+                    self.currentConfig = config;
+
+                    document.getElementById('chkEnableContentSync').checked = config.EnableContentSync || false;
+                    document.getElementById('chkIncludeExtras').checked = config.IncludeCompanionFiles || false;
+                    document.getElementById('chkRequireApproval').checked = config.RequireApprovalToSync || false;
+                    document.getElementById('chkDetectUpdatedFiles').checked = config.DetectUpdatedFiles !== false;
+                    document.getElementById('chkDeleteIfMissing').checked = config.DeleteIfMissingFromSource || false;
+                    document.getElementById('txtMaxConcurrentDownloads').value = config.MaxConcurrentDownloads || 2;
+                    document.getElementById('txtMaxDownloadSpeed').value = config.MaxDownloadSpeedMbps || 0;
+                    document.getElementById('txtSourceServerUrl').value = config.SourceServerUrl || '';
+                    document.getElementById('txtSourceServerApiKey').value = config.SourceServerApiKey || '';
+
+                    if (config.SourceServerName || config.SourceServerId) {
+                        document.getElementById('txtSourceServerName').textContent = config.SourceServerName || 'Unknown';
+                        document.getElementById('txtSourceServerId').textContent = config.SourceServerId || 'Unknown';
+                        document.getElementById('serverInfoContainer').style.display = 'block';
+                    }
+
+                    self.updatePendingVisibility(config.RequireApprovalToSync);
+                    self.updateDeletionVisibility(config.DeleteIfMissingFromSource);
+
+                    // Fetch local libraries first, then render mappings
+                    self.fetchLocalLibraries().then(function() {
+                        self.renderMappings(config.LibraryMappings || []);
+                    });
+
+                    self.loadSyncStatus();
+                    self.loadSyncItems();
+
+                    if (config.SourceServerUrl && config.SourceServerApiKey) {
+                        self.fetchSourceLibraries(config.SourceServerUrl, config.SourceServerApiKey);
+                    }
+                });
+            },
+
+            saveConfig: function() {
+                var self = this;
+                var config = self.currentConfig || {};
+
+                config.EnableContentSync = document.getElementById('chkEnableContentSync').checked;
+                config.IncludeCompanionFiles = document.getElementById('chkIncludeExtras').checked;
+                config.RequireApprovalToSync = document.getElementById('chkRequireApproval').checked;
+                config.DetectUpdatedFiles = document.getElementById('chkDetectUpdatedFiles').checked;
+                config.DeleteIfMissingFromSource = document.getElementById('chkDeleteIfMissing').checked;
+                config.MaxConcurrentDownloads = parseInt(document.getElementById('txtMaxConcurrentDownloads').value, 10) || 2;
+                config.MaxDownloadSpeedMbps = parseInt(document.getElementById('txtMaxDownloadSpeed').value, 10) || 0;
+                config.SourceServerUrl = document.getElementById('txtSourceServerUrl').value;
+                config.SourceServerApiKey = document.getElementById('txtSourceServerApiKey').value;
+                config.LibraryMappings = self.collectMappings();
+
+                ApiClient.updatePluginConfiguration(self.pluginId, config).then(function() {
+                    Dashboard.alert('Settings saved');
+                    self.updatePendingVisibility(config.RequireApprovalToSync);
+                }).catch(function(err) {
+                    console.error('Failed to save config:', err);
+                    Dashboard.alert('Failed to save settings');
+                });
+            },
+
+            testConnection: function() {
+                var self = this;
+                var url = document.getElementById('txtSourceServerUrl').value;
+                var apiKey = document.getElementById('txtSourceServerApiKey').value;
+                var statusEl = document.getElementById('connectionStatus');
+
+                if (!url || !apiKey) {
+                    statusEl.innerHTML = '<span style="color: #d9534f;">Please enter URL and API key</span>';
+                    return;
+                }
+
+                statusEl.textContent = 'Testing...';
+
+                ApiClient.fetch({
+                    url: ApiClient.getUrl('ServerSync/TestConnection'),
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ ServerUrl: url, ApiKey: apiKey }),
+                    dataType: 'json'
+                }).then(function(response) {
+                    if (response && response.Success) {
+                        statusEl.innerHTML = '<span style="color: #5cb85c;">Connected to ' + self.escapeHtml(response.ServerName) + '</span>';
+                        document.getElementById('txtSourceServerName').textContent = response.ServerName || 'Unknown';
+                        document.getElementById('txtSourceServerId').textContent = response.ServerId || 'Unknown';
+                        document.getElementById('serverInfoContainer').style.display = 'block';
+
+                        if (self.currentConfig) {
+                            self.currentConfig.SourceServerName = response.ServerName;
+                            self.currentConfig.SourceServerId = response.ServerId;
+                        }
+
+                        self.fetchSourceLibraries(url, apiKey);
+                    } else {
+                        statusEl.innerHTML = '<span style="color: #d9534f;">' + self.escapeHtml((response && response.Message) || 'Connection failed') + '</span>';
+                    }
+                }).catch(function() {
+                    statusEl.innerHTML = '<span style="color: #d9534f;">Connection failed</span>';
+                });
+            },
+
+            fetchSourceLibraries: function(url, apiKey) {
+                var self = this;
+                ApiClient.fetch({
+                    url: ApiClient.getUrl('ServerSync/GetSourceLibraries'),
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ ServerUrl: url, ApiKey: apiKey }),
+                    dataType: 'json'
+                }).then(function(libraries) {
+                    self.sourceLibraries = libraries || [];
+                    self.updateLibrarySelects();
+                });
+            },
+
+            fetchLocalLibraries: function() {
+                var self = this;
+                return ApiClient.fetch({
+                    url: ApiClient.getUrl('Library/VirtualFolders'),
+                    type: 'GET',
+                    dataType: 'json'
+                }).then(function(folders) {
+                    self.localLibraries = (folders || []).map(function(folder) {
+                        return {
+                            Id: folder.ItemId,
+                            Name: folder.Name,
+                            Locations: folder.Locations || []
+                        };
+                    });
+                }).catch(function() {
+                    self.localLibraries = [];
+                });
+            },
+
+            updateLibrarySelects: function() {
+                var self = this;
+                // Update source library selects
+                var sourceSelects = document.querySelectorAll('.sourceLibrarySelect');
+                sourceSelects.forEach(function(select) {
+                    // Use saved value from data attribute, or current value
+                    var savedValue = select.dataset.savedValue || select.value;
+                    select.innerHTML = '<option value="">Select source library...</option>';
+                    self.sourceLibraries.forEach(function(lib) {
+                        var option = document.createElement('option');
+                        option.value = lib.Id;
+                        option.textContent = lib.Name;
+                        option.dataset.locations = JSON.stringify(lib.Locations);
+                        select.appendChild(option);
+                    });
+                    if (savedValue) {
+                        select.value = savedValue;
+                    }
+                });
+
+                // Update local library selects
+                self.updateLocalLibrarySelects();
+            },
+
+            updateLocalLibrarySelects: function() {
+                var self = this;
+                var localSelects = document.querySelectorAll('.localLibrarySelect');
+                localSelects.forEach(function(select) {
+                    // Use saved value from data attribute, or current value
+                    var savedValue = select.dataset.savedValue || select.value;
+                    select.innerHTML = '<option value="">Select local library...</option>';
+                    self.localLibraries.forEach(function(lib) {
+                        var option = document.createElement('option');
+                        option.value = lib.Id;
+                        option.textContent = lib.Name;
+                        option.dataset.locations = JSON.stringify(lib.Locations);
+                        select.appendChild(option);
+                    });
+                    if (savedValue) {
+                        select.value = savedValue;
+                    }
+                });
+            },
+
+            renderMappings: function(mappings) {
+                var self = this;
+                var container = document.getElementById('libraryMappingsContainer');
+                container.innerHTML = '';
+
+                mappings.forEach(function(mapping, index) {
+                    self.addMappingRow(mapping, index);
+                });
+            },
+
+            addMapping: function() {
+                var container = document.getElementById('libraryMappingsContainer');
+                var index = container.children.length;
+                this.addMappingRow({}, index);
+            },
+
+            addMappingRow: function(mapping, index) {
+                var self = this;
+                var container = document.getElementById('libraryMappingsContainer');
+
+                var div = document.createElement('div');
+                div.className = 'libraryMapping';
+                div.dataset.index = index;
+
+                div.innerHTML =
+                    '<div class="mappingHeader">' +
+                        '<label class="checkboxContainer">' +
+                            '<input is="emby-checkbox" type="checkbox" class="mappingEnabled" ' + (mapping.IsEnabled ? 'checked' : '') + ' />' +
+                            '<span>Enabled</span>' +
+                        '</label>' +
+                        '<button is="emby-button" type="button" class="btnRemoveMapping raised button-destructive">' +
+                            '<span>Remove</span>' +
+                        '</button>' +
+                    '</div>' +
+                    '<div class="mappingGrid">' +
+                        '<div class="mappingColumn">' +
+                            '<div class="inputContainer">' +
+                                '<label class="inputLabel" for="sourceLibrary' + index + '">Source Library</label>' +
+                                '<select is="emby-select" id="sourceLibrary' + index + '" class="sourceLibrarySelect"></select>' +
+                            '</div>' +
+                            '<div class="inputContainer">' +
+                                '<label class="inputLabel" for="sourceRootPath' + index + '">Source Root Path</label>' +
+                                '<input is="emby-input" type="text" id="sourceRootPath' + index + '" class="sourceRootPath" value="' + self.escapeHtml(mapping.SourceRootPath || '') + '" />' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="mappingColumn">' +
+                            '<div class="inputContainer">' +
+                                '<label class="inputLabel" for="localLibrary' + index + '">Local Library</label>' +
+                                '<select is="emby-select" id="localLibrary' + index + '" class="localLibrarySelect"></select>' +
+                            '</div>' +
+                            '<div class="inputContainer">' +
+                                '<label class="inputLabel" for="localRootPath' + index + '">Local Root Path</label>' +
+                                '<input is="emby-input" type="text" id="localRootPath' + index + '" class="localRootPath" value="' + self.escapeHtml(mapping.LocalRootPath || '') + '" />' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>';
+
+                container.appendChild(div);
+
+                // Populate source library select
+                var sourceSelect = div.querySelector('.sourceLibrarySelect');
+                // Store the saved value as data attribute for later restoration
+                if (mapping.SourceLibraryId) {
+                    sourceSelect.dataset.savedValue = mapping.SourceLibraryId;
+                }
+                sourceSelect.innerHTML = '<option value="">Select source library...</option>';
+                self.sourceLibraries.forEach(function(lib) {
+                    var option = document.createElement('option');
+                    option.value = lib.Id;
+                    option.textContent = lib.Name;
+                    option.dataset.locations = JSON.stringify(lib.Locations);
+                    sourceSelect.appendChild(option);
+                });
+
+                if (mapping.SourceLibraryId) {
+                    sourceSelect.value = mapping.SourceLibraryId;
+                }
+
+                sourceSelect.addEventListener('change', function() {
+                    var option = this.options[this.selectedIndex];
+                    if (option && option.dataset.locations) {
+                        var locations = JSON.parse(option.dataset.locations);
+                        if (locations.length > 0) {
+                            div.querySelector('.sourceRootPath').value = locations[0];
+                        }
+                    }
+                });
+
+                // Populate local library select
+                var localSelect = div.querySelector('.localLibrarySelect');
+                // Store the saved value as data attribute for later restoration
+                if (mapping.LocalLibraryId) {
+                    localSelect.dataset.savedValue = mapping.LocalLibraryId;
+                }
+                localSelect.innerHTML = '<option value="">Select local library...</option>';
+                self.localLibraries.forEach(function(lib) {
+                    var option = document.createElement('option');
+                    option.value = lib.Id;
+                    option.textContent = lib.Name;
+                    option.dataset.locations = JSON.stringify(lib.Locations);
+                    localSelect.appendChild(option);
+                });
+
+                if (mapping.LocalLibraryId) {
+                    localSelect.value = mapping.LocalLibraryId;
+                }
+
+                localSelect.addEventListener('change', function() {
+                    var option = this.options[this.selectedIndex];
+                    if (option && option.dataset.locations) {
+                        var locations = JSON.parse(option.dataset.locations);
+                        if (locations.length > 0) {
+                            div.querySelector('.localRootPath').value = locations[0];
+                        }
+                    }
+                });
+
+                div.querySelector('.btnRemoveMapping').addEventListener('click', function() {
+                    div.remove();
+                });
+            },
+
+            collectMappings: function() {
+                var mappings = [];
+                var rows = document.querySelectorAll('.libraryMapping');
+
+                rows.forEach(function(row) {
+                    var sourceSelect = row.querySelector('.sourceLibrarySelect');
+                    var sourceOption = sourceSelect.options[sourceSelect.selectedIndex];
+                    var localSelect = row.querySelector('.localLibrarySelect');
+                    var localOption = localSelect.options[localSelect.selectedIndex];
+
+                    mappings.push({
+                        IsEnabled: row.querySelector('.mappingEnabled').checked,
+                        SourceLibraryId: sourceSelect.value,
+                        SourceLibraryName: sourceOption ? sourceOption.textContent : '',
+                        SourceRootPath: row.querySelector('.sourceRootPath').value,
+                        LocalLibraryId: localSelect.value,
+                        LocalLibraryName: localOption ? localOption.textContent : '',
+                        LocalRootPath: row.querySelector('.localRootPath').value
+                    });
+                });
+
+                return mappings;
+            },
+
+            loadSyncStatus: function() {
+                var self = this;
+
+                ApiClient.fetch({
+                    url: ApiClient.getUrl('ServerSync/Status'),
+                    type: 'GET',
+                    dataType: 'json'
+                }).then(function(status) {
+                    var syncedCount = status.Synced || 0;
+                    var queuedCount = (status.Queued || 0) + (status.Errored || 0);
+                    var ignoredCount = status.Ignored || 0;
+                    var pendingCount = status.Pending || 0;
+                    var pendingDeletionCount = status.PendingDeletion || 0;
+
+                    document.getElementById('syncedCount').textContent = syncedCount;
+                    document.getElementById('statusGroupSynced').setAttribute('title', 'Synced: ' + syncedCount);
+
+                    document.getElementById('queuedCount').textContent = queuedCount;
+                    document.getElementById('statusGroupQueued').setAttribute('title', 'Queued: ' + (status.Queued || 0) + '\nErrored: ' + (status.Errored || 0));
+
+                    document.getElementById('ignoredCount').textContent = ignoredCount;
+                    document.getElementById('statusGroupIgnored').setAttribute('title', 'Ignored: ' + ignoredCount);
+
+                    document.getElementById('pendingCount').textContent = pendingCount;
+                    document.getElementById('statusGroupPending').setAttribute('title', 'Pending: ' + pendingCount);
+
+                    document.getElementById('pendingDeletionCount').textContent = pendingDeletionCount;
+                    document.getElementById('statusGroupPendingDeletion').setAttribute('title', 'Pending Deletion: ' + pendingDeletionCount);
+                });
+            },
+
+            loadSyncItems: function() {
+                var self = this;
+                var container = document.getElementById('syncItemsContainer');
+                var filter = document.getElementById('selStatusFilter').value;
+
+                ApiClient.fetch({
+                    url: ApiClient.getUrl('ServerSync/Items'),
+                    type: 'GET',
+                    dataType: 'json'
+                }).then(function(items) {
+                    self.syncItems = items || [];
+                    self.selectedItems.clear();
+                    self.updateBulkActionsVisibility();
+
+                    var filteredItems = filter ? items.filter(function(i) { return i.Status === filter; }) : items;
+                    self.filteredItems = filteredItems;
+
+                    document.getElementById('chkSelectAll').checked = false;
+
+                    if (filteredItems.length === 0) {
+                        container.innerHTML = '<div style="padding: 16px; opacity: 0.7;">No items found</div>';
+                        return;
+                    }
+
+                    container.innerHTML = filteredItems.map(function(item) {
+                        var localExists = item.Status === 'Synced';
+                        var localPathClass = localExists ? '' : ' notExists';
+                        var localPathDisplay = item.LocalPath ? self.getFileName(item.LocalPath) : 'N/A';
+                        if (!localExists && item.LocalPath) {
+                            localPathDisplay = '(will sync to) ' + localPathDisplay;
+                        }
+
+                        return '<div class="syncItem" data-id="' + item.SourceItemId + '">' +
+                            '<input type="checkbox" class="syncItemCheckbox" data-id="' + item.SourceItemId + '" />' +
+                            '<div class="syncItemInfo">' +
+                                '<div class="syncItemName" title="' + self.escapeHtml(item.SourcePath) + '">' + self.escapeHtml(self.getFileName(item.SourcePath)) + '</div>' +
+                                '<div class="syncItemPath' + localPathClass + '" title="' + self.escapeHtml(item.LocalPath || '') + '">' + self.escapeHtml(localPathDisplay) + '</div>' +
+                            '</div>' +
+                            '<div class="syncItemStatus ' + item.Status + '">' + item.Status + '</div>' +
+                        '</div>';
+                    }).join('');
+
+                    container.querySelectorAll('.syncItem').forEach(function(el) {
+                        el.addEventListener('click', function(e) {
+                            if (e.target.type !== 'checkbox') {
+                                self.showItemDetail(el.dataset.id);
+                            }
+                        });
+                    });
+
+                    container.querySelectorAll('.syncItemCheckbox').forEach(function(cb) {
+                        cb.addEventListener('change', function() {
+                            if (this.checked) {
+                                self.selectedItems.add(this.dataset.id);
+                            } else {
+                                self.selectedItems.delete(this.dataset.id);
+                            }
+                            self.updateBulkActionsVisibility();
+                        });
+                    });
+                });
+            },
+
+            updateBulkActionsVisibility: function() {
+                var count = this.selectedItems.size;
+                document.getElementById('selectedCount').textContent = count + ' selected';
+            },
+
+            toggleSelectAll: function(checked) {
+                var self = this;
+                self.selectedItems.clear();
+
+                if (checked) {
+                    self.filteredItems.forEach(function(item) {
+                        self.selectedItems.add(item.SourceItemId);
+                    });
+                }
+
+                document.querySelectorAll('.syncItemCheckbox').forEach(function(cb) {
+                    cb.checked = checked;
+                });
+
+                self.updateBulkActionsVisibility();
+            },
+
+            bulkIgnore: function() {
+                this.bulkAction('IgnoreItems');
+            },
+
+            bulkQueue: function() {
+                this.bulkAction('QueueItems');
+            },
+
+            bulkDelete: function() {
+                var self = this;
+                var ids = Array.from(this.selectedItems);
+                if (ids.length === 0) return;
+
+                if (!confirm('Delete ' + ids.length + ' item(s) from the LOCAL server? This cannot be undone.\n\nNote: This only deletes from this local server, never from the source server.')) {
+                    return;
+                }
+
+                ApiClient.fetch({
+                    url: ApiClient.getUrl('ServerSync/DeleteLocalItems'),
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ SourceItemIds: ids })
+                }).then(function(result) {
+                    self.selectedItems.clear();
+                    self.loadSyncStatus();
+                    self.loadSyncItems();
+                    if (result && result.Deleted > 0) {
+                        Dashboard.alert('Deleted ' + result.Deleted + ' item(s)');
+                    }
+                }).catch(function() {
+                    Dashboard.alert('Failed to delete items');
+                });
+            },
+
+            bulkAction: function(endpoint) {
+                var self = this;
+                var ids = Array.from(this.selectedItems);
+
+                ApiClient.fetch({
+                    url: ApiClient.getUrl('ServerSync/' + endpoint),
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ SourceItemIds: ids })
+                }).then(function() {
+                    self.selectedItems.clear();
+                    self.loadSyncStatus();
+                    self.loadSyncItems();
+                });
+            },
+
+            showItemDetail: function(sourceItemId) {
+                var self = this;
+                var item = this.syncItems.find(function(i) { return i.SourceItemId === sourceItemId; });
+                if (!item) return;
+
+                self.currentModalItem = item;
+
+                document.getElementById('modalTitle').textContent = self.getFileName(item.SourcePath);
+                document.getElementById('modalStatus').textContent = item.Status;
+                document.getElementById('modalSize').textContent = self.formatSize(item.SourceSize);
+                document.getElementById('modalSourcePath').textContent = item.SourcePath;
+
+                var localPathEl = document.getElementById('modalLocalPath');
+                var localPathNoteEl = document.getElementById('modalLocalPathNote');
+                var localExists = item.Status === 'Synced';
+                if (item.LocalPath) {
+                    localPathEl.textContent = item.LocalPath;
+                    localPathEl.style.color = '';
+                    if (localExists) {
+                        localPathNoteEl.textContent = '';
+                        localPathNoteEl.style.display = 'none';
+                    } else {
+                        localPathNoteEl.textContent = 'File will be synced to this location';
+                        localPathNoteEl.style.display = 'block';
+                        localPathNoteEl.style.borderBottom = '1px solid #9b59b6';
+                        localPathNoteEl.style.paddingBottom = '4px';
+                        localPathNoteEl.style.color = '#9b59b6';
+                    }
+                } else {
+                    localPathEl.textContent = 'N/A';
+                    localPathEl.style.color = '';
+                    localPathNoteEl.style.display = 'none';
+                }
+
+                document.getElementById('itemDetailModal').style.display = 'flex';
+            },
+
+            closeModal: function() {
+                document.getElementById('itemDetailModal').style.display = 'none';
+                this.currentModalItem = null;
+            },
+
+            modalIgnore: function() {
+                if (this.currentModalItem) {
+                    this.updateItemStatus(this.currentModalItem.SourceItemId, 'Ignored');
+                }
+            },
+
+            modalQueue: function() {
+                if (this.currentModalItem) {
+                    this.updateItemStatus(this.currentModalItem.SourceItemId, 'Queued');
+                }
+            },
+
+            modalDelete: function() {
+                var self = this;
+                if (!this.currentModalItem) return;
+
+                var fileName = this.getFileName(this.currentModalItem.LocalPath || this.currentModalItem.SourcePath);
+                if (!confirm('Delete "' + fileName + '" from the LOCAL server? This cannot be undone.\n\nNote: This only deletes from this local server, never from the source server.')) {
+                    return;
+                }
+
+                ApiClient.fetch({
+                    url: ApiClient.getUrl('ServerSync/DeleteLocalItems'),
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ SourceItemIds: [this.currentModalItem.SourceItemId] })
+                }).then(function() {
+                    self.closeModal();
+                    self.loadSyncStatus();
+                    self.loadSyncItems();
+                    Dashboard.alert('Item deleted');
+                }).catch(function() {
+                    Dashboard.alert('Failed to delete item');
+                });
+            },
+
+            updateItemStatus: function(sourceItemId, status) {
+                var self = this;
+
+                ApiClient.fetch({
+                    url: ApiClient.getUrl('ServerSync/UpdateItemStatus'),
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ SourceItemId: sourceItemId, Status: status })
+                }).then(function() {
+                    self.closeModal();
+                    self.loadSyncStatus();
+                    self.loadSyncItems();
+                });
+            },
+
+            getFileName: function(path) {
+                if (!path) return '';
+                return path.split('/').pop().split('\\').pop();
+            },
+
+            formatSize: function(bytes) {
+                if (!bytes) return '0 B';
+                var units = ['B', 'KB', 'MB', 'GB', 'TB'];
+                var i = 0;
+                while (bytes >= 1024 && i < units.length - 1) {
+                    bytes /= 1024;
+                    i++;
+                }
+                return bytes.toFixed(i > 0 ? 2 : 0) + ' ' + units[i];
+            },
+
+            escapeHtml: function(str) {
+                if (!str) return '';
+                return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            }
+        };
+
+        (function() {
+            var page = document.querySelector('#ServerSyncConfigPage');
+            page.addEventListener('viewshow', function() {
+                ServerSyncConfig.init();
+            });
+        })();
+    </script>
+</div>
+</body>
+</html>
