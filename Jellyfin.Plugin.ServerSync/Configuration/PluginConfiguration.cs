@@ -26,23 +26,17 @@ public class PluginConfiguration : BasePluginConfiguration
 
     public int MaxConcurrentDownloads { get; set; } = 2;
 
-    /// <summary>
-    /// Gets or sets the maximum download speed in MB/s. 0 = unlimited.
-    /// </summary>
+    // MaxDownloadSpeedMbps
+    // Maximum download speed in MB/s (0 = unlimited).
     public int MaxDownloadSpeedMbps { get; set; } = 0;
 
     public bool RequireApprovalToSync { get; set; }
 
-    /// <summary>
-    /// Gets or sets whether to detect updated files by comparing size and date.
-    /// If true, files with different sizes or newer source dates will be re-queued.
-    /// </summary>
+    // DetectUpdatedFiles
+    // Re-queue files with size or date mismatches when enabled.
     public bool DetectUpdatedFiles { get; set; } = true;
 
-    /// <summary>
-    /// Gets or sets whether to delete local files that no longer exist on the source server.
-    /// If RequireApprovalToSync is true, items will be set to Pending for manual deletion.
-    /// Deletions only affect the local server, never the source server.
-    /// </summary>
+    // DeleteIfMissingFromSource
+    // Delete local files no longer present on source server.
     public bool DeleteIfMissingFromSource { get; set; }
 }
