@@ -83,15 +83,30 @@ public class PluginConfiguration : BasePluginConfiguration
         return isInScheduledWindow ? GetScheduledDownloadSpeedBytes() : GetMaxDownloadSpeedBytes();
     }
 
-    public bool RequireApprovalToSync { get; set; }
+    // DownloadNewContentMode
+    // Controls how new content (items on source that don't exist locally) is handled.
+    // Enabled: Automatically queue for download
+    // RequireApproval: Require manual approval before downloading
+    // Disabled: Don't download new content
+    public ApprovalMode DownloadNewContentMode { get; set; } = ApprovalMode.Enabled;
+
+    // ReplaceExistingContentMode
+    // Controls how updated content (items that differ from local version) is handled.
+    // Enabled: Automatically queue for re-download
+    // RequireApproval: Require manual approval before replacing
+    // Disabled: Don't replace existing content
+    public ApprovalMode ReplaceExistingContentMode { get; set; } = ApprovalMode.Enabled;
+
+    // DeleteMissingContentMode
+    // Controls how missing content (items on local that don't exist on source) is handled.
+    // Enabled: Automatically queue for deletion
+    // RequireApproval: Require manual approval before deleting
+    // Disabled: Don't delete missing content
+    public ApprovalMode DeleteMissingContentMode { get; set; } = ApprovalMode.Disabled;
 
     // DetectUpdatedFiles
     // Re-queue files with size or date mismatches when enabled.
     public bool DetectUpdatedFiles { get; set; } = true;
-
-    // DeleteIfMissingFromSource
-    // Delete local files no longer present on source server.
-    public bool DeleteIfMissingFromSource { get; set; }
 
     // EnableBandwidthScheduling
     // Enable time-based bandwidth scheduling with alternate speed.
@@ -128,6 +143,18 @@ public class PluginConfiguration : BasePluginConfiguration
     // LastSyncEndTime
     // Timestamp when the last sync completed.
     public DateTime? LastSyncEndTime { get; set; }
+
+    // EnableRecyclingBin
+    // Move deleted/replaced files to a recycling bin instead of permanent deletion.
+    public bool EnableRecyclingBin { get; set; }
+
+    // RecyclingBinPath
+    // Path to the recycling bin directory for soft-deleted files.
+    public string? RecyclingBinPath { get; set; }
+
+    // RecyclingBinRetentionDays
+    // Number of days to keep files in the recycling bin before permanent deletion.
+    public int RecyclingBinRetentionDays { get; set; } = 7;
 
     // ValidateConfiguration
     // Validates configuration values and returns a list of validation errors.
@@ -208,6 +235,20 @@ public class PluginConfiguration : BasePluginConfiguration
             }
         }
 
+        // Validate recycling bin settings
+        if (EnableRecyclingBin)
+        {
+            if (string.IsNullOrWhiteSpace(RecyclingBinPath))
+            {
+                errors.Add("Recycling bin path is required when recycling bin is enabled");
+            }
+
+            if (RecyclingBinRetentionDays < 1 || RecyclingBinRetentionDays > 365)
+            {
+                errors.Add("Recycling bin retention must be between 1 and 365 days");
+            }
+        }
+
         return errors;
     }
 
@@ -228,6 +269,7 @@ public class PluginConfiguration : BasePluginConfiguration
         ScheduledStartHour = Math.Clamp(ScheduledStartHour, 0, 23);
         ScheduledEndHour = Math.Clamp(ScheduledEndHour, 0, 24);
         ScheduledDownloadSpeed = Math.Max(0, ScheduledDownloadSpeed);
+        RecyclingBinRetentionDays = Math.Clamp(RecyclingBinRetentionDays, 1, 365);
 
         // Normalize URL
         if (!string.IsNullOrWhiteSpace(SourceServerUrl))

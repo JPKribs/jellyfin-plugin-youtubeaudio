@@ -595,6 +595,8 @@ public class SyncDatabase : IDisposable
         return command.ExecuteNonQuery();
     }
 
+    // ReadSyncItem
+    // Reads a SyncItem from the database reader.
     private static SyncItem ReadSyncItem(SqliteDataReader reader)
     {
         var item = new SyncItem
@@ -664,6 +666,8 @@ public class SyncDatabase : IDisposable
         return DateTime.MinValue;
     }
 
+    // EnsureConnection
+    // Ensures the database connection is open, reopening if necessary.
     private void EnsureConnection()
     {
         if (_connection != null && _connection.State == ConnectionState.Open)

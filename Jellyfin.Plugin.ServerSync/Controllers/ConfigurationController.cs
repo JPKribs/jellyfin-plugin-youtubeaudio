@@ -106,6 +106,8 @@ public class SyncStatusResponse
     public int Ignored { get; set; }
 
     public int PendingDeletion { get; set; }
+
+    public int PendingReplacement { get; set; }
 }
 
 // CapabilitiesResponse
@@ -136,6 +138,8 @@ public class SyncStatsResponse
     public int IgnoredItems { get; set; }
 
     public int PendingDeletionItems { get; set; }
+
+    public int PendingReplacementItems { get; set; }
 
     public long TotalSyncedBytes { get; set; }
 
@@ -392,7 +396,8 @@ public class ConfigurationController : ControllerBase
             Synced = counts.GetValueOrDefault(SyncStatus.Synced, 0),
             Errored = counts.GetValueOrDefault(SyncStatus.Errored, 0),
             Ignored = counts.GetValueOrDefault(SyncStatus.Ignored, 0),
-            PendingDeletion = counts.GetValueOrDefault(SyncStatus.PendingDeletion, 0)
+            PendingDeletion = counts.GetValueOrDefault(SyncStatus.PendingDeletion, 0),
+            PendingReplacement = counts.GetValueOrDefault(SyncStatus.PendingReplacement, 0)
         });
     }
 
@@ -421,6 +426,7 @@ public class ConfigurationController : ControllerBase
             PendingItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Pending, 0),
             IgnoredItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Ignored, 0),
             PendingDeletionItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.PendingDeletion, 0),
+            PendingReplacementItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.PendingReplacement, 0),
             TotalSyncedBytes = stats.TotalSyncedBytes,
             TotalQueuedBytes = stats.TotalQueuedBytes,
             LastSyncTime = stats.LastSyncTime,
@@ -662,6 +668,7 @@ public class ConfigurationController : ControllerBase
         }
 
         var logger = plugin.LoggerFactory.CreateLogger<ConfigurationController>();
+        var config = plugin.Configuration;
         var deletedCount = 0;
         var failedCount = 0;
         var skippedCount = 0;
@@ -680,16 +687,67 @@ public class ConfigurationController : ControllerBase
 
             var fileName = Path.GetFileName(item.LocalPath);
 
-            // Only delete if there's a local item ID (meaning Jellyfin knows about it)
+            // Validate path is within configured library directories (safety check)
+            if (!string.IsNullOrEmpty(item.LocalPath) && !IsPathWithinLibrary(item.LocalPath, config))
+            {
+                logger.LogWarning(
+                    "SKIPPED DELETE: {FileName} - Path is outside configured library directories. Local path: {LocalPath}",
+                    fileName,
+                    item.LocalPath);
+                skippedCount++;
+                continue;
+            }
+
+            // Try to find the local item - first by stored ID, then by path
+            MediaBrowser.Controller.Entities.BaseItem? localItem = null;
+
             if (!string.IsNullOrEmpty(item.LocalItemId) && Guid.TryParse(item.LocalItemId, out var localItemGuid))
+            {
+                localItem = _libraryManager.GetItemById(localItemGuid);
+            }
+
+            // If not found by ID, try to find by path (handles case where LocalItemId was never set)
+            if (localItem == null && !string.IsNullOrEmpty(item.LocalPath))
+            {
+                localItem = _libraryManager.FindByPath(item.LocalPath, isFolder: false);
+            }
+
+            // Check if recycling bin is enabled
+            var useRecyclingBin = config.EnableRecyclingBin && !string.IsNullOrEmpty(config.RecyclingBinPath);
+
+            if (localItem != null)
             {
                 try
                 {
-                    // Use Jellyfin's library manager to delete the item from the LOCAL server
-                    // This properly handles companion files and database cleanup
-                    var localItem = _libraryManager.GetItemById(localItemGuid);
-                    if (localItem != null)
+                    if (useRecyclingBin && !string.IsNullOrEmpty(item.LocalPath))
                     {
+                        // Move file to recycling bin first, then remove from Jellyfin without deleting file
+                        if (RecyclingBinService.MoveWithCompanionsToRecyclingBin(item.LocalPath, config.RecyclingBinPath!, logger))
+                        {
+                            // Remove from Jellyfin database only (file already moved)
+                            _libraryManager.DeleteItem(
+                                localItem,
+                                new DeleteOptions { DeleteFileLocation = false },
+                                localItem.GetParent(),
+                                notifyParentItem: true);
+
+                            logger.LogInformation(
+                                "RECYCLED: {FileName} - Moved to recycling bin. Local path: {LocalPath}",
+                                fileName,
+                                item.LocalPath);
+                            deletedCount++;
+                        }
+                        else
+                        {
+                            logger.LogError("Failed to move file to recycling bin: {LocalPath}", item.LocalPath);
+                            failedCount++;
+                            continue;
+                        }
+                    }
+                    else
+                    {
+                        // Use Jellyfin's library manager to delete the item from the LOCAL server
+                        // This properly handles companion files and database cleanup
                         _libraryManager.DeleteItem(
                             localItem,
                             new DeleteOptions { DeleteFileLocation = true },
@@ -701,15 +759,6 @@ public class ConfigurationController : ControllerBase
                             fileName,
                             item.LocalPath);
                         deletedCount++;
-                    }
-                    else
-                    {
-                        // Item not found in Jellyfin, just remove from tracking
-                        logger.LogWarning(
-                            "SKIPPED DELETE: {FileName} - Item not found in Jellyfin library (LocalItemId: {LocalItemId}), removing from tracking only",
-                            fileName,
-                            item.LocalItemId);
-                        skippedCount++;
                     }
                 }
                 catch (Exception ex)
@@ -724,16 +773,69 @@ public class ConfigurationController : ControllerBase
                     continue;
                 }
             }
+            else if (!string.IsNullOrEmpty(item.LocalPath) && System.IO.File.Exists(item.LocalPath))
+            {
+                // Item not in Jellyfin library but file exists
+                try
+                {
+                    if (useRecyclingBin)
+                    {
+                        // Move to recycling bin
+                        if (RecyclingBinService.MoveWithCompanionsToRecyclingBin(item.LocalPath, config.RecyclingBinPath!, logger))
+                        {
+                            logger.LogInformation(
+                                "RECYCLED (direct): {FileName} - File was not in Jellyfin library. Local path: {LocalPath}",
+                                fileName,
+                                item.LocalPath);
+                            deletedCount++;
+                        }
+                        else
+                        {
+                            logger.LogError("Failed to move file to recycling bin: {LocalPath}", item.LocalPath);
+                            failedCount++;
+                            continue;
+                        }
+                    }
+                    else
+                    {
+                        // Delete directly
+                        System.IO.File.Delete(item.LocalPath);
+
+                        // Also delete companion files (subtitles, etc.) in the same directory
+                        DeleteCompanionFiles(item.LocalPath, logger);
+
+                        logger.LogInformation(
+                            "DELETED (direct): {FileName} - File was not in Jellyfin library. Local path: {LocalPath}",
+                            fileName,
+                            item.LocalPath);
+                        deletedCount++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(
+                        ex,
+                        "FAILED DELETE (direct): {FileName} - {Error}. Local path: {LocalPath}",
+                        fileName,
+                        ex.Message,
+                        item.LocalPath);
+                    failedCount++;
+                    continue;
+                }
+            }
             else
             {
+                // File doesn't exist anywhere - remove from tracking since there's nothing to delete
                 logger.LogWarning(
-                    "SKIPPED DELETE: {FileName} - No local item ID, removing from tracking only. Source path: {SourcePath}",
+                    "SKIPPED DELETE: {FileName} - File not found in Jellyfin library or on disk, removing from tracking. Source path: {SourcePath}",
                     fileName,
                     item.SourcePath);
+                plugin.Database.Delete(sourceItemId);
                 skippedCount++;
+                continue;
             }
 
-            // Remove from our tracking database
+            // Only remove from tracking database on successful delete
             plugin.Database.Delete(sourceItemId);
         }
 
@@ -1050,5 +1152,75 @@ public class ConfigurationController : ControllerBase
         }
 
         return minSpaceInfo;
+    }
+
+    // DeleteCompanionFiles
+    // Deletes companion files (subtitles, etc.) that match the main file name.
+    private static void DeleteCompanionFiles(string mainFilePath, ILogger logger)
+    {
+        try
+        {
+            var directory = Path.GetDirectoryName(mainFilePath);
+            if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory))
+            {
+                return;
+            }
+
+            var fileNameWithoutExt = Path.GetFileNameWithoutExtension(mainFilePath);
+            var companionExtensions = new[] { ".srt", ".sub", ".ass", ".ssa", ".vtt", ".nfo", ".jpg", ".png" };
+
+            foreach (var ext in companionExtensions)
+            {
+                // Match patterns like "Movie.srt", "Movie.en.srt", "Movie.forced.en.srt"
+                var pattern = $"{fileNameWithoutExt}*{ext}";
+                try
+                {
+                    var companionFiles = Directory.GetFiles(directory, pattern);
+                    foreach (var companionFile in companionFiles)
+                    {
+                        try
+                        {
+                            System.IO.File.Delete(companionFile);
+                            logger.LogDebug("Deleted companion file: {CompanionFile}", Path.GetFileName(companionFile));
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogWarning(ex, "Failed to delete companion file: {CompanionFile}", Path.GetFileName(companionFile));
+                        }
+                    }
+                }
+                catch
+                {
+                    // Ignore pattern match errors
+                }
+            }
+        }
+        catch
+        {
+            // Ignore errors in companion file cleanup - main file was already deleted
+        }
+    }
+
+    // IsPathWithinLibrary
+    // Validates that a path is within one of the configured library paths.
+    private static bool IsPathWithinLibrary(string? path, PluginConfiguration config)
+    {
+        if (string.IsNullOrEmpty(path))
+        {
+            return false;
+        }
+
+        var normalizedPath = Path.GetFullPath(path);
+
+        foreach (var mapping in config.LibraryMappings.Where(m => m.IsEnabled && !string.IsNullOrEmpty(m.LocalRootPath)))
+        {
+            var normalizedLibraryPath = Path.GetFullPath(mapping.LocalRootPath);
+            if (normalizedPath.StartsWith(normalizedLibraryPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -16,14 +16,15 @@ owner: "JPKribs"
 artifacts:
 - "Jellyfin.Plugin.ServerSync.dll"
 changelog: >
-  Initial release of Server Sync plugin for Jellyfin 10.11.
+  10.11.1 - Content Syncing
 
-  Features:
-  - One-way sync from source server to local server
-  - Library-to-library mapping with path translation
-  - ETag-based change detection for reliable updates
-  - Configurable approval workflow for new content and deletions
+  - One-way media sync from source Jellyfin server
+  - Library mapping with automatic path translation
+  - ETag-based change detection
+  - Granular approval modes (Enabled/RequireApproval/Disabled) for new content, replacements, and deletions
+  - Recycling bin with configurable retention period
   - Bandwidth throttling with time-based scheduling
-  - Companion file support (subtitles, etc.)
-  - Automatic retry for failed downloads (up to 3 attempts)
-  - Pre-download validation to prevent unnecessary downloads
+  - Concurrent downloads (1-10 simultaneous)
+  - Minimum free disk space protection
+  - Companion file support (subtitles, NFO, images)
+  - Automatic retry with configurable max attempts

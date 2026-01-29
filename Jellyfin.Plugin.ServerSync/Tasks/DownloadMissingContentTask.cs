@@ -179,11 +179,13 @@ public class DownloadMissingContentTask : IScheduledTask
                     tempPath,
                     speedLimitBytesPerSecond,
                     config.IncludeCompanionFiles,
+                    config,
                     cancellationToken).ConfigureAwait(false);
 
                 if (success)
                 {
                     // Pass ETag and size to ensure they're preserved after sync
+                    // Note: LocalItemId is resolved at delete time via FindByPath
                     database.UpdateStatus(
                         item.SourceItemId,
                         SyncStatus.Synced,
@@ -416,6 +418,7 @@ public class DownloadMissingContentTask : IScheduledTask
             if (item.SourceSize > 0 && localInfo.Length == item.SourceSize)
             {
                 // Update status to Synced since file is already valid, preserve ETag
+                // Note: LocalItemId is resolved at delete time via FindByPath
                 database.UpdateStatus(
                     item.SourceItemId,
                     SyncStatus.Synced,
@@ -482,6 +485,7 @@ public class DownloadMissingContentTask : IScheduledTask
         string tempPath,
         long speedLimitBytesPerSecond,
         bool includeCompanionFiles,
+        PluginConfiguration config,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(item.LocalPath))
@@ -519,6 +523,12 @@ public class DownloadMissingContentTask : IScheduledTask
             if (!string.IsNullOrEmpty(targetDir))
             {
                 Directory.CreateDirectory(targetDir);
+            }
+
+            // If file exists and recycling bin is enabled, move old file to bin before replacing
+            if (File.Exists(item.LocalPath) && config.EnableRecyclingBin && !string.IsNullOrEmpty(config.RecyclingBinPath))
+            {
+                RecyclingBinService.MoveWithCompanionsToRecyclingBin(item.LocalPath, config.RecyclingBinPath, _logger);
             }
 
             // Use atomic move with overwrite to avoid race conditions

@@ -87,9 +87,10 @@ public class UpdateSyncTablesTask : IScheduledTask
         var totalMappings = enabledMappings.Count;
         var processedMappings = 0;
 
-        var requireApproval = config.RequireApprovalToSync;
+        var downloadNewMode = config.DownloadNewContentMode;
+        var replaceExistingMode = config.ReplaceExistingContentMode;
+        var deleteMissingMode = config.DeleteMissingContentMode;
         var detectUpdatedFiles = config.DetectUpdatedFiles;
-        var deleteIfMissing = config.DeleteIfMissingFromSource;
 
         foreach (var mapping in enabledMappings)
         {
@@ -98,7 +99,7 @@ public class UpdateSyncTablesTask : IScheduledTask
                 break;
             }
 
-            await ProcessLibraryAsync(client, database, mapping, requireApproval, detectUpdatedFiles, deleteIfMissing, cancellationToken).ConfigureAwait(false);
+            await ProcessLibraryAsync(client, database, mapping, downloadNewMode, replaceExistingMode, deleteMissingMode, detectUpdatedFiles, cancellationToken).ConfigureAwait(false);
 
             processedMappings++;
             progress.Report((double)processedMappings / totalMappings * 100);
@@ -107,13 +108,16 @@ public class UpdateSyncTablesTask : IScheduledTask
         _logger.LogInformation("Sync table update completed");
     }
 
+    // ProcessLibraryAsync
+    // Processes a single library mapping, fetching items and updating the sync database.
     private async Task ProcessLibraryAsync(
         SourceServerClient client,
         SyncDatabase database,
         LibraryMapping mapping,
-        bool requireApproval,
+        ApprovalMode downloadNewMode,
+        ApprovalMode replaceExistingMode,
+        ApprovalMode deleteMissingMode,
         bool detectUpdatedFiles,
-        bool deleteIfMissing,
         CancellationToken cancellationToken)
     {
         const int batchSize = 100;
@@ -208,7 +212,7 @@ public class UpdateSyncTablesTask : IScheduledTask
 
                 try
                 {
-                    ProcessItem(database, mapping, item, existingItems, requireApproval, detectUpdatedFiles);
+                    ProcessItem(database, mapping, item, existingItems, downloadNewMode, replaceExistingMode, detectUpdatedFiles);
                     processedItems++;
                 }
                 catch (Exception ex)
@@ -227,11 +231,11 @@ public class UpdateSyncTablesTask : IScheduledTask
         }
 
         // Handle items that exist in our database but no longer exist on the source
-        if (deleteIfMissing)
+        if (deleteMissingMode != ApprovalMode.Disabled)
         {
             try
             {
-                ProcessMissingItems(database, existingItems, seenSourceItemIds, requireApproval);
+                ProcessMissingItems(database, existingItems, seenSourceItemIds, deleteMissingMode);
             }
             catch (Exception ex)
             {
@@ -252,7 +256,7 @@ public class UpdateSyncTablesTask : IScheduledTask
         SyncDatabase database,
         Dictionary<string, SyncItem> existingItems,
         HashSet<string> seenSourceItemIds,
-        bool requireApproval)
+        ApprovalMode deleteMissingMode)
     {
         foreach (var kvp in existingItems)
         {
@@ -280,20 +284,17 @@ public class UpdateSyncTablesTask : IScheduledTask
                     continue;
                 }
 
-                if (requireApproval)
+                // Mark for deletion - status is the same, but approval mode affects UI behavior
+                item.Status = SyncStatus.PendingDeletion;
+                item.StatusDate = DateTime.UtcNow;
+                database.Upsert(item);
+
+                if (deleteMissingMode == ApprovalMode.RequireApproval)
                 {
-                    // Set to pending deletion for manual approval
-                    item.Status = SyncStatus.PendingDeletion;
-                    item.StatusDate = DateTime.UtcNow;
-                    database.Upsert(item);
-                    _logger.LogInformation("Marked {FileName} for pending deletion (missing from source)", Path.GetFileName(item.LocalPath));
+                    _logger.LogInformation("Marked {FileName} for pending deletion (requires approval)", Path.GetFileName(item.LocalPath));
                 }
                 else
                 {
-                    // Mark for automatic deletion - will be handled by delete task or controller
-                    item.Status = SyncStatus.PendingDeletion;
-                    item.StatusDate = DateTime.UtcNow;
-                    database.Upsert(item);
                     _logger.LogInformation("Queued {FileName} for deletion (missing from source)", Path.GetFileName(item.LocalPath));
                 }
             }
@@ -311,7 +312,8 @@ public class UpdateSyncTablesTask : IScheduledTask
         LibraryMapping mapping,
         BaseItemDto item,
         Dictionary<string, SyncItem> existingItems,
-        bool requireApproval,
+        ApprovalMode downloadNewMode,
+        ApprovalMode replaceExistingMode,
         bool detectUpdatedFiles)
     {
         var sourceItemId = item.Id!.Value.ToString("N", CultureInfo.InvariantCulture);
@@ -325,11 +327,11 @@ public class UpdateSyncTablesTask : IScheduledTask
 
         if (existingItem != null)
         {
-            ProcessExistingItem(database, existingItem, item.Path!, sourceSize, sourceCreateDate, sourceETag, localPath, detectUpdatedFiles);
+            ProcessExistingItem(database, existingItem, item.Path!, sourceSize, sourceCreateDate, sourceETag, localPath, replaceExistingMode, detectUpdatedFiles);
         }
         else
         {
-            ProcessNewItem(database, mapping, sourceItemId, item.Path!, sourceSize, sourceCreateDate, sourceETag, localPath, requireApproval);
+            ProcessNewItem(database, mapping, sourceItemId, item.Path!, sourceSize, sourceCreateDate, sourceETag, localPath, downloadNewMode);
         }
     }
 
@@ -344,6 +346,7 @@ public class UpdateSyncTablesTask : IScheduledTask
         DateTime sourceCreateDate,
         string? sourceETag,
         string localPath,
+        ApprovalMode replaceExistingMode,
         bool detectUpdatedFiles)
     {
         // Ignored items stay in their state
@@ -383,6 +386,22 @@ public class UpdateSyncTablesTask : IScheduledTask
             return;
         }
 
+        // PendingReplacement items stay pending but update metadata
+        if (existingItem.Status == SyncStatus.PendingReplacement)
+        {
+            if (existingItem.SourceSize != sourceSize || existingItem.SourcePath != sourcePath || existingItem.SourceETag != sourceETag)
+            {
+                existingItem.SourcePath = sourcePath;
+                existingItem.SourceSize = sourceSize;
+                existingItem.SourceCreateDate = sourceCreateDate;
+                existingItem.SourceETag = sourceETag;
+                existingItem.LocalPath = localPath;
+                database.Upsert(existingItem);
+            }
+
+            return;
+        }
+
         // Check for source changes using size, path, or ETag
         var sourceChanged = existingItem.SourceSize != sourceSize ||
                             existingItem.SourcePath != sourcePath ||
@@ -404,20 +423,46 @@ public class UpdateSyncTablesTask : IScheduledTask
             return;
         }
 
-        // Source changed (size, path, or ETag) - mark as queued
+        // Source changed (size, path, or ETag) - handle based on approval mode
         if (sourceChanged)
         {
-            var oldETag = existingItem.SourceETag; // Capture before updating
+            // If replace is disabled, don't queue the update
+            if (replaceExistingMode == ApprovalMode.Disabled)
+            {
+                // Just update metadata without changing status
+                existingItem.SourcePath = sourcePath;
+                existingItem.SourceSize = sourceSize;
+                existingItem.SourceCreateDate = sourceCreateDate;
+                existingItem.SourceETag = sourceETag;
+                existingItem.LocalPath = localPath;
+                database.Upsert(existingItem);
+                return;
+            }
+
+            var oldETag = existingItem.SourceETag;
             existingItem.SourcePath = sourcePath;
             existingItem.SourceSize = sourceSize;
             existingItem.SourceCreateDate = sourceCreateDate;
             existingItem.SourceETag = sourceETag;
             existingItem.LocalPath = localPath;
-            existingItem.Status = SyncStatus.Queued;
-            existingItem.StatusDate = DateTime.UtcNow;
-            database.Upsert(existingItem);
-            _logger.LogInformation("Re-queued {FileName} (source changed, ETag: {OldETag} -> {NewETag})",
-                Path.GetFileName(sourcePath), oldETag ?? "null", sourceETag ?? "null");
+
+            if (replaceExistingMode == ApprovalMode.RequireApproval)
+            {
+                existingItem.Status = SyncStatus.PendingReplacement;
+                existingItem.StatusDate = DateTime.UtcNow;
+                database.Upsert(existingItem);
+                _logger.LogInformation("Marked {FileName} for pending replacement (requires approval, ETag: {OldETag} -> {NewETag})",
+                    Path.GetFileName(sourcePath), oldETag ?? "null", sourceETag ?? "null");
+            }
+            else
+            {
+                existingItem.Status = SyncStatus.Queued;
+                existingItem.StatusDate = DateTime.UtcNow;
+                database.Upsert(existingItem);
+                _logger.LogInformation("Re-queued {FileName} (source changed, ETag: {OldETag} -> {NewETag})",
+                    Path.GetFileName(sourcePath), oldETag ?? "null", sourceETag ?? "null");
+            }
+
             return;
         }
 
@@ -432,7 +477,21 @@ public class UpdateSyncTablesTask : IScheduledTask
                     var localInfo = new FileInfo(localPath);
                     if (localInfo.Length != sourceSize)
                     {
-                        existingItem.Status = SyncStatus.Queued;
+                        // If replace is disabled, don't queue
+                        if (replaceExistingMode == ApprovalMode.Disabled)
+                        {
+                            return;
+                        }
+
+                        if (replaceExistingMode == ApprovalMode.RequireApproval)
+                        {
+                            existingItem.Status = SyncStatus.PendingReplacement;
+                        }
+                        else
+                        {
+                            existingItem.Status = SyncStatus.Queued;
+                        }
+
                         existingItem.StatusDate = DateTime.UtcNow;
                         database.Upsert(existingItem);
                         _logger.LogInformation("Re-queued {FileName} (local size {LocalSize} != source size {SourceSize})",
@@ -441,6 +500,7 @@ public class UpdateSyncTablesTask : IScheduledTask
                 }
                 else
                 {
+                    // Local file missing - this is like a new download, use download mode
                     existingItem.Status = SyncStatus.Queued;
                     existingItem.StatusDate = DateTime.UtcNow;
                     existingItem.LocalItemId = null;
@@ -466,8 +526,14 @@ public class UpdateSyncTablesTask : IScheduledTask
         DateTime sourceCreateDate,
         string? sourceETag,
         string localPath,
-        bool requireApproval)
+        ApprovalMode downloadNewMode)
     {
+        // If download new content is disabled, don't track new items at all
+        if (downloadNewMode == ApprovalMode.Disabled)
+        {
+            return;
+        }
+
         var syncItem = new SyncItem
         {
             SourceLibraryId = mapping.SourceLibraryId,
@@ -480,7 +546,7 @@ public class UpdateSyncTablesTask : IScheduledTask
             SourceETag = sourceETag,
             LocalPath = localPath,
             StatusDate = DateTime.UtcNow,
-            Status = requireApproval ? SyncStatus.Pending : SyncStatus.Queued
+            Status = downloadNewMode == ApprovalMode.RequireApproval ? SyncStatus.Pending : SyncStatus.Queued
         };
 
         // Check if local file already exists with matching size
@@ -496,6 +562,8 @@ public class UpdateSyncTablesTask : IScheduledTask
         database.Upsert(syncItem);
     }
 
+    // GetItemSize
+    // Extracts the file size from an item's media sources.
     private static long GetItemSize(BaseItemDto item)
     {
         if (item.MediaSources != null && item.MediaSources.Count > 0)
@@ -510,6 +578,8 @@ public class UpdateSyncTablesTask : IScheduledTask
         return 0;
     }
 
+    // TranslatePath
+    // Translates a source server path to the corresponding local path.
     private static string TranslatePath(string sourcePath, string sourceRoot, string localRoot)
     {
         // Normalize path separators for comparison

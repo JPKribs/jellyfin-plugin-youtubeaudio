@@ -318,6 +318,8 @@ public class SourceServerClient : IDisposable
         request.Headers.Authorization = new AuthenticationHeaderValue("MediaBrowser", authValue);
     }
 
+    // GetApiClient
+    // Returns the API client, creating it lazily if needed.
     private JellyfinApiClient GetApiClient()
     {
         if (_apiClient == null)

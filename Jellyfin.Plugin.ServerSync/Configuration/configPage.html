@@ -92,20 +92,62 @@
                                 <div class="fieldDescription">Also download external subtitles and other companion files when available.</div>
                             </div>
 
-                            <div class="inputContainer">
-                                <label class="checkboxContainer">
-                                    <input is="emby-checkbox" type="checkbox" id="chkRequireApproval" />
-                                    <span>Require Approval to Sync</span>
-                                </label>
-                                <div class="fieldDescription">When enabled, new items will be set to Pending status until manually approved.</div>
+                            <!-- Approval Modes Section -->
+                            <div class="sectionTitleContainer">
+                                <h2 class="sectionTitle">Sync Behavior</h2>
                             </div>
 
                             <div class="inputContainer">
+                                <label for="selDownloadNewContentMode">Download New Content:</label>
+                                <select is="emby-select" id="selDownloadNewContentMode">
+                                    <option value="0">Enabled</option>
+                                    <option value="1">Require Approval</option>
+                                    <option value="2">Disabled</option>
+                                </select>
+                                <div class="fieldDescription">Download content from source that doesn't exist locally.</div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label for="selReplaceExistingContentMode">Replace Existing Content:</label>
+                                <select is="emby-select" id="selReplaceExistingContentMode">
+                                    <option value="0">Enabled</option>
+                                    <option value="1">Require Approval</option>
+                                    <option value="2">Disabled</option>
+                                </select>
+                                <div class="fieldDescription">Replace local content when it differs from the source version.</div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label for="selDeleteMissingContentMode">Delete Missing Content:</label>
+                                <select is="emby-select" id="selDeleteMissingContentMode">
+                                    <option value="0">Enabled</option>
+                                    <option value="1">Require Approval</option>
+                                    <option value="2" selected>Disabled</option>
+                                </select>
+                                <div class="fieldDescription">Delete local content that no longer exists on the source server.</div>
+                            </div>
+
+                            <!-- Recycling Bin -->
+                            <div class="inputContainer">
                                 <label class="checkboxContainer">
-                                    <input is="emby-checkbox" type="checkbox" id="chkDeleteIfMissing" />
-                                    <span id="lblDeleteIfMissing">Delete if Missing from Source</span>
+                                    <input is="emby-checkbox" type="checkbox" id="chkEnableRecyclingBin" />
+                                    <span>Enable Recycling Bin</span>
                                 </label>
-                                <div class="fieldDescription">Remove local files when they no longer exist on the source.</div>
+                                <div class="fieldDescription">Move deleted/replaced files to a recycling bin instead of permanent deletion.</div>
+                            </div>
+
+                            <div id="recyclingBinSettings" class="nested-settings" style="display: none;">
+                                <div class="inputContainer">
+                                    <label for="txtRecyclingBinPath">Recycling Bin Path:</label>
+                                    <input is="emby-input" type="text" id="txtRecyclingBinPath" placeholder="/path/to/recycling-bin" />
+                                    <div class="fieldDescription">Directory where deleted files will be moved.</div>
+                                </div>
+
+                                <div class="inputContainer">
+                                    <label for="txtRecyclingBinRetentionDays">Retention Period (days):</label>
+                                    <input is="emby-input" type="number" id="txtRecyclingBinRetentionDays" min="1" max="365" />
+                                    <div class="fieldDescription">Files older than this will be permanently deleted (1-365 days).</div>
+                                </div>
                             </div>
 
                             <div class="inputContainer">
@@ -214,13 +256,17 @@
                                     <span class="statusCard-count" id="ignoredCount">0</span>
                                     <span class="statusCard-label">Ignored</span>
                                 </div>
-                                <div class="statusCard statusCard-pending" id="statusGroupPending" title="" style="display: none;">
+                                <div class="statusCard statusCard-pending" id="statusGroupPending" title="">
                                     <span class="statusCard-count" id="pendingCount">0</span>
                                     <span class="statusCard-label">Pending</span>
                                 </div>
-                                <div class="statusCard statusCard-pendingDeletion" id="statusGroupPendingDeletion" title="" style="display: none;">
+                                <div class="statusCard statusCard-pendingReplacement" id="statusGroupPendingReplacement" title="">
+                                    <span class="statusCard-count" id="pendingReplacementCount">0</span>
+                                    <span class="statusCard-label">Pending Replace</span>
+                                </div>
+                                <div class="statusCard statusCard-pendingDeletion" id="statusGroupPendingDeletion" title="">
                                     <span class="statusCard-count" id="pendingDeletionCount">0</span>
-                                    <span class="statusCard-label">Pending Deletion</span>
+                                    <span class="statusCard-label">Pending Delete</span>
                                 </div>
                             </div>
 
@@ -279,8 +325,9 @@
                                     <option value="Queued">Queued</option>
                                     <option value="Errored">Errored</option>
                                     <option value="Ignored">Ignored</option>
-                                    <option value="Pending" id="optPending" style="display: none;">Pending</option>
-                                    <option value="PendingDeletion" id="optPendingDeletion" style="display: none;">Pending Deletion</option>
+                                    <option value="Pending">Pending</option>
+                                    <option value="PendingReplacement">Pending Replace</option>
+                                    <option value="PendingDeletion">Pending Delete</option>
                                 </select>
                                 <button is="emby-button" type="button" id="btnReloadTable" class="reloadTableButton" title="Reload table data">
                                     <span class="reloadIcon">&#x27F3;</span>
@@ -580,6 +627,7 @@
         .statusCard-errored { background: rgba(217, 83, 79, 0.2); color: #d9534f; }
         .statusCard-ignored { background: rgba(153, 153, 153, 0.2); color: #999; }
         .statusCard-pending { background: rgba(155, 89, 182, 0.2); color: #9b59b6; }
+        .statusCard-pendingReplacement { background: rgba(52, 152, 219, 0.2); color: #3498db; }
         .statusCard-pendingDeletion { background: rgba(217, 83, 79, 0.2); color: #d9534f; }
         .syncItem {
             display: flex;
@@ -624,6 +672,7 @@
         .syncItemStatus.Errored { background: rgba(217, 83, 79, 0.2); color: #d9534f; }
         .syncItemStatus.Ignored { background: rgba(153, 153, 153, 0.2); color: #999; }
         .syncItemStatus.Pending { background: rgba(155, 89, 182, 0.2); color: #9b59b6; }
+        .syncItemStatus.PendingReplacement { background: rgba(52, 152, 219, 0.2); color: #3498db; }
         .syncItemStatus.PendingDeletion { background: rgba(217, 83, 79, 0.2); color: #d9534f; }
         .syncActionButtonRow {
             display: flex;
@@ -828,17 +877,17 @@
                 self.currentConfig = config;
                 document.getElementById('btnAddMapping').addEventListener('click', function() { self.addMapping(); });
                 document.getElementById('chkEnableContentSync').addEventListener('change', function() { self.updateContentSyncVisibility(this.checked); });
-                document.getElementById('chkDeleteIfMissing').addEventListener('change', function() { self.updateDeletionVisibility(this.checked); });
-                document.getElementById('chkRequireApproval').addEventListener('change', function() { self.updatePendingVisibility(this.checked); self.updateDeleteIfMissingLabel(this.checked); });
                 document.getElementById('chkEnableBandwidthScheduling').addEventListener('change', function() { self.updateBandwidthSchedulingVisibility(this.checked); });
+                document.getElementById('chkEnableRecyclingBin').addEventListener('change', function() { self.updateRecyclingBinVisibility(this.checked); });
             },
             loadConfig: function(config) {
                 var self = this; self.currentConfig = config;
                 document.getElementById('chkEnableContentSync').checked = config.EnableContentSync || false;
                 document.getElementById('chkIncludeExtras').checked = config.IncludeCompanionFiles || false;
-                document.getElementById('chkRequireApproval').checked = config.RequireApprovalToSync || false;
                 document.getElementById('chkDetectUpdatedFiles').checked = config.DetectUpdatedFiles !== false;
-                document.getElementById('chkDeleteIfMissing').checked = config.DeleteIfMissingFromSource || false;
+                document.getElementById('selDownloadNewContentMode').value = config.DownloadNewContentMode || 0;
+                document.getElementById('selReplaceExistingContentMode').value = config.ReplaceExistingContentMode || 0;
+                document.getElementById('selDeleteMissingContentMode').value = config.DeleteMissingContentMode || 2;
                 document.getElementById('txtMaxConcurrentDownloads').value = config.MaxConcurrentDownloads || 2;
                 document.getElementById('txtMaxDownloadSpeed').value = config.MaxDownloadSpeed || 0;
                 document.getElementById('selDownloadSpeedUnit').value = config.DownloadSpeedUnit || 'MB';
@@ -848,19 +897,21 @@
                 document.getElementById('txtScheduledEndHour').value = config.ScheduledEndHour || 6;
                 document.getElementById('txtScheduledDownloadSpeed').value = config.ScheduledDownloadSpeed || 0;
                 document.getElementById('selScheduledDownloadSpeedUnit').value = config.ScheduledDownloadSpeedUnit || 'MB';
+                document.getElementById('chkEnableRecyclingBin').checked = config.EnableRecyclingBin || false;
+                document.getElementById('txtRecyclingBinPath').value = config.RecyclingBinPath || '';
+                document.getElementById('txtRecyclingBinRetentionDays').value = config.RecyclingBinRetentionDays || 7;
                 self.updateBandwidthSchedulingVisibility(config.EnableBandwidthScheduling);
                 self.updateContentSyncVisibility(config.EnableContentSync);
-                self.updateDeleteIfMissingLabel(config.RequireApprovalToSync);
-                self.updatePendingVisibility(config.RequireApprovalToSync);
-                self.updateDeletionVisibility(config.DeleteIfMissingFromSource);
+                self.updateRecyclingBinVisibility(config.EnableRecyclingBin);
             },
             getValues: function() {
                 return {
                     EnableContentSync: document.getElementById('chkEnableContentSync').checked,
                     IncludeCompanionFiles: document.getElementById('chkIncludeExtras').checked,
-                    RequireApprovalToSync: document.getElementById('chkRequireApproval').checked,
                     DetectUpdatedFiles: document.getElementById('chkDetectUpdatedFiles').checked,
-                    DeleteIfMissingFromSource: document.getElementById('chkDeleteIfMissing').checked,
+                    DownloadNewContentMode: parseInt(document.getElementById('selDownloadNewContentMode').value, 10),
+                    ReplaceExistingContentMode: parseInt(document.getElementById('selReplaceExistingContentMode').value, 10),
+                    DeleteMissingContentMode: parseInt(document.getElementById('selDeleteMissingContentMode').value, 10),
                     MaxConcurrentDownloads: parseInt(document.getElementById('txtMaxConcurrentDownloads').value, 10) || 2,
                     MaxDownloadSpeed: parseInt(document.getElementById('txtMaxDownloadSpeed').value, 10) || 0,
                     DownloadSpeedUnit: document.getElementById('selDownloadSpeedUnit').value,
@@ -870,22 +921,19 @@
                     ScheduledEndHour: parseInt(document.getElementById('txtScheduledEndHour').value, 10) || 6,
                     ScheduledDownloadSpeed: parseInt(document.getElementById('txtScheduledDownloadSpeed').value, 10) || 0,
                     ScheduledDownloadSpeedUnit: document.getElementById('selScheduledDownloadSpeedUnit').value,
+                    EnableRecyclingBin: document.getElementById('chkEnableRecyclingBin').checked,
+                    RecyclingBinPath: document.getElementById('txtRecyclingBinPath').value,
+                    RecyclingBinRetentionDays: parseInt(document.getElementById('txtRecyclingBinRetentionDays').value, 10) || 7,
                     LibraryMappings: this.collectMappings()
                 };
             },
             loadCapabilities: function() {
                 var self = this;
-                return ServerSyncShared.apiRequest('Capabilities', 'GET').then(function(capabilities) { self.capabilities = capabilities; self.updateDeleteCapabilityVisibility(capabilities.CanDeleteItems); }).catch(function() { self.capabilities = { CanDeleteItems: false }; self.updateDeleteCapabilityVisibility(false); });
+                return ServerSyncShared.apiRequest('Capabilities', 'GET').then(function(capabilities) { self.capabilities = capabilities; }).catch(function() { self.capabilities = { CanDeleteItems: false }; });
             },
-            updateDeleteCapabilityVisibility: function(canDelete) {
-                var deleteIfMissingContainer = document.getElementById('chkDeleteIfMissing').closest('.inputContainer');
-                if (deleteIfMissingContainer) { deleteIfMissingContainer.style.display = canDelete ? 'block' : 'none'; }
-            },
-            updatePendingVisibility: function(requireApproval) { if (this.onPendingVisibilityChange) { this.onPendingVisibilityChange(requireApproval); } },
-            updateDeletionVisibility: function(deleteIfMissing) { if (this.onDeletionVisibilityChange) { this.onDeletionVisibilityChange(deleteIfMissing); } },
             updateBandwidthSchedulingVisibility: function(enabled) { document.getElementById('bandwidthScheduleContainer').style.display = enabled ? 'block' : 'none'; },
             updateContentSyncVisibility: function(enabled) { document.getElementById('contentSyncSettings').style.display = enabled ? 'block' : 'none'; },
-            updateDeleteIfMissingLabel: function(requireApproval) { document.getElementById('lblDeleteIfMissing').textContent = requireApproval ? 'Track if missing from source' : 'Delete if Missing from Source'; },
+            updateRecyclingBinVisibility: function(enabled) { document.getElementById('recyclingBinSettings').style.display = enabled ? 'block' : 'none'; },
             fetchSourceLibraries: function(serverUrl, apiKey) {
                 var self = this;
                 return ServerSyncShared.apiRequest('GetSourceLibraries', 'POST', { ServerUrl: serverUrl, ApiKey: apiKey }).then(function(libraries) { self.sourceLibraries = libraries || []; self.updateLibrarySelects(); }).catch(function(err) { console.error('Failed to fetch source libraries:', err); self.sourceLibraries = []; });
@@ -942,8 +990,7 @@
                     mappings.push({ IsEnabled: row.querySelector('.mappingEnabled').checked, SourceLibraryId: sourceSelect.value, SourceLibraryName: sourceOption ? sourceOption.textContent : '', SourceRootPath: row.querySelector('.sourceRootPath').value, LocalLibraryId: localSelect.value, LocalLibraryName: localOption ? localOption.textContent : '', LocalRootPath: row.querySelector('.localRootPath').value });
                 });
                 return mappings;
-            },
-            onPendingVisibilityChange: null, onDeletionVisibilityChange: null
+            }
         };
     </script>
 
@@ -976,14 +1023,6 @@
                 var bulkDeleteBtn = document.getElementById('btnBulkDelete'); var modalDeleteRow = document.getElementById('modalDeleteRow');
                 if (bulkDeleteBtn) { bulkDeleteBtn.style.display = canDelete ? 'inline-block' : 'none'; }
                 if (modalDeleteRow) { modalDeleteRow.style.display = canDelete ? 'block' : 'none'; }
-            },
-            updatePendingVisibility: function(requireApproval) {
-                document.getElementById('statusGroupPending').style.display = requireApproval ? 'block' : 'none';
-                document.getElementById('optPending').style.display = requireApproval ? 'block' : 'none';
-            },
-            updateDeletionVisibility: function(deleteIfMissing) {
-                document.getElementById('statusGroupPendingDeletion').style.display = deleteIfMissing ? 'block' : 'none';
-                document.getElementById('optPendingDeletion').style.display = deleteIfMissing ? 'block' : 'none';
             },
             loadHealthStats: function() {
                 return ServerSyncShared.apiRequest('Stats', 'GET').then(function(stats) {
@@ -1031,6 +1070,8 @@
                     document.getElementById('statusGroupIgnored').setAttribute('title', 'Ignored: ' + (status.Ignored || 0));
                     document.getElementById('pendingCount').textContent = status.Pending || 0;
                     document.getElementById('statusGroupPending').setAttribute('title', 'Pending: ' + (status.Pending || 0));
+                    document.getElementById('pendingReplacementCount').textContent = status.PendingReplacement || 0;
+                    document.getElementById('statusGroupPendingReplacement').setAttribute('title', 'Pending Replacement: ' + (status.PendingReplacement || 0));
                     document.getElementById('pendingDeletionCount').textContent = status.PendingDeletion || 0;
                     document.getElementById('statusGroupPendingDeletion').setAttribute('title', 'Pending Deletion: ' + (status.PendingDeletion || 0));
                 });
@@ -1173,14 +1214,6 @@
                         ContentConfigModule.fetchSourceLibraries(values.SourceServerUrl, values.SourceServerApiKey);
                     };
 
-                    ContentConfigModule.onPendingVisibilityChange = function(requireApproval) {
-                        SyncTableModule.updatePendingVisibility(requireApproval);
-                    };
-
-                    ContentConfigModule.onDeletionVisibilityChange = function(deleteIfMissing) {
-                        SyncTableModule.updateDeletionVisibility(deleteIfMissing);
-                    };
-
                     // Fetch libraries then render mappings
                     var libraryPromises = [ContentConfigModule.fetchLocalLibraries()];
                     if (config.SourceServerUrl && config.SourceServerApiKey) {
@@ -1208,7 +1241,6 @@
 
                 ServerSyncShared.saveConfig(config).then(function() {
                     ServerSyncShared.showAlert('Settings saved');
-                    SyncTableModule.updatePendingVisibility(config.RequireApprovalToSync);
                 }).catch(function(err) {
                     console.error('Failed to save config:', err);
                     ServerSyncShared.showAlert('Failed to save settings');
