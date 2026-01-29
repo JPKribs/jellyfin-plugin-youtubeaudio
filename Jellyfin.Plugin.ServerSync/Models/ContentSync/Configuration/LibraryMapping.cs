@@ -1,4 +1,4 @@
-namespace Jellyfin.Plugin.ServerSync.Models.Configuration;
+namespace Jellyfin.Plugin.ServerSync.Models.ContentSync.Configuration;
 
 /// <summary>
 /// Represents a mapping between a source library and a local library.

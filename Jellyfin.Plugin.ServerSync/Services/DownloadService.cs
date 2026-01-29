@@ -1,0 +1,236 @@
+using System;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using Jellyfin.Plugin.ServerSync.Configuration;
+using Jellyfin.Plugin.ServerSync.Models.ContentSync;
+using Jellyfin.Plugin.ServerSync.Utilities;
+using Microsoft.Extensions.Logging;
+
+namespace Jellyfin.Plugin.ServerSync.Services;
+
+/// <summary>
+/// Service for downloading files from the source server.
+/// </summary>
+public class DownloadService
+{
+    private readonly ILogger _logger;
+
+    public DownloadService(ILogger logger)
+    {
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Downloads a single item and its companion files.
+    /// </summary>
+    /// <param name="client">Source server client.</param>
+    /// <param name="item">Sync item to download.</param>
+    /// <param name="tempPath">Temporary download path.</param>
+    /// <param name="speedLimitBytesPerSecond">Download speed limit in bytes per second.</param>
+    /// <param name="includeCompanionFiles">Whether to download companion files.</param>
+    /// <param name="config">Plugin configuration.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Download result.</returns>
+    public async Task<DownloadResult> DownloadItemAsync(
+        SourceServerClient client,
+        SyncItem item,
+        string tempPath,
+        long speedLimitBytesPerSecond,
+        bool includeCompanionFiles,
+        PluginConfiguration config,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(item.LocalPath))
+        {
+            return new DownloadResult(false, "No local path configured");
+        }
+
+        var tempFileName = $"{item.SourceItemId}_{Path.GetFileName(item.LocalPath)}";
+        var tempFilePath = Path.Combine(tempPath, tempFileName);
+        var itemId = Guid.Parse(item.SourceItemId);
+
+        try
+        {
+            using var sourceStream = await client.DownloadFileAsync(itemId, cancellationToken).ConfigureAwait(false);
+
+            if (sourceStream == null)
+            {
+                return new DownloadResult(false, "No response from server");
+            }
+
+            using (var fileStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                await StreamUtilities.CopyWithSpeedLimitAsync(sourceStream, fileStream, speedLimitBytesPerSecond, cancellationToken).ConfigureAwait(false);
+            }
+
+            var downloadedInfo = new FileInfo(tempFilePath);
+            if (item.SourceSize > 0 && downloadedInfo.Length != item.SourceSize)
+            {
+                var errorMsg = $"Size mismatch: expected {FormatUtilities.FormatBytes(item.SourceSize)}, got {FormatUtilities.FormatBytes(downloadedInfo.Length)}";
+                File.Delete(tempFilePath);
+                return new DownloadResult(false, errorMsg);
+            }
+
+            var targetDir = Path.GetDirectoryName(item.LocalPath);
+            if (!string.IsNullOrEmpty(targetDir))
+            {
+                Directory.CreateDirectory(targetDir);
+            }
+
+            // If file exists and recycling bin is enabled, move old file to bin before replacing
+            if (File.Exists(item.LocalPath) && config.EnableRecyclingBin && !string.IsNullOrEmpty(config.RecyclingBinPath))
+            {
+                RecyclingBinService.MoveWithCompanionsToRecyclingBin(item.LocalPath, config.RecyclingBinPath, _logger);
+            }
+
+            // Use atomic move with overwrite
+            FileOperationUtilities.MoveFileWithOverwrite(tempFilePath, item.LocalPath, _logger);
+
+            if (includeCompanionFiles)
+            {
+                await DownloadCompanionFilesAsync(
+                    client,
+                    itemId,
+                    targetDir ?? Path.GetDirectoryName(item.LocalPath) ?? string.Empty,
+                    tempPath,
+                    speedLimitBytesPerSecond,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            return new DownloadResult(true);
+        }
+        catch (Exception ex)
+        {
+            CleanupTempFile(tempFilePath);
+            return new DownloadResult(false, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Downloads external companion files (subtitles, etc.) for an item.
+    /// </summary>
+    /// <param name="client">Source server client.</param>
+    /// <param name="itemId">Item ID.</param>
+    /// <param name="targetDir">Target directory for companion files.</param>
+    /// <param name="tempPath">Temporary download path.</param>
+    /// <param name="speedLimitBytesPerSecond">Download speed limit in bytes per second.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public async Task DownloadCompanionFilesAsync(
+        SourceServerClient client,
+        Guid itemId,
+        string targetDir,
+        string tempPath,
+        long speedLimitBytesPerSecond,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var companions = await client.GetCompanionFilesAsync(itemId, cancellationToken).ConfigureAwait(false);
+
+            if (companions.Count == 0)
+            {
+                return;
+            }
+
+            _logger.LogInformation("Downloading {Count} companion files for item {ItemId}", companions.Count, itemId);
+
+            foreach (var companion in companions)
+            {
+                try
+                {
+                    var tempFileName = $"{itemId}_{companion.FileName}";
+                    var tempFilePath = Path.Combine(tempPath, tempFileName);
+                    var targetPath = Path.Combine(targetDir, companion.FileName);
+
+                    using var stream = await client.DownloadCompanionFileAsync(itemId, companion.SourcePath, cancellationToken).ConfigureAwait(false);
+
+                    if (stream == null)
+                    {
+                        _logger.LogWarning("Failed to download companion file {FileName}", companion.FileName);
+                        continue;
+                    }
+
+                    using (var fileStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        await StreamUtilities.CopyWithSpeedLimitAsync(stream, fileStream, speedLimitBytesPerSecond, cancellationToken).ConfigureAwait(false);
+                    }
+
+                    FileOperationUtilities.MoveFileWithOverwrite(tempFilePath, targetPath, _logger);
+                    _logger.LogInformation("Downloaded companion file {FileName}", companion.FileName);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to download companion file {FileName}", companion.FileName);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to get companion files for item {ItemId}", itemId);
+        }
+    }
+
+    /// <summary>
+    /// Validates an item before downloading.
+    /// </summary>
+    /// <param name="item">Sync item to validate.</param>
+    /// <param name="config">Plugin configuration.</param>
+    /// <param name="database">Sync database for collision checking.</param>
+    /// <returns>Validation result with error message if invalid.</returns>
+    public static (bool IsValid, string? ErrorMessage) ValidateForDownload(
+        SyncItem item,
+        PluginConfiguration config,
+        SyncDatabase database)
+    {
+        // Validate path
+        var pathValidation = FileValidationService.ValidatePath(item.LocalPath, item.SourceItemId, config, database);
+        if (!pathValidation.IsValid)
+        {
+            return (false, pathValidation.ErrorMessage);
+        }
+
+        // Check disk space
+        if (!DiskSpaceService.HasSufficientSpaceForFile(item.LocalPath, item.SourceSize, config.MinimumFreeDiskSpaceGb))
+        {
+            return (false, "Insufficient disk space");
+        }
+
+        // Check write permissions
+        if (!FileValidationService.HasWritePermission(item.LocalPath))
+        {
+            return (false, "No write permission to target directory");
+        }
+
+        return (true, null);
+    }
+
+    /// <summary>
+    /// Checks if a download should be skipped because the local file already exists and is valid.
+    /// </summary>
+    /// <param name="item">Sync item to check.</param>
+    /// <param name="skipReason">Output parameter with reason for skipping.</param>
+    /// <returns>True if download should be skipped.</returns>
+    public static bool ShouldSkipDownload(SyncItem item, out string? skipReason)
+    {
+        return FileValidationService.ShouldSkipDownload(item, out skipReason);
+    }
+
+    /// <summary>
+    /// Cleans up a temporary file, ignoring any errors.
+    /// </summary>
+    private static void CleanupTempFile(string tempFilePath)
+    {
+        if (File.Exists(tempFilePath))
+        {
+            try
+            {
+                File.Delete(tempFilePath);
+            }
+            catch
+            {
+                // Ignore cleanup errors
+            }
+        }
+    }
+}

@@ -1,4 +1,4 @@
-namespace Jellyfin.Plugin.ServerSync.Models.Configuration;
+namespace Jellyfin.Plugin.ServerSync.Models.ContentSync.Configuration;
 
 /// <summary>
 /// Plugin capabilities for the UI.

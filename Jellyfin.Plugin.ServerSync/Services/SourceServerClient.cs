@@ -6,41 +6,13 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Plugin.ServerSync.Models.Configuration;
+using Jellyfin.Plugin.ServerSync.Models.ContentSync;
 using Jellyfin.Sdk;
 using Jellyfin.Sdk.Generated.Models;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.ServerSync.Services;
-
-// CompanionFileInfo
-// Information about a companion file (subtitle, etc.) for an item.
-public class CompanionFileInfo
-{
-    public string SourcePath { get; set; } = string.Empty;
-
-    public string FileName { get; set; } = string.Empty;
-
-    public string? Language { get; set; }
-
-    public string? Codec { get; set; }
-
-    public bool IsExternal { get; set; }
-
-    public int StreamIndex { get; set; }
-}
-
-// ConnectionTestResult
-// Result of a connection test containing server info.
-public class ConnectionTestResult
-{
-    public bool Success { get; set; }
-
-    public string? ServerName { get; set; }
-
-    public string? ServerId { get; set; }
-
-    public string? ErrorMessage { get; set; }
-}
 
 // SourceServerClient
 // Client for communicating with the source Jellyfin server using the official SDK.

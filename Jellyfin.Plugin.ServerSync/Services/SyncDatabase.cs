@@ -495,7 +495,7 @@ public class SyncDatabase : IDisposable
         command.Parameters.AddWithValue("@sourcePath", item.SourcePath);
         command.Parameters.AddWithValue("@sourceSize", item.SourceSize);
         command.Parameters.AddWithValue("@sourceCreateDate", item.SourceCreateDate.ToString("o"));
-        command.Parameters.AddWithValue("@sourceModifyDate", item.SourceModifyDate.ToString("o"));
+        command.Parameters.AddWithValue("@sourceModifyDate", item.SourceCreateDate.ToString("o")); // Deprecated: use SourceCreateDate
         command.Parameters.AddWithValue("@sourceETag", item.SourceETag ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@localItemId", item.LocalItemId ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@localPath", item.LocalPath ?? (object)DBNull.Value);
@@ -716,7 +716,7 @@ public class SyncDatabase : IDisposable
             SourcePath = reader.GetString(reader.GetOrdinal("SourcePath")),
             SourceSize = reader.GetInt64(reader.GetOrdinal("SourceSize")),
             SourceCreateDate = ParseDateTimeSafe(reader.GetString(reader.GetOrdinal("SourceCreateDate"))),
-            SourceModifyDate = ParseDateTimeSafe(reader.GetString(reader.GetOrdinal("SourceModifyDate"))),
+            // SourceModifyDate column exists in DB but is deprecated - not read into model
             LocalItemId = reader.IsDBNull(reader.GetOrdinal("LocalItemId")) ? null : reader.GetString(reader.GetOrdinal("LocalItemId")),
             LocalPath = reader.IsDBNull(reader.GetOrdinal("LocalPath")) ? null : reader.GetString(reader.GetOrdinal("LocalPath")),
             StatusDate = ParseDateTimeSafe(reader.GetString(reader.GetOrdinal("StatusDate"))),
@@ -842,17 +842,4 @@ public class SyncDatabase : IDisposable
             _disposed = true;
         }
     }
-}
-
-// SyncStats
-// Statistics about the sync database.
-public class SyncStats
-{
-    public Dictionary<SyncStatus, int> StatusCounts { get; set; } = new();
-
-    public long TotalQueuedBytes { get; set; }
-
-    public long TotalSyncedBytes { get; set; }
-
-    public DateTime? LastSyncTime { get; set; }
 }

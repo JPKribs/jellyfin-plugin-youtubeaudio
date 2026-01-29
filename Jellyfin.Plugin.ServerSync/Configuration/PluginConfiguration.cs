@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Jellyfin.Plugin.ServerSync.Models.Configuration;
+using Jellyfin.Plugin.ServerSync.Models.ContentSync.Configuration;
 using MediaBrowser.Model.Plugins;
 
 namespace Jellyfin.Plugin.ServerSync.Configuration;

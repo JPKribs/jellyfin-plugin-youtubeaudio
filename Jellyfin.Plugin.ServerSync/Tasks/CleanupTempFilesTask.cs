@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Plugin.ServerSync.Utilities;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -109,7 +109,7 @@ public class CleanupTempFilesTask : IScheduledTask
                 _logger.LogInformation(
                     "Cleanup complete: deleted {Count} orphaned temp files ({Size})",
                     deletedCount,
-                    FormatBytes(totalBytes));
+                    FormatUtilities.FormatBytes(totalBytes));
             }
 
             if (errorCount > 0)
@@ -123,23 +123,6 @@ public class CleanupTempFilesTask : IScheduledTask
         }
 
         return Task.CompletedTask;
-    }
-
-    // FormatBytes
-    // Formats bytes to human-readable string.
-    private static string FormatBytes(long bytes)
-    {
-        string[] units = { "B", "KB", "MB", "GB", "TB" };
-        double size = bytes;
-        var unitIndex = 0;
-
-        while (size >= 1024 && unitIndex < units.Length - 1)
-        {
-            size /= 1024;
-            unitIndex++;
-        }
-
-        return $"{size:F2} {units[unitIndex]}";
     }
 
     public IEnumerable<TaskTriggerInfo> GetDefaultTriggers()

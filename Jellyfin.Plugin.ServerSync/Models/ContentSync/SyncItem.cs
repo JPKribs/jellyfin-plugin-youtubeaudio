@@ -21,8 +21,6 @@ public class SyncItem
 
     public DateTime SourceCreateDate { get; set; }
 
-    public DateTime SourceModifyDate { get; set; }
-
     /// <summary>ETag from source server used to detect file changes without re-downloading.</summary>
     public string? SourceETag { get; set; }
 

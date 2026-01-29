@@ -1,4 +1,4 @@
-namespace Jellyfin.Plugin.ServerSync.Models.Configuration;
+namespace Jellyfin.Plugin.ServerSync.Models.ContentSync.Configuration;
 
 /// <summary>
 /// Controls how sync operations are handled for different action types.

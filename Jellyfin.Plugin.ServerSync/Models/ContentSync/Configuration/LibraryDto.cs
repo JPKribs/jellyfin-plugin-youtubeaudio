@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Jellyfin.Plugin.ServerSync.Models.Configuration;
+namespace Jellyfin.Plugin.ServerSync.Models.ContentSync.Configuration;
 
 /// <summary>
 /// Library information for API responses.

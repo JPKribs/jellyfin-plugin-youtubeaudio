@@ -1,0 +1,261 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using Jellyfin.Plugin.ServerSync.Configuration;
+using Jellyfin.Plugin.ServerSync.Models.ContentSync;
+using Jellyfin.Plugin.ServerSync.Utilities;
+using MediaBrowser.Controller.Entities;
+using MediaBrowser.Controller.Library;
+using Microsoft.Extensions.Logging;
+
+namespace Jellyfin.Plugin.ServerSync.Services;
+
+/// <summary>
+/// Centralized service for file deletion operations including companion files.
+/// </summary>
+public static class FileDeletionService
+{
+    /// <summary>
+    /// Deletes a file and its companion files permanently.
+    /// </summary>
+    /// <param name="filePath">Path to the main file to delete.</param>
+    /// <param name="logger">Logger for operation output.</param>
+    /// <returns>True if main file was deleted successfully.</returns>
+    public static bool DeleteWithCompanions(string filePath, ILogger logger)
+    {
+        if (string.IsNullOrEmpty(filePath))
+        {
+            return false;
+        }
+
+        var mainDeleted = false;
+
+        try
+        {
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+                mainDeleted = true;
+                logger.LogDebug("Deleted file: {FileName}", Path.GetFileName(filePath));
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to delete file: {FilePath}", filePath);
+            return false;
+        }
+
+        // Delete companion files
+        DeleteCompanionFiles(filePath, logger);
+
+        return mainDeleted;
+    }
+
+    /// <summary>
+    /// Deletes companion files (subtitles, metadata, images) that match the main file name.
+    /// </summary>
+    /// <param name="mainFilePath">Path to the main file (companions are found by pattern matching).</param>
+    /// <param name="logger">Logger for operation output.</param>
+    public static void DeleteCompanionFiles(string mainFilePath, ILogger logger)
+    {
+        var companions = FileOperationUtilities.GetCompanionFiles(mainFilePath);
+        foreach (var companionFile in companions)
+        {
+            try
+            {
+                File.Delete(companionFile);
+                logger.LogDebug("Deleted companion file: {CompanionFile}", Path.GetFileName(companionFile));
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to delete companion file: {CompanionFile}", Path.GetFileName(companionFile));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Deletes a file using the recycling bin (moves file instead of permanent delete).
+    /// </summary>
+    /// <param name="filePath">Path to the file to recycle.</param>
+    /// <param name="recyclingBinPath">Path to the recycling bin directory.</param>
+    /// <param name="logger">Logger for operation output.</param>
+    /// <returns>Deletion result.</returns>
+    public static DeletionResult DeleteWithRecyclingBin(string filePath, string recyclingBinPath, ILogger logger)
+    {
+        if (string.IsNullOrEmpty(filePath))
+        {
+            return new DeletionResult(false, "File path is empty");
+        }
+
+        if (string.IsNullOrEmpty(recyclingBinPath))
+        {
+            return new DeletionResult(false, "Recycling bin path is empty");
+        }
+
+        var success = RecyclingBinService.MoveWithCompanionsToRecyclingBin(filePath, recyclingBinPath, logger);
+        return success
+            ? new DeletionResult(true)
+            : new DeletionResult(false, "Failed to move file to recycling bin");
+    }
+
+    /// <summary>
+    /// Deletes a local item via the Jellyfin library manager API.
+    /// This properly handles library database cleanup and companion files.
+    /// </summary>
+    /// <param name="localItem">The Jellyfin library item to delete.</param>
+    /// <param name="libraryManager">Jellyfin library manager.</param>
+    /// <param name="deleteFileLocation">Whether to delete the actual file from disk.</param>
+    /// <param name="logger">Logger for operation output.</param>
+    /// <returns>Deletion result.</returns>
+    public static DeletionResult DeleteViaJellyfinApi(
+        BaseItem localItem,
+        ILibraryManager libraryManager,
+        bool deleteFileLocation,
+        ILogger logger)
+    {
+        try
+        {
+            libraryManager.DeleteItem(
+                localItem,
+                new DeleteOptions { DeleteFileLocation = deleteFileLocation },
+                localItem.GetParent(),
+                notifyParentItem: true);
+
+            return new DeletionResult(true);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to delete item via Jellyfin API: {ItemName}", localItem.Name);
+            return new DeletionResult(false, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Deletes a local file using the appropriate strategy based on configuration.
+    /// Handles: Jellyfin API deletion, recycling bin, and permanent deletion.
+    /// </summary>
+    /// <param name="filePath">Path to the file.</param>
+    /// <param name="localItem">Optional Jellyfin library item (null if not in library).</param>
+    /// <param name="libraryManager">Jellyfin library manager.</param>
+    /// <param name="config">Plugin configuration.</param>
+    /// <param name="logger">Logger for operation output.</param>
+    /// <returns>Deletion result.</returns>
+    public static DeletionResult DeleteLocalFile(
+        string? filePath,
+        BaseItem? localItem,
+        ILibraryManager libraryManager,
+        PluginConfiguration config,
+        ILogger logger)
+    {
+        var useRecyclingBin = config.EnableRecyclingBin && !string.IsNullOrEmpty(config.RecyclingBinPath);
+
+        // If item exists in Jellyfin library
+        if (localItem != null)
+        {
+            if (useRecyclingBin && !string.IsNullOrEmpty(filePath))
+            {
+                // Move to recycling bin first, then remove from Jellyfin without deleting file
+                var recycleResult = DeleteWithRecyclingBin(filePath, config.RecyclingBinPath!, logger);
+                if (!recycleResult.Success)
+                {
+                    return recycleResult;
+                }
+
+                // Remove from Jellyfin database only (file already moved)
+                return DeleteViaJellyfinApi(localItem, libraryManager, deleteFileLocation: false, logger);
+            }
+            else
+            {
+                // Use Jellyfin's library manager to delete the item (handles companion files)
+                return DeleteViaJellyfinApi(localItem, libraryManager, deleteFileLocation: true, logger);
+            }
+        }
+
+        // File not in Jellyfin library but exists on disk
+        if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
+        {
+            if (useRecyclingBin)
+            {
+                return DeleteWithRecyclingBin(filePath, config.RecyclingBinPath!, logger);
+            }
+            else
+            {
+                var success = DeleteWithCompanions(filePath, logger);
+                return success
+                    ? new DeletionResult(true)
+                    : new DeletionResult(false, "Failed to delete file");
+            }
+        }
+
+        // File doesn't exist
+        return new DeletionResult(true);
+    }
+
+    /// <summary>
+    /// Processes all items marked for deletion in the sync database.
+    /// </summary>
+    /// <param name="database">Sync database.</param>
+    /// <param name="config">Plugin configuration.</param>
+    /// <param name="logger">Logger for operation output.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Tuple of (deleted count, failed count).</returns>
+    public static (int Deleted, int Failed) ProcessPendingDeletions(
+        SyncDatabase database,
+        PluginConfiguration config,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        var itemsToDelete = database.GetByStatus(SyncStatus.Deleting).ToList();
+
+        if (itemsToDelete.Count == 0)
+        {
+            return (0, 0);
+        }
+
+        logger.LogInformation("Processing {Count} items marked for deletion", itemsToDelete.Count);
+
+        var deleted = 0;
+        var failed = 0;
+
+        foreach (var item in itemsToDelete)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+
+            var localPath = item.LocalPath;
+            var fileName = Path.GetFileName(localPath ?? item.SourcePath);
+
+            if (!string.IsNullOrEmpty(localPath) && File.Exists(localPath))
+            {
+                var result = config.EnableRecyclingBin && !string.IsNullOrEmpty(config.RecyclingBinPath)
+                    ? DeleteWithRecyclingBin(localPath, config.RecyclingBinPath, logger)
+                    : new DeletionResult(DeleteWithCompanions(localPath, logger));
+
+                if (result.Success)
+                {
+                    database.Delete(item.SourceItemId);
+                    deleted++;
+                    logger.LogInformation("DELETED: {FileName}", fileName);
+                }
+                else
+                {
+                    database.UpdateStatus(item.SourceItemId, SyncStatus.Errored, errorMessage: $"Deletion failed: {result.ErrorMessage}");
+                    failed++;
+                    logger.LogError("Failed to delete {FileName}: {Error}", fileName, result.ErrorMessage);
+                }
+            }
+            else
+            {
+                // File doesn't exist, just remove the record
+                database.Delete(item.SourceItemId);
+                deleted++;
+            }
+        }
+
+        logger.LogInformation("Deletion processing complete: {Deleted} deleted, {Failed} failed", deleted, failed);
+        return (deleted, failed);
+    }
+}

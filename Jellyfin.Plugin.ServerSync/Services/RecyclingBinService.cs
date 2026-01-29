@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Jellyfin.Plugin.ServerSync.Utilities;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.ServerSync.Services;
@@ -34,7 +35,7 @@ public static class RecyclingBinService
             }
 
             // Generate recycled file name: path.with.periods_2026-01-29_17-30-45.ext
-            var recycledFileName = GenerateRecycledFileName(filePath);
+            var recycledFileName = FileOperationUtilities.GenerateRecycledFileName(filePath);
             var destinationPath = Path.Combine(recyclingBinPath, recycledFileName);
 
             // Handle case where destination already exists (unlikely but possible)
@@ -81,9 +82,8 @@ public static class RecyclingBinService
             }
 
             var fileNameWithoutExt = Path.GetFileNameWithoutExtension(filePath);
-            var companionExtensions = new[] { ".srt", ".sub", ".ass", ".ssa", ".vtt", ".nfo", ".jpg", ".png" };
 
-            foreach (var ext in companionExtensions)
+            foreach (var ext in FileOperationUtilities.CompanionExtensions)
             {
                 var pattern = $"{fileNameWithoutExt}*{ext}";
                 try
@@ -135,7 +135,7 @@ public static class RecyclingBinService
 
                     // Check if file is older than retention period
                     // Use the timestamp from the filename if possible, otherwise use file modification time
-                    var fileTime = ExtractTimestampFromFileName(file) ?? fileInfo.LastWriteTimeUtc;
+                    var fileTime = FileOperationUtilities.ExtractTimestampFromFileName(file) ?? fileInfo.LastWriteTimeUtc;
 
                     if (fileTime < cutoffTime)
                     {
@@ -158,7 +158,7 @@ public static class RecyclingBinService
                 logger.LogInformation(
                     "Recycling bin cleanup: permanently deleted {Count} files ({Size})",
                     deletedCount,
-                    FormatBytes(totalBytes));
+                    FormatUtilities.FormatBytes(totalBytes));
             }
 
             if (errorCount > 0)
@@ -172,89 +172,5 @@ public static class RecyclingBinService
         }
 
         return deletedCount;
-    }
-
-    // GenerateRecycledFileName
-    // Generates a recycled file name with path encoded and timestamp.
-    // Format: path.to.file_2026-01-29_17-30-45.ext
-    private static string GenerateRecycledFileName(string originalPath)
-    {
-        var fileName = Path.GetFileName(originalPath);
-        var directory = Path.GetDirectoryName(originalPath) ?? string.Empty;
-
-        // Encode the directory path: replace path separators with periods
-        var encodedPath = directory
-            .Replace(Path.DirectorySeparatorChar, '.')
-            .Replace(Path.AltDirectorySeparatorChar, '.')
-            .Replace(':', '.')
-            .Trim('.');
-
-        // Get timestamp
-        var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd_HH-mm-ss");
-
-        // Get file parts
-        var nameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
-        var extension = Path.GetExtension(fileName);
-
-        // Combine: encodedPath.filename_timestamp.ext
-        if (!string.IsNullOrEmpty(encodedPath))
-        {
-            return $"{encodedPath}.{nameWithoutExt}_{timestamp}{extension}";
-        }
-
-        return $"{nameWithoutExt}_{timestamp}{extension}";
-    }
-
-    // ExtractTimestampFromFileName
-    // Attempts to extract the UTC timestamp from a recycled file name.
-    private static DateTime? ExtractTimestampFromFileName(string filePath)
-    {
-        try
-        {
-            var fileName = Path.GetFileNameWithoutExtension(filePath);
-
-            // Look for timestamp pattern: _YYYY-MM-DD_HH-mm-ss at the end
-            var lastUnderscore = fileName.LastIndexOf('_');
-            if (lastUnderscore < 0) return null;
-
-            var secondLastUnderscore = fileName.LastIndexOf('_', lastUnderscore - 1);
-            if (secondLastUnderscore < 0) return null;
-
-            var timestampPart = fileName[(secondLastUnderscore + 1)..];
-
-            // Parse: 2026-01-29_17-30-45
-            if (DateTime.TryParseExact(
-                timestampPart,
-                "yyyy-MM-dd_HH-mm-ss",
-                null,
-                System.Globalization.DateTimeStyles.AssumeUniversal,
-                out var timestamp))
-            {
-                return timestamp;
-            }
-        }
-        catch
-        {
-            // Ignore parsing errors
-        }
-
-        return null;
-    }
-
-    // FormatBytes
-    // Formats bytes to human-readable string.
-    private static string FormatBytes(long bytes)
-    {
-        string[] units = { "B", "KB", "MB", "GB", "TB" };
-        double size = bytes;
-        var unitIndex = 0;
-
-        while (size >= 1024 && unitIndex < units.Length - 1)
-        {
-            size /= 1024;
-            unitIndex++;
-        }
-
-        return $"{size:F2} {units[unitIndex]}";
     }
 }

@@ -25,8 +25,6 @@ public class SyncItemDto
 
     public DateTime SourceCreateDate { get; set; }
 
-    public DateTime SourceModifyDate { get; set; }
-
     public string Status { get; set; } = string.Empty;
 
     public string? PendingType { get; set; }
