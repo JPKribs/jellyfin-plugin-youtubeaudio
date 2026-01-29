@@ -60,15 +60,30 @@ var ServerSyncShared = {
     apiRequest: function(endpoint, method, data) {
         var options = {
             url: ApiClient.getUrl('ServerSync/' + endpoint),
-            type: method || 'GET',
-            dataType: 'json'
+            type: method || 'GET'
         };
+
+        // Only use dataType:'json' for GET requests
+        // POST requests may return empty body or JSON, handle both
+        if (method === 'GET') {
+            options.dataType = 'json';
+        }
 
         if (data) {
             options.contentType = 'application/json';
             options.data = JSON.stringify(data);
         }
 
-        return ApiClient.fetch(options);
+        return ApiClient.fetch(options).then(function(response) {
+            // If response is a string, try to parse as JSON
+            if (response && typeof response === 'string' && response.length > 0) {
+                try {
+                    return JSON.parse(response);
+                } catch (e) {
+                    return response;
+                }
+            }
+            return response;
+        });
     }
 };

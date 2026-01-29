@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
-using Jellyfin.Plugin.ServerSync.Models;
+using Jellyfin.Plugin.ServerSync.Models.ContentSync;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
@@ -15,7 +15,7 @@ namespace Jellyfin.Plugin.ServerSync.Services;
 // SQLite database for tracking sync items between servers.
 public class SyncDatabase : IDisposable
 {
-    private const int CurrentSchemaVersion = 3;
+    private const int CurrentSchemaVersion = 5;
 
     private readonly ILogger<SyncDatabase> _logger;
     private readonly string _dbPath;
@@ -138,6 +138,7 @@ public class SyncDatabase : IDisposable
                 LocalPath TEXT,
                 StatusDate TEXT NOT NULL,
                 Status INTEGER NOT NULL,
+                PendingType INTEGER,
                 LastSyncTime TEXT,
                 ErrorMessage TEXT,
                 RetryCount INTEGER DEFAULT 0,
@@ -206,6 +207,56 @@ public class SyncDatabase : IDisposable
                 {
                     _logger.LogDebug("SourceETag column already exists, skipping");
                 }
+            }
+
+            if (fromVersion < 4)
+            {
+                // Add PendingType column and migrate old PendingDeletion/PendingReplacement statuses
+                try
+                {
+                    using var addColCmd = _connection.CreateCommand();
+                    addColCmd.Transaction = transaction;
+                    addColCmd.CommandText = "ALTER TABLE SyncItems ADD COLUMN PendingType INTEGER";
+                    addColCmd.ExecuteNonQuery();
+                    _logger.LogInformation("Added PendingType column");
+                }
+                catch (SqliteException ex) when (ex.Message.Contains("duplicate column", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogDebug("PendingType column already exists, skipping");
+                }
+
+                // Migrate old statuses: PendingDeletion (5) -> Pending (0) with PendingType.Deletion (2)
+                using var migrateDeletionCmd = _connection.CreateCommand();
+                migrateDeletionCmd.Transaction = transaction;
+                migrateDeletionCmd.CommandText = "UPDATE SyncItems SET Status = 0, PendingType = 2 WHERE Status = 5";
+                var deletionCount = migrateDeletionCmd.ExecuteNonQuery();
+                if (deletionCount > 0)
+                {
+                    _logger.LogInformation("Migrated {Count} PendingDeletion items to Pending with PendingType.Deletion", deletionCount);
+                }
+
+                // Migrate old statuses: PendingReplacement (6) -> Pending (0) with PendingType.Replacement (1)
+                using var migrateReplacementCmd = _connection.CreateCommand();
+                migrateReplacementCmd.Transaction = transaction;
+                migrateReplacementCmd.CommandText = "UPDATE SyncItems SET Status = 0, PendingType = 1 WHERE Status = 6";
+                var replacementCount = migrateReplacementCmd.ExecuteNonQuery();
+                if (replacementCount > 0)
+                {
+                    _logger.LogInformation("Migrated {Count} PendingReplacement items to Pending with PendingType.Replacement", replacementCount);
+                }
+
+                // Set PendingType.Download (0) for existing Pending items without a type
+                using var migrateDownloadCmd = _connection.CreateCommand();
+                migrateDownloadCmd.Transaction = transaction;
+                migrateDownloadCmd.CommandText = "UPDATE SyncItems SET PendingType = 0 WHERE Status = 0 AND PendingType IS NULL";
+                migrateDownloadCmd.ExecuteNonQuery();
+            }
+
+            if (fromVersion < 5)
+            {
+                // No schema changes, but status value 5 is now Deleting instead of old PendingDeletion
+                // Old PendingDeletion items were already migrated to Pending+PendingType.Deletion in v4
+                _logger.LogInformation("Schema v5: Deleting status (5) is now available");
             }
 
             SetSchemaVersion(CurrentSchemaVersion);
@@ -338,6 +389,49 @@ public class SyncDatabase : IDisposable
         return items;
     }
 
+    // GetPendingByType
+    // Retrieves all pending items with a specific pending type.
+    public List<SyncItem> GetPendingByType(PendingType pendingType)
+    {
+        EnsureConnection();
+
+        var items = new List<SyncItem>();
+        using var command = _connection!.CreateCommand();
+        command.CommandText = "SELECT * FROM SyncItems WHERE Status = @status AND PendingType = @pendingType";
+        command.Parameters.AddWithValue("@status", (int)SyncStatus.Pending);
+        command.Parameters.AddWithValue("@pendingType", (int)pendingType);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            items.Add(ReadSyncItem(reader));
+        }
+
+        return items;
+    }
+
+    // GetPendingCounts
+    // Returns counts of pending items grouped by pending type.
+    public Dictionary<PendingType, int> GetPendingCounts()
+    {
+        EnsureConnection();
+
+        var counts = new Dictionary<PendingType, int>();
+        using var command = _connection!.CreateCommand();
+        command.CommandText = "SELECT PendingType, COUNT(*) as Count FROM SyncItems WHERE Status = @status AND PendingType IS NOT NULL GROUP BY PendingType";
+        command.Parameters.AddWithValue("@status", (int)SyncStatus.Pending);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            var pendingType = (PendingType)reader.GetInt32(0);
+            var count = reader.GetInt32(1);
+            counts[pendingType] = count;
+        }
+
+        return counts;
+    }
+
     // GetErroredItemsForRetry
     // Gets errored items that haven't exceeded max retries.
     public List<SyncItem> GetErroredItemsForRetry(int maxRetries)
@@ -371,11 +465,11 @@ public class SyncDatabase : IDisposable
             INSERT INTO SyncItems (
                 SourceLibraryId, LocalLibraryId, SourceItemId, SourcePath, SourceSize,
                 SourceCreateDate, SourceModifyDate, SourceETag, LocalItemId, LocalPath, StatusDate, Status,
-                LastSyncTime, ErrorMessage, RetryCount
+                PendingType, LastSyncTime, ErrorMessage, RetryCount
             ) VALUES (
                 @sourceLibraryId, @localLibraryId, @sourceItemId, @sourcePath, @sourceSize,
                 @sourceCreateDate, @sourceModifyDate, @sourceETag, @localItemId, @localPath, @statusDate, @status,
-                @lastSyncTime, @errorMessage, @retryCount
+                @pendingType, @lastSyncTime, @errorMessage, @retryCount
             )
             ON CONFLICT(SourceItemId) DO UPDATE SET
                 SourceLibraryId = @sourceLibraryId,
@@ -389,6 +483,7 @@ public class SyncDatabase : IDisposable
                 LocalPath = @localPath,
                 StatusDate = @statusDate,
                 Status = @status,
+                PendingType = @pendingType,
                 LastSyncTime = @lastSyncTime,
                 ErrorMessage = @errorMessage,
                 RetryCount = @retryCount
@@ -406,6 +501,7 @@ public class SyncDatabase : IDisposable
         command.Parameters.AddWithValue("@localPath", item.LocalPath ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@statusDate", item.StatusDate.ToString("o"));
         command.Parameters.AddWithValue("@status", (int)item.Status);
+        command.Parameters.AddWithValue("@pendingType", item.PendingType.HasValue ? (int)item.PendingType.Value : DBNull.Value);
         command.Parameters.AddWithValue("@lastSyncTime", item.LastSyncTime?.ToString("o") ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@errorMessage", item.ErrorMessage ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@retryCount", item.RetryCount);
@@ -418,6 +514,7 @@ public class SyncDatabase : IDisposable
     public void UpdateStatus(
         string sourceItemId,
         SyncStatus status,
+        PendingType? pendingType = null,
         string? localItemId = null,
         string? localPath = null,
         string? errorMessage = null,
@@ -433,6 +530,16 @@ public class SyncDatabase : IDisposable
             "Status = @status",
             "StatusDate = @statusDate"
         };
+
+        // Handle PendingType: set it when Pending, clear it otherwise
+        if (status == SyncStatus.Pending)
+        {
+            setClauses.Add("PendingType = @pendingType");
+        }
+        else
+        {
+            setClauses.Add("PendingType = NULL");
+        }
 
         if (localItemId != null)
         {
@@ -465,7 +572,7 @@ public class SyncDatabase : IDisposable
             setClauses.Add("ErrorMessage = @errorMessage");
             setClauses.Add("RetryCount = COALESCE(RetryCount, 0) + 1");
         }
-        else if (status == SyncStatus.Queued)
+        else if (status == SyncStatus.Queued || status == SyncStatus.Deleting)
         {
             setClauses.Add("ErrorMessage = NULL");
         }
@@ -475,6 +582,7 @@ public class SyncDatabase : IDisposable
         command.Parameters.AddWithValue("@sourceItemId", sourceItemId);
         command.Parameters.AddWithValue("@status", (int)status);
         command.Parameters.AddWithValue("@statusDate", DateTime.UtcNow.ToString("o"));
+        command.Parameters.AddWithValue("@pendingType", pendingType.HasValue ? (int)pendingType.Value : DBNull.Value);
 
         if (localItemId != null)
         {
@@ -617,6 +725,12 @@ public class SyncDatabase : IDisposable
 
         try
         {
+            var pendingTypeOrdinal = reader.GetOrdinal("PendingType");
+            if (!reader.IsDBNull(pendingTypeOrdinal))
+            {
+                item.PendingType = (PendingType)reader.GetInt32(pendingTypeOrdinal);
+            }
+
             var etagOrdinal = reader.GetOrdinal("SourceETag");
             if (!reader.IsDBNull(etagOrdinal))
             {

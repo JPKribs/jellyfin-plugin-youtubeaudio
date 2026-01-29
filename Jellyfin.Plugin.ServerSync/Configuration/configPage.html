@@ -100,9 +100,9 @@
                             <div class="inputContainer">
                                 <label for="selDownloadNewContentMode">Download New Content:</label>
                                 <select is="emby-select" id="selDownloadNewContentMode">
-                                    <option value="0">Enabled</option>
-                                    <option value="1">Require Approval</option>
-                                    <option value="2">Disabled</option>
+                                    <option value="Enabled">Enabled</option>
+                                    <option value="RequireApproval">Require Approval</option>
+                                    <option value="Disabled">Disabled</option>
                                 </select>
                                 <div class="fieldDescription">Download content from source that doesn't exist locally.</div>
                             </div>
@@ -110,9 +110,9 @@
                             <div class="inputContainer">
                                 <label for="selReplaceExistingContentMode">Replace Existing Content:</label>
                                 <select is="emby-select" id="selReplaceExistingContentMode">
-                                    <option value="0">Enabled</option>
-                                    <option value="1">Require Approval</option>
-                                    <option value="2">Disabled</option>
+                                    <option value="Enabled">Enabled</option>
+                                    <option value="RequireApproval">Require Approval</option>
+                                    <option value="Disabled">Disabled</option>
                                 </select>
                                 <div class="fieldDescription">Replace local content when it differs from the source version.</div>
                             </div>
@@ -120,9 +120,9 @@
                             <div class="inputContainer">
                                 <label for="selDeleteMissingContentMode">Delete Missing Content:</label>
                                 <select is="emby-select" id="selDeleteMissingContentMode">
-                                    <option value="0">Enabled</option>
-                                    <option value="1">Require Approval</option>
-                                    <option value="2" selected>Disabled</option>
+                                    <option value="Enabled">Enabled</option>
+                                    <option value="RequireApproval">Require Approval</option>
+                                    <option value="Disabled" selected>Disabled</option>
                                 </select>
                                 <div class="fieldDescription">Delete local content that no longer exists on the source server.</div>
                             </div>
@@ -239,34 +239,40 @@
                                 <h2 class="sectionTitle">Sync Items</h2>
                             </div>
 
-                            <div id="syncStatusSummary" class="statusCards">
-                                <div class="statusCard statusCard-synced" id="statusGroupSynced" title="">
-                                    <span class="statusCard-count" id="syncedCount">0</span>
-                                    <span class="statusCard-label">Synced</span>
+                            <div id="syncStatusSummary">
+                                <!-- Row 1: Main statuses -->
+                                <div class="statusCards" id="mainStatusRow">
+                                    <div class="statusCard statusCard-synced" id="statusGroupSynced" title="">
+                                        <span class="statusCard-count" id="syncedCount">0</span>
+                                        <span class="statusCard-label">Synced</span>
+                                    </div>
+                                    <div class="statusCard statusCard-queued" id="statusGroupQueued" title="">
+                                        <span class="statusCard-count" id="queuedCount">0</span>
+                                        <span class="statusCard-label">Queued</span>
+                                    </div>
+                                    <div class="statusCard statusCard-errored" id="statusGroupErrored" title="">
+                                        <span class="statusCard-count" id="erroredCount">0</span>
+                                        <span class="statusCard-label">Errored</span>
+                                    </div>
+                                    <div class="statusCard statusCard-ignored" id="statusGroupIgnored" title="">
+                                        <span class="statusCard-count" id="ignoredCount">0</span>
+                                        <span class="statusCard-label">Ignored</span>
+                                    </div>
                                 </div>
-                                <div class="statusCard statusCard-queued" id="statusGroupQueued" title="">
-                                    <span class="statusCard-count" id="queuedCount">0</span>
-                                    <span class="statusCard-label">Queued</span>
-                                </div>
-                                <div class="statusCard statusCard-errored" id="statusGroupErrored" title="">
-                                    <span class="statusCard-count" id="erroredCount">0</span>
-                                    <span class="statusCard-label">Errored</span>
-                                </div>
-                                <div class="statusCard statusCard-ignored" id="statusGroupIgnored" title="">
-                                    <span class="statusCard-count" id="ignoredCount">0</span>
-                                    <span class="statusCard-label">Ignored</span>
-                                </div>
-                                <div class="statusCard statusCard-pending" id="statusGroupPending" title="">
-                                    <span class="statusCard-count" id="pendingCount">0</span>
-                                    <span class="statusCard-label">Pending</span>
-                                </div>
-                                <div class="statusCard statusCard-pendingReplacement" id="statusGroupPendingReplacement" title="">
-                                    <span class="statusCard-count" id="pendingReplacementCount">0</span>
-                                    <span class="statusCard-label">Pending Replace</span>
-                                </div>
-                                <div class="statusCard statusCard-pendingDeletion" id="statusGroupPendingDeletion" title="">
-                                    <span class="statusCard-count" id="pendingDeletionCount">0</span>
-                                    <span class="statusCard-label">Pending Delete</span>
+                                <!-- Row 2: Pending statuses (only shown when approval required) -->
+                                <div class="statusCards" id="pendingStatusRow" style="display: none;">
+                                    <div class="statusCard statusCard-pendingDownload" id="statusGroupPendingDownload" title="" style="display: none;">
+                                        <span class="statusCard-count" id="pendingDownloadCount">0</span>
+                                        <span class="statusCard-label">Pending Download</span>
+                                    </div>
+                                    <div class="statusCard statusCard-pendingReplacement" id="statusGroupPendingReplacement" title="" style="display: none;">
+                                        <span class="statusCard-count" id="pendingReplacementCount">0</span>
+                                        <span class="statusCard-label">Pending Replace</span>
+                                    </div>
+                                    <div class="statusCard statusCard-pendingDeletion" id="statusGroupPendingDeletion" title="" style="display: none;">
+                                        <span class="statusCard-count" id="pendingDeletionCount">0</span>
+                                        <span class="statusCard-label">Pending Delete</span>
+                                    </div>
                                 </div>
                             </div>
 
@@ -325,9 +331,10 @@
                                     <option value="Queued">Queued</option>
                                     <option value="Errored">Errored</option>
                                     <option value="Ignored">Ignored</option>
-                                    <option value="Pending">Pending</option>
-                                    <option value="PendingReplacement">Pending Replace</option>
-                                    <option value="PendingDeletion">Pending Delete</option>
+                                    <option value="Pending">All Pending</option>
+                                    <option value="Pending:Download">Pending Download</option>
+                                    <option value="Pending:Replacement">Pending Replace</option>
+                                    <option value="Pending:Deletion">Pending Delete</option>
                                 </select>
                                 <button is="emby-button" type="button" id="btnReloadTable" class="reloadTableButton" title="Reload table data">
                                     <span class="reloadIcon">&#x27F3;</span>
@@ -626,7 +633,7 @@
         .statusCard-queued { background: rgba(240, 173, 78, 0.2); color: #f0ad4e; }
         .statusCard-errored { background: rgba(217, 83, 79, 0.2); color: #d9534f; }
         .statusCard-ignored { background: rgba(153, 153, 153, 0.2); color: #999; }
-        .statusCard-pending { background: rgba(155, 89, 182, 0.2); color: #9b59b6; }
+        .statusCard-pendingDownload { background: rgba(155, 89, 182, 0.2); color: #9b59b6; }
         .statusCard-pendingReplacement { background: rgba(52, 152, 219, 0.2); color: #3498db; }
         .statusCard-pendingDeletion { background: rgba(217, 83, 79, 0.2); color: #d9534f; }
         .syncItem {
@@ -671,9 +678,9 @@
         .syncItemStatus.Queued { background: rgba(240, 173, 78, 0.2); color: #f0ad4e; }
         .syncItemStatus.Errored { background: rgba(217, 83, 79, 0.2); color: #d9534f; }
         .syncItemStatus.Ignored { background: rgba(153, 153, 153, 0.2); color: #999; }
-        .syncItemStatus.Pending { background: rgba(155, 89, 182, 0.2); color: #9b59b6; }
-        .syncItemStatus.PendingReplacement { background: rgba(52, 152, 219, 0.2); color: #3498db; }
-        .syncItemStatus.PendingDeletion { background: rgba(217, 83, 79, 0.2); color: #d9534f; }
+        .syncItemStatus.Pending-Download { background: rgba(155, 89, 182, 0.2); color: #9b59b6; }
+        .syncItemStatus.Pending-Replacement { background: rgba(52, 152, 219, 0.2); color: #3498db; }
+        .syncItemStatus.Pending-Deletion { background: rgba(217, 83, 79, 0.2); color: #d9534f; }
         .syncActionButtonRow {
             display: flex;
             gap: 8px;
@@ -804,9 +811,15 @@
             getConfig: function() { return ApiClient.getPluginConfiguration(this.pluginId); },
             saveConfig: function(config) { return ApiClient.updatePluginConfiguration(this.pluginId, config); },
             apiRequest: function(endpoint, method, data) {
-                var options = { url: ApiClient.getUrl('ServerSync/' + endpoint), type: method || 'GET', dataType: 'json' };
+                var options = { url: ApiClient.getUrl('ServerSync/' + endpoint), type: method || 'GET' };
+                if (method === 'GET') { options.dataType = 'json'; }
                 if (data) { options.contentType = 'application/json'; options.data = JSON.stringify(data); }
-                return ApiClient.fetch(options);
+                return ApiClient.fetch(options).then(function(response) {
+                    if (response && typeof response === 'string' && response.length > 0) {
+                        try { return JSON.parse(response); } catch (e) { return response; }
+                    }
+                    return response;
+                });
             }
         };
     </script>
@@ -879,15 +892,31 @@
                 document.getElementById('chkEnableContentSync').addEventListener('change', function() { self.updateContentSyncVisibility(this.checked); });
                 document.getElementById('chkEnableBandwidthScheduling').addEventListener('change', function() { self.updateBandwidthSchedulingVisibility(this.checked); });
                 document.getElementById('chkEnableRecyclingBin').addEventListener('change', function() { self.updateRecyclingBinVisibility(this.checked); });
+                // Update pending visibility when approval modes change
+                document.getElementById('selDownloadNewContentMode').addEventListener('change', function() { self.updatePendingVisibilityFromUI(); });
+                document.getElementById('selReplaceExistingContentMode').addEventListener('change', function() { self.updatePendingVisibilityFromUI(); });
+                document.getElementById('selDeleteMissingContentMode').addEventListener('change', function() { self.updatePendingVisibilityFromUI(); });
+            },
+            updatePendingVisibilityFromUI: function() {
+                var downloadMode = document.getElementById('selDownloadNewContentMode').value;
+                var replaceMode = document.getElementById('selReplaceExistingContentMode').value;
+                var deleteMode = document.getElementById('selDeleteMissingContentMode').value;
+                this.updatePendingVisibility(downloadMode, replaceMode, deleteMode);
             },
             loadConfig: function(config) {
                 var self = this; self.currentConfig = config;
                 document.getElementById('chkEnableContentSync').checked = config.EnableContentSync || false;
                 document.getElementById('chkIncludeExtras').checked = config.IncludeCompanionFiles || false;
                 document.getElementById('chkDetectUpdatedFiles').checked = config.DetectUpdatedFiles !== false;
-                document.getElementById('selDownloadNewContentMode').value = config.DownloadNewContentMode || 0;
-                document.getElementById('selReplaceExistingContentMode').value = config.ReplaceExistingContentMode || 0;
-                document.getElementById('selDeleteMissingContentMode').value = config.DeleteMissingContentMode || 2;
+                // Set approval mode dropdowns - config stores string enum names (Enabled, RequireApproval, Disabled)
+                var downloadMode = config.DownloadNewContentMode || 'Enabled';
+                var replaceMode = config.ReplaceExistingContentMode || 'Enabled';
+                var deleteMode = config.DeleteMissingContentMode || 'Disabled';
+                document.getElementById('selDownloadNewContentMode').value = downloadMode;
+                document.getElementById('selReplaceExistingContentMode').value = replaceMode;
+                document.getElementById('selDeleteMissingContentMode').value = deleteMode;
+                // Update pending card visibility based on approval modes
+                self.updatePendingVisibility(downloadMode, replaceMode, deleteMode);
                 document.getElementById('txtMaxConcurrentDownloads').value = config.MaxConcurrentDownloads || 2;
                 document.getElementById('txtMaxDownloadSpeed').value = config.MaxDownloadSpeed || 0;
                 document.getElementById('selDownloadSpeedUnit').value = config.DownloadSpeedUnit || 'MB';
@@ -909,9 +938,9 @@
                     EnableContentSync: document.getElementById('chkEnableContentSync').checked,
                     IncludeCompanionFiles: document.getElementById('chkIncludeExtras').checked,
                     DetectUpdatedFiles: document.getElementById('chkDetectUpdatedFiles').checked,
-                    DownloadNewContentMode: parseInt(document.getElementById('selDownloadNewContentMode').value, 10),
-                    ReplaceExistingContentMode: parseInt(document.getElementById('selReplaceExistingContentMode').value, 10),
-                    DeleteMissingContentMode: parseInt(document.getElementById('selDeleteMissingContentMode').value, 10),
+                    DownloadNewContentMode: document.getElementById('selDownloadNewContentMode').value,
+                    ReplaceExistingContentMode: document.getElementById('selReplaceExistingContentMode').value,
+                    DeleteMissingContentMode: document.getElementById('selDeleteMissingContentMode').value,
                     MaxConcurrentDownloads: parseInt(document.getElementById('txtMaxConcurrentDownloads').value, 10) || 2,
                     MaxDownloadSpeed: parseInt(document.getElementById('txtMaxDownloadSpeed').value, 10) || 0,
                     DownloadSpeedUnit: document.getElementById('selDownloadSpeedUnit').value,
@@ -934,6 +963,19 @@
             updateBandwidthSchedulingVisibility: function(enabled) { document.getElementById('bandwidthScheduleContainer').style.display = enabled ? 'block' : 'none'; },
             updateContentSyncVisibility: function(enabled) { document.getElementById('contentSyncSettings').style.display = enabled ? 'block' : 'none'; },
             updateRecyclingBinVisibility: function(enabled) { document.getElementById('recyclingBinSettings').style.display = enabled ? 'block' : 'none'; },
+            updatePendingVisibility: function(downloadMode, replaceMode, deleteMode) {
+                // Show pending cards only if approval is required
+                var showPendingDownload = downloadMode === 'RequireApproval';
+                var showPendingReplace = replaceMode === 'RequireApproval';
+                var showPendingDelete = deleteMode === 'RequireApproval';
+                var showAnyPending = showPendingDownload || showPendingReplace || showPendingDelete;
+                document.getElementById('statusGroupPendingDownload').style.display = showPendingDownload ? 'block' : 'none';
+                document.getElementById('statusGroupPendingReplacement').style.display = showPendingReplace ? 'block' : 'none';
+                document.getElementById('statusGroupPendingDeletion').style.display = showPendingDelete ? 'block' : 'none';
+                // Show/hide the pending row container
+                var pendingRow = document.getElementById('pendingStatusRow');
+                if (pendingRow) { pendingRow.style.display = showAnyPending ? 'flex' : 'none'; }
+            },
             fetchSourceLibraries: function(serverUrl, apiKey) {
                 var self = this;
                 return ServerSyncShared.apiRequest('GetSourceLibraries', 'POST', { ServerUrl: serverUrl, ApiKey: apiKey }).then(function(libraries) { self.sourceLibraries = libraries || []; self.updateLibrarySelects(); }).catch(function(err) { console.error('Failed to fetch source libraries:', err); self.sourceLibraries = []; });
@@ -1068,19 +1110,41 @@
                     document.getElementById('statusGroupErrored').setAttribute('title', 'Errored: ' + (status.Errored || 0));
                     document.getElementById('ignoredCount').textContent = status.Ignored || 0;
                     document.getElementById('statusGroupIgnored').setAttribute('title', 'Ignored: ' + (status.Ignored || 0));
-                    document.getElementById('pendingCount').textContent = status.Pending || 0;
-                    document.getElementById('statusGroupPending').setAttribute('title', 'Pending: ' + (status.Pending || 0));
+                    document.getElementById('pendingDownloadCount').textContent = status.PendingDownload || 0;
+                    document.getElementById('statusGroupPendingDownload').setAttribute('title', 'Pending Download: ' + (status.PendingDownload || 0));
                     document.getElementById('pendingReplacementCount').textContent = status.PendingReplacement || 0;
                     document.getElementById('statusGroupPendingReplacement').setAttribute('title', 'Pending Replacement: ' + (status.PendingReplacement || 0));
                     document.getElementById('pendingDeletionCount').textContent = status.PendingDeletion || 0;
                     document.getElementById('statusGroupPendingDeletion').setAttribute('title', 'Pending Deletion: ' + (status.PendingDeletion || 0));
                 });
             },
+            getDisplayStatus: function(item) {
+                if (item.Status === 'Pending' && item.PendingType) {
+                    return 'Pending ' + item.PendingType;
+                }
+                return item.Status;
+            },
+            getStatusClass: function(item) {
+                if (item.Status === 'Pending' && item.PendingType) {
+                    return 'Pending-' + item.PendingType;
+                }
+                return item.Status;
+            },
             loadSyncItems: function() {
                 var self = this; var container = document.getElementById('syncItemsContainer'); var filter = document.getElementById('selStatusFilter').value;
                 return ServerSyncShared.apiRequest('Items', 'GET').then(function(items) {
                     self.syncItems = items || []; self.selectedItems.clear(); self.updateBulkActionsVisibility();
-                    var filteredItems = filter ? items.filter(function(i) { return i.Status === filter; }) : items; self.filteredItems = filteredItems;
+                    var filteredItems = items;
+                    if (filter) {
+                        if (filter.indexOf(':') > -1) {
+                            // Filter by Status:PendingType (e.g., "Pending:Download")
+                            var parts = filter.split(':');
+                            filteredItems = items.filter(function(i) { return i.Status === parts[0] && i.PendingType === parts[1]; });
+                        } else {
+                            filteredItems = items.filter(function(i) { return i.Status === filter; });
+                        }
+                    }
+                    self.filteredItems = filteredItems;
                     document.getElementById('chkSelectAll').checked = false;
                     if (filteredItems.length === 0) { container.innerHTML = '<div style="padding: 16px; opacity: 0.7;">No items found</div>'; return; }
                     container.innerHTML = filteredItems.map(function(item) {
@@ -1088,7 +1152,9 @@
                         var localPathDisplay = item.LocalPath ? ServerSyncShared.getFileName(item.LocalPath) : 'N/A';
                         if (!localExists && item.LocalPath) { localPathDisplay = '(will sync to) ' + localPathDisplay; }
                         var errorPreview = (item.Status === 'Errored' && item.ErrorMessage) ? '<div class="syncItemError" title="' + ServerSyncShared.escapeHtml(item.ErrorMessage) + '">' + ServerSyncShared.escapeHtml(item.ErrorMessage) + '</div>' : '';
-                        return '<div class="syncItem" data-id="' + item.SourceItemId + '"><input type="checkbox" class="syncItemCheckbox" data-id="' + item.SourceItemId + '" /><div class="syncItemInfo"><div class="syncItemName" title="' + ServerSyncShared.escapeHtml(item.SourcePath) + '">' + ServerSyncShared.escapeHtml(ServerSyncShared.getFileName(item.SourcePath)) + '</div><div class="syncItemPath' + localPathClass + '" title="' + ServerSyncShared.escapeHtml(item.LocalPath || '') + '">' + ServerSyncShared.escapeHtml(localPathDisplay) + '</div>' + errorPreview + '</div><div class="syncItemStatus ' + item.Status + '">' + item.Status + '</div></div>';
+                        var displayStatus = self.getDisplayStatus(item);
+                        var statusClass = self.getStatusClass(item);
+                        return '<div class="syncItem" data-id="' + item.SourceItemId + '"><input type="checkbox" class="syncItemCheckbox" data-id="' + item.SourceItemId + '" /><div class="syncItemInfo"><div class="syncItemName" title="' + ServerSyncShared.escapeHtml(item.SourcePath) + '">' + ServerSyncShared.escapeHtml(ServerSyncShared.getFileName(item.SourcePath)) + '</div><div class="syncItemPath' + localPathClass + '" title="' + ServerSyncShared.escapeHtml(item.LocalPath || '') + '">' + ServerSyncShared.escapeHtml(localPathDisplay) + '</div>' + errorPreview + '</div><div class="syncItemStatus ' + statusClass + '">' + displayStatus + '</div></div>';
                     }).join('');
                     container.querySelectorAll('.syncItem').forEach(function(el) { el.addEventListener('click', function(e) { if (e.target.type !== 'checkbox') { self.showItemDetail(el.dataset.id); } }); });
                     container.querySelectorAll('.syncItemCheckbox').forEach(function(cb) { cb.addEventListener('change', function() { if (this.checked) { self.selectedItems.add(this.dataset.id); } else { self.selectedItems.delete(this.dataset.id); } self.updateBulkActionsVisibility(); }); });
@@ -1122,7 +1188,7 @@
                 var self = this; var item = this.syncItems.find(function(i) { return i.SourceItemId === sourceItemId; }); if (!item) return;
                 self.currentModalItem = item;
                 document.getElementById('modalTitle').textContent = ServerSyncShared.getFileName(item.SourcePath);
-                document.getElementById('modalStatus').textContent = item.Status;
+                document.getElementById('modalStatus').textContent = self.getDisplayStatus(item);
                 document.getElementById('modalSize').textContent = ServerSyncShared.formatSize(item.SourceSize);
                 document.getElementById('modalSourcePath').textContent = item.SourcePath;
                 var errorSection = document.getElementById('modalErrorSection');

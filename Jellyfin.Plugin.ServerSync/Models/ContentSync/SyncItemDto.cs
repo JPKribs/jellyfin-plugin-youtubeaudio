@@ -1,19 +1,25 @@
 using System;
 
-namespace Jellyfin.Plugin.ServerSync.Models;
+namespace Jellyfin.Plugin.ServerSync.Models.ContentSync;
 
-// Represents a tracked sync item in the database.
-public class SyncItem
+/// <summary>
+/// Sync item information for API responses.
+/// </summary>
+public class SyncItemDto
 {
     public long Id { get; set; }
+
+    public string SourceItemId { get; set; } = string.Empty;
 
     public string SourceLibraryId { get; set; } = string.Empty;
 
     public string LocalLibraryId { get; set; } = string.Empty;
 
-    public string SourceItemId { get; set; } = string.Empty;
-
     public string SourcePath { get; set; } = string.Empty;
+
+    public string? LocalPath { get; set; }
+
+    public string? LocalItemId { get; set; }
 
     public long SourceSize { get; set; }
 
@@ -21,21 +27,19 @@ public class SyncItem
 
     public DateTime SourceModifyDate { get; set; }
 
-    public string? SourceETag { get; set; }
+    public string Status { get; set; } = string.Empty;
 
-    public string? LocalItemId { get; set; }
-
-    public string? LocalPath { get; set; }
+    public string? PendingType { get; set; }
 
     public DateTime StatusDate { get; set; }
-
-    public SyncStatus Status { get; set; }
-
-    public PendingType? PendingType { get; set; }
 
     public DateTime? LastSyncTime { get; set; }
 
     public string? ErrorMessage { get; set; }
 
     public int RetryCount { get; set; }
+
+    public string? SourceServerUrl { get; set; }
+
+    public string? SourceServerId { get; set; }
 }

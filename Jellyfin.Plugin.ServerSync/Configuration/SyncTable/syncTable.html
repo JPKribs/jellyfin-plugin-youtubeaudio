@@ -21,13 +21,21 @@
         <span class="statusCard-count" id="ignoredCount">0</span>
         <span class="statusCard-label">Ignored</span>
     </div>
-    <div class="statusCard statusCard-pending" id="statusGroupPending" title="" style="display: none;">
-        <span class="statusCard-count" id="pendingCount">0</span>
-        <span class="statusCard-label">Pending</span>
+    <div class="statusCard statusCard-pendingDownload" id="statusGroupPendingDownload" title="" style="display: none;">
+        <span class="statusCard-count" id="pendingDownloadCount">0</span>
+        <span class="statusCard-label">Pending Download</span>
+    </div>
+    <div class="statusCard statusCard-pendingReplacement" id="statusGroupPendingReplacement" title="" style="display: none;">
+        <span class="statusCard-count" id="pendingReplacementCount">0</span>
+        <span class="statusCard-label">Pending Replace</span>
     </div>
     <div class="statusCard statusCard-pendingDeletion" id="statusGroupPendingDeletion" title="" style="display: none;">
         <span class="statusCard-count" id="pendingDeletionCount">0</span>
-        <span class="statusCard-label">Pending Deletion</span>
+        <span class="statusCard-label">Pending Delete</span>
+    </div>
+    <div class="statusCard statusCard-deleting" id="statusGroupDeleting" title="" style="display: none;">
+        <span class="statusCard-count" id="deletingCount">0</span>
+        <span class="statusCard-label">Deleting</span>
     </div>
 </div>
 
@@ -87,8 +95,10 @@
         <option value="Queued">Queued</option>
         <option value="Errored">Errored</option>
         <option value="Ignored">Ignored</option>
-        <option value="Pending" id="optPending" style="display: none;">Pending</option>
-        <option value="PendingDeletion" id="optPendingDeletion" style="display: none;">Pending Deletion</option>
+        <option value="Pending:Download" id="optPendingDownload" style="display: none;">Pending Download</option>
+        <option value="Pending:Replacement" id="optPendingReplacement" style="display: none;">Pending Replacement</option>
+        <option value="Pending:Deletion" id="optPendingDeletion" style="display: none;">Pending Deletion</option>
+        <option value="Deleting" id="optDeleting" style="display: none;">Deleting</option>
     </select>
     <button is="emby-button" type="button" id="btnReloadTable" class="reloadTableButton" title="Reload table data">
         <span class="reloadIcon">&#x21bb;</span>

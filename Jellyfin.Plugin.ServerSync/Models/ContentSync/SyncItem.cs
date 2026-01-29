@@ -1,8 +1,10 @@
 using System;
 
-namespace Jellyfin.Plugin.ServerSync.Models;
+namespace Jellyfin.Plugin.ServerSync.Models.ContentSync;
 
-// Represents a tracked sync item in the database.
+/// <summary>
+/// Represents a tracked sync item in the database.
+/// </summary>
 public class SyncItem
 {
     public long Id { get; set; }
@@ -21,6 +23,7 @@ public class SyncItem
 
     public DateTime SourceModifyDate { get; set; }
 
+    /// <summary>ETag from source server used to detect file changes without re-downloading.</summary>
     public string? SourceETag { get; set; }
 
     public string? LocalItemId { get; set; }
@@ -31,6 +34,7 @@ public class SyncItem
 
     public SyncStatus Status { get; set; }
 
+    /// <summary>Specifies the pending operation type; null when Status is not Pending.</summary>
     public PendingType? PendingType { get; set; }
 
     public DateTime? LastSyncTime { get; set; }

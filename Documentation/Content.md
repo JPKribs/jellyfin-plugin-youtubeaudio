@@ -95,13 +95,21 @@ Each tracked item has a status that determines how it's processed:
 
 | Status | Value | Description |
 |--------|-------|-------------|
-| `Pending` | 0 | New item awaiting approval to download |
+| `Pending` | 0 | Awaiting approval (see PendingType for operation type) |
 | `Queued` | 1 | Approved and waiting to be downloaded |
 | `Synced` | 2 | Successfully downloaded and verified |
 | `Errored` | 3 | Download failed (will retry up to 3 times) |
 | `Ignored` | 4 | User chose to never sync this item |
-| `PendingDeletion` | 5 | Item removed from source, awaiting deletion approval |
-| `PendingReplacement` | 6 | Source changed, awaiting approval to replace |
+
+### Pending Types
+
+When an item has `Status = Pending`, the `PendingType` field indicates the operation awaiting approval:
+
+| PendingType | Value | Description |
+|-------------|-------|-------------|
+| `Download` | 0 | New item awaiting approval to download |
+| `Replacement` | 1 | Source changed, awaiting approval to replace |
+| `Deletion` | 2 | Item removed from source, awaiting deletion approval |
 
 ## Refresh Phase (UpdateSyncTablesTask)
 
@@ -155,10 +163,10 @@ EXISTING ITEM
 ├─► Status = IGNORED?
 │   └─► YES → No action
 │
-├─► Status = PENDING_DELETION?
+├─► Status = PENDING with PendingType = DELETION?
 │   └─► YES → Restore (Status = QUEUED)
 │
-├─► Status = PENDING or PENDING_REPLACEMENT?
+├─► Status = PENDING (any PendingType)?
 │   └─► YES → Update metadata only
 │
 ├─► Source changed? (size, path, or ETag)
@@ -167,7 +175,7 @@ EXISTING ITEM
 │   │   │
 │   │   ├─► ReplaceExistingContentMode = DISABLED → Update metadata only
 │   │   │
-│   │   ├─► ReplaceExistingContentMode = REQUIRE_APPROVAL → Status = PENDING_REPLACEMENT
+│   │   ├─► ReplaceExistingContentMode = REQUIRE_APPROVAL → Status = PENDING, PendingType = REPLACEMENT
 │   │   │
 │   │   └─► ReplaceExistingContentMode = ENABLED → Status = QUEUED
 │   │
@@ -181,7 +189,7 @@ After scanning all source items, check for items in the database that weren't se
 ```
 ITEM NOT FOUND ON SOURCE
 │
-├─► Status = IGNORED or PENDING_DELETION?
+├─► Status = IGNORED or (PENDING with PendingType = DELETION)?
 │   └─► YES → No action
 │
 ├─► Status != SYNCED? (Pending, Queued, Errored, etc.)
@@ -190,7 +198,7 @@ ITEM NOT FOUND ON SOURCE
 ├─► DeleteMissingContentMode = DISABLED?
 │   └─► YES → No action
 │
-└─► Status = PENDING_DELETION
+└─► Status = PENDING, PendingType = DELETION
     (awaits approval or auto-deletion based on mode)
 ```
 
@@ -402,6 +410,7 @@ CREATE TABLE SyncItems (
     SourceModifyDate TEXT NOT NULL,
     SourceETag TEXT,
     Status INTEGER NOT NULL,
+    PendingType INTEGER,  -- NULL when not Pending; 0=Download, 1=Replacement, 2=Deletion
     StatusDate TEXT NOT NULL,
     LastSyncTime TEXT,
     ErrorMessage TEXT,

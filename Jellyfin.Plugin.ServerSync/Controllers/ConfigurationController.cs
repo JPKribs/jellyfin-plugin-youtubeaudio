@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
 using System.Net.Mime;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.ServerSync.Configuration;
-using Jellyfin.Plugin.ServerSync.Models;
+using Jellyfin.Plugin.ServerSync.Models.Configuration;
+using Jellyfin.Plugin.ServerSync.Models.ContentSync;
 using Jellyfin.Plugin.ServerSync.Services;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Tasks;
@@ -17,213 +17,11 @@ using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.ServerSync.Controllers;
 
-// TestConnectionRequest
-// Request to test connection to a source server.
-public class TestConnectionRequest
-{
-    [Required]
-    public string ServerUrl { get; set; } = string.Empty;
-
-    [Required]
-    public string ApiKey { get; set; } = string.Empty;
-}
-
-// TestConnectionResponse
-// Response from a connection test.
-public class TestConnectionResponse
-{
-    public bool Success { get; set; }
-
-    public string? ServerName { get; set; }
-
-    public string? ServerId { get; set; }
-
-    public string? Message { get; set; }
-}
-
-// LibraryDto
-// Library information for API responses.
-public class LibraryDto
-{
-    public string Id { get; set; } = string.Empty;
-
-    public string Name { get; set; } = string.Empty;
-
-    public List<string> Locations { get; set; } = new();
-}
-
-// SyncItemDto
-// Sync item information for API responses.
-public class SyncItemDto
-{
-    public long Id { get; set; }
-
-    public string SourceItemId { get; set; } = string.Empty;
-
-    public string SourceLibraryId { get; set; } = string.Empty;
-
-    public string LocalLibraryId { get; set; } = string.Empty;
-
-    public string SourcePath { get; set; } = string.Empty;
-
-    public string? LocalPath { get; set; }
-
-    public string? LocalItemId { get; set; }
-
-    public long SourceSize { get; set; }
-
-    public DateTime SourceCreateDate { get; set; }
-
-    public DateTime SourceModifyDate { get; set; }
-
-    public string Status { get; set; } = string.Empty;
-
-    public DateTime StatusDate { get; set; }
-
-    public DateTime? LastSyncTime { get; set; }
-
-    public string? ErrorMessage { get; set; }
-
-    public int RetryCount { get; set; }
-
-    public string? SourceServerUrl { get; set; }
-
-    public string? SourceServerId { get; set; }
-}
-
-// SyncStatusResponse
-// Status counts for API responses.
-public class SyncStatusResponse
-{
-    public int Pending { get; set; }
-
-    public int Queued { get; set; }
-
-    public int Synced { get; set; }
-
-    public int Errored { get; set; }
-
-    public int Ignored { get; set; }
-
-    public int PendingDeletion { get; set; }
-
-    public int PendingReplacement { get; set; }
-}
-
-// CapabilitiesResponse
-// Plugin capabilities for the UI.
-public class CapabilitiesResponse
-{
-    public bool CanDeleteItems { get; set; }
-
-    public bool SupportsCompanionFiles { get; set; }
-
-    public bool SupportsBandwidthScheduling { get; set; }
-}
-
-// SyncStatsResponse
-// Detailed sync statistics for health dashboard.
-public class SyncStatsResponse
-{
-    public int TotalItems { get; set; }
-
-    public int SyncedItems { get; set; }
-
-    public int QueuedItems { get; set; }
-
-    public int ErroredItems { get; set; }
-
-    public int PendingItems { get; set; }
-
-    public int IgnoredItems { get; set; }
-
-    public int PendingDeletionItems { get; set; }
-
-    public int PendingReplacementItems { get; set; }
-
-    public long TotalSyncedBytes { get; set; }
-
-    public long TotalQueuedBytes { get; set; }
-
-    public DateTime? LastSyncTime { get; set; }
-
-    public DateTime? LastSyncStartTime { get; set; }
-
-    public DateTime? LastSyncEndTime { get; set; }
-
-    public long FreeDiskSpaceBytes { get; set; }
-
-    public long MinimumRequiredBytes { get; set; }
-
-    public bool HasSufficientDiskSpace { get; set; }
-}
-
-// DiskSpaceInfo
-// Information about disk space availability.
-public class DiskSpaceInfo
-{
-    public long FreeBytes { get; set; }
-
-    public long TotalBytes { get; set; }
-
-    public long RequiredBytes { get; set; }
-
-    public bool IsSufficient { get; set; }
-
-    public string Path { get; set; } = string.Empty;
-}
-
-// UpdateItemStatusRequest
-// Request to update an item's status.
-public class UpdateItemStatusRequest
-{
-    [Required]
-    public string SourceItemId { get; set; } = string.Empty;
-
-    [Required]
-    public string Status { get; set; } = string.Empty;
-}
-
-// BulkItemsRequest
-// Request for bulk item operations.
-public class BulkItemsRequest
-{
-    [Required]
-    public List<string> SourceItemIds { get; set; } = new();
-}
-
-// ValidateUrlRequest
-// Request to validate a server URL.
-public class ValidateUrlRequest
-{
-    [Required]
-    public string Url { get; set; } = string.Empty;
-}
-
-// ValidateUrlResponse
-// Response from URL validation.
-public class ValidateUrlResponse
-{
-    public bool IsValid { get; set; }
-
-    public string? Message { get; set; }
-
-    public string? NormalizedUrl { get; set; }
-}
-
-// ConfigurationValidationResponse
-// Response from configuration validation.
-public class ConfigurationValidationResponse
-{
-    public bool IsValid { get; set; }
-
-    public List<string> Errors { get; set; } = new();
-}
-
-// ConfigurationController
-// API controller for Server Sync plugin operations.
-// NOTE: This controller ONLY operates on the LOCAL server. It NEVER modifies the source server.
-// All delete operations use the local Jellyfin API to delete items from this server only.
+/// <summary>
+/// API controller for Server Sync plugin operations.
+/// NOTE: This controller ONLY operates on the LOCAL server. It NEVER modifies the source server.
+/// All delete operations use the local Jellyfin API to delete items from this server only.
+/// </summary>
 [ApiController]
 [Authorize(Policy = "RequiresElevation")]
 [Route("ServerSync")]
@@ -366,6 +164,7 @@ public class ConfigurationController : ControllerBase
             SourceModifyDate = i.SourceModifyDate,
             LocalItemId = i.LocalItemId,
             Status = i.Status.ToString(),
+            PendingType = i.PendingType?.ToString(),
             StatusDate = i.StatusDate,
             LastSyncTime = i.LastSyncTime,
             ErrorMessage = i.ErrorMessage,
@@ -388,16 +187,19 @@ public class ConfigurationController : ControllerBase
         }
 
         var counts = plugin.Database.GetStatusCounts();
+        var pendingCounts = plugin.Database.GetPendingCounts();
 
         return Ok(new SyncStatusResponse
         {
             Pending = counts.GetValueOrDefault(SyncStatus.Pending, 0),
+            PendingDownload = pendingCounts.GetValueOrDefault(PendingType.Download, 0),
+            PendingReplacement = pendingCounts.GetValueOrDefault(PendingType.Replacement, 0),
+            PendingDeletion = pendingCounts.GetValueOrDefault(PendingType.Deletion, 0),
             Queued = counts.GetValueOrDefault(SyncStatus.Queued, 0),
             Synced = counts.GetValueOrDefault(SyncStatus.Synced, 0),
             Errored = counts.GetValueOrDefault(SyncStatus.Errored, 0),
             Ignored = counts.GetValueOrDefault(SyncStatus.Ignored, 0),
-            PendingDeletion = counts.GetValueOrDefault(SyncStatus.PendingDeletion, 0),
-            PendingReplacement = counts.GetValueOrDefault(SyncStatus.PendingReplacement, 0)
+            Deleting = counts.GetValueOrDefault(SyncStatus.Deleting, 0)
         });
     }
 
@@ -415,6 +217,7 @@ public class ConfigurationController : ControllerBase
 
         var config = plugin.Configuration;
         var stats = plugin.Database.GetSyncStats();
+        var pendingCounts = plugin.Database.GetPendingCounts();
         var diskInfo = GetDiskSpaceForLibraries();
 
         return Ok(new SyncStatsResponse
@@ -424,9 +227,10 @@ public class ConfigurationController : ControllerBase
             QueuedItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Queued, 0),
             ErroredItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Errored, 0),
             PendingItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Pending, 0),
+            PendingDownloadItems = pendingCounts.GetValueOrDefault(PendingType.Download, 0),
+            PendingReplacementItems = pendingCounts.GetValueOrDefault(PendingType.Replacement, 0),
+            PendingDeletionItems = pendingCounts.GetValueOrDefault(PendingType.Deletion, 0),
             IgnoredItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Ignored, 0),
-            PendingDeletionItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.PendingDeletion, 0),
-            PendingReplacementItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.PendingReplacement, 0),
             TotalSyncedBytes = stats.TotalSyncedBytes,
             TotalQueuedBytes = stats.TotalQueuedBytes,
             LastSyncTime = stats.LastSyncTime,

@@ -1,7 +1,8 @@
-namespace Jellyfin.Plugin.ServerSync.Models;
+namespace Jellyfin.Plugin.ServerSync.Models.Configuration;
 
-// LibraryMapping
-// Represents a mapping between a source library and a local library.
+/// <summary>
+/// Represents a mapping between a source library and a local library.
+/// </summary>
 public class LibraryMapping
 {
     public string SourceLibraryId { get; set; } = string.Empty;

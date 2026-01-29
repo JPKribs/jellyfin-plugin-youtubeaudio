@@ -1,11 +1,12 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.ServerSync.Configuration;
-using Jellyfin.Plugin.ServerSync.Models;
+using Jellyfin.Plugin.ServerSync.Models.ContentSync;
 using Jellyfin.Plugin.ServerSync.Services;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Tasks;
@@ -19,6 +20,10 @@ public class DownloadMissingContentTask : IScheduledTask
 {
     private readonly ILogger<DownloadMissingContentTask> _logger;
     private readonly ILibraryManager _libraryManager;
+
+    // ActiveDownloads
+    // Tracks items currently being downloaded to prevent duplicate downloads.
+    private static readonly ConcurrentDictionary<string, DateTime> ActiveDownloads = new();
 
     public DownloadMissingContentTask(ILogger<DownloadMissingContentTask> logger, ILibraryManager libraryManager)
     {
@@ -64,6 +69,9 @@ public class DownloadMissingContentTask : IScheduledTask
         }
 
         var database = plugin.Database;
+
+        // Clean up any stale download entries (e.g., from crashed previous runs)
+        CleanupStaleDownloadEntries();
 
         var itemsToSync = database.GetByStatus(SyncStatus.Queued)
             .Concat(database.GetErroredItemsForRetry(maxRetries: 3))
@@ -113,6 +121,13 @@ public class DownloadMissingContentTask : IScheduledTask
             {
                 if (cancellationToken.IsCancellationRequested)
                 {
+                    return;
+                }
+
+                // Check if this item is already being downloaded (race condition prevention)
+                if (!ActiveDownloads.TryAdd(item.SourceItemId, DateTime.UtcNow))
+                {
+                    _logger.LogDebug("Item {SourceItemId} is already being downloaded, skipping", item.SourceItemId);
                     return;
                 }
 
@@ -216,6 +231,8 @@ public class DownloadMissingContentTask : IScheduledTask
             }
             finally
             {
+                // Remove from active downloads tracking
+                ActiveDownloads.TryRemove(item.SourceItemId, out _);
                 semaphore.Release();
             }
         });
@@ -251,7 +268,10 @@ public class DownloadMissingContentTask : IScheduledTask
             failCount,
             totalItems);
 
-        if (successCount > 0)
+        // Process deletions
+        var deletionResult = ProcessDeletions(database, config, cancellationToken);
+
+        if (successCount > 0 || deletionResult.Deleted > 0)
         {
             try
             {
@@ -262,6 +282,68 @@ public class DownloadMissingContentTask : IScheduledTask
                 _logger.LogError(ex, "Failed to trigger library refresh");
             }
         }
+    }
+
+    // ProcessDeletions
+    // Processes items marked for deletion, deleting local files then removing database records.
+    private (int Deleted, int Failed) ProcessDeletions(
+        SyncDatabase database,
+        PluginConfiguration config,
+        CancellationToken cancellationToken)
+    {
+        var itemsToDelete = database.GetByStatus(SyncStatus.Deleting).ToList();
+
+        if (itemsToDelete.Count == 0)
+        {
+            return (0, 0);
+        }
+
+        _logger.LogInformation("Processing {Count} items marked for deletion", itemsToDelete.Count);
+
+        var deleted = 0;
+        var failed = 0;
+
+        foreach (var item in itemsToDelete)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+
+            try
+            {
+                var localPath = item.LocalPath;
+                var fileName = Path.GetFileName(localPath ?? item.SourcePath);
+
+                // If local file exists, delete it (optionally to recycling bin)
+                if (!string.IsNullOrEmpty(localPath) && File.Exists(localPath))
+                {
+                    if (config.EnableRecyclingBin && !string.IsNullOrEmpty(config.RecyclingBinPath))
+                    {
+                        RecyclingBinService.MoveWithCompanionsToRecyclingBin(localPath, config.RecyclingBinPath, _logger);
+                        _logger.LogInformation("DELETED: {FileName} (moved to recycling bin)", fileName);
+                    }
+                    else
+                    {
+                        File.Delete(localPath);
+                        _logger.LogInformation("DELETED: {FileName}", fileName);
+                    }
+                }
+
+                // Only remove record after successful file deletion
+                database.Delete(item.SourceItemId);
+                deleted++;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to delete {FileName}", Path.GetFileName(item.LocalPath ?? item.SourcePath));
+                database.UpdateStatus(item.SourceItemId, SyncStatus.Errored, errorMessage: $"Deletion failed: {ex.Message}");
+                failed++;
+            }
+        }
+
+        _logger.LogInformation("Deletion processing complete: {Deleted} deleted, {Failed} failed", deleted, failed);
+        return (deleted, failed);
     }
 
     // CreateSourceServerClient
@@ -689,6 +771,30 @@ public class DownloadMissingContentTask : IScheduledTask
 
         // Final attempt - if this fails, let the exception propagate
         File.Move(sourcePath, destinationPath, overwrite: true);
+    }
+
+    // CleanupStaleDownloadEntries
+    // Removes download entries older than 1 hour (likely from crashed runs).
+    private void CleanupStaleDownloadEntries()
+    {
+        var staleThreshold = DateTime.UtcNow.AddHours(-1);
+        var staleEntries = ActiveDownloads
+            .Where(kvp => kvp.Value < staleThreshold)
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        foreach (var key in staleEntries)
+        {
+            if (ActiveDownloads.TryRemove(key, out _))
+            {
+                _logger.LogDebug("Removed stale download entry for {SourceItemId}", key);
+            }
+        }
+
+        if (staleEntries.Count > 0)
+        {
+            _logger.LogInformation("Cleaned up {Count} stale download entries", staleEntries.Count);
+        }
     }
 
     // FormatBytes

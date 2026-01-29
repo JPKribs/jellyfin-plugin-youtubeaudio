@@ -82,13 +82,21 @@
     background: rgba(153, 153, 153, 0.2);
     color: #999;
 }
-.statusCard-pending {
+.statusCard-pendingDownload {
     background: rgba(155, 89, 182, 0.2);
     color: #9b59b6;
+}
+.statusCard-pendingReplacement {
+    background: rgba(52, 152, 219, 0.2);
+    color: #3498db;
 }
 .statusCard-pendingDeletion {
     background: rgba(217, 83, 79, 0.2);
     color: #d9534f;
+}
+.statusCard-deleting {
+    background: rgba(231, 76, 60, 0.2);
+    color: #e74c3c;
 }
 
 /* Sync items list */
@@ -144,8 +152,10 @@
 .syncItemStatus.Queued { background: rgba(240, 173, 78, 0.2); color: #f0ad4e; }
 .syncItemStatus.Errored { background: rgba(217, 83, 79, 0.2); color: #d9534f; }
 .syncItemStatus.Ignored { background: rgba(153, 153, 153, 0.2); color: #999; }
-.syncItemStatus.Pending { background: rgba(155, 89, 182, 0.2); color: #9b59b6; }
-.syncItemStatus.PendingDeletion { background: rgba(217, 83, 79, 0.2); color: #d9534f; }
+.syncItemStatus.Pending-Download { background: rgba(155, 89, 182, 0.2); color: #9b59b6; }
+.syncItemStatus.Pending-Replacement { background: rgba(52, 152, 219, 0.2); color: #3498db; }
+.syncItemStatus.Pending-Deletion { background: rgba(217, 83, 79, 0.2); color: #d9534f; }
+.syncItemStatus.Deleting { background: rgba(231, 76, 60, 0.2); color: #e74c3c; }
 
 /* Sync Action Button Row */
 .syncActionButtonRow {

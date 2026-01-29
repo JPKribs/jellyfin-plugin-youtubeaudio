@@ -53,13 +53,20 @@ var SyncTableModule = {
     },
 
     updatePendingVisibility: function(requireApproval) {
-        document.getElementById('statusGroupPending').style.display = requireApproval ? 'block' : 'none';
-        document.getElementById('optPending').style.display = requireApproval ? 'block' : 'none';
+        document.getElementById('statusGroupPendingDownload').style.display = requireApproval ? 'block' : 'none';
+        document.getElementById('optPendingDownload').style.display = requireApproval ? 'block' : 'none';
+    },
+
+    updateReplacementVisibility: function(requireApproval) {
+        document.getElementById('statusGroupPendingReplacement').style.display = requireApproval ? 'block' : 'none';
+        document.getElementById('optPendingReplacement').style.display = requireApproval ? 'block' : 'none';
     },
 
     updateDeletionVisibility: function(deleteIfMissing) {
         document.getElementById('statusGroupPendingDeletion').style.display = deleteIfMissing ? 'block' : 'none';
         document.getElementById('optPendingDeletion').style.display = deleteIfMissing ? 'block' : 'none';
+        document.getElementById('statusGroupDeleting').style.display = deleteIfMissing ? 'block' : 'none';
+        document.getElementById('optDeleting').style.display = deleteIfMissing ? 'block' : 'none';
     },
 
     loadHealthStats: function() {
@@ -187,14 +194,30 @@ var SyncTableModule = {
         });
     },
 
+    getDisplayStatus: function(item) {
+        if (item.Status === 'Pending' && item.PendingType) {
+            return 'Pending ' + item.PendingType;
+        }
+        return item.Status;
+    },
+
+    getStatusClass: function(item) {
+        if (item.Status === 'Pending' && item.PendingType) {
+            return 'Pending-' + item.PendingType;
+        }
+        return item.Status;
+    },
+
     loadSyncStatus: function() {
         return ServerSyncShared.apiRequest('Status', 'GET').then(function(status) {
             var syncedCount = status.Synced || 0;
             var queuedCount = status.Queued || 0;
             var erroredCount = status.Errored || 0;
             var ignoredCount = status.Ignored || 0;
-            var pendingCount = status.Pending || 0;
+            var pendingDownloadCount = status.PendingDownload || 0;
+            var pendingReplacementCount = status.PendingReplacement || 0;
             var pendingDeletionCount = status.PendingDeletion || 0;
+            var deletingCount = status.Deleting || 0;
 
             document.getElementById('syncedCount').textContent = syncedCount;
             document.getElementById('statusGroupSynced').setAttribute('title', 'Synced: ' + syncedCount);
@@ -208,11 +231,17 @@ var SyncTableModule = {
             document.getElementById('ignoredCount').textContent = ignoredCount;
             document.getElementById('statusGroupIgnored').setAttribute('title', 'Ignored: ' + ignoredCount);
 
-            document.getElementById('pendingCount').textContent = pendingCount;
-            document.getElementById('statusGroupPending').setAttribute('title', 'Pending: ' + pendingCount);
+            document.getElementById('pendingDownloadCount').textContent = pendingDownloadCount;
+            document.getElementById('statusGroupPendingDownload').setAttribute('title', 'Pending Download: ' + pendingDownloadCount);
+
+            document.getElementById('pendingReplacementCount').textContent = pendingReplacementCount;
+            document.getElementById('statusGroupPendingReplacement').setAttribute('title', 'Pending Replacement: ' + pendingReplacementCount);
 
             document.getElementById('pendingDeletionCount').textContent = pendingDeletionCount;
             document.getElementById('statusGroupPendingDeletion').setAttribute('title', 'Pending Deletion: ' + pendingDeletionCount);
+
+            document.getElementById('deletingCount').textContent = deletingCount;
+            document.getElementById('statusGroupDeleting').setAttribute('title', 'Deleting: ' + deletingCount);
         });
     },
 
@@ -226,7 +255,16 @@ var SyncTableModule = {
             self.selectedItems.clear();
             self.updateBulkActionsVisibility();
 
-            var filteredItems = filter ? items.filter(function(i) { return i.Status === filter; }) : items;
+            var filteredItems = items;
+            if (filter) {
+                if (filter.indexOf(':') > -1) {
+                    // Filter by Status:PendingType (e.g., "Pending:Download")
+                    var parts = filter.split(':');
+                    filteredItems = items.filter(function(i) { return i.Status === parts[0] && i.PendingType === parts[1]; });
+                } else {
+                    filteredItems = items.filter(function(i) { return i.Status === filter; });
+                }
+            }
             self.filteredItems = filteredItems;
 
             document.getElementById('chkSelectAll').checked = false;
@@ -249,6 +287,9 @@ var SyncTableModule = {
                     errorPreview = '<div class="syncItemError" title="' + ServerSyncShared.escapeHtml(item.ErrorMessage) + '">' + ServerSyncShared.escapeHtml(item.ErrorMessage) + '</div>';
                 }
 
+                var displayStatus = self.getDisplayStatus(item);
+                var statusClass = self.getStatusClass(item);
+
                 return '<div class="syncItem" data-id="' + item.SourceItemId + '">' +
                     '<input type="checkbox" class="syncItemCheckbox" data-id="' + item.SourceItemId + '" />' +
                     '<div class="syncItemInfo">' +
@@ -256,7 +297,7 @@ var SyncTableModule = {
                         '<div class="syncItemPath' + localPathClass + '" title="' + ServerSyncShared.escapeHtml(item.LocalPath || '') + '">' + ServerSyncShared.escapeHtml(localPathDisplay) + '</div>' +
                         errorPreview +
                     '</div>' +
-                    '<div class="syncItemStatus ' + item.Status + '">' + item.Status + '</div>' +
+                    '<div class="syncItemStatus ' + statusClass + '">' + displayStatus + '</div>' +
                 '</div>';
             }).join('');
 
@@ -312,7 +353,33 @@ var SyncTableModule = {
     },
 
     bulkQueue: function() {
-        this.bulkAction('QueueItems');
+        var self = this;
+        var ids = Array.from(this.selectedItems);
+        if (ids.length === 0) return;
+
+        // Filter out pending deletion items - queuing them is a no-op
+        var filteredIds = ids.filter(function(id) {
+            var item = self.syncItems.find(function(i) { return i.SourceItemId === id; });
+            if (item && item.Status === 'Pending' && item.PendingType === 'Deletion') {
+                return false;
+            }
+            return true;
+        });
+
+        if (filteredIds.length === 0) {
+            ServerSyncShared.showAlert('No items to queue (deletion items cannot be queued)');
+            return;
+        }
+
+        ServerSyncShared.apiRequest('QueueItems', 'POST', { SourceItemIds: filteredIds }).then(function() {
+            self.selectedItems.clear();
+            self.loadSyncStatus();
+            self.loadSyncItems();
+            ServerSyncShared.showAlert(filteredIds.length + ' item(s) queued');
+        }).catch(function(err) {
+            console.error('Bulk queue failed:', err);
+            ServerSyncShared.showAlert('Failed to queue items');
+        });
     },
 
     bulkDelete: function() {
@@ -360,7 +427,7 @@ var SyncTableModule = {
         self.currentModalItem = item;
 
         document.getElementById('modalTitle').textContent = ServerSyncShared.getFileName(item.SourcePath);
-        document.getElementById('modalStatus').textContent = item.Status;
+        document.getElementById('modalStatus').textContent = self.getDisplayStatus(item);
         document.getElementById('modalSize').textContent = ServerSyncShared.formatSize(item.SourceSize);
         document.getElementById('modalSourcePath').textContent = item.SourcePath;
 
@@ -414,6 +481,33 @@ var SyncTableModule = {
             localPathNoteEl.style.display = 'none';
         }
 
+        // Show/hide modal buttons based on pending type
+        // Pending Deletion: show Delete + Ignore
+        // Pending Download/Replacement: show Queue + Ignore
+        // Other statuses: show all (for flexibility)
+        var btnQueue = document.getElementById('btnModalQueue');
+        var modalDeleteRow = document.getElementById('modalDeleteRow');
+        var isPendingDeletion = item.Status === 'Pending' && item.PendingType === 'Deletion';
+        var isPendingDownloadOrReplacement = item.Status === 'Pending' && (item.PendingType === 'Download' || item.PendingType === 'Replacement');
+
+        if (isPendingDeletion) {
+            // Pending Deletion: show Delete + Ignore, hide Queue
+            btnQueue.style.display = 'none';
+            if (self.capabilities && self.capabilities.CanDeleteItems) {
+                modalDeleteRow.style.display = 'block';
+            }
+        } else if (isPendingDownloadOrReplacement) {
+            // Pending Download/Replacement: show Queue + Ignore, hide Delete
+            btnQueue.style.display = 'inline-block';
+            modalDeleteRow.style.display = 'none';
+        } else {
+            // Other statuses (Synced, Queued, Errored, Ignored): show all available options
+            btnQueue.style.display = 'inline-block';
+            if (self.capabilities && self.capabilities.CanDeleteItems) {
+                modalDeleteRow.style.display = 'block';
+            }
+        }
+
         document.getElementById('itemDetailModal').style.display = 'flex';
     },
 
@@ -430,6 +524,10 @@ var SyncTableModule = {
 
     modalQueue: function() {
         if (this.currentModalItem) {
+            // Queuing a pending deletion item is a no-op
+            if (this.currentModalItem.Status === 'Pending' && this.currentModalItem.PendingType === 'Deletion') {
+                return;
+            }
             this.updateItemStatus(this.currentModalItem.SourceItemId, 'Queued');
         }
     },
