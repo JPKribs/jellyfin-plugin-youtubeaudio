@@ -112,28 +112,12 @@ PaginatedTable.prototype = {
         var opts = this.options;
         var html = '<div class="pt-wrapper">';
 
-        // Header row
-        html += '<div class="pt-header-row">';
-
-        // Selection controls
-        if (opts.selection && opts.selection.enabled) {
-            html += '<label class="pt-select-all-container">';
-            html += '<input type="checkbox" class="pt-select-all" />';
-            html += '<span>Select All</span>';
-            html += '</label>';
-            html += '<span class="pt-selected-count">0 selected</span>';
-            html += '<div class="pt-bulk-actions"></div>';
-        }
-
-        html += '<span class="pt-header-spacer"></span>';
-
-        // Search input
+        // Top row: Search + Filter
+        html += '<div class="pt-controls">';
         if (opts.search && opts.search.enabled !== false) {
             html += '<input is="emby-input" type="text" class="pt-search" placeholder="' +
                 ServerSyncShared.escapeHtml(opts.search.placeholder || 'Search...') + '" />';
         }
-
-        // Filter dropdown
         if (opts.filters && opts.filters.options && opts.filters.options.length > 0) {
             html += '<select is="emby-select" class="pt-filter">';
             html += '<option value="">All</option>';
@@ -145,13 +129,23 @@ PaginatedTable.prototype = {
             });
             html += '</select>';
         }
-
-        // Reload button
-        html += '<button is="emby-button" type="button" class="pt-reload-btn" title="Reload table data">';
-        html += '<span class="pt-reload-icon">&#x21bb;</span>';
-        html += '</button>';
-
         html += '</div>';
+
+        // Bottom row: Selection controls + Bulk actions + Reload button
+        if (opts.selection && opts.selection.enabled) {
+            html += '<div class="pt-selection-header">';
+            html += '<label class="pt-select-all-container">';
+            html += '<input type="checkbox" class="pt-select-all" />';
+            html += '<span>Select All</span>';
+            html += '</label>';
+            html += '<span class="pt-selected-count">0 selected</span>';
+            html += '<div class="pt-bulk-actions"></div>';
+            html += '<span class="pt-header-spacer"></span>';
+            html += '<button is="emby-button" type="button" class="pt-reload-btn" title="Reload table data">';
+            html += '<span class="material-icons pt-reload-icon">refresh</span>';
+            html += '</button>';
+            html += '</div>';
+        }
 
         // Table body
         html += '<div class="pt-body"></div>';
@@ -420,8 +414,9 @@ PaginatedTable.prototype = {
             if (col.type === 'status') {
                 var displayStatus = self._getDisplayStatus(item, value);
                 var statusClass = self._getStatusClass(item, value);
-                content = '<span class="pt-status-badge ' + statusClass + '">' +
-                    ServerSyncShared.escapeHtml(displayStatus) + '</span>';
+                content = '<button type="button" class="pt-status-badge pt-status-btn ' + statusClass + '" data-id="' +
+                    ServerSyncShared.escapeHtml(String(itemId)) + '">' +
+                    ServerSyncShared.escapeHtml(displayStatus) + '</button>';
             } else if (col.type === 'custom' && col.render) {
                 content = col.render(item, value);
             } else {
@@ -462,8 +457,9 @@ PaginatedTable.prototype = {
 
         body.querySelectorAll('.pt-row').forEach(function(row) {
             var handleRowAction = function(e) {
-                // Skip if clicking checkbox
-                if (e.target.type === 'checkbox' || e.target.classList.contains('pt-row-checkbox')) {
+                // Skip if clicking checkbox or status button (handled separately)
+                if (e.target.type === 'checkbox' || e.target.classList.contains('pt-row-checkbox') ||
+                    e.target.classList.contains('pt-status-btn')) {
                     return;
                 }
 
@@ -477,6 +473,19 @@ PaginatedTable.prototype = {
             };
 
             row.addEventListener('click', handleRowAction);
+        });
+
+        // Status badge buttons - explicit tap target for mobile
+        body.querySelectorAll('.pt-status-btn').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var id = btn.dataset.id;
+                var item = self._getItemById(id);
+                if (item && self.options.actions && self.options.actions.onRowClick) {
+                    self.options.actions.onRowClick(item);
+                }
+            });
         });
 
         body.querySelectorAll('.pt-row-checkbox').forEach(function(checkbox) {

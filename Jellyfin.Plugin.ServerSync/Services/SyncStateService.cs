@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Jellyfin.Plugin.ServerSync.Configuration;
 using Jellyfin.Plugin.ServerSync.Models.ContentSync;
 using Jellyfin.Plugin.ServerSync.Models.ContentSync.Configuration;
 using Microsoft.Extensions.Logging;
@@ -90,6 +91,7 @@ public static class SyncStateService
     /// <param name="localPath">Translated local path.</param>
     /// <param name="replaceMode">Approval mode for replacements.</param>
     /// <param name="detectUpdatedFiles">Whether to check local file integrity.</param>
+    /// <param name="changeDetectionPolicy">Policy for detecting source changes.</param>
     /// <param name="logger">Logger for status messages.</param>
     /// <returns>Transition result.</returns>
     public static TransitionResult ProcessExistingItem(
@@ -102,6 +104,7 @@ public static class SyncStateService
         string localPath,
         ApprovalMode replaceMode,
         bool detectUpdatedFiles,
+        ChangeDetectionPolicy changeDetectionPolicy,
         ILogger logger)
     {
         // Ignored items stay in their state
@@ -125,7 +128,7 @@ public static class SyncStateService
         // Pending items (Download or Replacement) stay pending but update metadata
         if (existingItem.Status == SyncStatus.Pending)
         {
-            if (HasMetadataChanged(existingItem, sourcePath, sourceSize, sourceETag))
+            if (HasMetadataChanged(existingItem, sourcePath, sourceSize, sourceETag, changeDetectionPolicy))
             {
                 UpdateItemMetadata(existingItem, sourcePath, sourceSize, sourceCreateDate, sourceETag, localPath);
                 database.Upsert(existingItem);
@@ -135,8 +138,8 @@ public static class SyncStateService
             return new TransitionResult(false, "No changes (pending)");
         }
 
-        // Check for source changes using size, path, or ETag
-        var sourceChanged = HasMetadataChanged(existingItem, sourcePath, sourceSize, sourceETag);
+        // Check for source changes using configured detection policy
+        var sourceChanged = HasMetadataChanged(existingItem, sourcePath, sourceSize, sourceETag, changeDetectionPolicy);
 
         // Queued items stay queued but update metadata if changed
         if (existingItem.Status == SyncStatus.Queued)
@@ -328,13 +331,31 @@ public static class SyncStateService
     }
 
     /// <summary>
-    /// Checks if item metadata has changed.
+    /// Checks if item metadata has changed based on the configured detection policy.
+    /// Path is always checked as the primary identifier.
     /// </summary>
-    private static bool HasMetadataChanged(SyncItem item, string sourcePath, long sourceSize, string? sourceETag)
+    private static bool HasMetadataChanged(
+        SyncItem item,
+        string sourcePath,
+        long sourceSize,
+        string? sourceETag,
+        ChangeDetectionPolicy policy = ChangeDetectionPolicy.SizeOnly)
     {
-        return item.SourceSize != sourceSize ||
-               item.SourcePath != sourcePath ||
-               (sourceETag != null && item.SourceETag != sourceETag);
+        // Path is always checked as the primary identifier
+        if (item.SourcePath != sourcePath)
+        {
+            return true;
+        }
+
+        // Check based on policy
+        return policy switch
+        {
+            ChangeDetectionPolicy.SizeOnly => item.SourceSize != sourceSize,
+            ChangeDetectionPolicy.ETagOnly => sourceETag != null && item.SourceETag != sourceETag,
+            ChangeDetectionPolicy.Both => item.SourceSize != sourceSize ||
+                                          (sourceETag != null && item.SourceETag != sourceETag),
+            _ => item.SourceSize != sourceSize
+        };
     }
 
     /// <summary>

@@ -103,6 +103,7 @@ public class UpdateSyncTablesTask : IScheduledTask
                 config.ReplaceExistingContentMode,
                 config.DeleteMissingContentMode,
                 config.DetectUpdatedFiles,
+                config.ChangeDetectionPolicy,
                 cancellationToken).ConfigureAwait(false);
 
             processedMappings++;

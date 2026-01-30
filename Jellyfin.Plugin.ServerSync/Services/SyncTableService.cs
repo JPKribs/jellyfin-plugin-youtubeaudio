@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
-using Jellyfin.Plugin.ServerSync.Models.ContentSync.Configuration;
+using Jellyfin.Plugin.ServerSync.Configuration;
 using Jellyfin.Plugin.ServerSync.Models.ContentSync;
+using Jellyfin.Plugin.ServerSync.Models.ContentSync.Configuration;
 using Jellyfin.Plugin.ServerSync.Utilities;
 using Jellyfin.Sdk.Generated.Models;
 using MediaBrowser.Controller.Library;
@@ -39,6 +40,7 @@ public class SyncTableService
     /// <param name="replaceExistingMode">Mode for handling existing items.</param>
     /// <param name="deleteMissingMode">Mode for handling missing items.</param>
     /// <param name="detectUpdatedFiles">Whether to detect updated files.</param>
+    /// <param name="changeDetectionPolicy">Policy for detecting source changes.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Number of items processed.</returns>
     public async Task<int> ProcessLibraryAsync(
@@ -49,6 +51,7 @@ public class SyncTableService
         ApprovalMode replaceExistingMode,
         ApprovalMode deleteMissingMode,
         bool detectUpdatedFiles,
+        ChangeDetectionPolicy changeDetectionPolicy,
         CancellationToken cancellationToken)
     {
         var startIndex = 0;
@@ -142,7 +145,7 @@ public class SyncTableService
 
                 try
                 {
-                    ProcessItem(database, mapping, item, existingItems, downloadNewMode, replaceExistingMode, detectUpdatedFiles);
+                    ProcessItem(database, mapping, item, existingItems, downloadNewMode, replaceExistingMode, detectUpdatedFiles, changeDetectionPolicy);
                     processedItems++;
                 }
                 catch (Exception ex)
@@ -260,7 +263,8 @@ public class SyncTableService
         Dictionary<string, SyncItem> existingItems,
         ApprovalMode downloadNewMode,
         ApprovalMode replaceExistingMode,
-        bool detectUpdatedFiles)
+        bool detectUpdatedFiles,
+        ChangeDetectionPolicy changeDetectionPolicy)
     {
         var sourceItemId = item.Id!.Value.ToString("N", CultureInfo.InvariantCulture);
         var sourceSize = MediaItemUtilities.GetItemSize(item);
@@ -282,6 +286,7 @@ public class SyncTableService
                 localPath,
                 replaceExistingMode,
                 detectUpdatedFiles,
+                changeDetectionPolicy,
                 _logger);
         }
         else

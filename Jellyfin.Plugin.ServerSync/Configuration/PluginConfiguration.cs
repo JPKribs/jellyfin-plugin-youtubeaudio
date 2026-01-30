@@ -117,6 +117,11 @@ public class PluginConfiguration : BasePluginConfiguration
     public bool DetectUpdatedFiles { get; set; } = true;
 
     /// <summary>
+    /// Controls how file changes are detected. Path is always checked.
+    /// </summary>
+    public ChangeDetectionPolicy ChangeDetectionPolicy { get; set; } = ChangeDetectionPolicy.SizeOnly;
+
+    /// <summary>
     /// Enable time-based bandwidth scheduling with alternate speed.
     /// </summary>
     public bool EnableBandwidthScheduling { get; set; }

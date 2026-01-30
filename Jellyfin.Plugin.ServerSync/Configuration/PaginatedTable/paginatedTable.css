@@ -14,8 +14,26 @@
     pointer-events: none;
 }
 
-/* Header row - contains select all, bulk actions, search, filter, reload */
-.pt-header-row {
+/* Top row: Search + Filter */
+.pt-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.pt-search {
+    flex: 1;
+    min-width: 150px;
+}
+
+.pt-filter {
+    width: auto !important;
+    min-width: 140px;
+}
+
+/* Bottom row: Selection + Bulk actions + Reload */
+.pt-selection-header {
     display: flex;
     gap: 8px;
     align-items: center;
@@ -23,7 +41,6 @@
     padding: 8px 12px;
     background: rgba(0, 0, 0, 0.2);
     border-radius: 4px;
-    flex-wrap: wrap;
 }
 
 .pt-select-all-container {
@@ -34,6 +51,7 @@
 }
 
 .pt-selected-count {
+    margin-left: 8px;
     opacity: 0.7;
     min-width: 80px;
 }
@@ -41,33 +59,23 @@
 .pt-bulk-actions {
     display: flex;
     gap: 8px;
+    margin-left: auto;
 }
 
 .pt-header-spacer {
     flex: 1;
 }
 
-.pt-search {
-    width: 150px;
-    min-width: 100px;
-}
-
-.pt-filter {
-    width: auto !important;
-    min-width: 120px;
-}
-
-/* Reload button */
+/* Reload button - material icon style */
 .pt-reload-btn {
-    background: rgba(255,255,255,0.1) !important;
-    border: 1px solid rgba(255,255,255,0.2) !important;
-    border-radius: 4px !important;
-    padding: 4px 10px !important;
-    min-width: 36px !important;
-    height: 36px !important;
+    background: transparent !important;
+    border: none !important;
+    padding: 8px !important;
+    min-width: 40px !important;
+    height: 40px !important;
     cursor: pointer;
-    opacity: 0.8;
-    transition: opacity 0.2s, background 0.2s;
+    opacity: 0.7;
+    transition: opacity 0.2s;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -75,7 +83,6 @@
 
 .pt-reload-btn:hover {
     opacity: 1;
-    background: rgba(255,255,255,0.2) !important;
 }
 
 .pt-reload-btn.spinning .pt-reload-icon {
@@ -83,11 +90,7 @@
 }
 
 .pt-reload-icon {
-    font-size: 1.3em;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1;
+    font-size: 24px !important;
 }
 
 @keyframes pt-spin {
@@ -149,13 +152,25 @@
     height: 18px;
 }
 
-/* Status badges */
+/* Status badges - clickable button for mobile */
 .pt-status-badge {
     display: inline-block;
-    padding: 2px 8px;
+    padding: 4px 12px;
     border-radius: 4px;
     font-size: 0.85em;
     white-space: nowrap;
+    border: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: opacity 0.15s, transform 0.1s;
+}
+
+.pt-status-badge:hover {
+    opacity: 0.85;
+}
+
+.pt-status-badge:active {
+    transform: scale(0.97);
 }
 
 .pt-status-badge.Synced { background: rgba(92, 184, 92, 0.2); color: #5cb85c; }
@@ -187,10 +202,6 @@
     padding: 8px 12px;
     font-size: 0.9em;
     opacity: 0.7;
-}
-
-.pt-item-count {
-    /* Item count text */
 }
 
 /* Bulk action buttons */
@@ -237,29 +248,4 @@
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 200px;
-}
-
-/* Responsive */
-@media (max-width: 600px) {
-    .pt-header-row {
-        flex-wrap: wrap;
-    }
-
-    .pt-header-spacer {
-        display: none;
-    }
-
-    .pt-search {
-        width: 100%;
-        order: 10;
-        margin-top: 8px;
-    }
-
-    .pt-filter {
-        flex: 1;
-    }
-
-    .pt-cell.pt-cell-status {
-        flex: 0 0 100px;
-    }
 }

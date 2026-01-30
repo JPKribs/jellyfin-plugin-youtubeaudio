@@ -1,7 +1,7 @@
 ---
 name: "Server Sync"
 guid: "ebd650b5-6f4c-4ccb-b10d-23dffb3a7286"
-version: "10.11.8"
+version: "10.11.9"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
 overview: "Sync media content from a source Jellyfin server to this server."
@@ -28,3 +28,4 @@ changelog:
   - Replace page navigation with infinite scroll for better UX
   - Add reload button to table header row
   - Fix mobile tap handling for opening item modals
+  - Add configurable change detection policy (Size Only, ETag Only, or Both)

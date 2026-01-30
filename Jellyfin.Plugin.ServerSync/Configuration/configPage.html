@@ -85,6 +85,16 @@
                             </div>
 
                             <div class="inputContainer">
+                                <label for="selChangeDetectionPolicy">Change Detection Policy:</label>
+                                <select is="emby-select" id="selChangeDetectionPolicy">
+                                    <option value="SizeOnly">Size Only (Recommended)</option>
+                                    <option value="ETagOnly">ETag Only</option>
+                                    <option value="Both">Both Size and ETag</option>
+                                </select>
+                                <div class="fieldDescription">How to detect if a file has changed. Size Only is most stable; ETag changes on metadata updates.</div>
+                            </div>
+
+                            <div class="inputContainer">
                                 <label class="checkboxContainer">
                                     <input is="emby-checkbox" type="checkbox" id="chkIncludeExtras" />
                                     <span>Include Companion Files</span>
@@ -760,17 +770,18 @@
     <style>
         .pt-wrapper { display: flex; flex-direction: column; }
         .pt-wrapper.pt-loading { opacity: 0.6; pointer-events: none; }
-        .pt-header-row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; padding: 8px 12px; background: rgba(0, 0, 0, 0.2); border-radius: 4px; flex-wrap: wrap; }
+        .pt-controls { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+        .pt-search { flex: 1; min-width: 150px; }
+        .pt-filter { width: auto !important; min-width: 140px; }
+        .pt-selection-header { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; padding: 8px 12px; background: rgba(0, 0, 0, 0.2); border-radius: 4px; }
         .pt-select-all-container { display: flex; align-items: center; gap: 4px; cursor: pointer; }
-        .pt-selected-count { opacity: 0.7; min-width: 80px; }
-        .pt-bulk-actions { display: flex; gap: 8px; }
+        .pt-selected-count { margin-left: 8px; opacity: 0.7; min-width: 80px; }
+        .pt-bulk-actions { display: flex; gap: 8px; margin-left: auto; }
         .pt-header-spacer { flex: 1; }
-        .pt-search { width: 150px; min-width: 100px; }
-        .pt-filter { width: auto !important; min-width: 120px; }
-        .pt-reload-btn { background: rgba(255,255,255,0.1) !important; border: 1px solid rgba(255,255,255,0.2) !important; border-radius: 4px !important; padding: 4px 10px !important; min-width: 36px !important; height: 36px !important; cursor: pointer; opacity: 0.8; transition: opacity 0.2s, background 0.2s; display: flex !important; align-items: center !important; justify-content: center !important; }
-        .pt-reload-btn:hover { opacity: 1; background: rgba(255,255,255,0.2) !important; }
+        .pt-reload-btn { background: transparent !important; border: none !important; padding: 8px !important; min-width: 40px !important; height: 40px !important; cursor: pointer; opacity: 0.7; transition: opacity 0.2s; display: flex !important; align-items: center !important; justify-content: center !important; }
+        .pt-reload-btn:hover { opacity: 1; }
         .pt-reload-btn.spinning .pt-reload-icon { animation: pt-spin 0.8s linear infinite; }
-        .pt-reload-icon { font-size: 1.3em; display: flex; align-items: center; justify-content: center; line-height: 1; }
+        .pt-reload-icon { font-size: 24px !important; }
         @keyframes pt-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .pt-body { max-height: 400px; overflow-y: auto; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 4px; }
         .pt-row { display: flex; align-items: center; padding: 10px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer; transition: background-color 0.15s; -webkit-tap-highlight-color: transparent; }
@@ -781,7 +792,9 @@
         .pt-cell.pt-cell-checkbox { flex: 0 0 40px; padding: 4px; }
         .pt-cell.pt-cell-status { flex: 0 0 130px; text-align: right; }
         .pt-row-checkbox { cursor: pointer; width: 18px; height: 18px; }
-        .pt-status-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.85em; white-space: nowrap; }
+        .pt-status-badge { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 0.85em; white-space: nowrap; border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: opacity 0.15s, transform 0.1s; }
+        .pt-status-badge:hover { opacity: 0.85; }
+        .pt-status-badge:active { transform: scale(0.97); }
         .pt-status-badge.Synced { background: rgba(92, 184, 92, 0.2); color: #5cb85c; }
         .pt-status-badge.Queued { background: rgba(240, 173, 78, 0.2); color: #f0ad4e; }
         .pt-status-badge.Errored { background: rgba(217, 83, 79, 0.2); color: #d9534f; }
@@ -800,7 +813,6 @@
         .pt-cell .syncItemPath { font-size: 0.85em; opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .pt-cell .syncItemPath.notExists { color: #9b59b6; font-style: italic; }
         .pt-cell .syncItemError { font-size: 0.75em; color: #d9534f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
-        @media (max-width: 600px) { .pt-header-row { flex-wrap: wrap; } .pt-header-spacer { display: none; } .pt-search { width: 100%; order: 10; margin-top: 8px; } .pt-filter { flex: 1; } .pt-cell.pt-cell-status { flex: 0 0 100px; } }
     </style>
 
     <!-- Scripts: shared.js -->
@@ -928,6 +940,7 @@
                 document.getElementById('chkEnableContentSync').checked = config.EnableContentSync || false;
                 document.getElementById('chkIncludeExtras').checked = config.IncludeCompanionFiles || false;
                 document.getElementById('chkDetectUpdatedFiles').checked = config.DetectUpdatedFiles !== false;
+                document.getElementById('selChangeDetectionPolicy').value = config.ChangeDetectionPolicy || 'SizeOnly';
                 // Set approval mode dropdowns - config stores string enum names (Enabled, RequireApproval, Disabled)
                 var downloadMode = config.DownloadNewContentMode || 'Enabled';
                 var replaceMode = config.ReplaceExistingContentMode || 'Enabled';
@@ -960,6 +973,7 @@
                     EnableContentSync: document.getElementById('chkEnableContentSync').checked,
                     IncludeCompanionFiles: document.getElementById('chkIncludeExtras').checked,
                     DetectUpdatedFiles: document.getElementById('chkDetectUpdatedFiles').checked,
+                    ChangeDetectionPolicy: document.getElementById('selChangeDetectionPolicy').value,
                     DownloadNewContentMode: document.getElementById('selDownloadNewContentMode').value,
                     ReplaceExistingContentMode: document.getElementById('selReplaceExistingContentMode').value,
                     DeleteMissingContentMode: document.getElementById('selDeleteMissingContentMode').value,
@@ -1077,13 +1091,12 @@
             _cacheElements: function(container) { this.elements = { container: container, search: container.querySelector('.pt-search'), filter: container.querySelector('.pt-filter'), selectAll: container.querySelector('.pt-select-all'), selectedCount: container.querySelector('.pt-selected-count'), bulkActions: container.querySelector('.pt-bulk-actions'), reloadBtn: container.querySelector('.pt-reload-btn'), body: container.querySelector('.pt-body'), loadingMore: container.querySelector('.pt-loading-more'), itemCount: container.querySelector('.pt-item-count') }; },
             _buildHTML: function() {
                 var opts = this.options, html = '<div class="pt-wrapper">';
-                html += '<div class="pt-header-row">';
-                if (opts.selection && opts.selection.enabled) { html += '<label class="pt-select-all-container"><input type="checkbox" class="pt-select-all" /><span>Select All</span></label><span class="pt-selected-count">0 selected</span><div class="pt-bulk-actions"></div>'; }
-                html += '<span class="pt-header-spacer"></span>';
+                html += '<div class="pt-controls">';
                 if (opts.search && opts.search.enabled !== false) { html += '<input is="emby-input" type="text" class="pt-search" placeholder="' + ServerSyncShared.escapeHtml(opts.search.placeholder || 'Search...') + '" />'; }
                 if (opts.filters && opts.filters.options && opts.filters.options.length > 0) { html += '<select is="emby-select" class="pt-filter"><option value="">All</option>'; opts.filters.options.forEach(function(opt) { var style = opt.hidden ? ' style="display:none"' : ''; var id = opt.id ? ' id="' + opt.id + '"' : ''; html += '<option value="' + ServerSyncShared.escapeHtml(opt.value) + '"' + style + id + '>' + ServerSyncShared.escapeHtml(opt.label) + '</option>'; }); html += '</select>'; }
-                html += '<button is="emby-button" type="button" class="pt-reload-btn" title="Reload table data"><span class="pt-reload-icon">&#x21bb;</span></button>';
-                html += '</div><div class="pt-body"></div>';
+                html += '</div>';
+                if (opts.selection && opts.selection.enabled) { html += '<div class="pt-selection-header"><label class="pt-select-all-container"><input type="checkbox" class="pt-select-all" /><span>Select All</span></label><span class="pt-selected-count">0 selected</span><div class="pt-bulk-actions"></div><span class="pt-header-spacer"></span><button is="emby-button" type="button" class="pt-reload-btn" title="Reload table data"><span class="material-icons pt-reload-icon">refresh</span></button></div>'; }
+                html += '<div class="pt-body"></div>';
                 html += '<div class="pt-loading-more" style="display:none;">Loading more...</div>';
                 html += '<div class="pt-footer"><span class="pt-item-count"></span></div>';
                 html += '</div>';
@@ -1149,7 +1162,7 @@
                 if (opts.selection && opts.selection.enabled) { var checked = this.state.selectedIds.has(String(itemId)) ? ' checked' : ''; html += '<div class="pt-cell pt-cell-checkbox"><input type="checkbox" class="pt-row-checkbox" data-id="' + ServerSyncShared.escapeHtml(String(itemId)) + '"' + checked + ' /></div>'; }
                 visibleColumns.forEach(function(col) {
                     var value = item[col.key], cellClass = 'pt-cell', content = '';
-                    if (col.type === 'status') { cellClass += ' pt-cell-status'; var displayStatus = self._getDisplayStatus(item, value); var statusClass = self._getStatusClass(item, value); content = '<span class="pt-status-badge ' + statusClass + '">' + ServerSyncShared.escapeHtml(displayStatus) + '</span>'; }
+                    if (col.type === 'status') { cellClass += ' pt-cell-status'; var displayStatus = self._getDisplayStatus(item, value); var statusClass = self._getStatusClass(item, value); content = '<button type="button" class="pt-status-badge pt-status-btn ' + statusClass + '" data-id="' + ServerSyncShared.escapeHtml(String(itemId)) + '">' + ServerSyncShared.escapeHtml(displayStatus) + '</button>'; }
                     else if (col.type === 'custom' && col.render) { content = col.render(item, value); }
                     else { content = value !== null && value !== undefined ? ServerSyncShared.escapeHtml(String(value)) : ''; }
                     html += '<div class="' + cellClass + '">' + content + '</div>';
@@ -1163,8 +1176,11 @@
                 var self = this, body = this.elements.body;
                 if (!body) return;
                 body.querySelectorAll('.pt-row').forEach(function(row) {
-                    var handleRowAction = function(e) { if (e.target.type === 'checkbox' || e.target.classList.contains('pt-row-checkbox')) return; var id = row.dataset.id; var item = self._getItemById(id); if (item && self.options.actions && self.options.actions.onRowClick) { e.preventDefault(); e.stopPropagation(); self.options.actions.onRowClick(item); } };
+                    var handleRowAction = function(e) { if (e.target.type === 'checkbox' || e.target.classList.contains('pt-row-checkbox') || e.target.classList.contains('pt-status-btn')) return; var id = row.dataset.id; var item = self._getItemById(id); if (item && self.options.actions && self.options.actions.onRowClick) { e.preventDefault(); e.stopPropagation(); self.options.actions.onRowClick(item); } };
                     row.addEventListener('click', handleRowAction);
+                });
+                body.querySelectorAll('.pt-status-btn').forEach(function(btn) {
+                    btn.addEventListener('click', function(e) { e.preventDefault(); e.stopPropagation(); var id = btn.dataset.id; var item = self._getItemById(id); if (item && self.options.actions && self.options.actions.onRowClick) { self.options.actions.onRowClick(item); } });
                 });
                 body.querySelectorAll('.pt-row-checkbox').forEach(function(checkbox) {
                     checkbox.addEventListener('change', function(e) { e.stopPropagation(); var id = checkbox.dataset.id; if (checkbox.checked) { self.state.selectedIds.add(id); } else { self.state.selectedIds.delete(id); } self._updateSelectionUI(); self._notifySelectionChange(); });
