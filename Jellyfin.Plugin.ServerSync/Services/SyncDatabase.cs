@@ -295,6 +295,109 @@ public class SyncDatabase : IDisposable
     }
 
     /// <summary>
+    /// SearchPaginated
+    /// Searches sync items with pagination support.
+    /// </summary>
+    /// <param name="searchTerm">Search term for filename.</param>
+    /// <param name="status">Optional status filter.</param>
+    /// <param name="pendingType">Optional pending type filter.</param>
+    /// <param name="skip">Number of items to skip.</param>
+    /// <param name="take">Maximum items to return.</param>
+    /// <returns>Tuple of items and total count.</returns>
+    public (List<SyncItem> Items, int TotalCount) SearchPaginated(
+        string? searchTerm,
+        SyncStatus? status = null,
+        PendingType? pendingType = null,
+        int skip = 0,
+        int take = 50)
+    {
+        EnsureConnection();
+
+        var conditions = new List<string>();
+
+        // Build WHERE clause conditions
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            conditions.Add("(SourcePath LIKE @searchTerm OR LocalPath LIKE @searchTerm)");
+        }
+
+        if (status.HasValue)
+        {
+            conditions.Add("Status = @status");
+        }
+
+        if (pendingType.HasValue)
+        {
+            conditions.Add("PendingType = @pendingType");
+        }
+
+        var whereClause = conditions.Count > 0
+            ? $"WHERE {string.Join(" AND ", conditions)}"
+            : string.Empty;
+
+        // Get total count
+        int totalCount;
+        using (var countCommand = _connection!.CreateCommand())
+        {
+            countCommand.CommandText = $"SELECT COUNT(*) FROM SyncItems {whereClause}";
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                countCommand.Parameters.AddWithValue("@searchTerm", $"%{searchTerm}%");
+            }
+
+            if (status.HasValue)
+            {
+                countCommand.Parameters.AddWithValue("@status", (int)status.Value);
+            }
+
+            if (pendingType.HasValue)
+            {
+                countCommand.Parameters.AddWithValue("@pendingType", (int)pendingType.Value);
+            }
+
+            totalCount = Convert.ToInt32(countCommand.ExecuteScalar());
+        }
+
+        // Get paginated data
+        var items = new List<SyncItem>();
+        using (var dataCommand = _connection!.CreateCommand())
+        {
+            dataCommand.CommandText = $@"
+                SELECT * FROM SyncItems
+                {whereClause}
+                ORDER BY StatusDate DESC
+                LIMIT @take OFFSET @skip";
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                dataCommand.Parameters.AddWithValue("@searchTerm", $"%{searchTerm}%");
+            }
+
+            if (status.HasValue)
+            {
+                dataCommand.Parameters.AddWithValue("@status", (int)status.Value);
+            }
+
+            if (pendingType.HasValue)
+            {
+                dataCommand.Parameters.AddWithValue("@pendingType", (int)pendingType.Value);
+            }
+
+            dataCommand.Parameters.AddWithValue("@take", take);
+            dataCommand.Parameters.AddWithValue("@skip", skip);
+
+            using var reader = dataCommand.ExecuteReader();
+            while (reader.Read())
+            {
+                items.Add(ReadSyncItem(reader));
+            }
+        }
+
+        return (items, totalCount);
+    }
+
+    /// <summary>
     /// GetPendingByType
     /// Retrieves all pending items with a specific pending type.
     /// </summary>

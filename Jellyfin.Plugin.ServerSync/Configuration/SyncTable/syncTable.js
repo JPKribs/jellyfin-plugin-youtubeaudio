@@ -1,32 +1,181 @@
 // Sync Table module
+// Uses the generic PaginatedTable component for content sync items
 
 var SyncTableModule = {
-    syncItems: [],
-    filteredItems: [],
-    selectedItems: new Set(),
+    table: null,
     currentModalItem: null,
     capabilities: null,
 
     init: function() {
         var self = this;
 
+        // Create the paginated table instance
+        this.table = new PaginatedTable({
+            containerId: 'syncItemsTableContainer',
+            endpoint: 'Items',
+
+            columns: [
+                {
+                    key: 'name',
+                    label: 'Name',
+                    type: 'custom',
+                    render: function(item) {
+                        var fileName = ServerSyncShared.getFileName(item.SourcePath);
+                        var localExists = item.Status === 'Synced';
+                        var localPathClass = localExists ? '' : ' notExists';
+                        var localPathDisplay = item.LocalPath
+                            ? ServerSyncShared.getFileName(item.LocalPath)
+                            : 'N/A';
+
+                        var willSync = !localExists && item.LocalPath &&
+                            item.Status !== 'Ignored' &&
+                            !(item.Status === 'Pending' && item.PendingType === 'Deletion');
+                        if (willSync) localPathDisplay = '(will sync to) ' + localPathDisplay;
+
+                        var errorPreview = '';
+                        if (item.Status === 'Errored' && item.ErrorMessage) {
+                            errorPreview = '<div class="syncItemError" title="' +
+                                ServerSyncShared.escapeHtml(item.ErrorMessage) + '">' +
+                                ServerSyncShared.escapeHtml(item.ErrorMessage) + '</div>';
+                        }
+
+                        return '<div class="syncItemInfo">' +
+                            '<div class="syncItemName" title="' +
+                                ServerSyncShared.escapeHtml(item.SourcePath) + '">' +
+                                ServerSyncShared.escapeHtml(fileName) + '</div>' +
+                            '<div class="syncItemPath' + localPathClass + '" title="' +
+                                ServerSyncShared.escapeHtml(item.LocalPath || '') + '">' +
+                                ServerSyncShared.escapeHtml(localPathDisplay) + '</div>' +
+                            errorPreview +
+                        '</div>';
+                    }
+                },
+                {
+                    key: 'details',
+                    label: 'Details',
+                    hidden: true,  // Hidden for content sync, available for future use
+                    type: 'custom',
+                    render: function() {
+                        return '';
+                    }
+                },
+                {
+                    key: 'Status',
+                    label: 'Status',
+                    type: 'status'
+                }
+            ],
+
+            selection: {
+                enabled: true,
+                idKey: 'SourceItemId',
+                onSelectionChange: function(selectedIds) {
+                    self.updateBulkActionsVisibility(selectedIds.length);
+                }
+            },
+
+            pagination: {
+                pageSize: 50,
+                pageSizes: [25, 50, 100, 200]
+            },
+
+            filters: {
+                options: [
+                    { value: 'Synced', label: 'Synced' },
+                    { value: 'Queued', label: 'Queued' },
+                    { value: 'Errored', label: 'Errored' },
+                    { value: 'Ignored', label: 'Ignored' },
+                    { value: 'Pending:Download', label: 'Pending Download', id: 'optPendingDownload', hidden: true },
+                    { value: 'Pending:Replacement', label: 'Pending Replace', id: 'optPendingReplacement', hidden: true },
+                    { value: 'Pending:Deletion', label: 'Pending Delete', id: 'optPendingDeletion', hidden: true },
+                    { value: 'Deleting', label: 'Deleting', id: 'optDeleting', hidden: true }
+                ],
+                buildParams: function(filterValue) {
+                    if (filterValue.indexOf(':') > -1) {
+                        var parts = filterValue.split(':');
+                        return { status: parts[0], pendingType: parts[1] };
+                    }
+                    return { status: filterValue };
+                }
+            },
+
+            actions: {
+                onRowClick: function(item) {
+                    self.showItemDetail(item.SourceItemId);
+                }
+            },
+
+            getDisplayStatus: function(item) {
+                if (item.Status === 'Pending' && item.PendingType) {
+                    return 'Pending ' + item.PendingType;
+                }
+                return item.Status;
+            },
+
+            getStatusClass: function(item) {
+                if (item.Status === 'Pending' && item.PendingType) {
+                    return 'Pending-' + item.PendingType;
+                }
+                return item.Status;
+            },
+
+            emptyState: {
+                message: 'No items found'
+            }
+        });
+
+        // Bind module-specific events (buttons outside the table)
+        this._bindModuleEvents();
+
+        // Inject bulk action buttons into the table's bulk actions container
+        this._injectBulkActions();
+    },
+
+    _bindModuleEvents: function() {
+        var self = this;
+
+        // Action buttons
         document.getElementById('btnRefreshItems').addEventListener('click', function() { self.refreshSyncTable(); });
-        document.getElementById('selStatusFilter').addEventListener('change', function() { self.loadSyncItems(); });
+        document.getElementById('btnTriggerSync').addEventListener('click', function() { self.triggerSync(); });
+        document.getElementById('btnRetryErrors').addEventListener('click', function() { self.retryErrors(); });
+        document.getElementById('btnResetDatabase').addEventListener('click', function() { self.resetDatabase(); });
         document.getElementById('btnReloadTable').addEventListener('click', function() { self.reloadTableData(); });
 
-        document.getElementById('btnBulkIgnore').addEventListener('click', function() { self.bulkIgnore(); });
-        document.getElementById('btnBulkQueue').addEventListener('click', function() { self.bulkQueue(); });
-        document.getElementById('btnBulkDelete').addEventListener('click', function() { self.bulkDelete(); });
-        document.getElementById('chkSelectAll').addEventListener('change', function() { self.toggleSelectAll(this.checked); });
-
+        // Modal buttons
         document.getElementById('btnModalIgnore').addEventListener('click', function() { self.modalIgnore(); });
         document.getElementById('btnModalQueue').addEventListener('click', function() { self.modalQueue(); });
         document.getElementById('btnModalDelete').addEventListener('click', function() { self.modalDelete(); });
         document.getElementById('btnModalClose').addEventListener('click', function() { self.closeModal(); });
+    },
 
-        document.getElementById('btnTriggerSync').addEventListener('click', function() { self.triggerSync(); });
-        document.getElementById('btnRetryErrors').addEventListener('click', function() { self.retryErrors(); });
-        document.getElementById('btnResetDatabase').addEventListener('click', function() { self.resetDatabase(); });
+    _injectBulkActions: function() {
+        var self = this;
+        var bulkContainer = this.table.getBulkActionsContainer();
+        if (!bulkContainer) return;
+
+        // Create bulk action buttons
+        bulkContainer.innerHTML =
+            '<button is="emby-button" type="button" id="btnBulkIgnore" class="raised" disabled><span>Ignore</span></button>' +
+            '<button is="emby-button" type="button" id="btnBulkQueue" class="raised button-primary" disabled><span>Queue</span></button>' +
+            '<button is="emby-button" type="button" id="btnBulkDelete" class="raised button-destructive" title="Delete from local server only" disabled><span>Delete</span></button>';
+
+        // Bind events
+        document.getElementById('btnBulkIgnore').addEventListener('click', function() { self.bulkIgnore(); });
+        document.getElementById('btnBulkQueue').addEventListener('click', function() { self.bulkQueue(); });
+        document.getElementById('btnBulkDelete').addEventListener('click', function() { self.bulkDelete(); });
+    },
+
+    // Backward compatibility - expose items through table
+    get syncItems() {
+        return this.table ? this.table.getItems() : [];
+    },
+
+    get filteredItems() {
+        return this.table ? this.table.getItems() : [];
+    },
+
+    get selectedItems() {
+        return this.table ? new Set(this.table.getSelectedIds()) : new Set();
     },
 
     loadCapabilities: function() {
@@ -54,24 +203,22 @@ var SyncTableModule = {
 
     updatePendingVisibility: function(requireApproval) {
         document.getElementById('statusGroupPendingDownload').style.display = requireApproval ? 'block' : 'none';
-        document.getElementById('optPendingDownload').style.display = requireApproval ? 'block' : 'none';
+        this.table.setFilterOptionVisible('optPendingDownload', requireApproval);
     },
 
     updateReplacementVisibility: function(requireApproval) {
         document.getElementById('statusGroupPendingReplacement').style.display = requireApproval ? 'block' : 'none';
-        document.getElementById('optPendingReplacement').style.display = requireApproval ? 'block' : 'none';
+        this.table.setFilterOptionVisible('optPendingReplacement', requireApproval);
     },
 
     updateDeletionVisibility: function(deleteIfMissing) {
         document.getElementById('statusGroupPendingDeletion').style.display = deleteIfMissing ? 'block' : 'none';
-        document.getElementById('optPendingDeletion').style.display = deleteIfMissing ? 'block' : 'none';
+        this.table.setFilterOptionVisible('optPendingDeletion', deleteIfMissing);
         document.getElementById('statusGroupDeleting').style.display = deleteIfMissing ? 'block' : 'none';
-        document.getElementById('optDeleting').style.display = deleteIfMissing ? 'block' : 'none';
+        this.table.setFilterOptionVisible('optDeleting', deleteIfMissing);
     },
 
     loadHealthStats: function() {
-        var self = this;
-
         return ServerSyncShared.apiRequest('Stats', 'GET').then(function(stats) {
             // Last sync time
             var lastSyncEl = document.getElementById('healthLastSync');
@@ -194,20 +341,6 @@ var SyncTableModule = {
         });
     },
 
-    getDisplayStatus: function(item) {
-        if (item.Status === 'Pending' && item.PendingType) {
-            return 'Pending ' + item.PendingType;
-        }
-        return item.Status;
-    },
-
-    getStatusClass: function(item) {
-        if (item.Status === 'Pending' && item.PendingType) {
-            return 'Pending-' + item.PendingType;
-        }
-        return item.Status;
-    },
-
     loadSyncStatus: function() {
         return ServerSyncShared.apiRequest('Status', 'GET').then(function(status) {
             var syncedCount = status.Synced || 0;
@@ -246,106 +379,18 @@ var SyncTableModule = {
     },
 
     loadSyncItems: function() {
-        var self = this;
-        var container = document.getElementById('syncItemsContainer');
-        var filter = document.getElementById('selStatusFilter').value;
-
-        return ServerSyncShared.apiRequest('Items', 'GET').then(function(items) {
-            self.syncItems = items || [];
-            self.selectedItems.clear();
-            self.updateBulkActionsVisibility();
-
-            var filteredItems = items;
-            if (filter) {
-                if (filter.indexOf(':') > -1) {
-                    // Filter by Status:PendingType (e.g., "Pending:Download")
-                    var parts = filter.split(':');
-                    filteredItems = items.filter(function(i) { return i.Status === parts[0] && i.PendingType === parts[1]; });
-                } else {
-                    filteredItems = items.filter(function(i) { return i.Status === filter; });
-                }
-            }
-            self.filteredItems = filteredItems;
-
-            document.getElementById('chkSelectAll').checked = false;
-
-            if (filteredItems.length === 0) {
-                container.innerHTML = '<div style="padding: 16px; opacity: 0.7;">No items found</div>';
-                return;
-            }
-
-            container.innerHTML = filteredItems.map(function(item) {
-                var localExists = item.Status === 'Synced';
-                var localPathClass = localExists ? '' : ' notExists';
-                var localPathDisplay = item.LocalPath ? ServerSyncShared.getFileName(item.LocalPath) : 'N/A';
-                if (!localExists && item.LocalPath) {
-                    localPathDisplay = '(will sync to) ' + localPathDisplay;
-                }
-
-                var errorPreview = '';
-                if (item.Status === 'Errored' && item.ErrorMessage) {
-                    errorPreview = '<div class="syncItemError" title="' + ServerSyncShared.escapeHtml(item.ErrorMessage) + '">' + ServerSyncShared.escapeHtml(item.ErrorMessage) + '</div>';
-                }
-
-                var displayStatus = self.getDisplayStatus(item);
-                var statusClass = self.getStatusClass(item);
-
-                return '<div class="syncItem" data-id="' + item.SourceItemId + '">' +
-                    '<input type="checkbox" class="syncItemCheckbox" data-id="' + item.SourceItemId + '" />' +
-                    '<div class="syncItemInfo">' +
-                        '<div class="syncItemName" title="' + ServerSyncShared.escapeHtml(item.SourcePath) + '">' + ServerSyncShared.escapeHtml(ServerSyncShared.getFileName(item.SourcePath)) + '</div>' +
-                        '<div class="syncItemPath' + localPathClass + '" title="' + ServerSyncShared.escapeHtml(item.LocalPath || '') + '">' + ServerSyncShared.escapeHtml(localPathDisplay) + '</div>' +
-                        errorPreview +
-                    '</div>' +
-                    '<div class="syncItemStatus ' + statusClass + '">' + displayStatus + '</div>' +
-                '</div>';
-            }).join('');
-
-            container.querySelectorAll('.syncItem').forEach(function(el) {
-                el.addEventListener('click', function(e) {
-                    if (e.target.type !== 'checkbox') {
-                        self.showItemDetail(el.dataset.id);
-                    }
-                });
-            });
-
-            container.querySelectorAll('.syncItemCheckbox').forEach(function(cb) {
-                cb.addEventListener('change', function() {
-                    if (this.checked) {
-                        self.selectedItems.add(this.dataset.id);
-                    } else {
-                        self.selectedItems.delete(this.dataset.id);
-                    }
-                    self.updateBulkActionsVisibility();
-                });
-            });
-        });
+        return this.table.load();
     },
 
-    updateBulkActionsVisibility: function() {
-        var count = this.selectedItems.size;
+    updateBulkActionsVisibility: function(count) {
         var hasSelection = count > 0;
-        document.getElementById('selectedCount').textContent = count + ' selected';
-        document.getElementById('btnBulkIgnore').disabled = !hasSelection;
-        document.getElementById('btnBulkQueue').disabled = !hasSelection;
-        document.getElementById('btnBulkDelete').disabled = !hasSelection;
-    },
+        var ignoreBtn = document.getElementById('btnBulkIgnore');
+        var queueBtn = document.getElementById('btnBulkQueue');
+        var deleteBtn = document.getElementById('btnBulkDelete');
 
-    toggleSelectAll: function(checked) {
-        var self = this;
-        self.selectedItems.clear();
-
-        if (checked) {
-            self.filteredItems.forEach(function(item) {
-                self.selectedItems.add(item.SourceItemId);
-            });
-        }
-
-        document.querySelectorAll('.syncItemCheckbox').forEach(function(cb) {
-            cb.checked = checked;
-        });
-
-        self.updateBulkActionsVisibility();
+        if (ignoreBtn) ignoreBtn.disabled = !hasSelection;
+        if (queueBtn) queueBtn.disabled = !hasSelection;
+        if (deleteBtn) deleteBtn.disabled = !hasSelection;
     },
 
     bulkIgnore: function() {
@@ -354,12 +399,13 @@ var SyncTableModule = {
 
     bulkQueue: function() {
         var self = this;
-        var ids = Array.from(this.selectedItems);
+        var ids = this.table.getSelectedIds();
         if (ids.length === 0) return;
 
         // Filter out pending deletion items - queuing them is a no-op
+        var items = this.table.getItems();
         var filteredIds = ids.filter(function(id) {
-            var item = self.syncItems.find(function(i) { return i.SourceItemId === id; });
+            var item = items.find(function(i) { return i.SourceItemId === id; });
             if (item && item.Status === 'Pending' && item.PendingType === 'Deletion') {
                 return false;
             }
@@ -372,7 +418,7 @@ var SyncTableModule = {
         }
 
         ServerSyncShared.apiRequest('QueueItems', 'POST', { SourceItemIds: filteredIds }).then(function() {
-            self.selectedItems.clear();
+            self.table.clearSelection();
             self.loadSyncStatus();
             self.loadSyncItems();
             ServerSyncShared.showAlert(filteredIds.length + ' item(s) queued');
@@ -384,7 +430,7 @@ var SyncTableModule = {
 
     bulkDelete: function() {
         var self = this;
-        var ids = Array.from(this.selectedItems);
+        var ids = this.table.getSelectedIds();
         if (ids.length === 0) return;
 
         if (!confirm('Delete ' + ids.length + ' item(s) from the LOCAL server? This cannot be undone.\n\nNote: This only deletes from this local server, never from the source server.')) {
@@ -392,7 +438,7 @@ var SyncTableModule = {
         }
 
         ServerSyncShared.apiRequest('DeleteLocalItems', 'POST', { SourceItemIds: ids }).then(function(result) {
-            self.selectedItems.clear();
+            self.table.clearSelection();
             self.loadSyncStatus();
             self.loadSyncItems();
             if (result && result.Deleted > 0) {
@@ -405,11 +451,11 @@ var SyncTableModule = {
 
     bulkAction: function(endpoint) {
         var self = this;
-        var ids = Array.from(this.selectedItems);
+        var ids = this.table.getSelectedIds();
         if (ids.length === 0) return;
 
         ServerSyncShared.apiRequest(endpoint, 'POST', { SourceItemIds: ids }).then(function() {
-            self.selectedItems.clear();
+            self.table.clearSelection();
             self.loadSyncStatus();
             self.loadSyncItems();
             ServerSyncShared.showAlert(ids.length + ' item(s) updated');
@@ -419,9 +465,24 @@ var SyncTableModule = {
         });
     },
 
+    getDisplayStatus: function(item) {
+        if (item.Status === 'Pending' && item.PendingType) {
+            return 'Pending ' + item.PendingType;
+        }
+        return item.Status;
+    },
+
+    getStatusClass: function(item) {
+        if (item.Status === 'Pending' && item.PendingType) {
+            return 'Pending-' + item.PendingType;
+        }
+        return item.Status;
+    },
+
     showItemDetail: function(sourceItemId) {
         var self = this;
-        var item = this.syncItems.find(function(i) { return i.SourceItemId === sourceItemId; });
+        var items = this.table.getItems();
+        var item = items.find(function(i) { return i.SourceItemId === sourceItemId; });
         if (!item) return;
 
         self.currentModalItem = item;

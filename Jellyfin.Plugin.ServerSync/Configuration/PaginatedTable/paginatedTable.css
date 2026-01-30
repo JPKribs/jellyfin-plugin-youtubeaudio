@@ -1,0 +1,326 @@
+/* ============================================
+   PaginatedTable Component Styles
+   Prefix: pt- (paginated-table)
+   Generic, reusable table component
+   ============================================ */
+
+/* Wrapper */
+.pt-wrapper {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Loading state */
+.pt-wrapper.pt-loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Controls row (search + filter) */
+.pt-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.pt-search {
+    flex: 1;
+    min-width: 150px;
+}
+
+.pt-filter {
+    width: auto !important;
+    min-width: 140px;
+}
+
+/* Selection header */
+.pt-selection-header {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+.pt-select-all-container {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+}
+
+.pt-selected-count {
+    margin-left: 8px;
+    opacity: 0.7;
+    min-width: 80px;
+}
+
+.pt-bulk-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+}
+
+/* Table header */
+.pt-header {
+    display: flex;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px 4px 0 0;
+    font-weight: 500;
+    font-size: 0.9em;
+    opacity: 0.8;
+}
+
+.pt-header-cell {
+    flex: 1;
+    padding: 4px 8px;
+}
+
+.pt-header-cell.pt-cell-checkbox {
+    flex: 0 0 40px;
+    padding: 4px;
+}
+
+.pt-header-cell.pt-cell-status {
+    flex: 0 0 130px;
+    text-align: right;
+}
+
+/* Table body */
+.pt-body {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+}
+
+/* Table rows */
+.pt-row {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.pt-row:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.pt-row:last-child {
+    border-bottom: none;
+}
+
+/* Table cells */
+.pt-cell {
+    flex: 1;
+    padding: 4px 8px;
+    min-width: 0;
+}
+
+.pt-cell.pt-cell-checkbox {
+    flex: 0 0 40px;
+    padding: 4px;
+}
+
+.pt-cell.pt-cell-status {
+    flex: 0 0 130px;
+    text-align: right;
+}
+
+/* Checkbox styling */
+.pt-row-checkbox {
+    cursor: pointer;
+}
+
+/* Status badges */
+.pt-status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+
+/* Status colors - matching existing syncTable styles */
+.pt-status-badge.Synced {
+    background: rgba(92, 184, 92, 0.2);
+    color: #5cb85c;
+}
+
+.pt-status-badge.Queued {
+    background: rgba(240, 173, 78, 0.2);
+    color: #f0ad4e;
+}
+
+.pt-status-badge.Errored {
+    background: rgba(217, 83, 79, 0.2);
+    color: #d9534f;
+}
+
+.pt-status-badge.Ignored {
+    background: rgba(153, 153, 153, 0.2);
+    color: #999;
+}
+
+.pt-status-badge.Pending-Download {
+    background: rgba(155, 89, 182, 0.2);
+    color: #9b59b6;
+}
+
+.pt-status-badge.Pending-Replacement {
+    background: rgba(52, 152, 219, 0.2);
+    color: #3498db;
+}
+
+.pt-status-badge.Pending-Deletion {
+    background: rgba(217, 83, 79, 0.2);
+    color: #d9534f;
+}
+
+.pt-status-badge.Deleting {
+    background: rgba(231, 76, 60, 0.2);
+    color: #e74c3c;
+}
+
+/* Empty state */
+.pt-empty {
+    padding: 32px 16px;
+    text-align: center;
+    opacity: 0.7;
+}
+
+/* Pagination controls */
+.pt-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.pt-page-info {
+    font-size: 0.9em;
+    opacity: 0.7;
+}
+
+.pt-page-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.pt-page-controls button {
+    min-width: 32px !important;
+    padding: 4px 8px !important;
+    font-size: 1em;
+}
+
+.pt-page-controls button:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.pt-page-indicator {
+    padding: 0 12px;
+    font-size: 0.9em;
+    white-space: nowrap;
+}
+
+.pt-page-size {
+    width: auto !important;
+    min-width: 110px;
+}
+
+/* Bulk action buttons in selection header - override emby styles */
+.pt-bulk-actions button {
+    padding: 4px 12px !important;
+    min-width: auto !important;
+}
+
+.pt-bulk-actions button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ============================================
+   Content-specific styles for syncTable use
+   These extend pt- classes for the Name column
+   ============================================ */
+
+/* Name cell with info block */
+.pt-cell .syncItemInfo {
+    flex: 1;
+    min-width: 0;
+}
+
+.pt-cell .syncItemName {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pt-cell .syncItemPath {
+    font-size: 0.85em;
+    opacity: 0.7;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pt-cell .syncItemPath.notExists {
+    color: #9b59b6;
+    font-style: italic;
+}
+
+.pt-cell .syncItemError {
+    font-size: 0.75em;
+    color: #d9534f;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+/* ============================================
+   Responsive adjustments
+   ============================================ */
+
+@media (max-width: 600px) {
+    .pt-pagination {
+        flex-direction: column;
+        align-items: stretch;
+        text-align: center;
+    }
+
+    .pt-page-controls {
+        justify-content: center;
+    }
+
+    .pt-page-size {
+        width: 100% !important;
+    }
+
+    .pt-controls {
+        flex-direction: column;
+    }
+
+    .pt-search {
+        width: 100%;
+    }
+
+    .pt-filter {
+        width: 100% !important;
+    }
+}

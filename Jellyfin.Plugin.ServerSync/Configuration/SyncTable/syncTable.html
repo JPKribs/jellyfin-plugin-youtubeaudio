@@ -71,42 +71,14 @@
     <button is="emby-button" type="button" id="btnResetDatabase" class="raised button-destructive syncActionButton">
         <span>Reset Database</span>
     </button>
-</div>
-
-<!-- Table Header Row -->
-<div class="syncTableHeader">
-    <label class="selectAllContainer">
-        <input type="checkbox" id="chkSelectAll" />
-        <span>Select All</span>
-    </label>
-    <span id="selectedCount" class="selectedCount">0 selected</span>
-    <button is="emby-button" type="button" id="btnBulkIgnore" class="raised syncHeaderButton" disabled>
-        <span>Ignore</span>
-    </button>
-    <button is="emby-button" type="button" id="btnBulkQueue" class="raised button-primary syncHeaderButton" disabled>
-        <span>Queue</span>
-    </button>
-    <button is="emby-button" type="button" id="btnBulkDelete" class="raised button-destructive syncHeaderButton" title="Delete from local server only" disabled>
-        <span>Delete</span>
-    </button>
     <button is="emby-button" type="button" id="btnReloadTable" class="reloadTableButton" title="Reload table data">
         <span class="reloadIcon">&#x21bb;</span>
     </button>
-    <select is="emby-select" id="selStatusFilter" class="statusFilter">
-        <option value="">All</option>
-        <option value="Synced">Synced</option>
-        <option value="Queued">Queued</option>
-        <option value="Errored">Errored</option>
-        <option value="Ignored">Ignored</option>
-        <option value="Pending:Download" id="optPendingDownload" style="display: none;">Pending Download</option>
-        <option value="Pending:Replacement" id="optPendingReplacement" style="display: none;">Pending Replacement</option>
-        <option value="Pending:Deletion" id="optPendingDeletion" style="display: none;">Pending Deletion</option>
-        <option value="Deleting" id="optDeleting" style="display: none;">Deleting</option>
-    </select>
 </div>
 
-<div id="syncItemsContainer" style="max-height: 400px; overflow-y: auto;">
-    <!-- Items populated dynamically -->
+<!-- Paginated Table Container - populated by PaginatedTable component -->
+<div id="syncItemsTableContainer">
+    <!-- PaginatedTable will generate its structure here -->
 </div>
 
 <!-- Item Detail Modal -->

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net.Mime;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.ServerSync.Configuration;
+using Jellyfin.Plugin.ServerSync.Models;
 using Jellyfin.Plugin.ServerSync.Models.Configuration;
 using Jellyfin.Plugin.ServerSync.Models.ContentSync.Configuration;
 using Jellyfin.Plugin.ServerSync.Models.ContentSync;
@@ -154,18 +155,22 @@ public class ConfigurationController : ControllerBase
 
     /// <summary>
     /// GetSyncItems
-    /// Gets sync items from the database with optional search and filter.
+    /// Gets paginated sync items from the database with optional search and filter.
     /// </summary>
     /// <param name="search">Optional search term.</param>
     /// <param name="status">Optional status filter.</param>
     /// <param name="pendingType">Optional pending type filter.</param>
-    /// <returns>List of sync item DTOs.</returns>
+    /// <param name="skip">Number of items to skip (default 0).</param>
+    /// <param name="take">Maximum items to return (default 50, max 200).</param>
+    /// <returns>Paginated result of sync item DTOs.</returns>
     [HttpGet("Items")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public ActionResult<List<SyncItemDto>> GetSyncItems(
+    public ActionResult<PaginatedResult<SyncItemDto>> GetSyncItems(
         [FromQuery] string? search = null,
         [FromQuery] string? status = null,
-        [FromQuery] string? pendingType = null)
+        [FromQuery] string? pendingType = null,
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 50)
     {
         var plugin = Plugin.Instance;
         if (plugin == null)
@@ -174,6 +179,10 @@ public class ConfigurationController : ControllerBase
         }
 
         var config = plugin.Configuration;
+
+        // Clamp pagination values to reasonable limits
+        take = Math.Clamp(take, 1, 200);
+        skip = Math.Max(0, skip);
 
         // Parse status filter
         SyncStatus? statusFilter = null;
@@ -189,32 +198,36 @@ public class ConfigurationController : ControllerBase
             pendingTypeFilter = parsedPendingType;
         }
 
-        // Use Search method if any filters are provided, otherwise GetAll
-        var items = !string.IsNullOrEmpty(search) || statusFilter.HasValue || pendingTypeFilter.HasValue
-            ? plugin.Database.Search(search, statusFilter, pendingTypeFilter)
-            : plugin.Database.GetAll();
+        // Get paginated results
+        var (items, totalCount) = plugin.Database.SearchPaginated(search, statusFilter, pendingTypeFilter, skip, take);
 
-        return Ok(items.Select(i => new SyncItemDto
+        return Ok(new PaginatedResult<SyncItemDto>
         {
-            Id = i.Id,
-            SourceItemId = i.SourceItemId,
-            SourceLibraryId = i.SourceLibraryId,
-            LocalLibraryId = i.LocalLibraryId,
-            SourcePath = i.SourcePath,
-            LocalPath = i.LocalPath,
-            SourceSize = i.SourceSize,
-            SourceCreateDate = i.SourceCreateDate,
-            LocalItemId = i.LocalItemId,
-            Status = i.Status.ToString(),
-            PendingType = i.PendingType?.ToString(),
-            StatusDate = i.StatusDate,
-            LastSyncTime = i.LastSyncTime,
-            ErrorMessage = i.ErrorMessage,
-            RetryCount = i.RetryCount,
-            SourceServerUrl = config.SourceServerUrl,
-            SourceServerId = config.SourceServerId,
-            CompanionFiles = i.CompanionFiles
-        }).ToList());
+            Items = items.Select(i => new SyncItemDto
+            {
+                Id = i.Id,
+                SourceItemId = i.SourceItemId,
+                SourceLibraryId = i.SourceLibraryId,
+                LocalLibraryId = i.LocalLibraryId,
+                SourcePath = i.SourcePath,
+                LocalPath = i.LocalPath,
+                SourceSize = i.SourceSize,
+                SourceCreateDate = i.SourceCreateDate,
+                LocalItemId = i.LocalItemId,
+                Status = i.Status.ToString(),
+                PendingType = i.PendingType?.ToString(),
+                StatusDate = i.StatusDate,
+                LastSyncTime = i.LastSyncTime,
+                ErrorMessage = i.ErrorMessage,
+                RetryCount = i.RetryCount,
+                SourceServerUrl = config.SourceServerUrl,
+                SourceServerId = config.SourceServerId,
+                CompanionFiles = i.CompanionFiles
+            }).ToList(),
+            TotalCount = totalCount,
+            Skip = skip,
+            Take = take
+        });
     }
 
     /// <summary>
