@@ -542,8 +542,8 @@ public class ConfigurationController : ControllerBase
             {
                 logger.LogWarning(
                     "SKIPPED DELETE: {FileName} - Path is outside configured library directories. Local path: {LocalPath}",
-                    fileName,
-                    item.LocalPath);
+                    SanitizeForLog(fileName),
+                    SanitizeForLog(item.LocalPath));
                 skippedCount++;
                 continue;
             }
@@ -570,8 +570,8 @@ public class ConfigurationController : ControllerBase
                 // File doesn't exist anywhere - remove from tracking since there's nothing to delete
                 logger.LogWarning(
                     "SKIPPED DELETE: {FileName} - File not found in Jellyfin library or on disk, removing from tracking. Source path: {SourcePath}",
-                    fileName,
-                    item.SourcePath);
+                    SanitizeForLog(fileName),
+                    SanitizeForLog(item.SourcePath));
                 plugin.Database.Delete(sourceItemId);
                 skippedCount++;
                 continue;
@@ -585,7 +585,7 @@ public class ConfigurationController : ControllerBase
                 var useRecyclingBin = config.EnableRecyclingBin && !string.IsNullOrEmpty(config.RecyclingBinPath);
                 var action = useRecyclingBin ? "RECYCLED" : "DELETED";
                 var suffix = localItem == null ? " (direct)" : string.Empty;
-                logger.LogInformation("{Action}{Suffix}: {FileName} - Local path: {LocalPath}", action, suffix, fileName, item.LocalPath);
+                logger.LogInformation("{Action}{Suffix}: {FileName} - Local path: {LocalPath}", action, suffix, SanitizeForLog(fileName), SanitizeForLog(item.LocalPath));
                 plugin.Database.Delete(sourceItemId);
                 deletedCount++;
             }
@@ -599,14 +599,14 @@ public class ConfigurationController : ControllerBase
                     // File is gone (deleted elsewhere) - remove from tracking
                     logger.LogInformation(
                         "DELETE (external): {FileName} - File no longer exists after deletion attempt, removing from tracking. Local path: {LocalPath}",
-                        fileName,
-                        item.LocalPath);
+                        SanitizeForLog(fileName),
+                        SanitizeForLog(item.LocalPath));
                     plugin.Database.Delete(sourceItemId);
                     deletedCount++;
                 }
                 else
                 {
-                    logger.LogError("FAILED DELETE: {FileName} - {Error}. Local path: {LocalPath}", fileName, result.ErrorMessage, item.LocalPath);
+                    logger.LogError("FAILED DELETE: {FileName} - {Error}. Local path: {LocalPath}", SanitizeForLog(fileName), SanitizeForLog(result.ErrorMessage), SanitizeForLog(item.LocalPath));
                     failedCount++;
                 }
             }
@@ -745,12 +745,12 @@ public class ConfigurationController : ControllerBase
                             localPath: item.LocalPath,
                             localItemId: localItem.Id.ToString());
                         resolvedCount++;
-                        logger.LogDebug("Resolved LocalItemId for {FileName}", Path.GetFileName(item.LocalPath));
+                        logger.LogDebug("Resolved LocalItemId for {FileName}", SanitizeForLog(Path.GetFileName(item.LocalPath)));
                     }
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Failed to resolve LocalItemId for {FileName}", Path.GetFileName(item.LocalPath));
+                    logger.LogWarning(ex, "Failed to resolve LocalItemId for {FileName}", SanitizeForLog(Path.GetFileName(item.LocalPath)));
                 }
             }
 

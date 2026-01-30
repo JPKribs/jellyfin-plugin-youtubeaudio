@@ -15,6 +15,14 @@ category: "General"
 owner: "JPKribs"
 artifacts:
 - "Jellyfin.Plugin.ServerSync.dll"
+- "Jellyfin.Sdk.dll"
+- "Microsoft.Kiota.Abstractions.dll"
+- "Microsoft.Kiota.Http.HttpClientLibrary.dll"
+- "Microsoft.Kiota.Serialization.Form.dll"
+- "Microsoft.Kiota.Serialization.Json.dll"
+- "Microsoft.Kiota.Serialization.Multipart.dll"
+- "Microsoft.Kiota.Serialization.Text.dll"
+- "Std.UriTemplate.dll"
 changelog:
   features:
   - One-way media sync from source Jellyfin server using API key authentication
