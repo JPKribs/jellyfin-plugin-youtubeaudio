@@ -1,41 +1,21 @@
 /* ============================================
    PaginatedTable Component Styles
    Prefix: pt- (paginated-table)
-   Generic, reusable table component
+   Generic, reusable table component with infinite scroll
    ============================================ */
 
-/* Wrapper */
 .pt-wrapper {
     display: flex;
     flex-direction: column;
 }
 
-/* Loading state */
 .pt-wrapper.pt-loading {
     opacity: 0.6;
     pointer-events: none;
 }
 
-/* Controls row (search + filter) */
-.pt-controls {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    margin-bottom: 12px;
-}
-
-.pt-search {
-    flex: 1;
-    min-width: 150px;
-}
-
-.pt-filter {
-    width: auto !important;
-    min-width: 140px;
-}
-
-/* Selection header */
-.pt-selection-header {
+/* Header row - contains select all, bulk actions, search, filter, reload */
+.pt-header-row {
     display: flex;
     gap: 8px;
     align-items: center;
@@ -43,6 +23,7 @@
     padding: 8px 12px;
     background: rgba(0, 0, 0, 0.2);
     border-radius: 4px;
+    flex-wrap: wrap;
 }
 
 .pt-select-all-container {
@@ -53,7 +34,6 @@
 }
 
 .pt-selected-count {
-    margin-left: 8px;
     opacity: 0.7;
     min-width: 80px;
 }
@@ -61,56 +41,85 @@
 .pt-bulk-actions {
     display: flex;
     gap: 8px;
-    margin-left: auto;
 }
 
-/* Table header */
-.pt-header {
-    display: flex;
-    padding: 8px 12px;
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 4px 4px 0 0;
-    font-weight: 500;
-    font-size: 0.9em;
-    opacity: 0.8;
-}
-
-.pt-header-cell {
+.pt-header-spacer {
     flex: 1;
-    padding: 4px 8px;
 }
 
-.pt-header-cell.pt-cell-checkbox {
-    flex: 0 0 40px;
-    padding: 4px;
+.pt-search {
+    width: 150px;
+    min-width: 100px;
 }
 
-.pt-header-cell.pt-cell-status {
-    flex: 0 0 130px;
-    text-align: right;
+.pt-filter {
+    width: auto !important;
+    min-width: 120px;
 }
 
-/* Table body */
+/* Reload button */
+.pt-reload-btn {
+    background: rgba(255,255,255,0.1) !important;
+    border: 1px solid rgba(255,255,255,0.2) !important;
+    border-radius: 4px !important;
+    padding: 4px 10px !important;
+    min-width: 36px !important;
+    height: 36px !important;
+    cursor: pointer;
+    opacity: 0.8;
+    transition: opacity 0.2s, background 0.2s;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.pt-reload-btn:hover {
+    opacity: 1;
+    background: rgba(255,255,255,0.2) !important;
+}
+
+.pt-reload-btn.spinning .pt-reload-icon {
+    animation: pt-spin 0.8s linear infinite;
+}
+
+.pt-reload-icon {
+    font-size: 1.3em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+@keyframes pt-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Table body - scrollable with infinite scroll */
 .pt-body {
     max-height: 400px;
     overflow-y: auto;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-top: none;
-    border-radius: 0 0 4px 4px;
+    border-radius: 4px;
 }
 
 /* Table rows */
 .pt-row {
     display: flex;
     align-items: center;
-    padding: 8px 12px;
+    padding: 10px 12px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     cursor: pointer;
     transition: background-color 0.15s;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .pt-row:hover {
     background: rgba(255, 255, 255, 0.05);
+}
+
+.pt-row:active {
+    background: rgba(255, 255, 255, 0.1);
 }
 
 .pt-row:last-child {
@@ -134,9 +143,10 @@
     text-align: right;
 }
 
-/* Checkbox styling */
 .pt-row-checkbox {
     cursor: pointer;
+    width: 18px;
+    height: 18px;
 }
 
 /* Status badges */
@@ -148,46 +158,14 @@
     white-space: nowrap;
 }
 
-/* Status colors - matching existing syncTable styles */
-.pt-status-badge.Synced {
-    background: rgba(92, 184, 92, 0.2);
-    color: #5cb85c;
-}
-
-.pt-status-badge.Queued {
-    background: rgba(240, 173, 78, 0.2);
-    color: #f0ad4e;
-}
-
-.pt-status-badge.Errored {
-    background: rgba(217, 83, 79, 0.2);
-    color: #d9534f;
-}
-
-.pt-status-badge.Ignored {
-    background: rgba(153, 153, 153, 0.2);
-    color: #999;
-}
-
-.pt-status-badge.Pending-Download {
-    background: rgba(155, 89, 182, 0.2);
-    color: #9b59b6;
-}
-
-.pt-status-badge.Pending-Replacement {
-    background: rgba(52, 152, 219, 0.2);
-    color: #3498db;
-}
-
-.pt-status-badge.Pending-Deletion {
-    background: rgba(217, 83, 79, 0.2);
-    color: #d9534f;
-}
-
-.pt-status-badge.Deleting {
-    background: rgba(231, 76, 60, 0.2);
-    color: #e74c3c;
-}
+.pt-status-badge.Synced { background: rgba(92, 184, 92, 0.2); color: #5cb85c; }
+.pt-status-badge.Queued { background: rgba(240, 173, 78, 0.2); color: #f0ad4e; }
+.pt-status-badge.Errored { background: rgba(217, 83, 79, 0.2); color: #d9534f; }
+.pt-status-badge.Ignored { background: rgba(153, 153, 153, 0.2); color: #999; }
+.pt-status-badge.Pending-Download { background: rgba(155, 89, 182, 0.2); color: #9b59b6; }
+.pt-status-badge.Pending-Replacement { background: rgba(52, 152, 219, 0.2); color: #3498db; }
+.pt-status-badge.Pending-Deletion { background: rgba(217, 83, 79, 0.2); color: #d9534f; }
+.pt-status-badge.Deleting { background: rgba(231, 76, 60, 0.2); color: #e74c3c; }
 
 /* Empty state */
 .pt-empty {
@@ -196,53 +174,26 @@
     opacity: 0.7;
 }
 
-/* Pagination controls */
-.pt-pagination {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+/* Loading more indicator */
+.pt-loading-more {
     padding: 12px;
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 4px;
-    margin-top: 8px;
-    flex-wrap: wrap;
-    gap: 12px;
+    text-align: center;
+    opacity: 0.7;
+    font-size: 0.9em;
 }
 
-.pt-page-info {
+/* Footer with item count */
+.pt-footer {
+    padding: 8px 12px;
     font-size: 0.9em;
     opacity: 0.7;
 }
 
-.pt-page-controls {
-    display: flex;
-    align-items: center;
-    gap: 4px;
+.pt-item-count {
+    /* Item count text */
 }
 
-.pt-page-controls button {
-    min-width: 32px !important;
-    padding: 4px 8px !important;
-    font-size: 1em;
-}
-
-.pt-page-controls button:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-}
-
-.pt-page-indicator {
-    padding: 0 12px;
-    font-size: 0.9em;
-    white-space: nowrap;
-}
-
-.pt-page-size {
-    width: auto !important;
-    min-width: 110px;
-}
-
-/* Bulk action buttons in selection header - override emby styles */
+/* Bulk action buttons */
 .pt-bulk-actions button {
     padding: 4px 12px !important;
     min-width: auto !important;
@@ -253,12 +204,7 @@
     cursor: not-allowed;
 }
 
-/* ============================================
-   Content-specific styles for syncTable use
-   These extend pt- classes for the Name column
-   ============================================ */
-
-/* Name cell with info block */
+/* Content-specific styles for syncTable use */
 .pt-cell .syncItemInfo {
     flex: 1;
     min-width: 0;
@@ -293,34 +239,27 @@
     max-width: 200px;
 }
 
-/* ============================================
-   Responsive adjustments
-   ============================================ */
-
+/* Responsive */
 @media (max-width: 600px) {
-    .pt-pagination {
-        flex-direction: column;
-        align-items: stretch;
-        text-align: center;
+    .pt-header-row {
+        flex-wrap: wrap;
     }
 
-    .pt-page-controls {
-        justify-content: center;
-    }
-
-    .pt-page-size {
-        width: 100% !important;
-    }
-
-    .pt-controls {
-        flex-direction: column;
+    .pt-header-spacer {
+        display: none;
     }
 
     .pt-search {
         width: 100%;
+        order: 10;
+        margin-top: 8px;
     }
 
     .pt-filter {
-        width: 100% !important;
+        flex: 1;
+    }
+
+    .pt-cell.pt-cell-status {
+        flex: 0 0 100px;
     }
 }

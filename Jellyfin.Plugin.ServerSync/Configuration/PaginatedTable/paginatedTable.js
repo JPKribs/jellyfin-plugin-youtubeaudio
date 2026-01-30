@@ -1,20 +1,9 @@
 // PaginatedTable - Generic paginated table component for Server Sync plugin
-// Provides reusable table functionality with server-side pagination
+// Provides reusable table functionality with infinite scroll pagination
 
-/**
- * PaginatedTable constructor
- * @param {Object} options - Configuration options
- * @param {string} options.containerId - ID of container element
- * @param {string} options.endpoint - API endpoint for fetching data
- * @param {Array} options.columns - Column definitions
- * @param {Object} [options.selection] - Selection configuration
- * @param {Object} [options.pagination] - Pagination configuration
- * @param {Object} [options.filters] - Filter configuration
- * @param {Object} [options.actions] - Action callbacks
- * @param {Object} [options.emptyState] - Empty state configuration
- */
+// PaginatedTable
+// Constructor that initializes a new paginated table instance with the given options.
 var PaginatedTable = function(options) {
-    // Merge defaults with provided options
     this.options = {
         containerId: '',
         endpoint: '',
@@ -25,15 +14,15 @@ var PaginatedTable = function(options) {
             onSelectionChange: null
         },
         pagination: {
-            pageSize: 50,
-            pageSizes: [25, 50, 100]
+            pageSize: 50
         },
         filters: {
             options: [],
             buildParams: null
         },
         actions: {
-            onRowClick: null
+            onRowClick: null,
+            onReload: null
         },
         emptyState: {
             message: 'No items found'
@@ -47,10 +36,8 @@ var PaginatedTable = function(options) {
         getStatusClass: null
     };
 
-    // Deep merge options
     this._mergeOptions(options);
 
-    // Instance state
     this.state = {
         items: [],
         totalCount: 0,
@@ -59,23 +46,19 @@ var PaginatedTable = function(options) {
         selectedIds: new Set(),
         filterValue: '',
         searchQuery: '',
-        isLoading: false
+        isLoading: false,
+        hasMore: true
     };
 
-    // DOM element references
     this.elements = {};
-
-    // Search debounce timeout
     this.searchTimeout = null;
-
-    // Initialize
     this._init();
 };
 
 PaginatedTable.prototype = {
-    /**
-     * Deep merge options
-     */
+
+    // _mergeOptions
+    // Deep merges user-provided options with defaults.
     _mergeOptions: function(options) {
         var self = this;
         Object.keys(options).forEach(function(key) {
@@ -87,31 +70,27 @@ PaginatedTable.prototype = {
         });
     },
 
-    /**
-     * Initialize the table component
-     */
+    // _init
+    // Initializes the component by creating DOM structure and binding events.
     _init: function() {
         this._createStructure();
         this._bindEvents();
     },
 
-    /**
-     * Create HTML structure
-     */
+    // _createStructure
+    // Builds and injects the table HTML into the container element.
     _createStructure: function() {
         var container = document.getElementById(this.options.containerId);
         if (!container) {
             console.error('PaginatedTable: Container not found:', this.options.containerId);
             return;
         }
-
         container.innerHTML = this._buildHTML();
         this._cacheElements(container);
     },
 
-    /**
-     * Cache DOM element references
-     */
+    // _cacheElements
+    // Stores references to frequently accessed DOM elements.
     _cacheElements: function(container) {
         this.elements = {
             container: container,
@@ -120,30 +99,41 @@ PaginatedTable.prototype = {
             selectAll: container.querySelector('.pt-select-all'),
             selectedCount: container.querySelector('.pt-selected-count'),
             bulkActions: container.querySelector('.pt-bulk-actions'),
+            reloadBtn: container.querySelector('.pt-reload-btn'),
             body: container.querySelector('.pt-body'),
-            pageInfo: container.querySelector('.pt-page-info'),
-            pageIndicator: container.querySelector('.pt-page-indicator'),
-            btnFirst: container.querySelector('.pt-btn-first'),
-            btnPrev: container.querySelector('.pt-btn-prev'),
-            btnNext: container.querySelector('.pt-btn-next'),
-            btnLast: container.querySelector('.pt-btn-last'),
-            pageSize: container.querySelector('.pt-page-size')
+            loadingMore: container.querySelector('.pt-loading-more'),
+            itemCount: container.querySelector('.pt-item-count')
         };
     },
 
-    /**
-     * Build the table HTML structure
-     */
+    // _buildHTML
+    // Generates the complete HTML structure for the table component.
     _buildHTML: function() {
         var opts = this.options;
         var html = '<div class="pt-wrapper">';
 
-        // Controls row (search + filter)
-        html += '<div class="pt-controls">';
+        // Header row
+        html += '<div class="pt-header-row">';
+
+        // Selection controls
+        if (opts.selection && opts.selection.enabled) {
+            html += '<label class="pt-select-all-container">';
+            html += '<input type="checkbox" class="pt-select-all" />';
+            html += '<span>Select All</span>';
+            html += '</label>';
+            html += '<span class="pt-selected-count">0 selected</span>';
+            html += '<div class="pt-bulk-actions"></div>';
+        }
+
+        html += '<span class="pt-header-spacer"></span>';
+
+        // Search input
         if (opts.search && opts.search.enabled !== false) {
             html += '<input is="emby-input" type="text" class="pt-search" placeholder="' +
                 ServerSyncShared.escapeHtml(opts.search.placeholder || 'Search...') + '" />';
         }
+
+        // Filter dropdown
         if (opts.filters && opts.filters.options && opts.filters.options.length > 0) {
             html += '<select is="emby-select" class="pt-filter">';
             html += '<option value="">All</option>';
@@ -155,120 +145,67 @@ PaginatedTable.prototype = {
             });
             html += '</select>';
         }
+
+        // Reload button
+        html += '<button is="emby-button" type="button" class="pt-reload-btn" title="Reload table data">';
+        html += '<span class="pt-reload-icon">&#x21bb;</span>';
+        html += '</button>';
+
         html += '</div>';
 
-        // Selection header (if enabled)
-        if (opts.selection && opts.selection.enabled) {
-            html += '<div class="pt-selection-header">';
-            html += '<label class="pt-select-all-container">';
-            html += '<input type="checkbox" class="pt-select-all" />';
-            html += '<span>Select All</span>';
-            html += '</label>';
-            html += '<span class="pt-selected-count">0 selected</span>';
-            html += '<div class="pt-bulk-actions"></div>';
-            html += '</div>';
-        }
-
-        // Table header
-        var visibleColumns = opts.columns.filter(function(col) { return !col.hidden; });
-        html += '<div class="pt-header">';
-        if (opts.selection && opts.selection.enabled) {
-            html += '<div class="pt-header-cell pt-cell-checkbox"></div>';
-        }
-        visibleColumns.forEach(function(col) {
-            var className = 'pt-header-cell';
-            if (col.type === 'status') className += ' pt-cell-status';
-            if (col.className) className += ' ' + col.className;
-            html += '<div class="' + className + '">' +
-                ServerSyncShared.escapeHtml(col.label || '') + '</div>';
-        });
-        html += '</div>';
-
-        // Table body (populated dynamically)
+        // Table body
         html += '<div class="pt-body"></div>';
 
-        // Pagination controls
-        html += '<div class="pt-pagination">';
-        html += '<div class="pt-page-info"></div>';
-        html += '<div class="pt-page-controls">';
-        html += '<button is="emby-button" class="pt-btn-first" title="First page">&#x23EE;</button>';
-        html += '<button is="emby-button" class="pt-btn-prev" title="Previous page">&#x276E;</button>';
-        html += '<span class="pt-page-indicator"></span>';
-        html += '<button is="emby-button" class="pt-btn-next" title="Next page">&#x276F;</button>';
-        html += '<button is="emby-button" class="pt-btn-last" title="Last page">&#x23ED;</button>';
-        html += '</div>';
-        if (opts.pagination.pageSizes && opts.pagination.pageSizes.length > 1) {
-            html += '<select is="emby-select" class="pt-page-size">';
-            var self = this;
-            opts.pagination.pageSizes.forEach(function(size) {
-                var selected = size === self.state.pageSize ? ' selected' : '';
-                html += '<option value="' + size + '"' + selected + '>' + size + ' per page</option>';
-            });
-            html += '</select>';
-        }
+        // Loading indicator
+        html += '<div class="pt-loading-more" style="display:none;">Loading more...</div>';
+
+        // Footer
+        html += '<div class="pt-footer">';
+        html += '<span class="pt-item-count"></span>';
         html += '</div>';
 
         html += '</div>';
         return html;
     },
 
-    /**
-     * Bind event listeners
-     */
+    // _bindEvents
+    // Attaches event listeners to interactive elements.
     _bindEvents: function() {
         var self = this;
 
-        // Search input
         if (this.elements.search) {
             this.elements.search.addEventListener('input', function(e) {
                 self._handleSearchInput(e.target.value);
             });
         }
 
-        // Filter select
         if (this.elements.filter) {
             this.elements.filter.addEventListener('change', function(e) {
                 self.setFilter(e.target.value);
             });
         }
 
-        // Select all checkbox
         if (this.elements.selectAll) {
             this.elements.selectAll.addEventListener('change', function(e) {
                 self._toggleSelectAll(e.target.checked);
             });
         }
 
-        // Pagination buttons
-        if (this.elements.btnFirst) {
-            this.elements.btnFirst.addEventListener('click', function() { self.goToPage(1); });
-        }
-        if (this.elements.btnPrev) {
-            this.elements.btnPrev.addEventListener('click', function() { self.goToPage(self.state.currentPage - 1); });
-        }
-        if (this.elements.btnNext) {
-            this.elements.btnNext.addEventListener('click', function() { self.goToPage(self.state.currentPage + 1); });
-        }
-        if (this.elements.btnLast) {
-            this.elements.btnLast.addEventListener('click', function() {
-                var totalPages = Math.ceil(self.state.totalCount / self.state.pageSize) || 1;
-                self.goToPage(totalPages);
+        if (this.elements.reloadBtn) {
+            this.elements.reloadBtn.addEventListener('click', function() {
+                self._handleReload();
             });
         }
 
-        // Page size select
-        if (this.elements.pageSize) {
-            this.elements.pageSize.addEventListener('change', function(e) {
-                self.state.pageSize = parseInt(e.target.value, 10);
-                self.state.currentPage = 1;
-                self.load();
+        if (this.elements.body) {
+            this.elements.body.addEventListener('scroll', function() {
+                self._handleScroll();
             });
         }
     },
 
-    /**
-     * Handle search input with debounce
-     */
+    // _handleSearchInput
+    // Debounces search input to avoid excessive API calls.
     _handleSearchInput: function(value) {
         var self = this;
         if (this.searchTimeout) {
@@ -280,9 +217,56 @@ PaginatedTable.prototype = {
         }, debounceMs);
     },
 
-    /**
-     * Load data from server
-     */
+    // _handleScroll
+    // Triggers loading more items when scrolled near the bottom.
+    _handleScroll: function() {
+        var body = this.elements.body;
+        if (!body || this.state.isLoading || !this.state.hasMore) return;
+
+        var scrollTop = body.scrollTop;
+        var scrollHeight = body.scrollHeight;
+        var clientHeight = body.clientHeight;
+
+        // Load more when within 100px of bottom
+        if (scrollTop + clientHeight >= scrollHeight - 100) {
+            this._loadMore();
+        }
+    },
+
+    // _handleReload
+    // Resets state and reloads all data from the first page.
+    _handleReload: function() {
+        var self = this;
+        var btn = this.elements.reloadBtn;
+
+        if (btn) {
+            btn.classList.add('spinning');
+            btn.disabled = true;
+        }
+
+        this.state.items = [];
+        this.state.currentPage = 1;
+        this.state.hasMore = true;
+        this.state.selectedIds.clear();
+
+        this.load().then(function() {
+            if (btn) {
+                btn.classList.remove('spinning');
+                btn.disabled = false;
+            }
+            if (self.options.actions && self.options.actions.onReload) {
+                self.options.actions.onReload();
+            }
+        }).catch(function() {
+            if (btn) {
+                btn.classList.remove('spinning');
+                btn.disabled = false;
+            }
+        });
+    },
+
+    // load
+    // Fetches items from the API for the current page.
     load: function() {
         var self = this;
         var state = this.state;
@@ -292,7 +276,7 @@ PaginatedTable.prototype = {
         state.isLoading = true;
         this._setLoading(true);
 
-        // Build query parameters
+        // Build query params
         var params = [];
         params.push('skip=' + ((state.currentPage - 1) * state.pageSize));
         params.push('take=' + state.pageSize);
@@ -301,9 +285,9 @@ PaginatedTable.prototype = {
             params.push('search=' + encodeURIComponent(state.searchQuery));
         }
 
-        // Handle filter value
         if (state.filterValue) {
             if (opts.filters && opts.filters.buildParams) {
+                // Custom filter param builder
                 var filterParams = opts.filters.buildParams(state.filterValue);
                 Object.keys(filterParams).forEach(function(key) {
                     if (filterParams[key] !== null && filterParams[key] !== undefined) {
@@ -318,8 +302,18 @@ PaginatedTable.prototype = {
         var endpoint = opts.endpoint + (params.length ? '?' + params.join('&') : '');
 
         return ServerSyncShared.apiRequest(endpoint, 'GET').then(function(result) {
-            state.items = result.Items || [];
+            var newItems = result.Items || [];
             state.totalCount = result.TotalCount || 0;
+
+            // First page replaces, subsequent pages append
+            if (state.currentPage === 1) {
+                state.items = newItems;
+            } else {
+                state.items = state.items.concat(newItems);
+            }
+
+            state.hasMore = state.items.length < state.totalCount;
+
             self._render();
             state.isLoading = false;
             self._setLoading(false);
@@ -332,12 +326,31 @@ PaginatedTable.prototype = {
         });
     },
 
-    /**
-     * Set loading state
-     */
+    // _loadMore
+    // Increments page and loads the next batch of items.
+    _loadMore: function() {
+        if (!this.state.hasMore || this.state.isLoading) return;
+
+        this.state.currentPage++;
+
+        if (this.elements.loadingMore) {
+            this.elements.loadingMore.style.display = 'block';
+        }
+
+        var self = this;
+        this.load().finally(function() {
+            if (self.elements.loadingMore) {
+                self.elements.loadingMore.style.display = 'none';
+            }
+        });
+    },
+
+    // _setLoading
+    // Toggles the loading state visual indicator.
     _setLoading: function(loading) {
         if (this.elements.container) {
-            if (loading) {
+            // Only show loading overlay on first page load
+            if (loading && this.state.currentPage === 1) {
                 this.elements.container.classList.add('pt-loading');
             } else {
                 this.elements.container.classList.remove('pt-loading');
@@ -345,18 +358,16 @@ PaginatedTable.prototype = {
         }
     },
 
-    /**
-     * Render the table
-     */
+    // _render
+    // Updates all rendered portions of the table.
     _render: function() {
         this._renderBody();
-        this._updatePagination();
+        this._updateItemCount();
         this._updateSelectionUI();
     },
 
-    /**
-     * Render the table body
-     */
+    // _renderBody
+    // Renders all table rows or empty state message.
     _renderBody: function() {
         var self = this;
         var state = this.state;
@@ -365,25 +376,21 @@ PaginatedTable.prototype = {
 
         if (!body) return;
 
-        // Empty state
         if (state.items.length === 0) {
             body.innerHTML = '<div class="pt-empty">' +
                 ServerSyncShared.escapeHtml(opts.emptyState.message) + '</div>';
             return;
         }
 
-        // Render rows
         body.innerHTML = state.items.map(function(item) {
             return self._renderRow(item);
         }).join('');
 
-        // Bind row events
         this._bindRowEvents();
     },
 
-    /**
-     * Render a single row
-     */
+    // _renderRow
+    // Generates HTML for a single table row.
     _renderRow: function(item) {
         var self = this;
         var opts = this.options;
@@ -395,7 +402,7 @@ PaginatedTable.prototype = {
 
         // Checkbox cell
         if (opts.selection && opts.selection.enabled) {
-            var checked = this.state.selectedIds.has(itemId) ? ' checked' : '';
+            var checked = this.state.selectedIds.has(String(itemId)) ? ' checked' : '';
             html += '<div class="pt-cell pt-cell-checkbox">';
             html += '<input type="checkbox" class="pt-row-checkbox" data-id="' +
                 ServerSyncShared.escapeHtml(String(itemId)) + '"' + checked + ' />';
@@ -428,9 +435,8 @@ PaginatedTable.prototype = {
         return html;
     },
 
-    /**
-     * Get display status text
-     */
+    // _getDisplayStatus
+    // Returns the display text for a status value.
     _getDisplayStatus: function(item, value) {
         if (this.options.getDisplayStatus) {
             return this.options.getDisplayStatus(item, value);
@@ -438,9 +444,8 @@ PaginatedTable.prototype = {
         return value || '';
     },
 
-    /**
-     * Get status CSS class
-     */
+    // _getStatusClass
+    // Returns the CSS class for a status value.
     _getStatusClass: function(item, value) {
         if (this.options.getStatusClass) {
             return this.options.getStatusClass(item, value);
@@ -448,31 +453,35 @@ PaginatedTable.prototype = {
         return value || '';
     },
 
-    /**
-     * Bind events to rendered rows
-     */
+    // _bindRowEvents
+    // Attaches click and change handlers to row elements.
     _bindRowEvents: function() {
         var self = this;
         var body = this.elements.body;
         if (!body) return;
 
-        // Row click events
         body.querySelectorAll('.pt-row').forEach(function(row) {
-            row.addEventListener('click', function(e) {
-                // Don't trigger row click if clicking checkbox
-                if (e.target.type === 'checkbox') return;
+            var handleRowAction = function(e) {
+                // Skip if clicking checkbox
+                if (e.target.type === 'checkbox' || e.target.classList.contains('pt-row-checkbox')) {
+                    return;
+                }
 
                 var id = row.dataset.id;
                 var item = self._getItemById(id);
                 if (item && self.options.actions && self.options.actions.onRowClick) {
+                    e.preventDefault();
+                    e.stopPropagation();
                     self.options.actions.onRowClick(item);
                 }
-            });
+            };
+
+            row.addEventListener('click', handleRowAction);
         });
 
-        // Checkbox change events
         body.querySelectorAll('.pt-row-checkbox').forEach(function(checkbox) {
-            checkbox.addEventListener('change', function() {
+            checkbox.addEventListener('change', function(e) {
+                e.stopPropagation();
                 var id = checkbox.dataset.id;
                 if (checkbox.checked) {
                     self.state.selectedIds.add(id);
@@ -482,12 +491,16 @@ PaginatedTable.prototype = {
                 self._updateSelectionUI();
                 self._notifySelectionChange();
             });
+
+            // Prevent row click when clicking checkbox
+            checkbox.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
         });
     },
 
-    /**
-     * Get item by ID
-     */
+    // _getItemById
+    // Finds an item in the current items array by its ID.
     _getItemById: function(id) {
         var idKey = this.options.selection && this.options.selection.idKey || 'id';
         return this.state.items.find(function(item) {
@@ -495,51 +508,32 @@ PaginatedTable.prototype = {
         });
     },
 
-    /**
-     * Update pagination UI
-     */
-    _updatePagination: function() {
-        var state = this.state;
-        var totalPages = Math.ceil(state.totalCount / state.pageSize) || 1;
-        var start = state.totalCount > 0 ? ((state.currentPage - 1) * state.pageSize) + 1 : 0;
-        var end = Math.min(state.currentPage * state.pageSize, state.totalCount);
+    // _updateItemCount
+    // Updates the footer text showing loaded vs total item counts.
+    _updateItemCount: function() {
+        if (this.elements.itemCount) {
+            var loaded = this.state.items.length;
+            var total = this.state.totalCount;
 
-        // Page info
-        if (this.elements.pageInfo) {
-            if (state.totalCount === 0) {
-                this.elements.pageInfo.textContent = 'No items';
+            if (total === 0) {
+                this.elements.itemCount.textContent = '';
+            } else if (loaded >= total) {
+                this.elements.itemCount.textContent = total + ' items';
             } else {
-                this.elements.pageInfo.textContent = 'Showing ' + start + '-' + end + ' of ' + state.totalCount;
+                this.elements.itemCount.textContent = 'Showing ' + loaded + ' of ' + total + ' items';
             }
         }
-
-        // Page indicator
-        if (this.elements.pageIndicator) {
-            this.elements.pageIndicator.textContent = 'Page ' + state.currentPage + ' of ' + totalPages;
-        }
-
-        // Button states
-        var isFirstPage = state.currentPage <= 1;
-        var isLastPage = state.currentPage >= totalPages;
-
-        if (this.elements.btnFirst) this.elements.btnFirst.disabled = isFirstPage;
-        if (this.elements.btnPrev) this.elements.btnPrev.disabled = isFirstPage;
-        if (this.elements.btnNext) this.elements.btnNext.disabled = isLastPage;
-        if (this.elements.btnLast) this.elements.btnLast.disabled = isLastPage;
     },
 
-    /**
-     * Update selection UI
-     */
+    // _updateSelectionUI
+    // Syncs the selection count display and select-all checkbox state.
     _updateSelectionUI: function() {
         var count = this.state.selectedIds.size;
 
-        // Update selected count
         if (this.elements.selectedCount) {
             this.elements.selectedCount.textContent = count + ' selected';
         }
 
-        // Update select all checkbox
         if (this.elements.selectAll) {
             var allSelected = count > 0 && count === this.state.items.length;
             var someSelected = count > 0 && count < this.state.items.length;
@@ -548,9 +542,8 @@ PaginatedTable.prototype = {
         }
     },
 
-    /**
-     * Toggle select all
-     */
+    // _toggleSelectAll
+    // Selects or deselects all currently loaded items.
     _toggleSelectAll: function(checked) {
         var self = this;
         var idKey = this.options.selection && this.options.selection.idKey || 'id';
@@ -563,7 +556,6 @@ PaginatedTable.prototype = {
             });
         }
 
-        // Update checkboxes in DOM
         if (this.elements.body) {
             this.elements.body.querySelectorAll('.pt-row-checkbox').forEach(function(cb) {
                 cb.checked = checked;
@@ -574,27 +566,26 @@ PaginatedTable.prototype = {
         this._notifySelectionChange();
     },
 
-    /**
-     * Notify selection change callback
-     */
+    // _notifySelectionChange
+    // Invokes the selection change callback if configured.
     _notifySelectionChange: function() {
         if (this.options.selection && this.options.selection.onSelectionChange) {
             this.options.selection.onSelectionChange(this.getSelectedIds());
         }
     },
 
-    // Public API methods
+    // ========================================
+    // Public API
+    // ========================================
 
-    /**
-     * Get selected item IDs
-     */
+    // getSelectedIds
+    // Returns an array of selected item IDs.
     getSelectedIds: function() {
         return Array.from(this.state.selectedIds);
     },
 
-    /**
-     * Get selected items
-     */
+    // getSelectedItems
+    // Returns an array of selected item objects.
     getSelectedItems: function() {
         var self = this;
         var idKey = this.options.selection && this.options.selection.idKey || 'id';
@@ -603,15 +594,13 @@ PaginatedTable.prototype = {
         });
     },
 
-    /**
-     * Clear selection
-     */
+    // clearSelection
+    // Clears all selected items and updates UI.
     clearSelection: function() {
         this.state.selectedIds.clear();
         this._updateSelectionUI();
         this._notifySelectionChange();
 
-        // Uncheck all checkboxes
         if (this.elements.body) {
             this.elements.body.querySelectorAll('.pt-row-checkbox').forEach(function(cb) {
                 cb.checked = false;
@@ -623,66 +612,57 @@ PaginatedTable.prototype = {
         }
     },
 
-    /**
-     * Refresh current page
-     */
+    // refresh
+    // Resets pagination and reloads data from the beginning.
     refresh: function() {
+        this.state.items = [];
+        this.state.currentPage = 1;
+        this.state.hasMore = true;
         return this.load();
     },
 
-    /**
-     * Go to specific page
-     */
-    goToPage: function(page) {
-        var totalPages = Math.ceil(this.state.totalCount / this.state.pageSize) || 1;
-        this.state.currentPage = Math.max(1, Math.min(page, totalPages));
-        return this.load();
-    },
-
-    /**
-     * Set filter value and reload
-     */
+    // setFilter
+    // Applies a filter value and reloads data.
     setFilter: function(value) {
         this.state.filterValue = value;
+        this.state.items = [];
         this.state.currentPage = 1;
+        this.state.hasMore = true;
         this.clearSelection();
         return this.load();
     },
 
-    /**
-     * Set search query and reload
-     */
+    // setSearch
+    // Applies a search query and reloads data.
     setSearch: function(query) {
         this.state.searchQuery = query;
+        this.state.items = [];
         this.state.currentPage = 1;
+        this.state.hasMore = true;
         this.clearSelection();
         return this.load();
     },
 
-    /**
-     * Get current items (for backward compatibility)
-     */
+    // getItems
+    // Returns all currently loaded items.
     getItems: function() {
         return this.state.items;
     },
 
-    /**
-     * Get total count
-     */
+    // getTotalCount
+    // Returns the total number of items available on the server.
     getTotalCount: function() {
         return this.state.totalCount;
     },
 
-    /**
-     * Get bulk actions container for external button injection
-     */
+    // getBulkActionsContainer
+    // Returns the DOM element for injecting bulk action buttons.
     getBulkActionsContainer: function() {
         return this.elements.bulkActions;
     },
 
-    /**
-     * Show/hide a filter option by ID
-     */
+    // setFilterOptionVisible
+    // Shows or hides a specific filter dropdown option.
     setFilterOptionVisible: function(optionId, visible) {
         if (this.elements.filter) {
             var option = this.elements.filter.querySelector('#' + optionId);
@@ -692,9 +672,8 @@ PaginatedTable.prototype = {
         }
     },
 
-    /**
-     * Update the filter select value programmatically
-     */
+    // setFilterValue
+    // Sets the filter value without triggering a reload.
     setFilterValue: function(value) {
         this.state.filterValue = value;
         if (this.elements.filter) {

@@ -318,9 +318,6 @@
                                 <button is="emby-button" type="button" id="btnResetDatabase" class="raised button-destructive syncActionButton">
                                     <span>Reset Database</span>
                                 </button>
-                                <button is="emby-button" type="button" id="btnReloadTable" class="reloadTableButton" title="Reload table data">
-                                    <span class="reloadIcon">&#x21bb;</span>
-                                </button>
                             </div>
 
                             <div class="syncSectionSeparator"></div>
@@ -736,32 +733,6 @@
         .statusFilter {
             width: auto !important;
         }
-        .reloadTableButton {
-            background: transparent !important;
-            border: none !important;
-            padding: 8px !important;
-            min-width: 40px !important;
-            height: 40px !important;
-            cursor: pointer;
-            opacity: 0.7;
-            transition: opacity 0.2s;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-        }
-        .reloadTableButton:hover {
-            opacity: 1;
-        }
-        .reloadTableButton.spinning .reloadIcon {
-            animation: spin 0.8s linear infinite;
-        }
-        .reloadIcon {
-            font-size: 24px !important;
-        }
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
         .modalButtonRow {
             display: flex;
             gap: 12px;
@@ -789,25 +760,27 @@
     <style>
         .pt-wrapper { display: flex; flex-direction: column; }
         .pt-wrapper.pt-loading { opacity: 0.6; pointer-events: none; }
-        .pt-controls { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
-        .pt-search { flex: 1; min-width: 150px; }
-        .pt-filter { width: auto !important; min-width: 140px; }
-        .pt-selection-header { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; padding: 8px 12px; background: rgba(0, 0, 0, 0.2); border-radius: 4px; }
+        .pt-header-row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; padding: 8px 12px; background: rgba(0, 0, 0, 0.2); border-radius: 4px; flex-wrap: wrap; }
         .pt-select-all-container { display: flex; align-items: center; gap: 4px; cursor: pointer; }
-        .pt-selected-count { margin-left: 8px; opacity: 0.7; min-width: 80px; }
-        .pt-bulk-actions { display: flex; gap: 8px; margin-left: auto; }
-        .pt-header { display: flex; padding: 8px 12px; background: rgba(0, 0, 0, 0.3); border-radius: 4px 4px 0 0; font-weight: 500; font-size: 0.9em; opacity: 0.8; }
-        .pt-header-cell { flex: 1; padding: 4px 8px; }
-        .pt-header-cell.pt-cell-checkbox { flex: 0 0 40px; padding: 4px; }
-        .pt-header-cell.pt-cell-status { flex: 0 0 130px; text-align: right; }
-        .pt-body { max-height: 400px; overflow-y: auto; border: 1px solid rgba(255, 255, 255, 0.1); border-top: none; border-radius: 0 0 4px 4px; }
-        .pt-row { display: flex; align-items: center; padding: 8px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer; transition: background-color 0.15s; }
+        .pt-selected-count { opacity: 0.7; min-width: 80px; }
+        .pt-bulk-actions { display: flex; gap: 8px; }
+        .pt-header-spacer { flex: 1; }
+        .pt-search { width: 150px; min-width: 100px; }
+        .pt-filter { width: auto !important; min-width: 120px; }
+        .pt-reload-btn { background: rgba(255,255,255,0.1) !important; border: 1px solid rgba(255,255,255,0.2) !important; border-radius: 4px !important; padding: 4px 10px !important; min-width: 36px !important; height: 36px !important; cursor: pointer; opacity: 0.8; transition: opacity 0.2s, background 0.2s; display: flex !important; align-items: center !important; justify-content: center !important; }
+        .pt-reload-btn:hover { opacity: 1; background: rgba(255,255,255,0.2) !important; }
+        .pt-reload-btn.spinning .pt-reload-icon { animation: pt-spin 0.8s linear infinite; }
+        .pt-reload-icon { font-size: 1.3em; display: flex; align-items: center; justify-content: center; line-height: 1; }
+        @keyframes pt-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .pt-body { max-height: 400px; overflow-y: auto; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 4px; }
+        .pt-row { display: flex; align-items: center; padding: 10px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer; transition: background-color 0.15s; -webkit-tap-highlight-color: transparent; }
         .pt-row:hover { background: rgba(255, 255, 255, 0.05); }
+        .pt-row:active { background: rgba(255, 255, 255, 0.1); }
         .pt-row:last-child { border-bottom: none; }
         .pt-cell { flex: 1; padding: 4px 8px; min-width: 0; }
         .pt-cell.pt-cell-checkbox { flex: 0 0 40px; padding: 4px; }
         .pt-cell.pt-cell-status { flex: 0 0 130px; text-align: right; }
-        .pt-row-checkbox { cursor: pointer; }
+        .pt-row-checkbox { cursor: pointer; width: 18px; height: 18px; }
         .pt-status-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.85em; white-space: nowrap; }
         .pt-status-badge.Synced { background: rgba(92, 184, 92, 0.2); color: #5cb85c; }
         .pt-status-badge.Queued { background: rgba(240, 173, 78, 0.2); color: #f0ad4e; }
@@ -818,13 +791,8 @@
         .pt-status-badge.Pending-Deletion { background: rgba(217, 83, 79, 0.2); color: #d9534f; }
         .pt-status-badge.Deleting { background: rgba(231, 76, 60, 0.2); color: #e74c3c; }
         .pt-empty { padding: 32px 16px; text-align: center; opacity: 0.7; }
-        .pt-pagination { display: flex; align-items: center; justify-content: space-between; padding: 12px; background: rgba(0, 0, 0, 0.2); border-radius: 4px; margin-top: 8px; flex-wrap: wrap; gap: 12px; }
-        .pt-page-info { font-size: 0.9em; opacity: 0.7; }
-        .pt-page-controls { display: flex; align-items: center; gap: 4px; }
-        .pt-page-controls button { min-width: 32px !important; padding: 4px 8px !important; font-size: 1em; }
-        .pt-page-controls button:disabled { opacity: 0.3; cursor: not-allowed; }
-        .pt-page-indicator { padding: 0 12px; font-size: 0.9em; white-space: nowrap; }
-        .pt-page-size { width: auto !important; min-width: 110px; }
+        .pt-loading-more { padding: 12px; text-align: center; opacity: 0.7; font-size: 0.9em; }
+        .pt-footer { padding: 8px 12px; font-size: 0.9em; opacity: 0.7; }
         .pt-bulk-actions button { padding: 4px 12px !important; min-width: auto !important; }
         .pt-bulk-actions button:disabled { opacity: 0.4; cursor: not-allowed; }
         .pt-cell .syncItemInfo { flex: 1; min-width: 0; }
@@ -832,6 +800,7 @@
         .pt-cell .syncItemPath { font-size: 0.85em; opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .pt-cell .syncItemPath.notExists { color: #9b59b6; font-style: italic; }
         .pt-cell .syncItemError { font-size: 0.75em; color: #d9534f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+        @media (max-width: 600px) { .pt-header-row { flex-wrap: wrap; } .pt-header-spacer { display: none; } .pt-search { width: 100%; order: 10; margin-top: 8px; } .pt-filter { flex: 1; } .pt-cell.pt-cell-status { flex: 0 0 100px; } }
     </style>
 
     <!-- Scripts: shared.js -->
@@ -1094,9 +1063,9 @@
     <!-- Scripts: paginatedTable.js -->
     <script type="text/javascript">
         var PaginatedTable = function(options) {
-            this.options = { containerId: '', endpoint: '', columns: [], selection: { enabled: false, idKey: 'id', onSelectionChange: null }, pagination: { pageSize: 50, pageSizes: [25, 50, 100] }, filters: { options: [], buildParams: null }, actions: { onRowClick: null }, emptyState: { message: 'No items found' }, search: { enabled: true, placeholder: 'Search...', debounceMs: 300 }, getDisplayStatus: null, getStatusClass: null };
+            this.options = { containerId: '', endpoint: '', columns: [], selection: { enabled: false, idKey: 'id', onSelectionChange: null }, pagination: { pageSize: 50 }, filters: { options: [], buildParams: null }, actions: { onRowClick: null, onReload: null }, emptyState: { message: 'No items found' }, search: { enabled: true, placeholder: 'Search...', debounceMs: 300 }, getDisplayStatus: null, getStatusClass: null };
             this._mergeOptions(options);
-            this.state = { items: [], totalCount: 0, currentPage: 1, pageSize: this.options.pagination.pageSize, selectedIds: new Set(), filterValue: '', searchQuery: '', isLoading: false };
+            this.state = { items: [], totalCount: 0, currentPage: 1, pageSize: this.options.pagination.pageSize, selectedIds: new Set(), filterValue: '', searchQuery: '', isLoading: false, hasMore: true };
             this.elements = {};
             this.searchTimeout = null;
             this._init();
@@ -1105,22 +1074,19 @@
             _mergeOptions: function(options) { var self = this; Object.keys(options).forEach(function(key) { if (typeof options[key] === 'object' && options[key] !== null && !Array.isArray(options[key])) { self.options[key] = Object.assign({}, self.options[key], options[key]); } else { self.options[key] = options[key]; } }); },
             _init: function() { this._createStructure(); this._bindEvents(); },
             _createStructure: function() { var container = document.getElementById(this.options.containerId); if (!container) { console.error('PaginatedTable: Container not found:', this.options.containerId); return; } container.innerHTML = this._buildHTML(); this._cacheElements(container); },
-            _cacheElements: function(container) { this.elements = { container: container, search: container.querySelector('.pt-search'), filter: container.querySelector('.pt-filter'), selectAll: container.querySelector('.pt-select-all'), selectedCount: container.querySelector('.pt-selected-count'), bulkActions: container.querySelector('.pt-bulk-actions'), body: container.querySelector('.pt-body'), pageInfo: container.querySelector('.pt-page-info'), pageIndicator: container.querySelector('.pt-page-indicator'), btnFirst: container.querySelector('.pt-btn-first'), btnPrev: container.querySelector('.pt-btn-prev'), btnNext: container.querySelector('.pt-btn-next'), btnLast: container.querySelector('.pt-btn-last'), pageSize: container.querySelector('.pt-page-size') }; },
+            _cacheElements: function(container) { this.elements = { container: container, search: container.querySelector('.pt-search'), filter: container.querySelector('.pt-filter'), selectAll: container.querySelector('.pt-select-all'), selectedCount: container.querySelector('.pt-selected-count'), bulkActions: container.querySelector('.pt-bulk-actions'), reloadBtn: container.querySelector('.pt-reload-btn'), body: container.querySelector('.pt-body'), loadingMore: container.querySelector('.pt-loading-more'), itemCount: container.querySelector('.pt-item-count') }; },
             _buildHTML: function() {
                 var opts = this.options, html = '<div class="pt-wrapper">';
-                html += '<div class="pt-controls">';
+                html += '<div class="pt-header-row">';
+                if (opts.selection && opts.selection.enabled) { html += '<label class="pt-select-all-container"><input type="checkbox" class="pt-select-all" /><span>Select All</span></label><span class="pt-selected-count">0 selected</span><div class="pt-bulk-actions"></div>'; }
+                html += '<span class="pt-header-spacer"></span>';
                 if (opts.search && opts.search.enabled !== false) { html += '<input is="emby-input" type="text" class="pt-search" placeholder="' + ServerSyncShared.escapeHtml(opts.search.placeholder || 'Search...') + '" />'; }
                 if (opts.filters && opts.filters.options && opts.filters.options.length > 0) { html += '<select is="emby-select" class="pt-filter"><option value="">All</option>'; opts.filters.options.forEach(function(opt) { var style = opt.hidden ? ' style="display:none"' : ''; var id = opt.id ? ' id="' + opt.id + '"' : ''; html += '<option value="' + ServerSyncShared.escapeHtml(opt.value) + '"' + style + id + '>' + ServerSyncShared.escapeHtml(opt.label) + '</option>'; }); html += '</select>'; }
-                html += '</div>';
-                if (opts.selection && opts.selection.enabled) { html += '<div class="pt-selection-header"><label class="pt-select-all-container"><input type="checkbox" class="pt-select-all" /><span>Select All</span></label><span class="pt-selected-count">0 selected</span><div class="pt-bulk-actions"></div></div>'; }
-                var visibleColumns = opts.columns.filter(function(col) { return !col.hidden; });
-                html += '<div class="pt-header">';
-                if (opts.selection && opts.selection.enabled) { html += '<div class="pt-header-cell pt-cell-checkbox"></div>'; }
-                visibleColumns.forEach(function(col) { var className = 'pt-header-cell'; if (col.type === 'status') className += ' pt-cell-status'; html += '<div class="' + className + '">' + ServerSyncShared.escapeHtml(col.label || '') + '</div>'; });
+                html += '<button is="emby-button" type="button" class="pt-reload-btn" title="Reload table data"><span class="pt-reload-icon">&#x21bb;</span></button>';
                 html += '</div><div class="pt-body"></div>';
-                html += '<div class="pt-pagination"><div class="pt-page-info"></div><div class="pt-page-controls"><button is="emby-button" class="pt-btn-first" title="First page">&#x23EE;</button><button is="emby-button" class="pt-btn-prev" title="Previous page">&#x276E;</button><span class="pt-page-indicator"></span><button is="emby-button" class="pt-btn-next" title="Next page">&#x276F;</button><button is="emby-button" class="pt-btn-last" title="Last page">&#x23ED;</button></div>';
-                if (opts.pagination.pageSizes && opts.pagination.pageSizes.length > 1) { html += '<select is="emby-select" class="pt-page-size">'; var self = this; opts.pagination.pageSizes.forEach(function(size) { var selected = size === self.state.pageSize ? ' selected' : ''; html += '<option value="' + size + '"' + selected + '>' + size + ' per page</option>'; }); html += '</select>'; }
-                html += '</div></div>';
+                html += '<div class="pt-loading-more" style="display:none;">Loading more...</div>';
+                html += '<div class="pt-footer"><span class="pt-item-count"></span></div>';
+                html += '</div>';
                 return html;
             },
             _bindEvents: function() {
@@ -1128,13 +1094,22 @@
                 if (this.elements.search) { this.elements.search.addEventListener('input', function(e) { self._handleSearchInput(e.target.value); }); }
                 if (this.elements.filter) { this.elements.filter.addEventListener('change', function(e) { self.setFilter(e.target.value); }); }
                 if (this.elements.selectAll) { this.elements.selectAll.addEventListener('change', function(e) { self._toggleSelectAll(e.target.checked); }); }
-                if (this.elements.btnFirst) { this.elements.btnFirst.addEventListener('click', function() { self.goToPage(1); }); }
-                if (this.elements.btnPrev) { this.elements.btnPrev.addEventListener('click', function() { self.goToPage(self.state.currentPage - 1); }); }
-                if (this.elements.btnNext) { this.elements.btnNext.addEventListener('click', function() { self.goToPage(self.state.currentPage + 1); }); }
-                if (this.elements.btnLast) { this.elements.btnLast.addEventListener('click', function() { var totalPages = Math.ceil(self.state.totalCount / self.state.pageSize) || 1; self.goToPage(totalPages); }); }
-                if (this.elements.pageSize) { this.elements.pageSize.addEventListener('change', function(e) { self.state.pageSize = parseInt(e.target.value, 10); self.state.currentPage = 1; self.load(); }); }
+                if (this.elements.reloadBtn) { this.elements.reloadBtn.addEventListener('click', function() { self._handleReload(); }); }
+                if (this.elements.body) { this.elements.body.addEventListener('scroll', function() { self._handleScroll(); }); }
             },
             _handleSearchInput: function(value) { var self = this; if (this.searchTimeout) { clearTimeout(this.searchTimeout); } var debounceMs = this.options.search.debounceMs || 300; this.searchTimeout = setTimeout(function() { self.setSearch(value); }, debounceMs); },
+            _handleScroll: function() {
+                var body = this.elements.body;
+                if (!body || this.state.isLoading || !this.state.hasMore) return;
+                var scrollTop = body.scrollTop, scrollHeight = body.scrollHeight, clientHeight = body.clientHeight;
+                if (scrollTop + clientHeight >= scrollHeight - 100) { this._loadMore(); }
+            },
+            _handleReload: function() {
+                var self = this, btn = this.elements.reloadBtn;
+                if (btn) { btn.classList.add('spinning'); btn.disabled = true; }
+                this.state.items = []; this.state.currentPage = 1; this.state.hasMore = true; this.state.selectedIds.clear();
+                this.load().then(function() { if (btn) { btn.classList.remove('spinning'); btn.disabled = false; } if (self.options.actions && self.options.actions.onReload) { self.options.actions.onReload(); } }).catch(function() { if (btn) { btn.classList.remove('spinning'); btn.disabled = false; } });
+            },
             load: function() {
                 var self = this, state = this.state, opts = this.options;
                 if (state.isLoading) return Promise.resolve();
@@ -1143,10 +1118,23 @@
                 if (state.searchQuery) { params.push('search=' + encodeURIComponent(state.searchQuery)); }
                 if (state.filterValue) { if (opts.filters && opts.filters.buildParams) { var filterParams = opts.filters.buildParams(state.filterValue); Object.keys(filterParams).forEach(function(key) { if (filterParams[key] !== null && filterParams[key] !== undefined) { params.push(key + '=' + encodeURIComponent(filterParams[key])); } }); } else { params.push('filter=' + encodeURIComponent(state.filterValue)); } }
                 var endpoint = opts.endpoint + (params.length ? '?' + params.join('&') : '');
-                return ServerSyncShared.apiRequest(endpoint, 'GET').then(function(result) { state.items = result.Items || []; state.totalCount = result.TotalCount || 0; self._render(); state.isLoading = false; self._setLoading(false); return result; }).catch(function(err) { console.error('PaginatedTable load error:', err); state.isLoading = false; self._setLoading(false); throw err; });
+                return ServerSyncShared.apiRequest(endpoint, 'GET').then(function(result) {
+                    var newItems = result.Items || [];
+                    state.totalCount = result.TotalCount || 0;
+                    if (state.currentPage === 1) { state.items = newItems; } else { state.items = state.items.concat(newItems); }
+                    state.hasMore = state.items.length < state.totalCount;
+                    self._render(); state.isLoading = false; self._setLoading(false); return result;
+                }).catch(function(err) { console.error('PaginatedTable load error:', err); state.isLoading = false; self._setLoading(false); throw err; });
             },
-            _setLoading: function(loading) { if (this.elements.container) { if (loading) { this.elements.container.classList.add('pt-loading'); } else { this.elements.container.classList.remove('pt-loading'); } } },
-            _render: function() { this._renderBody(); this._updatePagination(); this._updateSelectionUI(); },
+            _loadMore: function() {
+                if (!this.state.hasMore || this.state.isLoading) return;
+                this.state.currentPage++;
+                if (this.elements.loadingMore) { this.elements.loadingMore.style.display = 'block'; }
+                var self = this;
+                this.load().finally(function() { if (self.elements.loadingMore) { self.elements.loadingMore.style.display = 'none'; } });
+            },
+            _setLoading: function(loading) { if (this.elements.container) { if (loading && this.state.currentPage === 1) { this.elements.container.classList.add('pt-loading'); } else { this.elements.container.classList.remove('pt-loading'); } } },
+            _render: function() { this._renderBody(); this._updateItemCount(); this._updateSelectionUI(); },
             _renderBody: function() {
                 var self = this, state = this.state, opts = this.options, body = this.elements.body;
                 if (!body) return;
@@ -1158,7 +1146,7 @@
                 var self = this, opts = this.options, idKey = opts.selection && opts.selection.idKey || 'id', itemId = item[idKey];
                 var visibleColumns = opts.columns.filter(function(col) { return !col.hidden; });
                 var html = '<div class="pt-row" data-id="' + ServerSyncShared.escapeHtml(String(itemId)) + '">';
-                if (opts.selection && opts.selection.enabled) { var checked = this.state.selectedIds.has(itemId) ? ' checked' : ''; html += '<div class="pt-cell pt-cell-checkbox"><input type="checkbox" class="pt-row-checkbox" data-id="' + ServerSyncShared.escapeHtml(String(itemId)) + '"' + checked + ' /></div>'; }
+                if (opts.selection && opts.selection.enabled) { var checked = this.state.selectedIds.has(String(itemId)) ? ' checked' : ''; html += '<div class="pt-cell pt-cell-checkbox"><input type="checkbox" class="pt-row-checkbox" data-id="' + ServerSyncShared.escapeHtml(String(itemId)) + '"' + checked + ' /></div>'; }
                 visibleColumns.forEach(function(col) {
                     var value = item[col.key], cellClass = 'pt-cell', content = '';
                     if (col.type === 'status') { cellClass += ' pt-cell-status'; var displayStatus = self._getDisplayStatus(item, value); var statusClass = self._getStatusClass(item, value); content = '<span class="pt-status-badge ' + statusClass + '">' + ServerSyncShared.escapeHtml(displayStatus) + '</span>'; }
@@ -1174,21 +1162,23 @@
             _bindRowEvents: function() {
                 var self = this, body = this.elements.body;
                 if (!body) return;
-                body.querySelectorAll('.pt-row').forEach(function(row) { row.addEventListener('click', function(e) { if (e.target.type === 'checkbox') return; var id = row.dataset.id; var item = self._getItemById(id); if (item && self.options.actions && self.options.actions.onRowClick) { self.options.actions.onRowClick(item); } }); });
-                body.querySelectorAll('.pt-row-checkbox').forEach(function(checkbox) { checkbox.addEventListener('change', function() { var id = checkbox.dataset.id; if (checkbox.checked) { self.state.selectedIds.add(id); } else { self.state.selectedIds.delete(id); } self._updateSelectionUI(); self._notifySelectionChange(); }); });
+                body.querySelectorAll('.pt-row').forEach(function(row) {
+                    var handleRowAction = function(e) { if (e.target.type === 'checkbox' || e.target.classList.contains('pt-row-checkbox')) return; var id = row.dataset.id; var item = self._getItemById(id); if (item && self.options.actions && self.options.actions.onRowClick) { e.preventDefault(); e.stopPropagation(); self.options.actions.onRowClick(item); } };
+                    row.addEventListener('click', handleRowAction);
+                });
+                body.querySelectorAll('.pt-row-checkbox').forEach(function(checkbox) {
+                    checkbox.addEventListener('change', function(e) { e.stopPropagation(); var id = checkbox.dataset.id; if (checkbox.checked) { self.state.selectedIds.add(id); } else { self.state.selectedIds.delete(id); } self._updateSelectionUI(); self._notifySelectionChange(); });
+                    checkbox.addEventListener('click', function(e) { e.stopPropagation(); });
+                });
             },
             _getItemById: function(id) { var idKey = this.options.selection && this.options.selection.idKey || 'id'; return this.state.items.find(function(item) { return String(item[idKey]) === String(id); }); },
-            _updatePagination: function() {
-                var state = this.state, totalPages = Math.ceil(state.totalCount / state.pageSize) || 1;
-                var start = state.totalCount > 0 ? ((state.currentPage - 1) * state.pageSize) + 1 : 0;
-                var end = Math.min(state.currentPage * state.pageSize, state.totalCount);
-                if (this.elements.pageInfo) { this.elements.pageInfo.textContent = state.totalCount === 0 ? 'No items' : 'Showing ' + start + '-' + end + ' of ' + state.totalCount; }
-                if (this.elements.pageIndicator) { this.elements.pageIndicator.textContent = 'Page ' + state.currentPage + ' of ' + totalPages; }
-                var isFirstPage = state.currentPage <= 1, isLastPage = state.currentPage >= totalPages;
-                if (this.elements.btnFirst) this.elements.btnFirst.disabled = isFirstPage;
-                if (this.elements.btnPrev) this.elements.btnPrev.disabled = isFirstPage;
-                if (this.elements.btnNext) this.elements.btnNext.disabled = isLastPage;
-                if (this.elements.btnLast) this.elements.btnLast.disabled = isLastPage;
+            _updateItemCount: function() {
+                if (this.elements.itemCount) {
+                    var loaded = this.state.items.length, total = this.state.totalCount;
+                    if (total === 0) { this.elements.itemCount.textContent = ''; }
+                    else if (loaded >= total) { this.elements.itemCount.textContent = total + ' items'; }
+                    else { this.elements.itemCount.textContent = 'Showing ' + loaded + ' of ' + total + ' items'; }
+                }
             },
             _updateSelectionUI: function() {
                 var count = this.state.selectedIds.size;
@@ -1206,10 +1196,9 @@
             getSelectedIds: function() { return Array.from(this.state.selectedIds); },
             getSelectedItems: function() { var self = this, idKey = this.options.selection && this.options.selection.idKey || 'id'; return this.state.items.filter(function(item) { return self.state.selectedIds.has(String(item[idKey])); }); },
             clearSelection: function() { this.state.selectedIds.clear(); this._updateSelectionUI(); this._notifySelectionChange(); if (this.elements.body) { this.elements.body.querySelectorAll('.pt-row-checkbox').forEach(function(cb) { cb.checked = false; }); } if (this.elements.selectAll) { this.elements.selectAll.checked = false; this.elements.selectAll.indeterminate = false; } },
-            refresh: function() { return this.load(); },
-            goToPage: function(page) { var totalPages = Math.ceil(this.state.totalCount / this.state.pageSize) || 1; this.state.currentPage = Math.max(1, Math.min(page, totalPages)); return this.load(); },
-            setFilter: function(value) { this.state.filterValue = value; this.state.currentPage = 1; this.clearSelection(); return this.load(); },
-            setSearch: function(query) { this.state.searchQuery = query; this.state.currentPage = 1; this.clearSelection(); return this.load(); },
+            refresh: function() { this.state.items = []; this.state.currentPage = 1; this.state.hasMore = true; return this.load(); },
+            setFilter: function(value) { this.state.filterValue = value; this.state.items = []; this.state.currentPage = 1; this.state.hasMore = true; this.clearSelection(); return this.load(); },
+            setSearch: function(query) { this.state.searchQuery = query; this.state.items = []; this.state.currentPage = 1; this.state.hasMore = true; this.clearSelection(); return this.load(); },
             getItems: function() { return this.state.items; },
             getTotalCount: function() { return this.state.totalCount; },
             getBulkActionsContainer: function() { return this.elements.bulkActions; },
@@ -1234,9 +1223,9 @@
                         { key: 'Status', label: 'Status', type: 'status' }
                     ],
                     selection: { enabled: true, idKey: 'SourceItemId', onSelectionChange: function(selectedIds) { self.updateBulkActionsVisibility(selectedIds.length); } },
-                    pagination: { pageSize: 50, pageSizes: [25, 50, 100, 200] },
+                    pagination: { pageSize: 50 },
                     filters: { options: [ { value: 'Synced', label: 'Synced' }, { value: 'Queued', label: 'Queued' }, { value: 'Errored', label: 'Errored' }, { value: 'Ignored', label: 'Ignored' }, { value: 'Pending:Download', label: 'Pending Download', id: 'optPendingDownload', hidden: true }, { value: 'Pending:Replacement', label: 'Pending Replace', id: 'optPendingReplacement', hidden: true }, { value: 'Pending:Deletion', label: 'Pending Delete', id: 'optPendingDeletion', hidden: true }, { value: 'Deleting', label: 'Deleting', id: 'optDeleting', hidden: true } ], buildParams: function(filterValue) { if (filterValue.indexOf(':') > -1) { var parts = filterValue.split(':'); return { status: parts[0], pendingType: parts[1] }; } return { status: filterValue }; } },
-                    actions: { onRowClick: function(item) { self.showItemDetail(item.SourceItemId); } },
+                    actions: { onRowClick: function(item) { self.showItemDetail(item.SourceItemId); }, onReload: function() { self.loadSyncStatus(); self.loadHealthStats(); } },
                     getDisplayStatus: function(item) { if (item.Status === 'Pending' && item.PendingType) { return 'Pending ' + item.PendingType; } return item.Status; },
                     getStatusClass: function(item) { if (item.Status === 'Pending' && item.PendingType) { return 'Pending-' + item.PendingType; } return item.Status; },
                     emptyState: { message: 'No items found' }
@@ -1250,7 +1239,6 @@
                 document.getElementById('btnTriggerSync').addEventListener('click', function() { self.triggerSync(); });
                 document.getElementById('btnRetryErrors').addEventListener('click', function() { self.retryErrors(); });
                 document.getElementById('btnResetDatabase').addEventListener('click', function() { self.resetDatabase(); });
-                document.getElementById('btnReloadTable').addEventListener('click', function() { self.reloadTableData(); });
                 document.getElementById('btnModalIgnore').addEventListener('click', function() { self.modalIgnore(); });
                 document.getElementById('btnModalQueue').addEventListener('click', function() { self.modalQueue(); });
                 document.getElementById('btnModalDelete').addEventListener('click', function() { self.modalDelete(); });
@@ -1276,7 +1264,6 @@
             loadHealthStats: function() { return ServerSyncShared.apiRequest('Stats', 'GET').then(function(stats) { var lastSyncEl = document.getElementById('healthLastSync'); if (stats.LastSyncEndTime) { lastSyncEl.textContent = ServerSyncShared.formatRelativeTime(new Date(stats.LastSyncEndTime)); lastSyncEl.className = 'healthValue success'; } else { lastSyncEl.textContent = 'Never'; lastSyncEl.className = 'healthValue'; } var diskSpaceEl = document.getElementById('healthDiskSpace'); if (stats.FreeDiskSpaceBytes > 0) { diskSpaceEl.textContent = ServerSyncShared.formatSize(stats.FreeDiskSpaceBytes) + ' free'; diskSpaceEl.className = stats.HasSufficientDiskSpace ? 'healthValue success' : 'healthValue error'; } else { diskSpaceEl.textContent = 'Unknown'; diskSpaceEl.className = 'healthValue'; } var queuedSizeEl = document.getElementById('healthQueuedSize'); queuedSizeEl.textContent = ServerSyncShared.formatSize(stats.TotalQueuedBytes); queuedSizeEl.className = stats.QueuedItems > 0 ? 'healthValue warning' : 'healthValue'; }).catch(function() {}); },
             triggerSync: function() { var self = this; var btn = document.getElementById('btnTriggerSync'); btn.disabled = true; btn.querySelector('span').textContent = 'Starting...'; ServerSyncShared.apiRequest('TriggerSync', 'POST').then(function() { ServerSyncShared.showAlert('Sync task started'); btn.querySelector('span').textContent = 'Sync'; btn.disabled = false; }).catch(function() { ServerSyncShared.showAlert('Failed to start sync task'); btn.querySelector('span').textContent = 'Sync'; btn.disabled = false; }); },
             refreshSyncTable: function() { var self = this; var btn = document.getElementById('btnRefreshItems'); btn.disabled = true; btn.querySelector('span').textContent = 'Refreshing...'; ServerSyncShared.apiRequest('TriggerRefresh', 'POST').then(function() { ServerSyncShared.showAlert('Refresh task started'); btn.querySelector('span').textContent = 'Refresh'; btn.disabled = false; self.loadSyncStatus(); self.loadSyncItems(); self.loadHealthStats(); }).catch(function() { ServerSyncShared.showAlert('Failed to start refresh task'); btn.querySelector('span').textContent = 'Refresh'; btn.disabled = false; }); },
-            reloadTableData: function() { var self = this; var btn = document.getElementById('btnReloadTable'); btn.classList.add('spinning'); btn.disabled = true; Promise.all([self.loadSyncStatus(), self.loadSyncItems(), self.loadHealthStats()]).then(function() { btn.classList.remove('spinning'); btn.disabled = false; }).catch(function() { btn.classList.remove('spinning'); btn.disabled = false; }); },
             retryErrors: function() { var self = this; ServerSyncShared.apiRequest('RetryErroredItems', 'POST', {}).then(function() { ServerSyncShared.showAlert('Errored items queued for retry'); self.loadSyncStatus(); self.loadSyncItems(); }).catch(function() { ServerSyncShared.showAlert('Failed to retry errored items'); }); },
             resetDatabase: function() { var self = this; if (!confirm('Are you sure you want to reset the sync database?\n\nThis will delete ALL tracking data and you will need to re-sync everything. This cannot be undone.')) { return; } ServerSyncShared.apiRequest('ResetSyncDatabase', 'POST').then(function() { ServerSyncShared.showAlert('Sync database has been reset'); self.loadSyncStatus(); self.loadSyncItems(); self.loadHealthStats(); }).catch(function() { ServerSyncShared.showAlert('Failed to reset sync database'); }); },
             loadSyncStatus: function() { return ServerSyncShared.apiRequest('Status', 'GET').then(function(status) { document.getElementById('syncedCount').textContent = status.Synced || 0; document.getElementById('statusGroupSynced').setAttribute('title', 'Synced: ' + (status.Synced || 0)); document.getElementById('queuedCount').textContent = status.Queued || 0; document.getElementById('statusGroupQueued').setAttribute('title', 'Queued: ' + (status.Queued || 0)); document.getElementById('erroredCount').textContent = status.Errored || 0; document.getElementById('statusGroupErrored').setAttribute('title', 'Errored: ' + (status.Errored || 0)); document.getElementById('ignoredCount').textContent = status.Ignored || 0; document.getElementById('statusGroupIgnored').setAttribute('title', 'Ignored: ' + (status.Ignored || 0)); document.getElementById('pendingDownloadCount').textContent = status.PendingDownload || 0; document.getElementById('statusGroupPendingDownload').setAttribute('title', 'Pending Download: ' + (status.PendingDownload || 0)); document.getElementById('pendingReplacementCount').textContent = status.PendingReplacement || 0; document.getElementById('statusGroupPendingReplacement').setAttribute('title', 'Pending Replacement: ' + (status.PendingReplacement || 0)); document.getElementById('pendingDeletionCount').textContent = status.PendingDeletion || 0; document.getElementById('statusGroupPendingDeletion').setAttribute('title', 'Pending Deletion: ' + (status.PendingDeletion || 0)); document.getElementById('deletingCount').textContent = status.Deleting || 0; document.getElementById('statusGroupDeleting').setAttribute('title', 'Deleting: ' + (status.Deleting || 0)); }); },

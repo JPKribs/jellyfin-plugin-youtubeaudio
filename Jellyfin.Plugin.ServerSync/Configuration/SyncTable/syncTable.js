@@ -75,8 +75,7 @@ var SyncTableModule = {
             },
 
             pagination: {
-                pageSize: 50,
-                pageSizes: [25, 50, 100, 200]
+                pageSize: 50
             },
 
             filters: {
@@ -102,6 +101,10 @@ var SyncTableModule = {
             actions: {
                 onRowClick: function(item) {
                     self.showItemDetail(item.SourceItemId);
+                },
+                onReload: function() {
+                    self.loadSyncStatus();
+                    self.loadHealthStats();
                 }
             },
 
@@ -139,7 +142,6 @@ var SyncTableModule = {
         document.getElementById('btnTriggerSync').addEventListener('click', function() { self.triggerSync(); });
         document.getElementById('btnRetryErrors').addEventListener('click', function() { self.retryErrors(); });
         document.getElementById('btnResetDatabase').addEventListener('click', function() { self.resetDatabase(); });
-        document.getElementById('btnReloadTable').addEventListener('click', function() { self.reloadTableData(); });
 
         // Modal buttons
         document.getElementById('btnModalIgnore').addEventListener('click', function() { self.modalIgnore(); });
@@ -289,25 +291,6 @@ var SyncTableModule = {
         }).catch(function() {
             ServerSyncShared.showAlert('Failed to start refresh task');
             btn.querySelector('span').textContent = 'Refresh';
-            btn.disabled = false;
-        });
-    },
-
-    reloadTableData: function() {
-        var self = this;
-        var btn = document.getElementById('btnReloadTable');
-        btn.classList.add('spinning');
-        btn.disabled = true;
-
-        Promise.all([
-            self.loadSyncStatus(),
-            self.loadSyncItems(),
-            self.loadHealthStats()
-        ]).then(function() {
-            btn.classList.remove('spinning');
-            btn.disabled = false;
-        }).catch(function() {
-            btn.classList.remove('spinning');
             btn.disabled = false;
         });
     },
