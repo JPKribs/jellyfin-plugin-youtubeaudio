@@ -144,9 +144,7 @@ main() {
     # Build and publish the project with version from build.yaml
     # Using dotnet publish to ensure all dependencies are copied to output
     log "INFO" "Publishing project with configuration: $CONFIGURATION, version: $VERSION"
-    # AssemblyVersion requires 4-part version (x.y.z.0)
-    local ASSEMBLY_VERSION="${VERSION}.0"
-    if ! dotnet publish "$PROJECT_FILE" --configuration "$CONFIGURATION" --no-restore --verbosity minimal -p:Version="$VERSION" -p:AssemblyVersion="$ASSEMBLY_VERSION" -p:FileVersion="$ASSEMBLY_VERSION"; then
+    if ! dotnet publish "$PROJECT_FILE" --configuration "$CONFIGURATION" --no-restore --verbosity minimal -p:Version="$VERSION"; then
         log "ERROR" "Publish failed"
         exit 1
     fi
