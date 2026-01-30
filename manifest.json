@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "10.11.11",
+        "changelog": "## Improvements\r\n- Add build system for config page (separate component files assembled at build time)\r\n- Add configurable change detection policy (Size Only, ETag Only, or Both)\r\n\r\n## Fixes\r\n- Fix pending filter options not showing when approval mode enabled\r\n- Fix item detail modal not opening due to missing status badge element\r\n- Fix database reset button not working",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-serversync/releases/download/v10.11.11/jellyfin-plugin-serversync-10.11.11.zip",
+        "checksum": "b47f4ef3f65dc905ccdc9feb65912610",
+        "timestamp": "2026-01-30T21:19:42Z"
+      },
+      {
         "version": "10.11.10",
         "changelog": "## Improvements\r\n- Add configurable change detection policy (Size Only, ETag Only, or Both)\r\n\r\n## Fixes\r\n- Fix item detail modal not opening due to missing status badge element\r\n- Fix database reset button not working",
         "targetAbi": "10.11.0.0",
