@@ -141,10 +141,11 @@ main() {
     fi
     log "SUCCESS" "Package restore completed"
     
-    # Build the project with version from build.yaml
-    log "INFO" "Building project with configuration: $CONFIGURATION, version: $VERSION"
-    if ! dotnet build "$PROJECT_FILE" --configuration "$CONFIGURATION" --no-restore --verbosity minimal -p:Version="$VERSION"; then
-        log "ERROR" "Build failed"
+    # Build and publish the project with version from build.yaml
+    # Using dotnet publish to ensure all dependencies are copied to output
+    log "INFO" "Publishing project with configuration: $CONFIGURATION, version: $VERSION"
+    if ! dotnet publish "$PROJECT_FILE" --configuration "$CONFIGURATION" --no-restore --verbosity minimal -p:Version="$VERSION"; then
+        log "ERROR" "Publish failed"
         exit 1
     fi
     
@@ -168,9 +169,44 @@ main() {
     log "INFO" "Creating temporary directory: $temp_dir"
     mkdir -p "$temp_dir"
     
-    # Copy DLL to temp directory
-    log "INFO" "Copying DLL to package directory"
-    cp "$dll_path" "$temp_dir/"
+    # Get artifacts list from build.yaml and copy all to temp directory
+    log "INFO" "Copying artifacts to package directory"
+    local build_dir="$PROJECT_DIR/bin/$CONFIGURATION/net9.0"
+
+    # Read artifacts from build.yaml (parse YAML artifact list using grep/sed)
+    # The artifacts section looks like:
+    # artifacts:
+    # - "Jellyfin.Plugin.ServerSync.dll"
+    # - "Jellyfin.Sdk.dll"
+    local in_artifacts=false
+    while IFS= read -r line; do
+        # Check if we hit the artifacts section
+        if [[ "$line" =~ ^artifacts: ]]; then
+            in_artifacts=true
+            continue
+        fi
+
+        # Check if we've left the artifacts section (hit another top-level key)
+        if [[ "$in_artifacts" == true ]] && [[ "$line" =~ ^[a-z] ]] && [[ ! "$line" =~ ^[[:space:]]+ ]]; then
+            break
+        fi
+
+        # Extract artifact names from lines like "- Jellyfin.Plugin.ServerSync.dll" or '- "Jellyfin.Plugin.ServerSync.dll"'
+        if [[ "$in_artifacts" == true ]] && [[ "$line" =~ ^[[:space:]]*-[[:space:]]* ]]; then
+            # Remove leading "- " and quotes
+            local artifact=$(echo "$line" | sed 's/^[[:space:]]*-[[:space:]]*//' | tr -d '"' | tr -d "'")
+            if [[ -n "$artifact" ]]; then
+                local src_file="$build_dir/$artifact"
+                if [[ -f "$src_file" ]]; then
+                    cp "$src_file" "$temp_dir/"
+                    log "SUCCESS" "Copied: $artifact"
+                else
+                    log "ERROR" "Artifact not found: $src_file"
+                    exit 1
+                fi
+            fi
+        fi
+    done < build.yaml
 
     # Create ZIP with all files in temp directory
     log "INFO" "Creating ZIP archive"
