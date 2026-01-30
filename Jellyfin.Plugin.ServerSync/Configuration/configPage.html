@@ -2332,7 +2332,17 @@
                     }
                 });
             },
-        
+
+            // reload
+            // Public method to reset state and reload from page 1.
+            reload: function() {
+                this.state.items = [];
+                this.state.currentPage = 1;
+                this.state.hasMore = true;
+                this.state.selectedIds.clear();
+                return this.load();
+            },
+
             // load
             // Fetches items from the API for the current page.
             load: function() {
@@ -3134,7 +3144,7 @@
             },
         
             loadSyncItems: function() {
-                return this.table.load();
+                return this.table.reload();
             },
         
             updateBulkActionsVisibility: function(count) {
