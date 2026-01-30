@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "10.11.7",
+        "changelog": "## Improvements\r\n- Add server-side pagination to sync table for better performance on large libraries\r\n- Create reusable PaginatedTable component for future user/history sync features",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-serversync/releases/download/v10.11.7/jellyfin-plugin-serversync-10.11.7.zip",
+        "checksum": "c3e5dbabc1e9ede51b7a861edf451fd6",
+        "timestamp": "2026-01-30T12:32:33Z"
+      },
+      {
         "version": "10.11.6",
         "changelog": "## Fixes\r\n- Remove hardcoded version from csproj to match episodepostergenerator pattern",
         "targetAbi": "10.11.0.0",
