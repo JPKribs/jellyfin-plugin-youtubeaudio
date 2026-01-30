@@ -87,7 +87,7 @@
                             <div class="inputContainer">
                                 <label for="selChangeDetectionPolicy">Change Detection Policy:</label>
                                 <select is="emby-select" id="selChangeDetectionPolicy">
-                                    <option value="SizeOnly">Size Only (Recommended)</option>
+                                    <option value="SizeOnly">Size Only</option>
                                     <option value="ETagOnly">ETag Only</option>
                                     <option value="Both">Both Size and ETag</option>
                                 </select>
@@ -866,9 +866,15 @@
             getConfig: function() { return ApiClient.getPluginConfiguration(this.pluginId); },
             saveConfig: function(config) { return ApiClient.updatePluginConfiguration(this.pluginId, config); },
             apiRequest: function(endpoint, method, data) {
-                var options = { url: ApiClient.getUrl('ServerSync/' + endpoint), type: method || 'GET', dataType: 'json' };
+                var options = { url: ApiClient.getUrl('ServerSync/' + endpoint), type: method || 'GET' };
+                if (method === 'GET') { options.dataType = 'json'; }
                 if (data) { options.contentType = 'application/json'; options.data = JSON.stringify(data); }
-                return ApiClient.fetch(options);
+                return ApiClient.fetch(options).then(function(response) {
+                    if (response && typeof response === 'string' && response.length > 0) {
+                        try { return JSON.parse(response); } catch (e) { return response; }
+                    }
+                    return response;
+                });
             }
         };
     </script>
