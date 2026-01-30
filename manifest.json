@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "10.11.2",
+        "changelog": "## Fixes\r\n- Package all dependencies\r\n- Increment correctly",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-serversync/releases/download/v10.11.2/jellyfin-plugin-serversync-10.11.2.zip",
+        "checksum": "f034050940b44cb5a0b7a38c037a5755",
+        "timestamp": "2026-01-30T04:23:21Z"
+      },
+      {
         "version": "10.11.1",
         "changelog": "## Features\r\n- One-way media sync from source Jellyfin server using API key authentication\r\n- Library mapping with automatic path translation between source and local servers\r\n- ETag-based change detection for identifying updated content\r\n- Granular approval modes (Enabled/RequireApproval/Disabled) for new content, replacements, and deletions\r\n- Recycling bin for soft-deleting replaced or removed files with configurable retention period\r\n- Bandwidth throttling with configurable speed limits (KB/s, MB/s, GB/s)\r\n- Time-based bandwidth scheduling for off-peak unlimited downloads\r\n- Concurrent downloads with configurable limit (1-10 simultaneous)\r\n- Minimum free disk space protection to prevent disk exhaustion\r\n- Per-file disk space validation before each download\r\n- Companion file support for external subtitles, NFO files, and images\r\n- Automatic retry for failed downloads with configurable max attempts\r\n- Circuit breaker pattern to prevent hammering failed source servers\r\n- Web UI for managing sync items with search, filtering, and bulk actions\r\n- Health dashboard showing sync status, disk space, and last sync time\r\n- Database reset capability for fresh sync state",
         "targetAbi": "10.11.0.0",
