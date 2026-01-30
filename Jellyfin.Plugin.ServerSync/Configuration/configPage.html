@@ -1638,17 +1638,18 @@
                 statusEl.textContent = 'Testing...';
         
                 ServerSyncShared.apiRequest('TestConnection', 'POST', requestData).then(function(response) {
+                    console.log('TestConnection response:', response);
                     if (response && response.Success) {
                         statusEl.innerHTML = '<span style="color: #5cb85c;">Connected to ' + ServerSyncShared.escapeHtml(response.ServerName) + '</span>';
                         document.getElementById('txtSourceServerName').textContent = response.ServerName || 'Unknown';
                         document.getElementById('txtSourceServerId').textContent = response.ServerId || 'Unknown';
                         document.getElementById('serverInfoContainer').style.display = 'block';
-        
+
                         if (self.currentConfig) {
                             self.currentConfig.SourceServerName = response.ServerName;
                             self.currentConfig.SourceServerId = response.ServerId;
                         }
-        
+
                         // Trigger library fetch event
                         if (self.onConnectionSuccess) {
                             self.onConnectionSuccess(response);
@@ -1656,7 +1657,8 @@
                     } else {
                         statusEl.innerHTML = '<span style="color: #d9534f;">' + ServerSyncShared.escapeHtml((response && response.Message) || 'Connection failed') + '</span>';
                     }
-                }).catch(function() {
+                }).catch(function(error) {
+                    console.error('TestConnection error:', error);
                     statusEl.innerHTML = '<span style="color: #d9534f;">Connection failed</span>';
                 });
             },
