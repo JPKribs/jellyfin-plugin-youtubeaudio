@@ -364,7 +364,7 @@
             <div id="modalContent" style="margin: 16px 0;">
                 <div style="margin-bottom: 12px;">
                     <div style="opacity: 0.7; margin-bottom: 4px;">Status</div>
-                    <div id="modalStatus"></div>
+                    <span id="modalStatusBadge" class="itemModal-statusBadge"></span>
                 </div>
                 <div id="modalErrorSection" style="margin-bottom: 12px; display: none;">
                     <div style="opacity: 0.7; margin-bottom: 4px;">Error</div>
@@ -764,6 +764,23 @@
             text-align: center;
             justify-content: center;
         }
+        .itemModal-statusBadge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .itemModal-statusBadge.Synced { background: rgba(92, 184, 92, 0.2); color: #5cb85c; border: 1px solid rgba(92, 184, 92, 0.3); }
+        .itemModal-statusBadge.Queued { background: rgba(240, 173, 78, 0.2); color: #f0ad4e; border: 1px solid rgba(240, 173, 78, 0.3); }
+        .itemModal-statusBadge.Errored { background: rgba(217, 83, 79, 0.2); color: #d9534f; border: 1px solid rgba(217, 83, 79, 0.3); }
+        .itemModal-statusBadge.Ignored { background: rgba(153, 153, 153, 0.2); color: #999; border: 1px solid rgba(153, 153, 153, 0.3); }
+        .itemModal-statusBadge.Pending-Download { background: rgba(155, 89, 182, 0.2); color: #9b59b6; border: 1px solid rgba(155, 89, 182, 0.3); }
+        .itemModal-statusBadge.Pending-Replacement { background: rgba(52, 152, 219, 0.2); color: #3498db; border: 1px solid rgba(52, 152, 219, 0.3); }
+        .itemModal-statusBadge.Pending-Deletion { background: rgba(217, 83, 79, 0.2); color: #d9534f; border: 1px solid rgba(217, 83, 79, 0.3); }
+        .itemModal-statusBadge.Deleting { background: rgba(231, 76, 60, 0.2); color: #e74c3c; border: 1px solid rgba(231, 76, 60, 0.3); }
     </style>
 
     <!-- Styles: paginatedTable.css -->
