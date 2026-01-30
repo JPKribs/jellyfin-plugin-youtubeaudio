@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "10.11.9",
+        "changelog": "## Improvements\r\n- Replace page navigation with infinite scroll for better UX\r\n- Add reload button to table header row\r\n- Fix mobile tap handling for opening item modals\r\n- Add configurable change detection policy (Size Only, ETag Only, or Both)",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-serversync/releases/download/v10.11.9/jellyfin-plugin-serversync-10.11.9.zip",
+        "checksum": "bf7fbf1967b730f293b8884332cc22da",
+        "timestamp": "2026-01-30T14:12:43Z"
+      },
+      {
         "version": "10.11.8",
         "changelog": "## Improvements\r\n- Replace page navigation with infinite scroll for better UX\r\n- Add reload button to table header row\r\n- Fix mobile tap handling for opening item modals",
         "targetAbi": "10.11.0.0",
