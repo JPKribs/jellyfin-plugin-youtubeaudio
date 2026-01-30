@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.ServerSync.Configuration;
@@ -107,9 +109,10 @@ public class DownloadService
             // Use atomic move with overwrite
             FileOperationUtilities.MoveFileWithOverwrite(tempFilePath, item.LocalPath, _logger);
 
+            string? companionFilesList = null;
             if (includeCompanionFiles)
             {
-                await DownloadCompanionFilesAsync(
+                var downloadedCompanions = await DownloadCompanionFilesAsync(
                     client,
                     itemId,
                     targetDir ?? Path.GetDirectoryName(item.LocalPath) ?? string.Empty,
@@ -117,9 +120,14 @@ public class DownloadService
                     speedLimitBytesPerSecond,
                     config,
                     cancellationToken).ConfigureAwait(false);
+
+                if (downloadedCompanions.Count > 0)
+                {
+                    companionFilesList = string.Join(",", downloadedCompanions);
+                }
             }
 
-            return new DownloadResult(true);
+            return new DownloadResult(true, null, companionFilesList);
         }
         catch (OperationCanceledException)
         {
@@ -143,7 +151,8 @@ public class DownloadService
     /// <param name="speedLimitBytesPerSecond">Download speed limit in bytes per second.</param>
     /// <param name="config">Plugin configuration.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    public async Task DownloadCompanionFilesAsync(
+    /// <returns>List of successfully downloaded companion file names.</returns>
+    public async Task<List<string>> DownloadCompanionFilesAsync(
         SourceServerClient client,
         Guid itemId,
         string targetDir,
@@ -152,6 +161,7 @@ public class DownloadService
         PluginConfiguration config,
         CancellationToken cancellationToken)
     {
+        var downloadedFiles = new List<string>();
         var networkRetries = config.MaxRetryCount > 0 ? config.MaxRetryCount : DefaultNetworkRetries;
 
         try
@@ -160,7 +170,7 @@ public class DownloadService
 
             if (companions.Count == 0)
             {
-                return;
+                return downloadedFiles;
             }
 
             _logger.LogInformation("Downloading {Count} companion files for item {ItemId}", companions.Count, itemId);
@@ -197,6 +207,7 @@ public class DownloadService
                         cancellationToken).ConfigureAwait(false);
 
                     FileOperationUtilities.MoveFileWithOverwrite(tempFilePath, targetPath, _logger);
+                    downloadedFiles.Add(companion.FileName);
                     _logger.LogInformation("Downloaded companion file {FileName}", companion.FileName);
                 }
                 catch (OperationCanceledException)
@@ -215,6 +226,8 @@ public class DownloadService
         {
             _logger.LogWarning(ex, "Failed to get companion files for item {ItemId}", itemId);
         }
+
+        return downloadedFiles;
     }
 
     /// <summary>

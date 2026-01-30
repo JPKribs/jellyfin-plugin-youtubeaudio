@@ -320,7 +320,8 @@ public class DownloadMissingContentTask : IScheduledTask
         {
             _circuitBreaker?.RecordSuccess();
             database.UpdateStatus(item.SourceItemId, SyncStatus.Synced,
-                localPath: item.LocalPath, sourceETag: item.SourceETag, sourceSize: item.SourceSize);
+                localPath: item.LocalPath, sourceETag: item.SourceETag, sourceSize: item.SourceSize,
+                companionFiles: result.CompanionFiles);
             _logger.LogInformation("DOWNLOADED: {FileName} ({Size}) -> {LocalPath}", fileName, fileSize, item.LocalPath);
         }
         else

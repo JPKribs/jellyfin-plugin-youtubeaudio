@@ -14,9 +14,10 @@ using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.ServerSync.Services;
 
-// SourceServerClient
-// Client for communicating with the source Jellyfin server using the official SDK.
-// Uses API key authentication only.
+/// <summary>
+/// SourceServerClient
+/// Client for communicating with the source Jellyfin server using the official SDK.
+/// </summary>
 public class SourceServerClient : IDisposable
 {
     private const string ClientName = "Jellyfin Server Sync";
@@ -35,8 +36,12 @@ public class SourceServerClient : IDisposable
     private JellyfinApiClient? _apiClient;
     private bool _disposed;
 
-    // SourceServerClient
-    // Creates client using API key authentication.
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SourceServerClient"/> class.
+    /// </summary>
+    /// <param name="logger">Logger instance.</param>
+    /// <param name="serverUrl">Source server URL.</param>
+    /// <param name="apiKey">API key for authentication.</param>
     public SourceServerClient(ILogger<SourceServerClient> logger, string serverUrl, string apiKey)
     {
         _logger = logger;
@@ -57,8 +62,12 @@ public class SourceServerClient : IDisposable
         _sdkSettings.SetAccessToken(_apiKey);
     }
 
-    // TestConnectionAsync
-    // Tests connection to the source server and returns server info.
+    /// <summary>
+    /// TestConnectionAsync
+    /// Tests connection to the source server and returns server info.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Connection test result with server info.</returns>
     public async Task<ConnectionTestResult> TestConnectionAsync(CancellationToken cancellationToken = default)
     {
         try
@@ -110,8 +119,12 @@ public class SourceServerClient : IDisposable
         }
     }
 
-    // GetLibrariesAsync
-    // Gets all libraries from the source server.
+    /// <summary>
+    /// GetLibrariesAsync
+    /// Gets all libraries from the source server.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>List of virtual folder info.</returns>
     public async Task<List<VirtualFolderInfo>> GetLibrariesAsync(CancellationToken cancellationToken = default)
     {
         try
@@ -127,8 +140,15 @@ public class SourceServerClient : IDisposable
         }
     }
 
-    // GetLibraryItemsAsync
-    // Gets items from a library with pagination support.
+    /// <summary>
+    /// GetLibraryItemsAsync
+    /// Gets items from a library with pagination support.
+    /// </summary>
+    /// <param name="libraryId">Library ID.</param>
+    /// <param name="startIndex">Starting index for pagination.</param>
+    /// <param name="limit">Maximum items to return.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Query result with items.</returns>
     public async Task<BaseItemDtoQueryResult?> GetLibraryItemsAsync(
         Guid libraryId,
         int startIndex = 0,
@@ -157,8 +177,13 @@ public class SourceServerClient : IDisposable
         }
     }
 
-    // GetItemDetailsAsync
-    // Gets detailed item info including media sources and streams.
+    /// <summary>
+    /// GetItemDetailsAsync
+    /// Gets detailed item info including media sources and streams.
+    /// </summary>
+    /// <param name="itemId">Item ID.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Item details or null if not found.</returns>
     public async Task<BaseItemDto?> GetItemDetailsAsync(Guid itemId, CancellationToken cancellationToken = default)
     {
         try
@@ -187,8 +212,13 @@ public class SourceServerClient : IDisposable
         }
     }
 
-    // DownloadFileAsync
-    // Downloads a file from the source server.
+    /// <summary>
+    /// DownloadFileAsync
+    /// Downloads a file from the source server.
+    /// </summary>
+    /// <param name="itemId">Item ID.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Stream of file content or null on failure.</returns>
     public async Task<Stream?> DownloadFileAsync(Guid itemId, CancellationToken cancellationToken = default)
     {
         try
@@ -208,8 +238,13 @@ public class SourceServerClient : IDisposable
         }
     }
 
-    // GetCompanionFilesAsync
-    // Gets external companion files (subtitles, etc.) for an item.
+    /// <summary>
+    /// GetCompanionFilesAsync
+    /// Gets external companion files (subtitles, etc.) for an item.
+    /// </summary>
+    /// <param name="itemId">Item ID.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>List of companion file info.</returns>
     public async Task<List<CompanionFileInfo>> GetCompanionFilesAsync(Guid itemId, CancellationToken cancellationToken = default)
     {
         var companions = new List<CompanionFileInfo>();
@@ -249,8 +284,14 @@ public class SourceServerClient : IDisposable
         return companions;
     }
 
-    // DownloadCompanionFileAsync
-    // Downloads an external subtitle or companion file by its path.
+    /// <summary>
+    /// DownloadCompanionFileAsync
+    /// Downloads an external subtitle or companion file by its path.
+    /// </summary>
+    /// <param name="itemId">Item ID.</param>
+    /// <param name="filePath">Source file path.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Stream of file content or null on failure.</returns>
     public async Task<Stream?> DownloadCompanionFileAsync(Guid itemId, string filePath, CancellationToken cancellationToken = default)
     {
         try
@@ -282,16 +323,22 @@ public class SourceServerClient : IDisposable
         }
     }
 
-    // AddAuthorizationHeader
-    // Adds the MediaBrowser authorization header to HTTP requests.
+    /// <summary>
+    /// AddAuthorizationHeader
+    /// Adds the MediaBrowser authorization header to HTTP requests.
+    /// </summary>
+    /// <param name="request">HTTP request message.</param>
     private void AddAuthorizationHeader(HttpRequestMessage request)
     {
         var authValue = $"MediaBrowser Client=\"{ClientName}\", Device=\"{DeviceName}\", DeviceId=\"{DeviceId}\", Version=\"{ClientVersion}\", Token=\"{_apiKey}\"";
         request.Headers.Authorization = new AuthenticationHeaderValue("MediaBrowser", authValue);
     }
 
-    // GetApiClient
-    // Returns the API client, creating it lazily if needed.
+    /// <summary>
+    /// GetApiClient
+    /// Returns the API client, creating it lazily if needed.
+    /// </summary>
+    /// <returns>Jellyfin API client instance.</returns>
     private JellyfinApiClient GetApiClient()
     {
         if (_apiClient == null)

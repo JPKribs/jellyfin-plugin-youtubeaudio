@@ -6,8 +6,10 @@ using MediaBrowser.Model.Plugins;
 
 namespace Jellyfin.Plugin.ServerSync.Configuration;
 
-// PluginConfiguration
-// Configuration settings for the Server Sync plugin.
+/// <summary>
+/// PluginConfiguration
+/// Configuration settings for the Server Sync plugin.
+/// </summary>
 public class PluginConfiguration : BasePluginConfiguration
 {
     public string SourceServerUrl { get; set; } = string.Empty;
@@ -28,16 +30,21 @@ public class PluginConfiguration : BasePluginConfiguration
 
     public int MaxConcurrentDownloads { get; set; } = 2;
 
-    // MaxDownloadSpeed
-    // Maximum download speed value (0 = unlimited).
+    /// <summary>
+    /// Maximum download speed value (0 = unlimited).
+    /// </summary>
     public int MaxDownloadSpeed { get; set; } = 0;
 
-    // DownloadSpeedUnit
-    // Unit for MaxDownloadSpeed (KB, MB, GB).
+    /// <summary>
+    /// Unit for MaxDownloadSpeed (KB, MB, GB).
+    /// </summary>
     public string DownloadSpeedUnit { get; set; } = "MB";
 
-    // GetMaxDownloadSpeedBytes
-    // Calculates the max download speed in bytes per second.
+    /// <summary>
+    /// GetMaxDownloadSpeedBytes
+    /// Calculates the max download speed in bytes per second.
+    /// </summary>
+    /// <returns>Speed in bytes per second.</returns>
     public long GetMaxDownloadSpeedBytes()
     {
         if (MaxDownloadSpeed == 0) return 0;
@@ -51,8 +58,11 @@ public class PluginConfiguration : BasePluginConfiguration
         };
     }
 
-    // GetScheduledDownloadSpeedBytes
-    // Calculates the scheduled download speed in bytes per second.
+    /// <summary>
+    /// GetScheduledDownloadSpeedBytes
+    /// Calculates the scheduled download speed in bytes per second.
+    /// </summary>
+    /// <returns>Speed in bytes per second.</returns>
     public long GetScheduledDownloadSpeedBytes()
     {
         if (ScheduledDownloadSpeed == 0) return 0;
@@ -66,8 +76,11 @@ public class PluginConfiguration : BasePluginConfiguration
         };
     }
 
-    // GetEffectiveDownloadSpeedBytes
-    // Returns the appropriate download speed based on current time and scheduling settings.
+    /// <summary>
+    /// GetEffectiveDownloadSpeedBytes
+    /// Returns the appropriate download speed based on current time and scheduling settings.
+    /// </summary>
+    /// <returns>Effective speed in bytes per second.</returns>
     public long GetEffectiveDownloadSpeedBytes()
     {
         if (!EnableBandwidthScheduling)
@@ -83,85 +96,96 @@ public class PluginConfiguration : BasePluginConfiguration
         return isInScheduledWindow ? GetScheduledDownloadSpeedBytes() : GetMaxDownloadSpeedBytes();
     }
 
-    // DownloadNewContentMode
-    // Controls how new content (items on source that don't exist locally) is handled.
-    // Enabled: Automatically queue for download
-    // RequireApproval: Require manual approval before downloading
-    // Disabled: Don't download new content
+    /// <summary>
+    /// Controls how new content (items on source that don't exist locally) is handled.
+    /// </summary>
     public ApprovalMode DownloadNewContentMode { get; set; } = ApprovalMode.Enabled;
 
-    // ReplaceExistingContentMode
-    // Controls how updated content (items that differ from local version) is handled.
-    // Enabled: Automatically queue for re-download
-    // RequireApproval: Require manual approval before replacing
-    // Disabled: Don't replace existing content
+    /// <summary>
+    /// Controls how updated content (items that differ from local version) is handled.
+    /// </summary>
     public ApprovalMode ReplaceExistingContentMode { get; set; } = ApprovalMode.Enabled;
 
-    // DeleteMissingContentMode
-    // Controls how missing content (items on local that don't exist on source) is handled.
-    // Enabled: Automatically queue for deletion
-    // RequireApproval: Require manual approval before deleting
-    // Disabled: Don't delete missing content
+    /// <summary>
+    /// Controls how missing content (items on local that don't exist on source) is handled.
+    /// </summary>
     public ApprovalMode DeleteMissingContentMode { get; set; } = ApprovalMode.Disabled;
 
-    // DetectUpdatedFiles
-    // Re-queue files with size or date mismatches when enabled.
+    /// <summary>
+    /// Re-queue files with size or date mismatches when enabled.
+    /// </summary>
     public bool DetectUpdatedFiles { get; set; } = true;
 
-    // EnableBandwidthScheduling
-    // Enable time-based bandwidth scheduling with alternate speed.
+    /// <summary>
+    /// Enable time-based bandwidth scheduling with alternate speed.
+    /// </summary>
     public bool EnableBandwidthScheduling { get; set; }
 
-    // ScheduledStartHour
-    // Hour of day (0-23) when scheduled bandwidth starts.
+    /// <summary>
+    /// Hour of day (0-23) when scheduled bandwidth starts.
+    /// </summary>
     public int ScheduledStartHour { get; set; } = 0;
 
-    // ScheduledEndHour
-    // Hour of day (0-24) when scheduled bandwidth ends.
+    /// <summary>
+    /// Hour of day (0-24) when scheduled bandwidth ends.
+    /// </summary>
     public int ScheduledEndHour { get; set; } = 6;
 
-    // ScheduledDownloadSpeed
-    // Download speed during scheduled hours.
+    /// <summary>
+    /// Download speed during scheduled hours.
+    /// </summary>
     public int ScheduledDownloadSpeed { get; set; } = 0;
 
-    // ScheduledDownloadSpeedUnit
-    // Unit for scheduled download speed (KB, MB, GB).
+    /// <summary>
+    /// Unit for scheduled download speed (KB, MB, GB).
+    /// </summary>
     public string ScheduledDownloadSpeedUnit { get; set; } = "MB";
 
-    // MinimumFreeDiskSpaceGb
-    // Minimum free disk space required before downloads (in GB).
+    /// <summary>
+    /// Minimum free disk space required before downloads (in GB).
+    /// </summary>
     public int MinimumFreeDiskSpaceGb { get; set; } = 10;
 
-    // LastConnectionCheck
-    // Timestamp of last successful connection check.
+    /// <summary>
+    /// Timestamp of last successful connection check.
+    /// </summary>
     public DateTime? LastConnectionCheck { get; set; }
 
-    // LastSyncStartTime
-    // Timestamp when the last sync started.
+    /// <summary>
+    /// Timestamp when the last sync started.
+    /// </summary>
     public DateTime? LastSyncStartTime { get; set; }
 
-    // LastSyncEndTime
-    // Timestamp when the last sync completed.
+    /// <summary>
+    /// Timestamp when the last sync completed.
+    /// </summary>
     public DateTime? LastSyncEndTime { get; set; }
 
-    // EnableRecyclingBin
-    // Move deleted/replaced files to a recycling bin instead of permanent deletion.
+    /// <summary>
+    /// Move deleted/replaced files to a recycling bin instead of permanent deletion.
+    /// </summary>
     public bool EnableRecyclingBin { get; set; }
 
-    // RecyclingBinPath
-    // Path to the recycling bin directory for soft-deleted files.
+    /// <summary>
+    /// Path to the recycling bin directory for soft-deleted files.
+    /// </summary>
     public string? RecyclingBinPath { get; set; }
 
-    // RecyclingBinRetentionDays
-    // Number of days to keep files in the recycling bin before permanent deletion.
+    /// <summary>
+    /// Number of days to keep files in the recycling bin before permanent deletion.
+    /// </summary>
     public int RecyclingBinRetentionDays { get; set; } = 7;
 
-    // MaxRetryCount
-    // Maximum number of times to retry failed downloads before giving up.
+    /// <summary>
+    /// Maximum number of times to retry failed downloads before giving up.
+    /// </summary>
     public int MaxRetryCount { get; set; } = 3;
 
-    // ValidateConfiguration
-    // Validates configuration values and returns a list of validation errors.
+    /// <summary>
+    /// ValidateConfiguration
+    /// Validates configuration values and returns a list of validation errors.
+    /// </summary>
+    /// <returns>List of validation error messages.</returns>
     public List<string> ValidateConfiguration()
     {
         var errors = new List<string>();
@@ -256,15 +280,20 @@ public class PluginConfiguration : BasePluginConfiguration
         return errors;
     }
 
-    // IsValid
-    // Returns true if the configuration passes validation.
+    /// <summary>
+    /// IsValid
+    /// Returns true if the configuration passes validation.
+    /// </summary>
+    /// <returns>True if valid.</returns>
     public bool IsValid()
     {
         return ValidateConfiguration().Count == 0;
     }
 
-    // SanitizeValues
-    // Clamps configuration values to valid ranges.
+    /// <summary>
+    /// SanitizeValues
+    /// Clamps configuration values to valid ranges.
+    /// </summary>
     public void SanitizeValues()
     {
         MaxConcurrentDownloads = Math.Clamp(MaxConcurrentDownloads, 1, 10);

@@ -40,4 +40,7 @@ public class SyncItem
     public string? ErrorMessage { get; set; }
 
     public int RetryCount { get; set; }
+
+    /// <summary>Comma-separated list of companion file names that were downloaded with this item.</summary>
+    public string? CompanionFiles { get; set; }
 }

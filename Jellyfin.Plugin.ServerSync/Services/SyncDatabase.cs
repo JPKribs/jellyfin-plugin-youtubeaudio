@@ -11,13 +11,12 @@ using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.ServerSync.Services;
 
-// SyncDatabase
-// SQLite database for tracking sync items between servers.
-// Uses a write lock to prevent concurrent write access issues with SQLite.
+/// <summary>
+/// SyncDatabase
+/// SQLite database for tracking sync items between servers.
+/// </summary>
 public class SyncDatabase : IDisposable
 {
-    private const int CurrentSchemaVersion = 5;
-
     private readonly ILogger<SyncDatabase> _logger;
     private readonly string _dbPath;
     private readonly object _writeLock = new();
@@ -40,16 +39,16 @@ public class SyncDatabase : IDisposable
             _connection = new SqliteConnection($"Data Source={_dbPath}");
             _connection.Open();
 
-            var currentVersion = GetSchemaVersion();
+            var currentVersion = DatabaseMigrationService.GetSchemaVersion(_connection);
 
             if (currentVersion == 0)
             {
-                CreateInitialSchema();
-                SetSchemaVersion(CurrentSchemaVersion);
+                DatabaseMigrationService.CreateInitialSchema(_connection);
+                DatabaseMigrationService.SetSchemaVersion(_connection, DatabaseMigrationService.CurrentSchemaVersion);
             }
-            else if (currentVersion < CurrentSchemaVersion)
+            else if (currentVersion < DatabaseMigrationService.CurrentSchemaVersion)
             {
-                var migrationSucceeded = MigrateSchema(currentVersion);
+                var migrationSucceeded = DatabaseMigrationService.MigrateSchema(_connection, currentVersion, _logger);
                 if (!migrationSucceeded)
                 {
                     _logger.LogWarning("Migration failed, recreating database with fresh schema");
@@ -58,7 +57,7 @@ public class SyncDatabase : IDisposable
                 }
             }
 
-            _logger.LogDebug("Sync database initialized at {DbPath} (schema v{Version})", _dbPath, CurrentSchemaVersion);
+            _logger.LogDebug("Sync database initialized at {DbPath} (schema v{Version})", _dbPath, DatabaseMigrationService.CurrentSchemaVersion);
         }
         catch (Exception ex)
         {
@@ -75,8 +74,10 @@ public class SyncDatabase : IDisposable
         }
     }
 
-    // RecreateDatabase
-    // Closes and deletes the current database, then creates a fresh one.
+    /// <summary>
+    /// RecreateDatabase
+    /// Closes and deletes the current database, then creates a fresh one.
+    /// </summary>
     private void RecreateDatabase()
     {
         _connection?.Dispose();
@@ -96,194 +97,29 @@ public class SyncDatabase : IDisposable
 
         _connection = new SqliteConnection($"Data Source={_dbPath}");
         _connection.Open();
-        CreateInitialSchema();
-        SetSchemaVersion(CurrentSchemaVersion);
-        _logger.LogInformation("Database recreated with fresh schema v{Version}", CurrentSchemaVersion);
+        DatabaseMigrationService.CreateInitialSchema(_connection);
+        DatabaseMigrationService.SetSchemaVersion(_connection, DatabaseMigrationService.CurrentSchemaVersion);
+        _logger.LogInformation("Database recreated with fresh schema v{Version}", DatabaseMigrationService.CurrentSchemaVersion);
     }
 
-    // GetSchemaVersion
-    // Returns the current database schema version.
-    private int GetSchemaVersion()
-    {
-        using var command = _connection!.CreateCommand();
-        command.CommandText = "PRAGMA user_version";
-        var result = command.ExecuteScalar();
-        return Convert.ToInt32(result);
-    }
-
-    // SetSchemaVersion
-    // Sets the database schema version.
-    private void SetSchemaVersion(int version)
-    {
-        using var command = _connection!.CreateCommand();
-        command.CommandText = $"PRAGMA user_version = {version}";
-        command.ExecuteNonQuery();
-    }
-
-    // CreateInitialSchema
-    // Creates the initial database schema.
-    private void CreateInitialSchema()
-    {
-        using var command = _connection!.CreateCommand();
-        command.CommandText = @"
-            CREATE TABLE IF NOT EXISTS SyncItems (
-                Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                SourceLibraryId TEXT NOT NULL,
-                LocalLibraryId TEXT NOT NULL,
-                SourceItemId TEXT NOT NULL,
-                SourcePath TEXT NOT NULL,
-                SourceSize INTEGER NOT NULL,
-                SourceCreateDate TEXT NOT NULL,
-                SourceModifyDate TEXT NOT NULL,
-                SourceETag TEXT,
-                LocalItemId TEXT,
-                LocalPath TEXT,
-                StatusDate TEXT NOT NULL,
-                Status INTEGER NOT NULL,
-                PendingType INTEGER,
-                LastSyncTime TEXT,
-                ErrorMessage TEXT,
-                RetryCount INTEGER DEFAULT 0,
-                UNIQUE(SourceItemId)
-            );
-            CREATE INDEX IF NOT EXISTS idx_source_item ON SyncItems(SourceItemId);
-            CREATE INDEX IF NOT EXISTS idx_status ON SyncItems(Status);
-            CREATE INDEX IF NOT EXISTS idx_source_library ON SyncItems(SourceLibraryId);
-            CREATE INDEX IF NOT EXISTS idx_local_path ON SyncItems(LocalPath);
-        ";
-        command.ExecuteNonQuery();
-    }
-
-    // MigrateSchema
-    // Migrates the database schema from an older version.
-    // Returns true if migration succeeded, false if it failed and database was reset.
-    private bool MigrateSchema(int fromVersion)
-    {
-        _logger.LogInformation("Migrating database schema from v{From} to v{To}", fromVersion, CurrentSchemaVersion);
-
-        using var transaction = _connection!.BeginTransaction();
-        try
-        {
-            if (fromVersion < 2)
-            {
-                var alterStatements = new[]
-                {
-                    "ALTER TABLE SyncItems ADD COLUMN LastSyncTime TEXT",
-                    "ALTER TABLE SyncItems ADD COLUMN ErrorMessage TEXT",
-                    "ALTER TABLE SyncItems ADD COLUMN RetryCount INTEGER DEFAULT 0"
-                };
-
-                foreach (var statement in alterStatements)
-                {
-                    try
-                    {
-                        using var cmd = _connection.CreateCommand();
-                        cmd.Transaction = transaction;
-                        cmd.CommandText = statement;
-                        cmd.ExecuteNonQuery();
-                    }
-                    catch (SqliteException ex) when (ex.Message.Contains("duplicate column", StringComparison.OrdinalIgnoreCase))
-                    {
-                        _logger.LogDebug("Column already exists, skipping");
-                    }
-                }
-
-                using var idxCmd = _connection.CreateCommand();
-                idxCmd.Transaction = transaction;
-                idxCmd.CommandText = "CREATE INDEX IF NOT EXISTS idx_local_path ON SyncItems(LocalPath)";
-                idxCmd.ExecuteNonQuery();
-            }
-
-            if (fromVersion < 3)
-            {
-                // Add SourceETag column for reliable change detection
-                try
-                {
-                    using var cmd = _connection.CreateCommand();
-                    cmd.Transaction = transaction;
-                    cmd.CommandText = "ALTER TABLE SyncItems ADD COLUMN SourceETag TEXT";
-                    cmd.ExecuteNonQuery();
-                    _logger.LogInformation("Added SourceETag column for change detection");
-                }
-                catch (SqliteException ex) when (ex.Message.Contains("duplicate column", StringComparison.OrdinalIgnoreCase))
-                {
-                    _logger.LogDebug("SourceETag column already exists, skipping");
-                }
-            }
-
-            if (fromVersion < 4)
-            {
-                // Add PendingType column and migrate old PendingDeletion/PendingReplacement statuses
-                try
-                {
-                    using var addColCmd = _connection.CreateCommand();
-                    addColCmd.Transaction = transaction;
-                    addColCmd.CommandText = "ALTER TABLE SyncItems ADD COLUMN PendingType INTEGER";
-                    addColCmd.ExecuteNonQuery();
-                    _logger.LogInformation("Added PendingType column");
-                }
-                catch (SqliteException ex) when (ex.Message.Contains("duplicate column", StringComparison.OrdinalIgnoreCase))
-                {
-                    _logger.LogDebug("PendingType column already exists, skipping");
-                }
-
-                // Migrate old statuses: PendingDeletion (5) -> Pending (0) with PendingType.Deletion (2)
-                using var migrateDeletionCmd = _connection.CreateCommand();
-                migrateDeletionCmd.Transaction = transaction;
-                migrateDeletionCmd.CommandText = "UPDATE SyncItems SET Status = 0, PendingType = 2 WHERE Status = 5";
-                var deletionCount = migrateDeletionCmd.ExecuteNonQuery();
-                if (deletionCount > 0)
-                {
-                    _logger.LogInformation("Migrated {Count} PendingDeletion items to Pending with PendingType.Deletion", deletionCount);
-                }
-
-                // Migrate old statuses: PendingReplacement (6) -> Pending (0) with PendingType.Replacement (1)
-                using var migrateReplacementCmd = _connection.CreateCommand();
-                migrateReplacementCmd.Transaction = transaction;
-                migrateReplacementCmd.CommandText = "UPDATE SyncItems SET Status = 0, PendingType = 1 WHERE Status = 6";
-                var replacementCount = migrateReplacementCmd.ExecuteNonQuery();
-                if (replacementCount > 0)
-                {
-                    _logger.LogInformation("Migrated {Count} PendingReplacement items to Pending with PendingType.Replacement", replacementCount);
-                }
-
-                // Set PendingType.Download (0) for existing Pending items without a type
-                using var migrateDownloadCmd = _connection.CreateCommand();
-                migrateDownloadCmd.Transaction = transaction;
-                migrateDownloadCmd.CommandText = "UPDATE SyncItems SET PendingType = 0 WHERE Status = 0 AND PendingType IS NULL";
-                migrateDownloadCmd.ExecuteNonQuery();
-            }
-
-            if (fromVersion < 5)
-            {
-                // No schema changes, but status value 5 is now Deleting instead of old PendingDeletion
-                // Old PendingDeletion items were already migrated to Pending+PendingType.Deletion in v4
-                _logger.LogInformation("Schema v5: Deleting status (5) is now available");
-            }
-
-            SetSchemaVersion(CurrentSchemaVersion);
-            transaction.Commit();
-            _logger.LogInformation("Database migration completed successfully");
-            return true;
-        }
-        catch (Exception ex)
-        {
-            transaction.Rollback();
-            _logger.LogError(ex, "Database migration failed, rolled back changes");
-            return false;
-        }
-    }
-
-    // BeginTransaction
-    // Starts a new database transaction.
+    /// <summary>
+    /// BeginTransaction
+    /// Starts a new database transaction.
+    /// </summary>
+    /// <returns>A new SQLite transaction.</returns>
     public SqliteTransaction BeginTransaction()
     {
         EnsureConnection();
         return _connection!.BeginTransaction();
     }
 
-    // CheckPathCollision
-    // Returns true if another item already uses this local path.
+    /// <summary>
+    /// CheckPathCollision
+    /// Returns true if another item already uses this local path.
+    /// </summary>
+    /// <param name="localPath">Path to check.</param>
+    /// <param name="excludeSourceItemId">Optional item ID to exclude from check.</param>
+    /// <returns>True if collision exists.</returns>
     public bool CheckPathCollision(string localPath, string? excludeSourceItemId = null)
     {
         EnsureConnection();
@@ -304,8 +140,12 @@ public class SyncDatabase : IDisposable
         return count > 0;
     }
 
-    // GetBySourceItemId
-    // Retrieves a sync item by its source item ID.
+    /// <summary>
+    /// GetBySourceItemId
+    /// Retrieves a sync item by its source item ID.
+    /// </summary>
+    /// <param name="sourceItemId">Source item ID.</param>
+    /// <returns>Sync item or null if not found.</returns>
     public SyncItem? GetBySourceItemId(string sourceItemId)
     {
         EnsureConnection();
@@ -318,8 +158,12 @@ public class SyncDatabase : IDisposable
         return reader.Read() ? ReadSyncItem(reader) : null;
     }
 
-    // GetByLocalPath
-    // Retrieves a sync item by its local path.
+    /// <summary>
+    /// GetByLocalPath
+    /// Retrieves a sync item by its local path.
+    /// </summary>
+    /// <param name="localPath">Local file path.</param>
+    /// <returns>Sync item or null if not found.</returns>
     public SyncItem? GetByLocalPath(string localPath)
     {
         EnsureConnection();
@@ -332,8 +176,12 @@ public class SyncDatabase : IDisposable
         return reader.Read() ? ReadSyncItem(reader) : null;
     }
 
-    // GetByStatus
-    // Retrieves all sync items with a specific status.
+    /// <summary>
+    /// GetByStatus
+    /// Retrieves all sync items with a specific status.
+    /// </summary>
+    /// <param name="status">Status to filter by.</param>
+    /// <returns>List of matching sync items.</returns>
     public List<SyncItem> GetByStatus(SyncStatus status)
     {
         EnsureConnection();
@@ -352,8 +200,12 @@ public class SyncDatabase : IDisposable
         return items;
     }
 
-    // GetBySourceLibrary
-    // Retrieves all sync items for a specific source library.
+    /// <summary>
+    /// GetBySourceLibrary
+    /// Retrieves all sync items for a specific source library.
+    /// </summary>
+    /// <param name="sourceLibraryId">Source library ID.</param>
+    /// <returns>List of sync items in the library.</returns>
     public List<SyncItem> GetBySourceLibrary(string sourceLibraryId)
     {
         EnsureConnection();
@@ -372,8 +224,11 @@ public class SyncDatabase : IDisposable
         return items;
     }
 
-    // GetAll
-    // Retrieves all sync items from the database.
+    /// <summary>
+    /// GetAll
+    /// Retrieves all sync items from the database.
+    /// </summary>
+    /// <returns>List of all sync items.</returns>
     public List<SyncItem> GetAll()
     {
         EnsureConnection();
@@ -391,8 +246,14 @@ public class SyncDatabase : IDisposable
         return items;
     }
 
-    // Search
-    // Searches sync items by filename with optional status and pending type filters.
+    /// <summary>
+    /// Search
+    /// Searches sync items by filename with optional status and pending type filters.
+    /// </summary>
+    /// <param name="searchTerm">Search term for filename.</param>
+    /// <param name="status">Optional status filter.</param>
+    /// <param name="pendingType">Optional pending type filter.</param>
+    /// <returns>List of matching sync items.</returns>
     public List<SyncItem> Search(string? searchTerm, SyncStatus? status = null, PendingType? pendingType = null)
     {
         EnsureConnection();
@@ -433,8 +294,12 @@ public class SyncDatabase : IDisposable
         return items;
     }
 
-    // GetPendingByType
-    // Retrieves all pending items with a specific pending type.
+    /// <summary>
+    /// GetPendingByType
+    /// Retrieves all pending items with a specific pending type.
+    /// </summary>
+    /// <param name="pendingType">Type of pending operation.</param>
+    /// <returns>List of pending sync items.</returns>
     public List<SyncItem> GetPendingByType(PendingType pendingType)
     {
         EnsureConnection();
@@ -454,8 +319,11 @@ public class SyncDatabase : IDisposable
         return items;
     }
 
-    // GetPendingCounts
-    // Returns counts of pending items grouped by pending type.
+    /// <summary>
+    /// GetPendingCounts
+    /// Returns counts of pending items grouped by pending type.
+    /// </summary>
+    /// <returns>Dictionary of pending type to count.</returns>
     public Dictionary<PendingType, int> GetPendingCounts()
     {
         EnsureConnection();
@@ -476,8 +344,12 @@ public class SyncDatabase : IDisposable
         return counts;
     }
 
-    // GetErroredItemsForRetry
-    // Gets errored items that haven't exceeded max retries.
+    /// <summary>
+    /// GetErroredItemsForRetry
+    /// Gets errored items that haven't exceeded max retries.
+    /// </summary>
+    /// <param name="maxRetries">Maximum retry count threshold.</param>
+    /// <returns>List of errored items eligible for retry.</returns>
     public List<SyncItem> GetErroredItemsForRetry(int maxRetries)
     {
         EnsureConnection();
@@ -497,8 +369,12 @@ public class SyncDatabase : IDisposable
         return items;
     }
 
-    // Upsert
-    // Inserts or updates a sync item in the database.
+    /// <summary>
+    /// Upsert
+    /// Inserts or updates a sync item in the database.
+    /// </summary>
+    /// <param name="item">Sync item to insert or update.</param>
+    /// <param name="transaction">Optional transaction.</param>
     public void Upsert(SyncItem item, SqliteTransaction? transaction = null)
     {
         lock (_writeLock)
@@ -517,11 +393,11 @@ public class SyncDatabase : IDisposable
             INSERT INTO SyncItems (
                 SourceLibraryId, LocalLibraryId, SourceItemId, SourcePath, SourceSize,
                 SourceCreateDate, SourceModifyDate, SourceETag, LocalItemId, LocalPath, StatusDate, Status,
-                PendingType, LastSyncTime, ErrorMessage, RetryCount
+                PendingType, LastSyncTime, ErrorMessage, RetryCount, CompanionFiles
             ) VALUES (
                 @sourceLibraryId, @localLibraryId, @sourceItemId, @sourcePath, @sourceSize,
                 @sourceCreateDate, @sourceModifyDate, @sourceETag, @localItemId, @localPath, @statusDate, @status,
-                @pendingType, @lastSyncTime, @errorMessage, @retryCount
+                @pendingType, @lastSyncTime, @errorMessage, @retryCount, @companionFiles
             )
             ON CONFLICT(SourceItemId) DO UPDATE SET
                 SourceLibraryId = @sourceLibraryId,
@@ -538,7 +414,8 @@ public class SyncDatabase : IDisposable
                 PendingType = @pendingType,
                 LastSyncTime = @lastSyncTime,
                 ErrorMessage = @errorMessage,
-                RetryCount = @retryCount
+                RetryCount = @retryCount,
+                CompanionFiles = @companionFiles
         ";
 
         command.Parameters.AddWithValue("@sourceLibraryId", item.SourceLibraryId);
@@ -557,12 +434,23 @@ public class SyncDatabase : IDisposable
         command.Parameters.AddWithValue("@lastSyncTime", item.LastSyncTime?.ToString("o") ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@errorMessage", item.ErrorMessage ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@retryCount", item.RetryCount);
+        command.Parameters.AddWithValue("@companionFiles", item.CompanionFiles ?? (object)DBNull.Value);
 
         command.ExecuteNonQuery();
     }
 
-    // UpdateStatus
-    // Updates the status of a sync item with optional fields.
+    /// <summary>
+    /// UpdateStatus
+    /// Updates the status of a sync item with optional fields.
+    /// </summary>
+    /// <param name="sourceItemId">Source item ID.</param>
+    /// <param name="status">New status.</param>
+    /// <param name="pendingType">Optional pending type.</param>
+    /// <param name="localItemId">Optional local item ID.</param>
+    /// <param name="localPath">Optional local path.</param>
+    /// <param name="errorMessage">Optional error message.</param>
+    /// <param name="sourceETag">Optional source ETag.</param>
+    /// <param name="sourceSize">Optional source size.</param>
     public void UpdateStatus(
         string sourceItemId,
         SyncStatus status,
@@ -571,7 +459,8 @@ public class SyncDatabase : IDisposable
         string? localPath = null,
         string? errorMessage = null,
         string? sourceETag = null,
-        long? sourceSize = null)
+        long? sourceSize = null,
+        string? companionFiles = null)
     {
         lock (_writeLock)
         {
@@ -613,6 +502,11 @@ public class SyncDatabase : IDisposable
         if (sourceSize.HasValue)
         {
             setClauses.Add("SourceSize = @sourceSize");
+        }
+
+        if (companionFiles != null)
+        {
+            setClauses.Add("CompanionFiles = @companionFiles");
         }
 
         if (status == SyncStatus.Synced)
@@ -658,14 +552,23 @@ public class SyncDatabase : IDisposable
             command.Parameters.AddWithValue("@sourceSize", sourceSize.Value);
         }
 
+        if (companionFiles != null)
+        {
+            command.Parameters.AddWithValue("@companionFiles", companionFiles);
+        }
+
         command.Parameters.AddWithValue("@errorMessage", errorMessage ?? (object)DBNull.Value);
 
             command.ExecuteNonQuery();
         }
     }
 
-    // Delete
-    // Deletes a sync item by its source item ID.
+    /// <summary>
+    /// Delete
+    /// Deletes a sync item by its source item ID.
+    /// </summary>
+    /// <param name="sourceItemId">Source item ID to delete.</param>
+    /// <param name="transaction">Optional transaction.</param>
     public void Delete(string sourceItemId, SqliteTransaction? transaction = null)
     {
         // Only lock if we're not already inside a transaction (which would have its own lock)
@@ -693,8 +596,11 @@ public class SyncDatabase : IDisposable
         command.ExecuteNonQuery();
     }
 
-    // GetStatusCounts
-    // Returns counts of items grouped by status.
+    /// <summary>
+    /// GetStatusCounts
+    /// Returns counts of items grouped by status.
+    /// </summary>
+    /// <returns>Dictionary of status to count.</returns>
     public Dictionary<SyncStatus, int> GetStatusCounts()
     {
         EnsureConnection();
@@ -714,8 +620,11 @@ public class SyncDatabase : IDisposable
         return counts;
     }
 
-    // GetSyncStats
-    // Returns detailed sync statistics.
+    /// <summary>
+    /// GetSyncStats
+    /// Returns detailed sync statistics.
+    /// </summary>
+    /// <returns>Sync statistics object.</returns>
     public SyncStats GetSyncStats()
     {
         EnsureConnection();
@@ -753,8 +662,12 @@ public class SyncDatabase : IDisposable
         return stats;
     }
 
-    // ClearStaleErrors
-    // Resets error status for items older than specified days.
+    /// <summary>
+    /// ClearStaleErrors
+    /// Resets error status for items older than specified days.
+    /// </summary>
+    /// <param name="olderThanDays">Age threshold in days.</param>
+    /// <returns>Number of items reset.</returns>
     public int ClearStaleErrors(int olderThanDays)
     {
         lock (_writeLock)
@@ -777,8 +690,12 @@ public class SyncDatabase : IDisposable
         }
     }
 
-    // ReadSyncItem
-    // Reads a SyncItem from the database reader.
+    /// <summary>
+    /// ReadSyncItem
+    /// Reads a SyncItem from the database reader.
+    /// </summary>
+    /// <param name="reader">SQLite data reader.</param>
+    /// <returns>Populated sync item.</returns>
     private static SyncItem ReadSyncItem(SqliteDataReader reader)
     {
         var item = new SyncItem
@@ -828,6 +745,12 @@ public class SyncDatabase : IDisposable
             {
                 item.RetryCount = reader.GetInt32(retryOrdinal);
             }
+
+            var companionOrdinal = reader.GetOrdinal("CompanionFiles");
+            if (!reader.IsDBNull(companionOrdinal))
+            {
+                item.CompanionFiles = reader.GetString(companionOrdinal);
+            }
         }
         catch (ArgumentOutOfRangeException)
         {
@@ -837,8 +760,12 @@ public class SyncDatabase : IDisposable
         return item;
     }
 
-    // ParseDateTimeSafe
-    // Parses a datetime string safely, returning DateTime.MinValue on failure.
+    /// <summary>
+    /// ParseDateTimeSafe
+    /// Parses a datetime string safely, returning DateTime.MinValue on failure.
+    /// </summary>
+    /// <param name="dateString">Date string to parse.</param>
+    /// <returns>Parsed datetime or MinValue on failure.</returns>
     private static DateTime ParseDateTimeSafe(string? dateString)
     {
         if (string.IsNullOrEmpty(dateString))
@@ -854,8 +781,10 @@ public class SyncDatabase : IDisposable
         return DateTime.MinValue;
     }
 
-    // EnsureConnection
-    // Ensures the database connection is open, reopening if necessary.
+    /// <summary>
+    /// EnsureConnection
+    /// Ensures the database connection is open, reopening if necessary.
+    /// </summary>
     private void EnsureConnection()
     {
         if (_connection != null && _connection.State == ConnectionState.Open)
@@ -884,8 +813,10 @@ public class SyncDatabase : IDisposable
         }
     }
 
-    // ResetDatabase
-    // Drops all data and recreates the database with the latest schema.
+    /// <summary>
+    /// ResetDatabase
+    /// Drops all data and recreates the database with the latest schema.
+    /// </summary>
     public void ResetDatabase()
     {
         _logger.LogWarning("Resetting sync database - all tracking data will be lost");
@@ -899,12 +830,15 @@ public class SyncDatabase : IDisposable
         }
 
         InitializeDatabase();
-        _logger.LogInformation("Sync database has been reset with fresh schema v{Version}", CurrentSchemaVersion);
+        _logger.LogInformation("Sync database has been reset with fresh schema v{Version}", DatabaseMigrationService.CurrentSchemaVersion);
     }
 
-    // ExecuteInTransaction
-    // Executes multiple database operations within a transaction.
-    // Returns true if the transaction was committed successfully.
+    /// <summary>
+    /// ExecuteInTransaction
+    /// Executes multiple database operations within a transaction.
+    /// </summary>
+    /// <param name="action">Action to execute within transaction.</param>
+    /// <returns>True if committed successfully.</returns>
     public bool ExecuteInTransaction(Action<SqliteTransaction> action)
     {
         lock (_writeLock)
@@ -935,8 +869,12 @@ public class SyncDatabase : IDisposable
         }
     }
 
-    // BatchDelete
-    // Deletes multiple items within a transaction.
+    /// <summary>
+    /// BatchDelete
+    /// Deletes multiple items within a transaction.
+    /// </summary>
+    /// <param name="sourceItemIds">Source item IDs to delete.</param>
+    /// <returns>Number of items deleted.</returns>
     public int BatchDelete(IEnumerable<string> sourceItemIds)
     {
         lock (_writeLock)
@@ -965,8 +903,14 @@ public class SyncDatabase : IDisposable
         }
     }
 
-    // BatchUpdateStatus
-    // Updates the status of multiple items within a transaction.
+    /// <summary>
+    /// BatchUpdateStatus
+    /// Updates the status of multiple items within a transaction.
+    /// </summary>
+    /// <param name="sourceItemIds">Source item IDs to update.</param>
+    /// <param name="status">New status to set.</param>
+    /// <param name="errorMessage">Optional error message.</param>
+    /// <returns>Number of items updated.</returns>
     public int BatchUpdateStatus(IEnumerable<string> sourceItemIds, SyncStatus status, string? errorMessage = null)
     {
         lock (_writeLock)

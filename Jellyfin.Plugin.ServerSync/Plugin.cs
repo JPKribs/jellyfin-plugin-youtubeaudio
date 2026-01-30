@@ -11,8 +11,10 @@ using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.ServerSync;
 
-// Plugin
-// Main plugin entry point for Server Sync.
+/// <summary>
+/// Plugin
+/// Main plugin entry point for Server Sync.
+/// </summary>
 public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages, IDisposable
 {
     private readonly ILogger<Plugin> _logger;
@@ -68,8 +70,11 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages, IDisposable
         }
     }
 
-    // GetTempDownloadPath
-    // Returns the configured temp path or falls back to cache directory.
+    /// <summary>
+    /// GetTempDownloadPath
+    /// Returns the configured temp path or falls back to cache directory.
+    /// </summary>
+    /// <returns>Path to temp download directory.</returns>
     public string GetTempDownloadPath()
     {
         if (!string.IsNullOrWhiteSpace(Configuration.TempDownloadPath))

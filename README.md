@@ -26,17 +26,7 @@ Once connected, you'll see the source server's name and ID displayed, confirming
 
 ## Content Syncing
 
-Content syncing downloads media files from the source server to your local server. The plugin periodically scans the source for movies, episodes, audio, and video files, then downloads missing or updated content based on your configuration.
-
-**Key Features:**
-- Library-to-library mapping with automatic path translation
-- ETag-based change detection for reliable sync
-- Granular approval workflows (Enabled / Require Approval / Disabled) for new content, replacements, and deletions
-- Bandwidth throttling with time-based scheduling
-- Recycling bin for safe deletions
-- Companion file support (subtitles, NFO, images)
-
-For complete documentation including all settings, library mappings, approval workflows, and technical details, see **[Documentation/Content.md](Documentation/Content.md)**.
+Content syncing enables one-way media file synchronization from the source server to your local server. The plugin periodically scans the source for movies, episodes, audio, and video files, compares them against what exists locally using ETag-based change detection, and queues missing or updated content for download. Downloads respect your configured bandwidth limits and can require manual approval before proceeding. For complete documentation, see **[Documentation/Content.md](Documentation/Content.md)**.
 
 ---
 
@@ -49,3 +39,28 @@ For complete documentation including all settings, library mappings, approval wo
 ## User Syncing
 
 *Work in Progress*
+
+## Installation
+
+### Step 1: Add Plugin Repository
+
+* Open Jellyfin and navigate to Dashboard → Plugins → Repositories
+* Click Add Repository
+* Enter the following repository URL: `https://raw.githubusercontent.com/JPKribs/jellyfin-plugin-serversync/master/manifest.json`
+* Click Save
+
+### Step 2: Install Plugin
+
+* Go to the Catalog tab in the Plugins section
+* Find Server Sync in the catalog
+* Click Install
+* Wait for installation to complete
+
+### Step 3: Restart Jellyfin
+
+* Restart your Jellyfin server completely
+* Wait for Jellyfin to fully start up
+
+### Verification Check
+
+* After restart, navigate to Dashboard → Plugins → Server Sync to confirm the plugin configuration page loads properly.

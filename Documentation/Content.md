@@ -1,449 +1,175 @@
-# Content Syncing - Technical Documentation
+# Content Syncing
 
-This document provides a detailed technical breakdown of how content syncing works in the Server Sync plugin.
+## Summary
 
-## Overview
+Content syncing enables one-way media synchronization from a source Jellyfin server to your local Jellyfin server. The plugin runs on your local (destination) server and pulls content from a remote source server using API key authentication.
 
-Content syncing is a two-phase process:
+The sync process works in two phases. First, a refresh task scans the source server's libraries and compares each item against your local tracking database. New items, changed items, and items that no longer exist on the source are identified and categorized. Second, a download task processes any items that have been queued for download, streaming the files from the source server to your local storage with optional bandwidth throttling.
 
-1. **Refresh Phase** (`UpdateSyncTablesTask`): Scans the source server and updates the local tracking database
-2. **Download Phase** (`DownloadMissingContentTask`): Downloads files for items in the queue
+Each item is tracked individually with its own status. Items can be automatically queued for download, require manual approval, or be disabled entirely depending on your configuration. The plugin supports three operation types: downloading new content, replacing existing content when the source version changes, and deleting local content when it's removed from the source. Each operation type has its own approval setting, giving you fine-grained control over what happens automatically versus what requires your review.
 
-Both phases run as scheduled Jellyfin tasks and can also be triggered manually from the plugin UI.
-
-## Architecture
-
-### Components
-
-| Component | Purpose |
-|-----------|---------|
-| `SourceServerClient` | Communicates with the source Jellyfin server via API |
-| `SyncDatabase` | SQLite database tracking all sync items and their states |
-| `UpdateSyncTablesTask` | Scheduled task that scans source and updates tracking |
-| `DownloadMissingContentTask` | Scheduled task that downloads queued items |
-| `RecyclingBinService` | Handles soft-delete operations for replaced/deleted files |
-| `ConfigurationController` | API endpoints for the plugin UI |
-
-### Data Flow
+The plugin also handles companion files (subtitles, NFO metadata files, images) alongside the main media files. When enabled, these are downloaded together with the primary media file. A recycling bin feature allows replaced or deleted files to be soft-deleted first, giving you a recovery window before permanent deletion.
 
 ```
-Source Server                    Local Server
-     │                                │
-     │  ── API Request ──────────►    │
-     │     (GetItems)                 │
-     │                                │
-     │  ◄── Item List ────────────    │
-     │                                │
-     │                          ┌─────┴─────┐
-     │                          │  Compare  │
-     │                          │  with DB  │
-     │                          └─────┬─────┘
-     │                                │
-     │                          ┌─────┴─────┐
-     │                          │  Update   │
-     │                          │  Statuses │
-     │                          └─────┬─────┘
-     │                                │
-     │  ── Download Request ─────►    │
-     │     (for Queued items)         │
-     │                                │
-     │  ◄── File Stream ──────────    │
-     │                                │
-     │                          ┌─────┴─────┐
-     │                          │   Save    │
-     │                          │   File    │
-     │                          └───────────┘
+Source Server                         Local Server
+┌─────────────┐                       ┌─────────────────────────────┐
+│             │                       │                             │
+│  Libraries  │ ──── API Scan ─────►  │  Tracking Database          │
+│             │                       │  (compares source vs local) │
+│             │                       │                             │
+│             │                       │         ▼                   │
+│             │                       │  ┌─────────────────────┐    │
+│             │                       │  │ Queued / Pending    │    │
+│             │                       │  └─────────────────────┘    │
+│             │                       │         ▼                   │
+│  Files      │ ◄── Download ───────  │  Download Task              │
+│             │    (throttled)        │  (processes queue)          │
+│             │                       │         ▼                   │
+│             │                       │  Local Storage              │
+└─────────────┘                       └─────────────────────────────┘
 ```
 
-## API Communication
+---
 
-### Source Server APIs Used
+## How it Works
 
-The plugin uses the Jellyfin SDK to communicate with the source server:
+When you configure content syncing, you map source server libraries to local paths on your server. For example, you might map the source server's "Movies" library (located at `/media/movies`) to your local path `/srv/jellyfin/movies`. The plugin uses this mapping to translate file paths between servers.
 
-| Endpoint | Purpose |
-|----------|---------|
-| `GET /System/Info/Public` | Test connection, get server name/ID |
-| `GET /Library/VirtualFolders` | List available libraries |
-| `GET /Items` | Fetch items from a library (paginated) |
-| `GET /Items/{id}/File` | Download the actual media file |
-
-### Authentication
-
-All API requests use an API key passed in the `Authorization` header:
-```
-Authorization: MediaBrowser Token="{api_key}"
-```
-
-### Pagination
-
-Items are fetched in batches of 100 to avoid memory issues with large libraries:
-
-```csharp
-var result = await client.GetItemsAsync(
-    parentId: libraryId,
-    fields: [ItemFields.Path, ItemFields.DateCreated, ItemFields.MediaSources, ItemFields.Etag],
-    includeItemTypes: [BaseItemKind.Movie, BaseItemKind.Episode, BaseItemKind.Audio, BaseItemKind.Video],
-    startIndex: startIndex,
-    limit: 100
-);
-```
-
-## Sync Item States
-
-Each tracked item has a status that determines how it's processed:
-
-| Status | Value | Description |
-|--------|-------|-------------|
-| `Pending` | 0 | Awaiting approval (see PendingType for operation type) |
-| `Queued` | 1 | Approved and waiting to be downloaded |
-| `Synced` | 2 | Successfully downloaded and verified |
-| `Errored` | 3 | Download failed (will retry up to 3 times) |
-| `Ignored` | 4 | User chose to never sync this item |
-
-### Pending Types
-
-When an item has `Status = Pending`, the `PendingType` field indicates the operation awaiting approval:
-
-| PendingType | Value | Description |
-|-------------|-------|-------------|
-| `Download` | 0 | New item awaiting approval to download |
-| `Replacement` | 1 | Source changed, awaiting approval to replace |
-| `Deletion` | 2 | Item removed from source, awaiting deletion approval |
-
-## Refresh Phase (UpdateSyncTablesTask)
-
-The refresh task runs every 6 hours by default and performs the following:
-
-### 1. Fetch Existing Items
-
-Load all currently tracked items from the database for the library being processed.
-
-### 2. Scan Source Library
-
-Iterate through all items on the source server in batches.
-
-### 3. Process Each Item
-
-For each item found on the source:
-
-```
-ITEM FOUND ON SOURCE
-│
-├─► Item exists in tracking DB?
-│   │
-│   ├─► YES → ProcessExistingItem()
-│   │
-│   └─► NO → ProcessNewItem()
-```
-
-#### ProcessNewItem Logic
-
-```
-NEW ITEM
-│
-├─► Is DownloadNewContentMode = DISABLED?
-│   └─► YES → Don't track (return)
-│
-├─► Does local file exist with matching size?
-│   └─► YES → Status = SYNCED
-│
-├─► Is DownloadNewContentMode = REQUIRE_APPROVAL?
-│   │
-│   ├─► YES → Status = PENDING
-│   │
-│   └─► NO → Status = QUEUED
-```
-
-#### ProcessExistingItem Logic
-
-```
-EXISTING ITEM
-│
-├─► Status = IGNORED?
-│   └─► YES → No action
-│
-├─► Status = PENDING with PendingType = DELETION?
-│   └─► YES → Restore (Status = QUEUED)
-│
-├─► Status = PENDING (any PendingType)?
-│   └─► YES → Update metadata only
-│
-├─► Source changed? (size, path, or ETag)
-│   │
-│   ├─► YES:
-│   │   │
-│   │   ├─► ReplaceExistingContentMode = DISABLED → Update metadata only
-│   │   │
-│   │   ├─► ReplaceExistingContentMode = REQUIRE_APPROVAL → Status = PENDING, PendingType = REPLACEMENT
-│   │   │
-│   │   └─► ReplaceExistingContentMode = ENABLED → Status = QUEUED
-│   │
-│   └─► NO → Check local file integrity (if DetectUpdatedFiles enabled)
-```
-
-### 4. Process Missing Items
-
-After scanning all source items, check for items in the database that weren't seen:
-
-```
-ITEM NOT FOUND ON SOURCE
-│
-├─► Status = IGNORED or (PENDING with PendingType = DELETION)?
-│   └─► YES → No action
-│
-├─► Status != SYNCED? (Pending, Queued, Errored, etc.)
-│   └─► YES → Delete from tracking DB only
-│
-├─► DeleteMissingContentMode = DISABLED?
-│   └─► YES → No action
-│
-└─► Status = PENDING, PendingType = DELETION
-    (awaits approval or auto-deletion based on mode)
-```
-
-## Download Phase (DownloadMissingContentTask)
-
-The download task runs every hour by default and processes items with `Queued` status.
-
-### Download Process
-
-```
-FOR EACH QUEUED ITEM:
-│
-├─► Pre-download validation:
-│   │
-│   ├─► Local file exists with matching size?
-│   │   └─► YES → Status = SYNCED, skip download
-│   │
-│   ├─► Sufficient disk space?
-│   │   └─► NO → Skip, log warning
-│   │
-│   └─► Library mapping still valid?
-│       └─► NO → Skip, log warning
-│
-├─► If replacing existing file and recycling bin enabled:
-│   └─► Move existing file to recycling bin
-│
-├─► Download to temp file:
-│   │
-│   ├─► Create temp directory if needed
-│   │
-│   ├─► Stream file from source with bandwidth throttling
-│   │
-│   └─► Verify downloaded size matches expected
-│
-├─► Move temp file to final location:
-│   │
-│   ├─► Create target directory if needed
-│   │
-│   └─► Atomic move from temp to final path
-│
-├─► Download companion files (if enabled):
-│   │
-│   └─► Subtitles, NFO, images
-│
-└─► Update status:
-    │
-    ├─► Success → Status = SYNCED
-    │
-    └─► Failure → Status = ERRORED, increment retry count
-```
-
-### Bandwidth Throttling
-
-Downloads respect the configured bandwidth limits:
-
-```csharp
-var maxBytesPerSecond = config.GetEffectiveDownloadSpeedBytes();
-
-if (maxBytesPerSecond > 0)
-{
-    // Throttled read
-    var bytesToRead = Math.Min(buffer.Length, maxBytesPerSecond);
-    var bytesRead = await stream.ReadAsync(buffer, 0, bytesToRead);
-    await Task.Delay(1000); // Wait 1 second between reads
-}
-```
-
-The `GetEffectiveDownloadSpeedBytes()` method checks if bandwidth scheduling is enabled and returns the appropriate speed based on current time.
-
-### Retry Logic
-
-Failed downloads are retried up to 3 times:
-
-```csharp
-if (item.RetryCount < MaxRetries)
-{
-    item.RetryCount++;
-    item.Status = SyncStatus.Errored;
-    // Will be retried on next task run
-}
-else
-{
-    item.Status = SyncStatus.Errored;
-    item.ErrorMessage = "Max retries exceeded: " + error;
-    // Requires manual intervention
-}
-```
-
-## Change Detection
-
-The plugin uses multiple methods to detect when content has changed:
-
-### ETag (Primary)
-
-The ETag is derived from the source file's `DateModified` timestamp. This is the most reliable indicator of actual file changes.
-
-```csharp
-var sourceChanged = sourceETag != null && existingItem.SourceETag != sourceETag;
-```
-
-### File Size
-
-Compared between source and local. Detects corruption or incomplete downloads.
-
-```csharp
-var sizeChanged = existingItem.SourceSize != sourceSize;
-```
-
-### File Path
-
-Detects renamed or moved files on the source server.
-
-```csharp
-var pathChanged = existingItem.SourcePath != sourcePath;
-```
-
-## Path Translation
-
-Paths are translated between source and local servers using the library mapping configuration:
-
-```csharp
-private static string TranslatePath(string sourcePath, string sourceRoot, string localRoot)
-{
-    // Example:
-    // sourcePath: /media/movies/Movie (2024)/Movie.mkv
-    // sourceRoot: /media/movies
-    // localRoot:  /srv/jellyfin/movies
-    // Result:     /srv/jellyfin/movies/Movie (2024)/Movie.mkv
-
-    if (sourcePath.StartsWith(sourceRoot))
-    {
-        var relativePath = sourcePath.Substring(sourceRoot.Length);
-        return localRoot + relativePath;
-    }
-
-    return sourcePath;
-}
-```
-
-## Deletion Process
-
-When items are approved for deletion (or auto-deletion is enabled):
-
-### With Recycling Bin
-
-```
-DELETE ITEM (Recycling Bin Enabled)
-│
-├─► Generate recycled filename:
-│   │   Format: path.to.file_2024-01-15_14-30-45.mkv
-│   │
-│   └─► Encodes original path and timestamp
-│
-├─► Move file to recycling bin
-│
-├─► Move companion files to recycling bin
-│
-└─► Remove from Jellyfin library
-    (DeleteFileLocation = false)
-```
-
-### Without Recycling Bin
-
-```
-DELETE ITEM (Permanent)
-│
-├─► Delete via Jellyfin Library Manager
-│   (DeleteFileLocation = true)
-│
-└─► Library manager handles:
-    ├─► File deletion
-    ├─► Companion file cleanup
-    └─► Database cleanup
-```
-
-### Recycling Bin Cleanup
-
-The `EmptyRecyclingBinTask` runs daily and permanently deletes files older than the retention period:
-
-```csharp
-var cutoffTime = DateTime.UtcNow.AddDays(-retentionDays);
-
-foreach (var file in Directory.GetFiles(recyclingBinPath))
-{
-    var fileTime = ExtractTimestampFromFileName(file) ?? fileInfo.LastWriteTimeUtc;
-
-    if (fileTime < cutoffTime)
-    {
-        File.Delete(file);
-    }
-}
-```
-
-## Database Schema
-
-The sync database uses SQLite with the following schema:
-
-```sql
-CREATE TABLE SyncItems (
-    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    SourceLibraryId TEXT NOT NULL,
-    LocalLibraryId TEXT NOT NULL,
-    SourceItemId TEXT NOT NULL UNIQUE,
-    SourcePath TEXT NOT NULL,
-    LocalPath TEXT,
-    LocalItemId TEXT,
-    SourceSize INTEGER NOT NULL,
-    SourceCreateDate TEXT NOT NULL,
-    SourceModifyDate TEXT NOT NULL,
-    SourceETag TEXT,
-    Status INTEGER NOT NULL,
-    PendingType INTEGER,  -- NULL when not Pending; 0=Download, 1=Replacement, 2=Deletion
-    StatusDate TEXT NOT NULL,
-    LastSyncTime TEXT,
-    ErrorMessage TEXT,
-    RetryCount INTEGER DEFAULT 0
-);
-
-CREATE INDEX idx_status ON SyncItems(Status);
-CREATE INDEX idx_source_library ON SyncItems(SourceLibraryId);
-```
-
-## Scheduled Tasks
-
-| Task | Key | Default Interval | Purpose |
-|------|-----|------------------|---------|
-| Update Sync Tables | `ServerSyncUpdateTables` | 6 hours | Scan source, update tracking |
-| Download Content | `ServerSyncDownloadContent` | 1 hour | Download queued items |
-| Cleanup Temp Files | `ServerSyncCleanupTempFiles` | 24 hours | Remove orphaned temp files |
-| Empty Recycling Bin | `ServerSyncEmptyRecyclingBin` | 24 hours | Permanently delete expired files |
-
-## Error Handling
-
-### Network Errors
-
-Transient network errors increment the retry count. After 3 failures, the item remains in `Errored` status for manual review.
-
-### Disk Space Errors
-
-Downloads are skipped (not failed) when disk space is below the minimum threshold. The item remains `Queued` for the next attempt.
-
-### File Permission Errors
-
-Logged and treated as errors. May require manual intervention to fix permissions.
-
-### API Errors
-
-Connection failures during the refresh phase abort the current library scan but don't affect already-tracked items.
+The **Refresh Task** runs periodically (default: every 6 hours) and performs a full scan of all mapped libraries on the source server. For each item found, it fetches metadata including the file path, size, and ETag (a change indicator based on the file's modification date). The plugin then compares this against its tracking database to determine what action is needed.
+
+For new items not in the database, the plugin checks if a local file already exists at the expected path with a matching file size. If so, it marks the item as already synced. Otherwise, it either queues the item for download or marks it as pending approval, depending on your "Download New Content" setting.
+
+For existing tracked items, the plugin checks whether the source file has changed by comparing the ETag, file size, and path. If changes are detected and you have "Replace Existing Content" enabled or set to require approval, the item is queued or marked pending accordingly. If "Detect Updated Files" is enabled, the plugin also verifies that previously synced local files still exist and match the expected size.
+
+For items in the database that no longer exist on the source, the plugin can mark them for deletion if you have "Delete Missing Content" enabled. These go through the same approval workflow as other operations.
+
+The **Download Task** runs more frequently (default: every hour) and processes all items with a "Queued" status. For each item, it validates that sufficient disk space exists, streams the file from the source server to a temporary location, then moves it to the final destination. If bandwidth throttling is configured, downloads respect the speed limit. Failed downloads are retried up to 3 times before being marked as errored.
+
+After downloads complete, the plugin triggers a Jellyfin library refresh so new content appears in your server immediately.
+
+---
+
+## Configuration
+
+### General Settings
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Enable Content Sync | Master toggle for all content syncing functionality | Off |
+| Include Companion Files | Download subtitles, NFO files, and images alongside media | On |
+| Detect Updated Files | Re-queue files if local copy is missing or size mismatches | On |
+
+### Download Settings
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Max Concurrent Downloads | Number of simultaneous downloads (1-10) | 2 |
+| Max Download Speed | Bandwidth limit (0 = unlimited) | 0 (unlimited) |
+| Download Speed Unit | Unit for speed limit (KB/s, MB/s, GB/s) | MB/s |
+| Minimum Free Disk Space | Stop downloads when disk space falls below this (GB) | 10 GB |
+| Max Retry Count | Times to retry failed downloads before giving up | 3 |
+
+### Bandwidth Scheduling
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Enable Bandwidth Scheduling | Use different speed during scheduled hours | Off |
+| Scheduled Start Hour | Hour (0-23) when scheduled speed begins | 0 (midnight) |
+| Scheduled End Hour | Hour (0-24) when scheduled speed ends | 6 (6 AM) |
+| Scheduled Download Speed | Speed during scheduled hours (0 = unlimited) | 0 (unlimited) |
+| Scheduled Speed Unit | Unit for scheduled speed | MB/s |
+
+### Approval Modes
+
+Each operation type can be set to one of three modes:
+
+| Mode | Behavior |
+|------|----------|
+| Enabled | Operations happen automatically without approval |
+| Require Approval | Operations are queued as "Pending" and require manual approval |
+| Disabled | Operations are not performed |
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Download New Content | How to handle items on source that don't exist locally | Enabled |
+| Replace Existing Content | How to handle items that have changed on source | Enabled |
+| Delete Missing Content | How to handle items removed from source | Disabled |
+
+### Recycling Bin
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Enable Recycling Bin | Soft-delete files instead of permanent deletion | Off |
+| Recycling Bin Path | Directory where deleted files are moved | (none) |
+| Retention Days | Days to keep files before permanent deletion | 7 |
+
+### Library Mappings
+
+Library mappings connect source server libraries to local storage paths. Each mapping includes:
+
+| Field | Description |
+|-------|-------------|
+| Source Library | The library on the source server to sync from |
+| Local Root Path | The local directory where files should be saved |
+| Enabled | Whether this mapping is active |
+
+The plugin automatically translates paths between servers. For example, if the source has a file at `/media/movies/Film (2024)/Film.mkv` and your mapping specifies source root `/media/movies` with local root `/srv/jellyfin/movies`, the file will be saved to `/srv/jellyfin/movies/Film (2024)/Film.mkv`.
+
+---
+
+## Approval and Pending Items
+
+When an operation mode is set to "Require Approval", items enter a pending state instead of being processed automatically. This gives you the opportunity to review what will happen before any files are downloaded, replaced, or deleted.
+
+### Status Cards
+
+The Sync Items page displays status cards at the top showing counts for each item status:
+
+- **Synced**: Items that have been successfully downloaded and verified
+- **Queued**: Items approved and waiting for the next download task
+- **Errored**: Items that failed to download (will retry automatically)
+- **Ignored**: Items you've chosen to never sync
+- **Pending Download**: New items awaiting approval to download
+- **Pending Replace**: Changed items awaiting approval to replace
+- **Pending Delete**: Removed items awaiting approval to delete
+
+The pending status cards only appear when you have items in those states.
+
+### Filtering Items
+
+Use the status dropdown filter to view items by status. Click on any status card to quickly filter to that status. The "Select All" checkbox and bulk action buttons let you process multiple items at once.
+
+### Item Detail Modal
+
+Click on any item row to open the detail modal. The modal displays:
+
+- **Status**: Current status with color indicator
+- **Error**: If errored, the error message (useful for troubleshooting)
+- **Retry Count**: Number of download attempts if errored
+- **Size**: File size
+- **Source Path**: Location on the source server
+- **Local Path**: Where the file will be saved locally
+- **Last Sync**: When the item was last successfully synced (if applicable)
+- **Companion Files**: List of associated files (subtitles, etc.)
+
+### Approving Items
+
+From the detail modal or using bulk actions, you can:
+
+- **Queue**: Approve the item for download/replacement/deletion. The item moves to "Queued" status and will be processed on the next download task run.
+- **Ignore**: Mark the item to never sync. The item will be skipped on future scans.
+- **Delete**: Remove the local file (for synced items only). This deletes from your local server, not the source.
+
+For pending deletions specifically, clicking "Queue" approves the deletion. If the recycling bin is enabled, the file will be moved there instead of permanently deleted.
+
+### Bulk Actions
+
+Select multiple items using the checkboxes, then use the header buttons:
+
+- **Ignore**: Mark all selected items as ignored
+- **Queue**: Approve all selected items
+- **Delete**: Delete all selected local files (synced items only)
+
+### Manual Sync
+
+Use the "Sync" button to manually trigger a download task immediately instead of waiting for the scheduled run. Use "Refresh" to reload the item list from the database. Use "Retry Errors" to reset all errored items back to queued status for another attempt.

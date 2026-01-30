@@ -3,7 +3,7 @@ namespace Jellyfin.Plugin.ServerSync.Models.ContentSync;
 /// <summary>
 /// Result of a download operation.
 /// </summary>
-public record DownloadResult(bool Success, string? ErrorMessage = null);
+public record DownloadResult(bool Success, string? ErrorMessage = null, string? CompanionFiles = null);
 
 /// <summary>
 /// Result of a deletion operation.

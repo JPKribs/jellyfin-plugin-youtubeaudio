@@ -15,16 +15,21 @@ category: "General"
 owner: "JPKribs"
 artifacts:
 - "Jellyfin.Plugin.ServerSync.dll"
-changelog: >
-  10.11.1 - Content Syncing
-
-  - One-way media sync from source Jellyfin server
-  - Library mapping with automatic path translation
-  - ETag-based change detection
+changelog:
+  features:
+  - One-way media sync from source Jellyfin server using API key authentication
+  - Library mapping with automatic path translation between source and local servers
+  - ETag-based change detection for identifying updated content
   - Granular approval modes (Enabled/RequireApproval/Disabled) for new content, replacements, and deletions
-  - Recycling bin with configurable retention period
-  - Bandwidth throttling with time-based scheduling
-  - Concurrent downloads (1-10 simultaneous)
-  - Minimum free disk space protection
-  - Companion file support (subtitles, NFO, images)
-  - Automatic retry with configurable max attempts
+  - Recycling bin for soft-deleting replaced or removed files with configurable retention period
+  - Bandwidth throttling with configurable speed limits (KB/s, MB/s, GB/s)
+  - Time-based bandwidth scheduling for off-peak unlimited downloads
+  - Concurrent downloads with configurable limit (1-10 simultaneous)
+  - Minimum free disk space protection to prevent disk exhaustion
+  - Per-file disk space validation before each download
+  - Companion file support for external subtitles, NFO files, and images
+  - Automatic retry for failed downloads with configurable max attempts
+  - Circuit breaker pattern to prevent hammering failed source servers
+  - Web UI for managing sync items with search, filtering, and bulk actions
+  - Health dashboard showing sync status, disk space, and last sync time
+  - Database reset capability for fresh sync state

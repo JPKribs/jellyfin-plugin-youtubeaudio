@@ -5,13 +5,20 @@ using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.ServerSync.Services;
 
-// RecyclingBinService
-// Handles moving files to the recycling bin and cleaning up old files.
+/// <summary>
+/// RecyclingBinService
+/// Handles moving files to the recycling bin and cleaning up old files.
+/// </summary>
 public static class RecyclingBinService
 {
-    // MoveToRecyclingBin
-    // Moves a file to the recycling bin with a timestamped name.
-    // Returns true if successful, false otherwise.
+    /// <summary>
+    /// MoveToRecyclingBin
+    /// Moves a file to the recycling bin with a timestamped name.
+    /// </summary>
+    /// <param name="filePath">Path to the file to move.</param>
+    /// <param name="recyclingBinPath">Path to the recycling bin directory.</param>
+    /// <param name="logger">Logger for operation output.</param>
+    /// <returns>True if successful, false otherwise.</returns>
     public static bool MoveToRecyclingBin(string filePath, string recyclingBinPath, ILogger logger)
     {
         if (string.IsNullOrEmpty(filePath) || string.IsNullOrEmpty(recyclingBinPath))
@@ -60,8 +67,14 @@ public static class RecyclingBinService
         }
     }
 
-    // MoveWithCompanionsToRecyclingBin
-    // Moves a file and its companion files (subtitles, etc.) to the recycling bin.
+    /// <summary>
+    /// MoveWithCompanionsToRecyclingBin
+    /// Moves a file and its companion files (subtitles, etc.) to the recycling bin.
+    /// </summary>
+    /// <param name="filePath">Path to the main file to move.</param>
+    /// <param name="recyclingBinPath">Path to the recycling bin directory.</param>
+    /// <param name="logger">Logger for operation output.</param>
+    /// <returns>True if the main file was moved successfully.</returns>
     public static bool MoveWithCompanionsToRecyclingBin(string filePath, string recyclingBinPath, ILogger logger)
     {
         if (string.IsNullOrEmpty(filePath) || string.IsNullOrEmpty(recyclingBinPath))
@@ -108,9 +121,14 @@ public static class RecyclingBinService
         return mainSuccess;
     }
 
-    // CleanupExpiredFiles
-    // Deletes files in the recycling bin older than the retention period.
-    // Returns the number of files deleted.
+    /// <summary>
+    /// CleanupExpiredFiles
+    /// Deletes files in the recycling bin older than the retention period.
+    /// </summary>
+    /// <param name="recyclingBinPath">Path to the recycling bin directory.</param>
+    /// <param name="retentionDays">Number of days to retain files before deletion.</param>
+    /// <param name="logger">Logger for operation output.</param>
+    /// <returns>Number of files deleted.</returns>
     public static int CleanupExpiredFiles(string recyclingBinPath, int retentionDays, ILogger logger)
     {
         if (string.IsNullOrEmpty(recyclingBinPath) || !Directory.Exists(recyclingBinPath))

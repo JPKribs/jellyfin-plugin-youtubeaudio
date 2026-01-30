@@ -11,15 +11,17 @@ using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.ServerSync.Tasks;
 
-// CleanupTempFilesTask
-// Scheduled task to clean up orphaned temporary files from failed downloads.
+/// <summary>
+/// CleanupTempFilesTask
+/// Scheduled task to clean up orphaned temporary files from failed downloads.
+/// </summary>
 public class CleanupTempFilesTask : IScheduledTask
 {
     private readonly ILogger<CleanupTempFilesTask> _logger;
 
-    // MaxTempFileAgeHours
-    // Maximum age in hours before a temp file is considered orphaned.
-    // Files older than this are deleted even if they appear to be active downloads.
+    /// <summary>
+    /// Maximum age in hours before a temp file is considered orphaned.
+    /// </summary>
     private const int MaxTempFileAgeHours = 24;
 
     public CleanupTempFilesTask(ILogger<CleanupTempFilesTask> logger)

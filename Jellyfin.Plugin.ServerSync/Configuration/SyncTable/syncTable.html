@@ -109,61 +109,83 @@
     <!-- Items populated dynamically -->
 </div>
 
-<!-- Separator line at bottom of content section -->
-<div class="contentSectionSeparator"></div>
-
 <!-- Item Detail Modal -->
-<div id="itemDetailModal" class="dialog" style="display: none;">
-    <div class="dialogContent" style="max-width: 600px; position: relative;">
-        <button type="button" id="btnModalClose" class="dialogCloseBtn" title="Close">&times;</button>
-        <h2 id="modalTitle" style="margin-top: 0; padding-right: 32px;"></h2>
-        <div id="modalContent" style="margin: 16px 0;">
-            <div style="margin-bottom: 12px;">
-                <div style="opacity: 0.7; margin-bottom: 4px;">Status</div>
-                <div id="modalStatus"></div>
-            </div>
-            <div id="modalErrorSection" style="margin-bottom: 12px; display: none;">
-                <div style="opacity: 0.7; margin-bottom: 4px;">Error</div>
-                <div id="modalError" class="errorMessage"></div>
-            </div>
-            <div id="modalRetrySection" style="margin-bottom: 12px; display: none;">
-                <div style="opacity: 0.7; margin-bottom: 4px;">Retry Count</div>
-                <div id="modalRetryCount"></div>
-            </div>
-            <div style="margin-bottom: 12px;">
-                <div style="opacity: 0.7; margin-bottom: 4px;">Size</div>
-                <div id="modalSize"></div>
-            </div>
-            <div style="margin-bottom: 12px;">
-                <div style="opacity: 0.7; margin-bottom: 4px;">Source Path</div>
-                <div id="modalSourcePath" style="word-break: break-all;"></div>
-            </div>
-            <div style="margin-bottom: 12px;">
-                <div style="opacity: 0.7; margin-bottom: 4px;">Local Path</div>
-                <div id="modalLocalPath" style="word-break: break-all;"></div>
-                <div id="modalLocalPathNote" class="fieldDescription" style="margin-top: 4px;"></div>
-            </div>
-            <div id="modalLastSyncSection" style="margin-bottom: 12px; display: none;">
-                <div style="opacity: 0.7; margin-bottom: 4px;">Last Sync</div>
-                <div id="modalLastSync"></div>
-            </div>
-            <div id="modalCompanionFilesSection" style="margin-bottom: 12px; display: none;">
-                <div style="opacity: 0.7; margin-bottom: 4px;">Companion Files</div>
-                <div id="modalCompanionFiles" style="word-break: break-all;"></div>
-            </div>
-        </div>
-        <div class="modalButtonRow">
-            <button is="emby-button" type="button" id="btnModalIgnore" class="raised modalButton">
-                <span>Ignore</span>
-            </button>
-            <button is="emby-button" type="button" id="btnModalQueue" class="raised button-primary modalButton">
-                <span>Queue</span>
+<div id="itemDetailModal" class="itemModal" style="display: none;">
+    <div class="itemModal-backdrop"></div>
+    <div class="itemModal-container">
+        <div class="itemModal-header">
+            <h2 id="modalTitle" class="itemModal-title"></h2>
+            <button type="button" id="btnModalClose" class="itemModal-closeBtn" title="Close">
+                <span class="itemModal-closeIcon">&times;</span>
             </button>
         </div>
-        <div id="modalDeleteRow" class="modalDeleteRow">
-            <button is="emby-button" type="button" id="btnModalDelete" class="raised button-destructive modalDeleteButton" title="Delete from local server only">
-                <span>Delete</span>
-            </button>
+
+        <div class="itemModal-body">
+            <!-- Status Badge -->
+            <div class="itemModal-statusRow">
+                <span id="modalStatusBadge" class="itemModal-statusBadge"></span>
+            </div>
+
+            <!-- Error Alert -->
+            <div id="modalErrorSection" class="itemModal-alert itemModal-alert-error" style="display: none;">
+                <div class="itemModal-alertIcon">&#9888;</div>
+                <div class="itemModal-alertContent">
+                    <div class="itemModal-alertTitle">Error</div>
+                    <div id="modalError" class="itemModal-alertMessage"></div>
+                </div>
+            </div>
+
+            <!-- Info Grid -->
+            <div class="itemModal-infoGrid">
+                <div class="itemModal-infoItem">
+                    <div class="itemModal-infoLabel">Size</div>
+                    <div id="modalSize" class="itemModal-infoValue"></div>
+                </div>
+                <div id="modalRetrySection" class="itemModal-infoItem" style="display: none;">
+                    <div class="itemModal-infoLabel">Retry Count</div>
+                    <div id="modalRetryCount" class="itemModal-infoValue"></div>
+                </div>
+                <div id="modalLastSyncSection" class="itemModal-infoItem" style="display: none;">
+                    <div class="itemModal-infoLabel">Last Sync</div>
+                    <div id="modalLastSync" class="itemModal-infoValue"></div>
+                </div>
+            </div>
+
+            <!-- Paths Section -->
+            <div class="itemModal-section">
+                <div class="itemModal-sectionTitle">Paths</div>
+                <div class="itemModal-pathItem">
+                    <div class="itemModal-pathLabel">Source</div>
+                    <div id="modalSourcePath" class="itemModal-pathValue"></div>
+                </div>
+                <div class="itemModal-pathItem">
+                    <div class="itemModal-pathLabel">Local</div>
+                    <div id="modalLocalPath" class="itemModal-pathValue"></div>
+                    <div id="modalLocalPathNote" class="itemModal-pathNote"></div>
+                </div>
+            </div>
+
+            <!-- Companion Files Section -->
+            <div id="modalCompanionFilesSection" class="itemModal-section" style="display: none;">
+                <div class="itemModal-sectionTitle">Companion Files</div>
+                <div id="modalCompanionFiles" class="itemModal-companionList"></div>
+            </div>
+        </div>
+
+        <div class="itemModal-footer">
+            <div class="itemModal-actions">
+                <button is="emby-button" type="button" id="btnModalIgnore" class="raised itemModal-btn">
+                    <span>Ignore</span>
+                </button>
+                <button is="emby-button" type="button" id="btnModalQueue" class="raised button-primary itemModal-btn">
+                    <span>Queue</span>
+                </button>
+            </div>
+            <div id="modalDeleteRow" class="itemModal-deleteRow">
+                <button is="emby-button" type="button" id="btnModalDelete" class="raised button-destructive itemModal-deleteBtn" title="Delete from local server only">
+                    <span>Delete from Local Server</span>
+                </button>
+            </div>
         </div>
     </div>
 </div>

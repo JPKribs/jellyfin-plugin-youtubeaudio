@@ -38,9 +38,12 @@ public class ConfigurationController : ControllerBase
         _taskManager = taskManager;
     }
 
-    // SanitizeForLog
-    // Sanitizes user input to prevent log injection attacks.
-    // Removes control characters and truncates to prevent log flooding.
+    /// <summary>
+    /// SanitizeForLog
+    /// Sanitizes user input to prevent log injection attacks.
+    /// </summary>
+    /// <param name="input">User input to sanitize.</param>
+    /// <returns>Sanitized string safe for logging.</returns>
     private static string SanitizeForLog(string? input)
     {
         if (string.IsNullOrEmpty(input))
@@ -61,8 +64,12 @@ public class ConfigurationController : ControllerBase
         return sanitized;
     }
 
-    // TestConnection
-    // Tests connection to the source server using API key authentication.
+    /// <summary>
+    /// TestConnection
+    /// Tests connection to the source server using API key authentication.
+    /// </summary>
+    /// <param name="request">Connection test request.</param>
+    /// <returns>Connection test response.</returns>
     [HttpPost("TestConnection")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<TestConnectionResponse>> TestConnection([FromBody] TestConnectionRequest request)
@@ -105,8 +112,12 @@ public class ConfigurationController : ControllerBase
         });
     }
 
-    // ValidateUrl
-    // Validates a server URL format and accessibility.
+    /// <summary>
+    /// ValidateUrl
+    /// Validates a server URL format and accessibility.
+    /// </summary>
+    /// <param name="request">URL validation request.</param>
+    /// <returns>URL validation response.</returns>
     [HttpPost("ValidateUrl")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult<ValidateUrlResponse> ValidateUrl([FromBody] ValidateUrlRequest request)
@@ -114,8 +125,12 @@ public class ConfigurationController : ControllerBase
         return Ok(ValidateServerUrl(request.Url));
     }
 
-    // GetSourceLibraries
-    // Gets libraries from the source server.
+    /// <summary>
+    /// GetSourceLibraries
+    /// Gets libraries from the source server.
+    /// </summary>
+    /// <param name="request">Connection request with credentials.</param>
+    /// <returns>List of library DTOs.</returns>
     [HttpPost("GetSourceLibraries")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<LibraryDto>>> GetSourceLibraries([FromBody] TestConnectionRequest request)
@@ -137,8 +152,14 @@ public class ConfigurationController : ControllerBase
         }).ToList());
     }
 
-    // GetSyncItems
-    // Gets sync items from the database with optional search and filter.
+    /// <summary>
+    /// GetSyncItems
+    /// Gets sync items from the database with optional search and filter.
+    /// </summary>
+    /// <param name="search">Optional search term.</param>
+    /// <param name="status">Optional status filter.</param>
+    /// <param name="pendingType">Optional pending type filter.</param>
+    /// <returns>List of sync item DTOs.</returns>
     [HttpGet("Items")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult<List<SyncItemDto>> GetSyncItems(
@@ -191,12 +212,16 @@ public class ConfigurationController : ControllerBase
             ErrorMessage = i.ErrorMessage,
             RetryCount = i.RetryCount,
             SourceServerUrl = config.SourceServerUrl,
-            SourceServerId = config.SourceServerId
+            SourceServerId = config.SourceServerId,
+            CompanionFiles = i.CompanionFiles
         }).ToList());
     }
 
-    // GetSyncStatus
-    // Gets sync status counts.
+    /// <summary>
+    /// GetSyncStatus
+    /// Gets sync status counts.
+    /// </summary>
+    /// <returns>Sync status response with counts.</returns>
     [HttpGet("Status")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult<SyncStatusResponse> GetSyncStatus()
@@ -224,8 +249,11 @@ public class ConfigurationController : ControllerBase
         });
     }
 
-    // GetSyncStats
-    // Gets detailed sync statistics for health dashboard.
+    /// <summary>
+    /// GetSyncStats
+    /// Gets detailed sync statistics for health dashboard.
+    /// </summary>
+    /// <returns>Sync stats response.</returns>
     [HttpGet("Stats")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult<SyncStatsResponse> GetSyncStats()
@@ -263,8 +291,11 @@ public class ConfigurationController : ControllerBase
         });
     }
 
-    // GetDiskSpace
-    // Gets disk space information for configured library paths.
+    /// <summary>
+    /// GetDiskSpace
+    /// Gets disk space information for configured library paths.
+    /// </summary>
+    /// <returns>List of disk space info.</returns>
     [HttpGet("DiskSpace")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult<List<DiskSpaceInfo>> GetDiskSpace()
@@ -278,8 +309,11 @@ public class ConfigurationController : ControllerBase
         return Ok(DiskSpaceService.GetDiskSpaceInfo(plugin.Configuration));
     }
 
-    // TriggerSync
-    // Manually triggers the sync task.
+    /// <summary>
+    /// TriggerSync
+    /// Manually triggers the sync task.
+    /// </summary>
+    /// <returns>Action result with status message.</returns>
     [HttpPost("TriggerSync")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -298,8 +332,11 @@ public class ConfigurationController : ControllerBase
         return Ok(new { Message = "Sync task started" });
     }
 
-    // TriggerRefresh
-    // Manually triggers the refresh sync table task.
+    /// <summary>
+    /// TriggerRefresh
+    /// Manually triggers the refresh sync table task.
+    /// </summary>
+    /// <returns>Action result with status message.</returns>
     [HttpPost("TriggerRefresh")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -318,8 +355,12 @@ public class ConfigurationController : ControllerBase
         return Ok(new { Message = "Refresh task started" });
     }
 
-    // RetryErroredItems
-    // Resets errored items for retry.
+    /// <summary>
+    /// RetryErroredItems
+    /// Resets errored items for retry.
+    /// </summary>
+    /// <param name="request">Optional request with specific item IDs.</param>
+    /// <returns>Action result with success status.</returns>
     [HttpPost("RetryErroredItems")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult RetryErroredItems([FromBody] BulkItemsRequest? request = null)
@@ -349,8 +390,12 @@ public class ConfigurationController : ControllerBase
         return Ok(new { Success = true });
     }
 
-    // UpdateItemStatus
-    // Updates the status of a sync item.
+    /// <summary>
+    /// UpdateItemStatus
+    /// Updates the status of a sync item.
+    /// </summary>
+    /// <param name="request">Status update request.</param>
+    /// <returns>Action result with success status.</returns>
     [HttpPost("UpdateItemStatus")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult UpdateItemStatus([FromBody] UpdateItemStatusRequest request)
@@ -370,8 +415,12 @@ public class ConfigurationController : ControllerBase
         return Ok(new { Success = true });
     }
 
-    // IgnoreItems
-    // Marks multiple items as ignored.
+    /// <summary>
+    /// IgnoreItems
+    /// Marks multiple items as ignored.
+    /// </summary>
+    /// <param name="request">Bulk items request.</param>
+    /// <returns>Action result with updated count.</returns>
     [HttpPost("IgnoreItems")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -406,8 +455,12 @@ public class ConfigurationController : ControllerBase
         return Ok(new { Updated = successCount });
     }
 
-    // QueueItems
-    // Moves items to Queued status (works for Pending, Ignored, Errored, and Synced items).
+    /// <summary>
+    /// QueueItems
+    /// Moves items to Queued status (works for Pending, Ignored, Errored, and Synced items).
+    /// </summary>
+    /// <param name="request">Bulk items request.</param>
+    /// <returns>Action result with updated count.</returns>
     [HttpPost("QueueItems")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -442,9 +495,12 @@ public class ConfigurationController : ControllerBase
         return Ok(new { Updated = successCount });
     }
 
-    // DeleteLocalItems
-    // Deletes items from the LOCAL server only using the Jellyfin API.
-    // This NEVER touches the source server. Companion files are also deleted.
+    /// <summary>
+    /// DeleteLocalItems
+    /// Deletes items from the LOCAL server only using the Jellyfin API.
+    /// </summary>
+    /// <param name="request">Bulk items request.</param>
+    /// <returns>Action result with deletion counts.</returns>
     [HttpPost("DeleteLocalItems")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -550,9 +606,12 @@ public class ConfigurationController : ControllerBase
         return Ok(new { Deleted = deletedCount, Failed = failedCount, Skipped = skippedCount });
     }
 
-    // RemoveFromTracking
-    // Removes items from the sync tracking database without deleting the actual files.
-    // Use this to stop tracking items without affecting the local files.
+    /// <summary>
+    /// RemoveFromTracking
+    /// Removes items from the sync tracking database without deleting the actual files.
+    /// </summary>
+    /// <param name="request">Bulk items request.</param>
+    /// <returns>Action result with removed count.</returns>
     [HttpPost("RemoveFromTracking")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -587,8 +646,11 @@ public class ConfigurationController : ControllerBase
         return Ok(new { Removed = successCount });
     }
 
-    // GetCapabilities
-    // Returns the plugin capabilities including whether deletion is supported.
+    /// <summary>
+    /// GetCapabilities
+    /// Returns the plugin capabilities including whether deletion is supported.
+    /// </summary>
+    /// <returns>Capabilities response.</returns>
     [HttpGet("Capabilities")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult<CapabilitiesResponse> GetCapabilities()
@@ -618,9 +680,11 @@ public class ConfigurationController : ControllerBase
         }
     }
 
-    // ResolveLocalItemIds
-    // Attempts to find and store the local Jellyfin item IDs for synced items.
-    // This is needed for delete operations to work properly.
+    /// <summary>
+    /// ResolveLocalItemIds
+    /// Attempts to find and store the local Jellyfin item IDs for synced items.
+    /// </summary>
+    /// <returns>Action result with resolved count.</returns>
     [HttpPost("ResolveLocalItemIds")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult ResolveLocalItemIds()
@@ -684,8 +748,11 @@ public class ConfigurationController : ControllerBase
         }
     }
 
-    // ResetSyncDatabase
-    // Deletes all items from the sync database and recreates it with the latest schema.
+    /// <summary>
+    /// ResetSyncDatabase
+    /// Deletes all items from the sync database and recreates it with the latest schema.
+    /// </summary>
+    /// <returns>Action result with success status.</returns>
     [HttpPost("ResetSyncDatabase")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult ResetSyncDatabase()
@@ -711,8 +778,12 @@ public class ConfigurationController : ControllerBase
         }
     }
 
-    // ValidateServerUrl
-    // Validates and normalizes a server URL.
+    /// <summary>
+    /// ValidateServerUrl
+    /// Validates and normalizes a server URL.
+    /// </summary>
+    /// <param name="url">URL to validate.</param>
+    /// <returns>Validation response with normalized URL.</returns>
     private static ValidateUrlResponse ValidateServerUrl(string url)
     {
         if (string.IsNullOrWhiteSpace(url))
@@ -774,8 +845,11 @@ public class ConfigurationController : ControllerBase
         };
     }
 
-    // ValidateConfiguration
-    // Validates the current plugin configuration.
+    /// <summary>
+    /// ValidateConfiguration
+    /// Validates the current plugin configuration.
+    /// </summary>
+    /// <returns>Validation response with errors.</returns>
     [HttpGet("ValidateConfiguration")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult<ConfigurationValidationResponse> ValidateConfiguration()
@@ -795,8 +869,11 @@ public class ConfigurationController : ControllerBase
         });
     }
 
-    // SanitizeConfiguration
-    // Sanitizes configuration values to valid ranges.
+    /// <summary>
+    /// SanitizeConfiguration
+    /// Sanitizes configuration values to valid ranges.
+    /// </summary>
+    /// <returns>Action result with status message.</returns>
     [HttpPost("SanitizeConfiguration")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult SanitizeConfiguration()

@@ -426,16 +426,27 @@ var SyncTableModule = {
 
         self.currentModalItem = item;
 
+        // Title
         document.getElementById('modalTitle').textContent = ServerSyncShared.getFileName(item.SourcePath);
-        document.getElementById('modalStatus').textContent = self.getDisplayStatus(item);
+
+        // Status badge
+        var statusBadge = document.getElementById('modalStatusBadge');
+        var displayStatus = self.getDisplayStatus(item);
+        var statusClass = self.getStatusClass(item);
+        statusBadge.textContent = displayStatus;
+        statusBadge.className = 'itemModal-statusBadge ' + statusClass;
+
+        // Size
         document.getElementById('modalSize').textContent = ServerSyncShared.formatSize(item.SourceSize);
+
+        // Paths
         document.getElementById('modalSourcePath').textContent = item.SourcePath;
 
         // Error message
         var errorSection = document.getElementById('modalErrorSection');
         if (item.Status === 'Errored' && item.ErrorMessage) {
             document.getElementById('modalError').textContent = item.ErrorMessage;
-            errorSection.style.display = 'block';
+            errorSection.style.display = 'flex';
         } else {
             errorSection.style.display = 'none';
         }
@@ -443,7 +454,7 @@ var SyncTableModule = {
         // Retry count
         var retrySection = document.getElementById('modalRetrySection');
         if (item.RetryCount > 0) {
-            document.getElementById('modalRetryCount').textContent = item.RetryCount;
+            document.getElementById('modalRetryCount').textContent = item.RetryCount + ' attempt' + (item.RetryCount > 1 ? 's' : '');
             retrySection.style.display = 'block';
         } else {
             retrySection.style.display = 'none';
@@ -459,49 +470,62 @@ var SyncTableModule = {
             lastSyncSection.style.display = 'none';
         }
 
+        // Companion files
+        var companionSection = document.getElementById('modalCompanionFilesSection');
+        if (item.CompanionFiles) {
+            var companionList = item.CompanionFiles.split(',').map(function(f) {
+                return f.trim();
+            }).filter(function(f) {
+                return f.length > 0;
+            });
+            if (companionList.length > 0) {
+                document.getElementById('modalCompanionFiles').innerHTML = companionList.map(function(f) {
+                    return '<div class="itemModal-companionItem">' +
+                        '<span class="itemModal-companionIcon">&#128196;</span>' +
+                        '<span class="itemModal-companionName">' + ServerSyncShared.escapeHtml(f) + '</span>' +
+                        '</div>';
+                }).join('');
+                companionSection.style.display = 'block';
+            } else {
+                companionSection.style.display = 'none';
+            }
+        } else {
+            companionSection.style.display = 'none';
+        }
+
+        // Local path
         var localPathEl = document.getElementById('modalLocalPath');
         var localPathNoteEl = document.getElementById('modalLocalPathNote');
         var localExists = item.Status === 'Synced';
         if (item.LocalPath) {
             localPathEl.textContent = item.LocalPath;
-            localPathEl.style.color = '';
             if (localExists) {
                 localPathNoteEl.textContent = '';
                 localPathNoteEl.style.display = 'none';
             } else {
                 localPathNoteEl.textContent = 'File will be synced to this location';
                 localPathNoteEl.style.display = 'block';
-                localPathNoteEl.style.borderBottom = '1px solid #9b59b6';
-                localPathNoteEl.style.paddingBottom = '4px';
-                localPathNoteEl.style.color = '#9b59b6';
             }
         } else {
             localPathEl.textContent = 'N/A';
-            localPathEl.style.color = '';
             localPathNoteEl.style.display = 'none';
         }
 
         // Show/hide modal buttons based on pending type
-        // Pending Deletion: show Delete + Ignore
-        // Pending Download/Replacement: show Queue + Ignore
-        // Other statuses: show all (for flexibility)
         var btnQueue = document.getElementById('btnModalQueue');
         var modalDeleteRow = document.getElementById('modalDeleteRow');
         var isPendingDeletion = item.Status === 'Pending' && item.PendingType === 'Deletion';
         var isPendingDownloadOrReplacement = item.Status === 'Pending' && (item.PendingType === 'Download' || item.PendingType === 'Replacement');
 
         if (isPendingDeletion) {
-            // Pending Deletion: show Delete + Ignore, hide Queue
             btnQueue.style.display = 'none';
             if (self.capabilities && self.capabilities.CanDeleteItems) {
                 modalDeleteRow.style.display = 'block';
             }
         } else if (isPendingDownloadOrReplacement) {
-            // Pending Download/Replacement: show Queue + Ignore, hide Delete
             btnQueue.style.display = 'inline-block';
             modalDeleteRow.style.display = 'none';
         } else {
-            // Other statuses (Synced, Queued, Errored, Ignored): show all available options
             btnQueue.style.display = 'inline-block';
             if (self.capabilities && self.capabilities.CanDeleteItems) {
                 modalDeleteRow.style.display = 'block';
