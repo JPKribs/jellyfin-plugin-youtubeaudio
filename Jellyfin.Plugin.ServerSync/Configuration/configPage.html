@@ -1559,32 +1559,25 @@
             apiRequest: function(endpoint, method, data) {
                 var options = {
                     url: ApiClient.getUrl('ServerSync/' + endpoint),
-                    type: method || 'GET'
+                    type: method || 'GET',
+                    dataType: 'json'
                 };
-        
+
                 if (data) {
                     options.contentType = 'application/json';
                     options.data = JSON.stringify(data);
                 }
-        
+
                 return ApiClient.fetch(options).then(function(response) {
-                    // Handle empty responses (204 or empty 200)
-                    if (!response || response === '') {
+                    // dataType: 'json' handles parsing, just return
+                    return response;
+                }).catch(function(error) {
+                    // Some endpoints return empty 200/204, which fails JSON parse
+                    // Check if this is a "no content" situation
+                    if (error && error.message && error.message.indexOf('JSON') !== -1) {
                         return null;
                     }
-                    // If already parsed as object, return it
-                    if (typeof response === 'object') {
-                        return response;
-                    }
-                    // Try to parse string as JSON
-                    if (typeof response === 'string') {
-                        try {
-                            return JSON.parse(response);
-                        } catch (e) {
-                            return response;
-                        }
-                    }
-                    return response;
+                    throw error;
                 });
             }
         };
