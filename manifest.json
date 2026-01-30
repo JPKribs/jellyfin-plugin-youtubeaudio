@@ -9,6 +9,14 @@
     "versions": [
       {
         "version": "10.11.6",
+        "changelog": "## Fixes\r\n- Remove hardcoded version from csproj to match episodepostergenerator pattern",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-serversync/releases/download/v10.11.6/jellyfin-plugin-serversync-10.11.6.zip",
+        "checksum": "9e2045e483240e9cd9a89b9a5ac51bcd",
+        "timestamp": "2026-01-30T05:16:46Z"
+      },
+      {
+        "version": "10.11.6",
         "changelog": "## Fixes\r\n- Fix AssemblyVersion to match build.yaml version",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-serversync/releases/download/v10.11.5/jellyfin-plugin-serversync-10.11.6.zip",
