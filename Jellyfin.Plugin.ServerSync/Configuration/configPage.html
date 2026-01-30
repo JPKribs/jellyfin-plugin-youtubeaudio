@@ -84,14 +84,16 @@
                                 <div class="fieldDescription">Re-queue files if the source file size differs or if the source was modified after last sync.</div>
                             </div>
 
-                            <div class="inputContainer">
-                                <label for="selChangeDetectionPolicy">Change Detection Policy:</label>
-                                <select is="emby-select" id="selChangeDetectionPolicy">
-                                    <option value="SizeOnly">Size Only</option>
-                                    <option value="ETagOnly">ETag Only</option>
-                                    <option value="Both">Both Size and ETag</option>
-                                </select>
-                                <div class="fieldDescription">How to detect if a file has changed. Size Only is most stable; ETag changes on metadata updates.</div>
+                            <div id="detectUpdatedFilesSettings" class="nested-settings" style="display: none;">
+                                <div class="inputContainer">
+                                    <label for="selChangeDetectionPolicy">Change Detection Policy:</label>
+                                    <select is="emby-select" id="selChangeDetectionPolicy">
+                                        <option value="SizeOnly">Size Only</option>
+                                        <option value="ETagOnly">ETag Only</option>
+                                        <option value="Both">Both Size and ETag</option>
+                                    </select>
+                                    <div class="fieldDescription">How to detect if a file has changed. Size Only is most stable; ETag changes on metadata updates.</div>
+                                </div>
                             </div>
 
                             <div class="inputContainer">
@@ -414,16 +416,23 @@
 
     <!-- Styles: shared.css -->
     <style>
+        /* Shared styles for Server Sync plugin configuration */
+        
+        /* Section titles with bottom border */
         .sectionTitleContainer .sectionTitle {
             width: 100%;
             border-bottom: 1px solid #555;
             padding-bottom: 0.5em;
             margin-bottom: 1em;
         }
+        
+        /* Tab separator line */
         .tabSeparator {
             border-bottom: 1px solid #555;
             margin-bottom: 16px;
         }
+        
+        /* Tab navigation - fill width equally */
         .tabContainer {
             display: flex;
             gap: 8px;
@@ -449,11 +458,15 @@
             opacity: 0.3;
             cursor: not-allowed;
         }
-        .button-primary, .button-submit {
+        
+        /* Button styles - primary (blue), secondary (gray), destructive (red) */
+        .button-primary,
+        .button-submit {
             background-color: #00a4dc !important;
             color: #fff !important;
         }
-        .button-primary:hover, .button-submit:hover {
+        .button-primary:hover,
+        .button-submit:hover {
             background-color: #0088cc !important;
         }
         .button-destructive {
@@ -463,11 +476,15 @@
         .button-destructive:hover {
             background-color: #c9302c !important;
         }
+        
+        /* Nested settings with left border */
         .nested-settings {
             margin-left: 1.5em;
             padding-left: 1em;
             border-left: 2px solid rgba(85, 85, 85, 0.3);
         }
+        
+        /* Input row - horizontal layout for input + select combinations */
         .inputRow {
             display: flex;
             gap: 8px;
@@ -483,11 +500,15 @@
             margin: 0 !important;
             padding: 0 !important;
         }
+        
+        /* Content section separator line */
         .contentSectionSeparator {
             border-bottom: 1px solid #555;
             margin-top: 24px;
             margin-bottom: 16px;
         }
+        
+        /* Dialog/Modal styling */
         .dialog {
             position: fixed;
             top: 0;
@@ -524,6 +545,8 @@
         .dialogCloseBtn:hover {
             opacity: 1;
         }
+        
+        /* Error message styling */
         .errorMessage {
             background: rgba(217, 83, 79, 0.2);
             color: #d9534f;
@@ -533,13 +556,31 @@
             font-size: 0.9em;
             word-break: break-all;
         }
+        
+        /* Generic button row layout */
+        .buttonRow {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .buttonRow button {
+            flex: 1;
+            text-align: center;
+            justify-content: center;
+        }
+        
     </style>
 
-    <!-- Styles: sourceServer.css -->
+    <!-- Styles: SourceServer/sourceServer.css -->
     <style>
+        /* Source Server Configuration styles */
+        
+        /* Server info container separator */
         #serverInfoContainer {
             padding-bottom: 16px;
         }
+        
+        /* Source Server button row */
         .sourceServerButtonRow {
             display: flex;
             gap: 8px;
@@ -550,10 +591,14 @@
             text-align: center;
             justify-content: center;
         }
+        
     </style>
 
-    <!-- Styles: contentConfig.css -->
+    <!-- Styles: ContentConfig/contentConfig.css -->
     <style>
+        /* Content Sync Configuration styles */
+        
+        /* Library mappings - 2 column layout */
         .libraryMapping {
             margin-bottom: 2em;
             padding-bottom: 1em;
@@ -578,10 +623,14 @@
             display: flex;
             flex-direction: column;
         }
+        
     </style>
 
-    <!-- Styles: syncTable.css -->
+    <!-- Styles: SyncTable/syncTable.css -->
     <style>
+        /* Sync Table styles */
+        
+        /* Health Dashboard */
         .healthDashboard {
             padding: 16px;
             background: rgba(0,0,0,0.3);
@@ -606,13 +655,23 @@
             font-size: 1.1em;
             font-weight: 500;
         }
-        .healthValue.warning { color: #f0ad4e; }
-        .healthValue.error { color: #d9534f; }
-        .healthValue.success { color: #5cb85c; }
+        .healthValue.warning {
+            color: #f0ad4e;
+        }
+        .healthValue.error {
+            color: #d9534f;
+        }
+        .healthValue.success {
+            color: #5cb85c;
+        }
+        
+        /* Separator between stats and table */
         .syncSectionSeparator {
             border-bottom: 1px solid #555;
             margin-bottom: 16px;
         }
+        
+        /* Status cards */
         .statusCards {
             display: flex;
             gap: 12px;
@@ -637,13 +696,40 @@
             font-size: 0.85em;
             opacity: 0.9;
         }
-        .statusCard-synced { background: rgba(92, 184, 92, 0.2); color: #5cb85c; }
-        .statusCard-queued { background: rgba(240, 173, 78, 0.2); color: #f0ad4e; }
-        .statusCard-errored { background: rgba(217, 83, 79, 0.2); color: #d9534f; }
-        .statusCard-ignored { background: rgba(153, 153, 153, 0.2); color: #999; }
-        .statusCard-pendingDownload { background: rgba(155, 89, 182, 0.2); color: #9b59b6; }
-        .statusCard-pendingReplacement { background: rgba(52, 152, 219, 0.2); color: #3498db; }
-        .statusCard-pendingDeletion { background: rgba(217, 83, 79, 0.2); color: #d9534f; }
+        .statusCard-synced {
+            background: rgba(92, 184, 92, 0.2);
+            color: #5cb85c;
+        }
+        .statusCard-queued {
+            background: rgba(240, 173, 78, 0.2);
+            color: #f0ad4e;
+        }
+        .statusCard-errored {
+            background: rgba(217, 83, 79, 0.2);
+            color: #d9534f;
+        }
+        .statusCard-ignored {
+            background: rgba(153, 153, 153, 0.2);
+            color: #999;
+        }
+        .statusCard-pendingDownload {
+            background: rgba(155, 89, 182, 0.2);
+            color: #9b59b6;
+        }
+        .statusCard-pendingReplacement {
+            background: rgba(52, 152, 219, 0.2);
+            color: #3498db;
+        }
+        .statusCard-pendingDeletion {
+            background: rgba(217, 83, 79, 0.2);
+            color: #d9534f;
+        }
+        .statusCard-deleting {
+            background: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+        }
+        
+        /* Sync items list */
         .syncItem {
             display: flex;
             align-items: center;
@@ -651,9 +737,16 @@
             border-bottom: 1px solid rgba(255,255,255,0.1);
             cursor: pointer;
         }
-        .syncItem:hover { background: rgba(255,255,255,0.05); }
-        .syncItemCheckbox { margin-right: 12px; }
-        .syncItemInfo { flex: 1; min-width: 0; }
+        .syncItem:hover {
+            background: rgba(255,255,255,0.05);
+        }
+        .syncItemCheckbox {
+            margin-right: 12px;
+        }
+        .syncItemInfo {
+            flex: 1;
+            min-width: 0;
+        }
         .syncItemName {
             font-weight: 500;
             white-space: nowrap;
@@ -667,7 +760,10 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        .syncItemPath.notExists { color: #9b59b6; font-style: italic; }
+        .syncItemPath.notExists {
+            color: #9b59b6;
+            font-style: italic;
+        }
         .syncItemError {
             font-size: 0.75em;
             color: #d9534f;
@@ -689,6 +785,9 @@
         .syncItemStatus.Pending-Download { background: rgba(155, 89, 182, 0.2); color: #9b59b6; }
         .syncItemStatus.Pending-Replacement { background: rgba(52, 152, 219, 0.2); color: #3498db; }
         .syncItemStatus.Pending-Deletion { background: rgba(217, 83, 79, 0.2); color: #d9534f; }
+        .syncItemStatus.Deleting { background: rgba(231, 76, 60, 0.2); color: #e74c3c; }
+        
+        /* Sync Action Button Row */
         .syncActionButtonRow {
             display: flex;
             gap: 8px;
@@ -699,6 +798,8 @@
             text-align: center;
             justify-content: center;
         }
+        
+        /* Sync Table Header */
         .syncTableHeader {
             display: flex;
             gap: 8px;
@@ -727,30 +828,401 @@
             opacity: 0.4;
             cursor: not-allowed;
         }
-        .syncHeaderSpacer {
-            flex: 1;
-        }
-        .syncTableControlsRow {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-        .syncSearchInput {
-            flex: 1;
-            min-width: 150px;
-        }
         .statusFilter {
+            margin-left: auto;
             width: auto !important;
         }
-        .modalButtonRow {
+        
+        /* Reload table button */
+        .reloadTableButton {
+            background: rgba(255,255,255,0.1) !important;
+            border: 1px solid rgba(255,255,255,0.2) !important;
+            border-radius: 4px !important;
+            padding: 4px 10px !important;
+            min-width: 36px !important;
+            height: 36px !important;
+            cursor: pointer;
+            opacity: 0.8;
+            transition: opacity 0.2s, background 0.2s, transform 0.3s;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        .reloadTableButton:hover {
+            opacity: 1;
+            background: rgba(255,255,255,0.2) !important;
+        }
+        .reloadTableButton.spinning .reloadIcon {
+            animation: spin 0.8s linear infinite;
+        }
+        .reloadIcon {
+            font-size: 1.3em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        /* ============================================
+           Item Detail Modal
+           ============================================ */
+        
+        .itemModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .itemModal-backdrop {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+        }
+        
+        .itemModal-container {
+            position: relative;
+            width: 100%;
+            max-width: 560px;
+            max-height: 90vh;
+            background: linear-gradient(145deg, #1e1e2e 0%, #181825 100%);
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            animation: modalSlideIn 0.2s ease-out;
+        }
+        
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        
+        /* Modal Header */
+        .itemModal-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            padding: 20px 24px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        .itemModal-title {
+            margin: 0;
+            font-size: 1.25em;
+            font-weight: 600;
+            color: #fff;
+            line-height: 1.3;
+            word-break: break-word;
+            padding-right: 16px;
+        }
+        
+        .itemModal-closeBtn {
+            flex-shrink: 0;
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+        }
+        
+        .itemModal-closeBtn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: scale(1.05);
+        }
+        
+        .itemModal-closeIcon {
+            font-size: 1.5em;
+            color: rgba(255, 255, 255, 0.7);
+            line-height: 1;
+        }
+        
+        /* Modal Body */
+        .itemModal-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 24px;
+        }
+        
+        /* Status Badge */
+        .itemModal-statusRow {
+            margin-bottom: 16px;
+        }
+        
+        .itemModal-statusBadge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .itemModal-statusBadge.Synced {
+            background: rgba(92, 184, 92, 0.2);
+            color: #5cb85c;
+            border: 1px solid rgba(92, 184, 92, 0.3);
+        }
+        
+        .itemModal-statusBadge.Queued {
+            background: rgba(240, 173, 78, 0.2);
+            color: #f0ad4e;
+            border: 1px solid rgba(240, 173, 78, 0.3);
+        }
+        
+        .itemModal-statusBadge.Errored {
+            background: rgba(217, 83, 79, 0.2);
+            color: #d9534f;
+            border: 1px solid rgba(217, 83, 79, 0.3);
+        }
+        
+        .itemModal-statusBadge.Ignored {
+            background: rgba(153, 153, 153, 0.2);
+            color: #999;
+            border: 1px solid rgba(153, 153, 153, 0.3);
+        }
+        
+        .itemModal-statusBadge.Pending-Download {
+            background: rgba(155, 89, 182, 0.2);
+            color: #9b59b6;
+            border: 1px solid rgba(155, 89, 182, 0.3);
+        }
+        
+        .itemModal-statusBadge.Pending-Replacement {
+            background: rgba(52, 152, 219, 0.2);
+            color: #3498db;
+            border: 1px solid rgba(52, 152, 219, 0.3);
+        }
+        
+        .itemModal-statusBadge.Pending-Deletion {
+            background: rgba(217, 83, 79, 0.2);
+            color: #d9534f;
+            border: 1px solid rgba(217, 83, 79, 0.3);
+        }
+        
+        .itemModal-statusBadge.Deleting {
+            background: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+            border: 1px solid rgba(231, 76, 60, 0.3);
+        }
+        
+        /* Error Alert */
+        .itemModal-alert {
             display: flex;
             gap: 12px;
-            margin-top: 16px;
+            padding: 14px 16px;
+            border-radius: 10px;
+            margin-bottom: 16px;
         }
-        .modalButtonRow .modalButton {
-            flex: 1 1 0;
+        
+        .itemModal-alert-error {
+            background: rgba(217, 83, 79, 0.12);
+            border: 1px solid rgba(217, 83, 79, 0.25);
+        }
+        
+        .itemModal-alertIcon {
+            font-size: 1.2em;
+            color: #d9534f;
+            flex-shrink: 0;
+        }
+        
+        .itemModal-alertContent {
+            flex: 1;
             min-width: 0;
+        }
+        
+        .itemModal-alertTitle {
+            font-weight: 600;
+            font-size: 0.9em;
+            color: #d9534f;
+            margin-bottom: 4px;
+        }
+        
+        .itemModal-alertMessage {
+            font-size: 0.85em;
+            color: rgba(255, 255, 255, 0.8);
+            word-break: break-word;
+        }
+        
+        /* Info Grid */
+        .itemModal-infoGrid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+            padding: 16px;
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 10px;
+        }
+        
+        .itemModal-infoItem {
+            text-align: center;
+        }
+        
+        .itemModal-infoLabel {
+            font-size: 0.75em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 4px;
+        }
+        
+        .itemModal-infoValue {
+            font-size: 1em;
+            font-weight: 500;
+            color: #fff;
+        }
+        
+        /* Sections */
+        .itemModal-section {
+            margin-bottom: 16px;
+            padding: 16px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .itemModal-sectionTitle {
+            font-size: 0.75em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        /* Paths */
+        .itemModal-pathItem {
+            margin-bottom: 12px;
+        }
+        
+        .itemModal-pathItem:last-child {
+            margin-bottom: 0;
+        }
+        
+        .itemModal-pathLabel {
+            font-size: 0.8em;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 4px;
+        }
+        
+        .itemModal-pathValue {
+            font-size: 0.9em;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            color: rgba(255, 255, 255, 0.9);
+            word-break: break-all;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px 10px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .itemModal-pathNote {
+            font-size: 0.8em;
+            color: #9b59b6;
+            margin-top: 6px;
+            font-style: italic;
+        }
+        
+        /* Companion Files */
+        .itemModal-companionList {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .itemModal-companionItem {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+        
+        .itemModal-companionIcon {
+            color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .itemModal-companionName {
+            color: rgba(255, 255, 255, 0.85);
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.9em;
+        }
+        
+        /* Modal Footer */
+        .itemModal-footer {
+            padding: 16px 24px 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(0, 0, 0, 0.15);
+        }
+        
+        .itemModal-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .itemModal-btn {
+            flex: 1;
+            text-align: center;
+            justify-content: center;
+            padding: 10px 16px !important;
+            border-radius: 8px !important;
+            font-weight: 500;
+        }
+        
+        .itemModal-deleteRow {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        .itemModal-deleteBtn {
+            width: 100%;
+            text-align: center;
+            justify-content: center;
+            padding: 10px 16px !important;
+            border-radius: 8px !important;
+            font-weight: 500;
+        }
+        
+        /* Legacy modal button layout (kept for compatibility) */
+        .modalButtonRow {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .modalButton {
+            flex: 1;
             text-align: center;
             justify-content: center;
         }
@@ -764,54 +1236,186 @@
             text-align: center;
             justify-content: center;
         }
-        .itemModal-statusBadge {
-            display: inline-block;
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 0.85em;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .itemModal-statusBadge.Synced { background: rgba(92, 184, 92, 0.2); color: #5cb85c; border: 1px solid rgba(92, 184, 92, 0.3); }
-        .itemModal-statusBadge.Queued { background: rgba(240, 173, 78, 0.2); color: #f0ad4e; border: 1px solid rgba(240, 173, 78, 0.3); }
-        .itemModal-statusBadge.Errored { background: rgba(217, 83, 79, 0.2); color: #d9534f; border: 1px solid rgba(217, 83, 79, 0.3); }
-        .itemModal-statusBadge.Ignored { background: rgba(153, 153, 153, 0.2); color: #999; border: 1px solid rgba(153, 153, 153, 0.3); }
-        .itemModal-statusBadge.Pending-Download { background: rgba(155, 89, 182, 0.2); color: #9b59b6; border: 1px solid rgba(155, 89, 182, 0.3); }
-        .itemModal-statusBadge.Pending-Replacement { background: rgba(52, 152, 219, 0.2); color: #3498db; border: 1px solid rgba(52, 152, 219, 0.3); }
-        .itemModal-statusBadge.Pending-Deletion { background: rgba(217, 83, 79, 0.2); color: #d9534f; border: 1px solid rgba(217, 83, 79, 0.3); }
-        .itemModal-statusBadge.Deleting { background: rgba(231, 76, 60, 0.2); color: #e74c3c; border: 1px solid rgba(231, 76, 60, 0.3); }
+        
     </style>
 
-    <!-- Styles: paginatedTable.css -->
+    <!-- Styles: PaginatedTable/paginatedTable.css -->
     <style>
-        .pt-wrapper { display: flex; flex-direction: column; }
-        .pt-wrapper.pt-loading { opacity: 0.6; pointer-events: none; }
-        .pt-controls { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
-        .pt-search { flex: 1; min-width: 150px; }
-        .pt-filter { width: auto !important; min-width: 140px; }
-        .pt-selection-header { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; padding: 8px 12px; background: rgba(0, 0, 0, 0.2); border-radius: 4px; }
-        .pt-select-all-container { display: flex; align-items: center; gap: 4px; cursor: pointer; }
-        .pt-selected-count { margin-left: 8px; opacity: 0.7; min-width: 80px; }
-        .pt-bulk-actions { display: flex; gap: 8px; margin-left: auto; }
-        .pt-header-spacer { flex: 1; }
-        .pt-reload-btn { background: transparent !important; border: none !important; padding: 8px !important; min-width: 40px !important; height: 40px !important; cursor: pointer; opacity: 0.7; transition: opacity 0.2s; display: flex !important; align-items: center !important; justify-content: center !important; }
-        .pt-reload-btn:hover { opacity: 1; }
-        .pt-reload-btn.spinning .pt-reload-icon { animation: pt-spin 0.8s linear infinite; }
-        .pt-reload-icon { font-size: 24px !important; }
-        @keyframes pt-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .pt-body { max-height: 400px; overflow-y: auto; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 4px; }
-        .pt-row { display: flex; align-items: center; padding: 10px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer; transition: background-color 0.15s; -webkit-tap-highlight-color: transparent; }
-        .pt-row:hover { background: rgba(255, 255, 255, 0.05); }
-        .pt-row:active { background: rgba(255, 255, 255, 0.1); }
-        .pt-row:last-child { border-bottom: none; }
-        .pt-cell { flex: 1; padding: 4px 8px; min-width: 0; }
-        .pt-cell.pt-cell-checkbox { flex: 0 0 40px; padding: 4px; }
-        .pt-cell.pt-cell-status { flex: 0 0 130px; text-align: right; }
-        .pt-row-checkbox { cursor: pointer; width: 18px; height: 18px; }
-        .pt-status-badge { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 0.85em; white-space: nowrap; border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: opacity 0.15s, transform 0.1s; }
-        .pt-status-badge:hover { opacity: 0.85; }
-        .pt-status-badge:active { transform: scale(0.97); }
+        /* ============================================
+           PaginatedTable Component Styles
+           Prefix: pt- (paginated-table)
+           Generic, reusable table component with infinite scroll
+           ============================================ */
+        
+        .pt-wrapper {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .pt-wrapper.pt-loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+        
+        /* Top row: Search + Filter */
+        .pt-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .pt-search {
+            flex: 1;
+            min-width: 150px;
+        }
+        
+        .pt-filter {
+            width: auto !important;
+            min-width: 140px;
+        }
+        
+        /* Bottom row: Selection + Bulk actions + Reload */
+        .pt-selection-header {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+        
+        .pt-select-all-container {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+        }
+        
+        .pt-selected-count {
+            margin-left: 8px;
+            opacity: 0.7;
+            min-width: 80px;
+        }
+        
+        .pt-bulk-actions {
+            display: flex;
+            gap: 8px;
+            margin-left: auto;
+        }
+        
+        .pt-header-spacer {
+            flex: 1;
+        }
+        
+        /* Reload button - material icon style */
+        .pt-reload-btn {
+            background: transparent !important;
+            border: none !important;
+            padding: 8px !important;
+            min-width: 40px !important;
+            height: 40px !important;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        
+        .pt-reload-btn:hover {
+            opacity: 1;
+        }
+        
+        .pt-reload-btn.spinning .pt-reload-icon {
+            animation: pt-spin 0.8s linear infinite;
+        }
+        
+        .pt-reload-icon {
+            font-size: 24px !important;
+        }
+        
+        @keyframes pt-spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Table body - scrollable with infinite scroll */
+        .pt-body {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        
+        /* Table rows */
+        .pt-row {
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            transition: background-color 0.15s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        .pt-row:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .pt-row:active {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .pt-row:last-child {
+            border-bottom: none;
+        }
+        
+        /* Table cells */
+        .pt-cell {
+            flex: 1;
+            padding: 4px 8px;
+            min-width: 0;
+        }
+        
+        .pt-cell.pt-cell-checkbox {
+            flex: 0 0 40px;
+            padding: 4px;
+        }
+        
+        .pt-cell.pt-cell-status {
+            flex: 0 0 130px;
+            text-align: right;
+        }
+        
+        .pt-row-checkbox {
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+        }
+        
+        /* Status badges - clickable button for mobile */
+        .pt-status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            white-space: nowrap;
+            border: none;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            transition: opacity 0.15s, transform 0.1s;
+        }
+        
+        .pt-status-badge:hover {
+            opacity: 0.85;
+        }
+        
+        .pt-status-badge:active {
+            transform: scale(0.97);
+        }
+        
         .pt-status-badge.Synced { background: rgba(92, 184, 92, 0.2); color: #5cb85c; }
         .pt-status-badge.Queued { background: rgba(240, 173, 78, 0.2); color: #f0ad4e; }
         .pt-status-badge.Errored { background: rgba(217, 83, 79, 0.2); color: #d9534f; }
@@ -820,150 +1424,335 @@
         .pt-status-badge.Pending-Replacement { background: rgba(52, 152, 219, 0.2); color: #3498db; }
         .pt-status-badge.Pending-Deletion { background: rgba(217, 83, 79, 0.2); color: #d9534f; }
         .pt-status-badge.Deleting { background: rgba(231, 76, 60, 0.2); color: #e74c3c; }
-        .pt-empty { padding: 32px 16px; text-align: center; opacity: 0.7; }
-        .pt-loading-more { padding: 12px; text-align: center; opacity: 0.7; font-size: 0.9em; }
-        .pt-footer { padding: 8px 12px; font-size: 0.9em; opacity: 0.7; }
-        .pt-bulk-actions button { padding: 4px 12px !important; min-width: auto !important; }
-        .pt-bulk-actions button:disabled { opacity: 0.4; cursor: not-allowed; }
-        .pt-cell .syncItemInfo { flex: 1; min-width: 0; }
-        .pt-cell .syncItemName { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .pt-cell .syncItemPath { font-size: 0.85em; opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .pt-cell .syncItemPath.notExists { color: #9b59b6; font-style: italic; }
-        .pt-cell .syncItemError { font-size: 0.75em; color: #d9534f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+        
+        /* Empty state */
+        .pt-empty {
+            padding: 32px 16px;
+            text-align: center;
+            opacity: 0.7;
+        }
+        
+        /* Loading more indicator */
+        .pt-loading-more {
+            padding: 12px;
+            text-align: center;
+            opacity: 0.7;
+            font-size: 0.9em;
+        }
+        
+        /* Footer with item count */
+        .pt-footer {
+            padding: 8px 12px;
+            font-size: 0.9em;
+            opacity: 0.7;
+        }
+        
+        /* Bulk action buttons */
+        .pt-bulk-actions button {
+            padding: 4px 12px !important;
+            min-width: auto !important;
+        }
+        
+        .pt-bulk-actions button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        
+        /* Content-specific styles for syncTable use */
+        .pt-cell .syncItemInfo {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .pt-cell .syncItemName {
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .pt-cell .syncItemPath {
+            font-size: 0.85em;
+            opacity: 0.7;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .pt-cell .syncItemPath.notExists {
+            color: #9b59b6;
+            font-style: italic;
+        }
+        
+        .pt-cell .syncItemError {
+            font-size: 0.75em;
+            color: #d9534f;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
+        }
+        
     </style>
 
     <!-- Scripts: shared.js -->
     <script type="text/javascript">
+        // Shared utilities for Server Sync plugin configuration
+        
         var ServerSyncShared = {
             pluginId: 'ebd650b5-6f4c-4ccb-b10d-23dffb3a7286',
+        
+            // Format bytes to human readable size
             formatSize: function(bytes) {
                 if (!bytes) return '0 B';
                 var units = ['B', 'KB', 'MB', 'GB', 'TB'];
                 var i = 0;
-                while (bytes >= 1024 && i < units.length - 1) { bytes /= 1024; i++; }
+                while (bytes >= 1024 && i < units.length - 1) {
+                    bytes /= 1024;
+                    i++;
+                }
                 return bytes.toFixed(i > 0 ? 2 : 0) + ' ' + units[i];
             },
+        
+            // Format relative time (e.g., "5 minutes ago")
             formatRelativeTime: function(date) {
                 var now = new Date();
                 var diff = now - date;
                 var minutes = Math.floor(diff / 60000);
                 var hours = Math.floor(minutes / 60);
                 var days = Math.floor(hours / 24);
+        
                 if (days > 0) return days + ' day' + (days > 1 ? 's' : '') + ' ago';
                 if (hours > 0) return hours + ' hour' + (hours > 1 ? 's' : '') + ' ago';
                 if (minutes > 0) return minutes + ' minute' + (minutes > 1 ? 's' : '') + ' ago';
                 return 'Just now';
             },
+        
+            // Get filename from path
             getFileName: function(path) {
                 if (!path) return '';
                 return path.split('/').pop().split('\\').pop();
             },
+        
+            // Escape HTML special characters
             escapeHtml: function(str) {
                 if (!str) return '';
                 return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
             },
-            showAlert: function(message) { Dashboard.alert(message); },
-            getConfig: function() { return ApiClient.getPluginConfiguration(this.pluginId); },
-            saveConfig: function(config) { return ApiClient.updatePluginConfiguration(this.pluginId, config); },
+        
+            // Show alert using Dashboard
+            showAlert: function(message) {
+                Dashboard.alert(message);
+            },
+        
+            // Get plugin configuration
+            getConfig: function() {
+                return ApiClient.getPluginConfiguration(this.pluginId);
+            },
+        
+            // Save plugin configuration
+            saveConfig: function(config) {
+                return ApiClient.updatePluginConfiguration(this.pluginId, config);
+            },
+        
+            // Make API request to plugin endpoint
             apiRequest: function(endpoint, method, data) {
-                var options = { url: ApiClient.getUrl('ServerSync/' + endpoint), type: method || 'GET' };
-                if (method === 'GET') { options.dataType = 'json'; }
-                if (data) { options.contentType = 'application/json'; options.data = JSON.stringify(data); }
+                var options = {
+                    url: ApiClient.getUrl('ServerSync/' + endpoint),
+                    type: method || 'GET'
+                };
+        
+                if (data) {
+                    options.contentType = 'application/json';
+                    options.data = JSON.stringify(data);
+                }
+        
                 return ApiClient.fetch(options).then(function(response) {
-                    if (response && typeof response === 'string' && response.length > 0) {
-                        try { return JSON.parse(response); } catch (e) { return response; }
+                    // Handle empty responses (204 or empty 200)
+                    if (!response || response === '') {
+                        return null;
+                    }
+                    // If already parsed as object, return it
+                    if (typeof response === 'object') {
+                        return response;
+                    }
+                    // Try to parse string as JSON
+                    if (typeof response === 'string') {
+                        try {
+                            return JSON.parse(response);
+                        } catch (e) {
+                            return response;
+                        }
                     }
                     return response;
                 });
             }
         };
+        
     </script>
 
-    <!-- Scripts: sourceServer.js -->
+    <!-- Scripts: SourceServer/sourceServer.js -->
     <script type="text/javascript">
+        // Source Server Configuration module
+        
         var SourceServerModule = {
             currentConfig: null,
+        
             init: function(config) {
                 var self = this;
                 self.currentConfig = config;
+        
                 document.getElementById('btnSaveServer').addEventListener('click', function() { self.saveServerConfig(); });
                 document.getElementById('btnTestConnection').addEventListener('click', function() { self.testConnection(); });
+        
                 self.loadConfig(config);
             },
+        
             loadConfig: function(config) {
                 document.getElementById('txtSourceServerUrl').value = config.SourceServerUrl || '';
                 document.getElementById('txtSourceServerApiKey').value = config.SourceServerApiKey || '';
+        
                 if (config.SourceServerName || config.SourceServerId) {
                     document.getElementById('txtSourceServerName').textContent = config.SourceServerName || 'Unknown';
                     document.getElementById('txtSourceServerId').textContent = config.SourceServerId || 'Unknown';
                     document.getElementById('serverInfoContainer').style.display = 'block';
                 }
             },
+        
             getValues: function() {
                 return {
                     SourceServerUrl: document.getElementById('txtSourceServerUrl').value,
                     SourceServerApiKey: document.getElementById('txtSourceServerApiKey').value
                 };
             },
+        
             testConnection: function() {
                 var self = this;
                 var url = document.getElementById('txtSourceServerUrl').value;
                 var apiKey = document.getElementById('txtSourceServerApiKey').value;
                 var statusEl = document.getElementById('connectionStatus');
-                if (!url || !apiKey) { statusEl.innerHTML = '<span style="color: #d9534f;">Please enter URL and API key</span>'; return; }
+        
+                if (!url || !apiKey) {
+                    statusEl.innerHTML = '<span style="color: #d9534f;">Please enter URL and API key</span>';
+                    return;
+                }
+        
+                var requestData = {
+                    ServerUrl: url,
+                    ApiKey: apiKey
+                };
+        
                 statusEl.textContent = 'Testing...';
-                ServerSyncShared.apiRequest('TestConnection', 'POST', { ServerUrl: url, ApiKey: apiKey }).then(function(response) {
+        
+                ServerSyncShared.apiRequest('TestConnection', 'POST', requestData).then(function(response) {
                     if (response && response.Success) {
                         statusEl.innerHTML = '<span style="color: #5cb85c;">Connected to ' + ServerSyncShared.escapeHtml(response.ServerName) + '</span>';
                         document.getElementById('txtSourceServerName').textContent = response.ServerName || 'Unknown';
                         document.getElementById('txtSourceServerId').textContent = response.ServerId || 'Unknown';
                         document.getElementById('serverInfoContainer').style.display = 'block';
-                        if (self.currentConfig) { self.currentConfig.SourceServerName = response.ServerName; self.currentConfig.SourceServerId = response.ServerId; }
-                        if (self.onConnectionSuccess) { self.onConnectionSuccess(response); }
+        
+                        if (self.currentConfig) {
+                            self.currentConfig.SourceServerName = response.ServerName;
+                            self.currentConfig.SourceServerId = response.ServerId;
+                        }
+        
+                        // Trigger library fetch event
+                        if (self.onConnectionSuccess) {
+                            self.onConnectionSuccess(response);
+                        }
                     } else {
                         statusEl.innerHTML = '<span style="color: #d9534f;">' + ServerSyncShared.escapeHtml((response && response.Message) || 'Connection failed') + '</span>';
                     }
-                }).catch(function() { statusEl.innerHTML = '<span style="color: #d9534f;">Connection failed</span>'; });
+                }).catch(function() {
+                    statusEl.innerHTML = '<span style="color: #d9534f;">Connection failed</span>';
+                });
             },
+        
             saveServerConfig: function() {
                 var self = this;
                 var config = self.currentConfig || {};
+        
                 config.SourceServerUrl = document.getElementById('txtSourceServerUrl').value;
                 config.SourceServerApiKey = document.getElementById('txtSourceServerApiKey').value;
-                ServerSyncShared.saveConfig(config).then(function() { ServerSyncShared.showAlert('Server settings saved'); }).catch(function(err) { console.error('Failed to save server config:', err); ServerSyncShared.showAlert('Failed to save server settings'); });
+        
+                ServerSyncShared.saveConfig(config).then(function() {
+                    ServerSyncShared.showAlert('Server settings saved');
+                }).catch(function(err) {
+                    console.error('Failed to save server config:', err);
+                    ServerSyncShared.showAlert('Failed to save server settings');
+                });
             },
+        
+            // Callback for successful connection
             onConnectionSuccess: null
         };
+        
     </script>
 
-    <!-- Scripts: contentConfig.js -->
+    <!-- Scripts: ContentConfig/contentConfig.js -->
     <script type="text/javascript">
+        // Content Sync Configuration module
+        
         var ContentConfigModule = {
-            currentConfig: null, sourceLibraries: [], localLibraries: [], capabilities: null,
+            currentConfig: null,
+            sourceLibraries: [],
+            localLibraries: [],
+            capabilities: null,
+        
             init: function(config) {
                 var self = this;
                 self.currentConfig = config;
-                document.getElementById('btnAddMapping').addEventListener('click', function() { self.addMapping(); });
-                document.getElementById('chkEnableContentSync').addEventListener('change', function() { self.updateContentSyncVisibility(this.checked); });
-                document.getElementById('chkEnableBandwidthScheduling').addEventListener('change', function() { self.updateBandwidthSchedulingVisibility(this.checked); });
-                document.getElementById('chkEnableRecyclingBin').addEventListener('change', function() { self.updateRecyclingBinVisibility(this.checked); });
+        
+                document.getElementById('btnAddMapping').addEventListener('click', function() {
+                    self.addMapping();
+                });
+        
+                document.getElementById('chkEnableContentSync').addEventListener('change', function() {
+                    self.updateContentSyncVisibility(this.checked);
+                });
+        
+                document.getElementById('chkDetectUpdatedFiles').addEventListener('change', function() {
+                    self.updateDetectUpdatedFilesVisibility(this.checked);
+                });
+        
+                document.getElementById('chkEnableBandwidthScheduling').addEventListener('change', function() {
+                    self.updateBandwidthSchedulingVisibility(this.checked);
+                });
+        
+                document.getElementById('chkEnableRecyclingBin').addEventListener('change', function() {
+                    self.updateRecyclingBinVisibility(this.checked);
+                });
+        
                 // Update pending visibility when approval modes change
-                document.getElementById('selDownloadNewContentMode').addEventListener('change', function() { self.updatePendingVisibilityFromUI(); });
-                document.getElementById('selReplaceExistingContentMode').addEventListener('change', function() { self.updatePendingVisibilityFromUI(); });
-                document.getElementById('selDeleteMissingContentMode').addEventListener('change', function() { self.updatePendingVisibilityFromUI(); });
+                document.getElementById('selDownloadNewContentMode').addEventListener('change', function() {
+                    self.updatePendingVisibilityFromUI();
+                });
+        
+                document.getElementById('selReplaceExistingContentMode').addEventListener('change', function() {
+                    self.updatePendingVisibilityFromUI();
+                });
+        
+                document.getElementById('selDeleteMissingContentMode').addEventListener('change', function() {
+                    self.updatePendingVisibilityFromUI();
+                });
             },
+        
             updatePendingVisibilityFromUI: function() {
                 var downloadMode = document.getElementById('selDownloadNewContentMode').value;
                 var replaceMode = document.getElementById('selReplaceExistingContentMode').value;
                 var deleteMode = document.getElementById('selDeleteMissingContentMode').value;
                 this.updatePendingVisibility(downloadMode, replaceMode, deleteMode);
             },
+        
             loadConfig: function(config) {
-                var self = this; self.currentConfig = config;
+                var self = this;
+                self.currentConfig = config;
+        
                 document.getElementById('chkEnableContentSync').checked = config.EnableContentSync || false;
                 document.getElementById('chkIncludeExtras').checked = config.IncludeCompanionFiles || false;
                 document.getElementById('chkDetectUpdatedFiles').checked = config.DetectUpdatedFiles !== false;
                 document.getElementById('selChangeDetectionPolicy').value = config.ChangeDetectionPolicy || 'SizeOnly';
+        
                 // Set approval mode dropdowns - config stores string enum names (Enabled, RequireApproval, Disabled)
                 var downloadMode = config.DownloadNewContentMode || 'Enabled';
                 var replaceMode = config.ReplaceExistingContentMode || 'Enabled';
@@ -971,8 +1760,10 @@
                 document.getElementById('selDownloadNewContentMode').value = downloadMode;
                 document.getElementById('selReplaceExistingContentMode').value = replaceMode;
                 document.getElementById('selDeleteMissingContentMode').value = deleteMode;
+        
                 // Update pending card visibility based on approval modes
                 self.updatePendingVisibility(downloadMode, replaceMode, deleteMode);
+        
                 document.getElementById('txtMaxConcurrentDownloads').value = config.MaxConcurrentDownloads || 2;
                 document.getElementById('txtMaxRetryCount').value = config.MaxRetryCount || 3;
                 document.getElementById('txtTempDownloadPath').value = config.TempDownloadPath || '';
@@ -987,10 +1778,13 @@
                 document.getElementById('chkEnableRecyclingBin').checked = config.EnableRecyclingBin || false;
                 document.getElementById('txtRecyclingBinPath').value = config.RecyclingBinPath || '';
                 document.getElementById('txtRecyclingBinRetentionDays').value = config.RecyclingBinRetentionDays || 7;
+        
                 self.updateBandwidthSchedulingVisibility(config.EnableBandwidthScheduling);
                 self.updateContentSyncVisibility(config.EnableContentSync);
+                self.updateDetectUpdatedFilesVisibility(config.DetectUpdatedFiles !== false);
                 self.updateRecyclingBinVisibility(config.EnableRecyclingBin);
             },
+        
             getValues: function() {
                 return {
                     EnableContentSync: document.getElementById('chkEnableContentSync').checked,
@@ -1017,319 +1811,1618 @@
                     LibraryMappings: this.collectMappings()
                 };
             },
+        
             loadCapabilities: function() {
                 var self = this;
-                return ServerSyncShared.apiRequest('Capabilities', 'GET').then(function(capabilities) { self.capabilities = capabilities; }).catch(function() { self.capabilities = { CanDeleteItems: false }; });
+                return ServerSyncShared.apiRequest('Capabilities', 'GET').then(function(capabilities) {
+                    self.capabilities = capabilities;
+                }).catch(function() {
+                    self.capabilities = { CanDeleteItems: false };
+                });
             },
-            updateBandwidthSchedulingVisibility: function(enabled) { document.getElementById('bandwidthScheduleContainer').style.display = enabled ? 'block' : 'none'; },
-            updateContentSyncVisibility: function(enabled) { document.getElementById('contentSyncSettings').style.display = enabled ? 'block' : 'none'; },
-            updateRecyclingBinVisibility: function(enabled) { document.getElementById('recyclingBinSettings').style.display = enabled ? 'block' : 'none'; },
+        
+            updateBandwidthSchedulingVisibility: function(enabled) {
+                document.getElementById('bandwidthScheduleContainer').style.display = enabled ? 'block' : 'none';
+            },
+        
+            updateContentSyncVisibility: function(enabled) {
+                document.getElementById('contentSyncSettings').style.display = enabled ? 'block' : 'none';
+            },
+        
+            updateDetectUpdatedFilesVisibility: function(enabled) {
+                document.getElementById('detectUpdatedFilesSettings').style.display = enabled ? 'block' : 'none';
+            },
+        
+            updateRecyclingBinVisibility: function(enabled) {
+                document.getElementById('recyclingBinSettings').style.display = enabled ? 'block' : 'none';
+            },
+        
             updatePendingVisibility: function(downloadMode, replaceMode, deleteMode) {
                 // Show pending cards only if approval is required
                 var showPendingDownload = downloadMode === 'RequireApproval';
                 var showPendingReplace = replaceMode === 'RequireApproval';
                 var showPendingDelete = deleteMode === 'RequireApproval';
                 var showAnyPending = showPendingDownload || showPendingReplace || showPendingDelete;
+        
                 document.getElementById('statusGroupPendingDownload').style.display = showPendingDownload ? 'block' : 'none';
                 document.getElementById('statusGroupPendingReplacement').style.display = showPendingReplace ? 'block' : 'none';
                 document.getElementById('statusGroupPendingDeletion').style.display = showPendingDelete ? 'block' : 'none';
+        
                 // Show/hide the pending row container
                 var pendingRow = document.getElementById('pendingStatusRow');
-                if (pendingRow) { pendingRow.style.display = showAnyPending ? 'flex' : 'none'; }
+                if (pendingRow) {
+                    pendingRow.style.display = showAnyPending ? 'flex' : 'none';
+                }
+        
+                // Also update filter options in SyncTableModule if available
+                if (typeof SyncTableModule !== 'undefined' && SyncTableModule.table) {
+                    SyncTableModule.table.setFilterOptionVisible('optPendingDownload', showPendingDownload);
+                    SyncTableModule.table.setFilterOptionVisible('optPendingReplacement', showPendingReplace);
+                    SyncTableModule.table.setFilterOptionVisible('optPendingDeletion', showPendingDelete);
+                    SyncTableModule.table.setFilterOptionVisible('optDeleting', showPendingDelete);
+                }
             },
+        
             fetchSourceLibraries: function(serverUrl, apiKey) {
                 var self = this;
-                return ServerSyncShared.apiRequest('GetSourceLibraries', 'POST', { ServerUrl: serverUrl, ApiKey: apiKey }).then(function(libraries) { self.sourceLibraries = libraries || []; self.updateLibrarySelects(); }).catch(function(err) { console.error('Failed to fetch source libraries:', err); self.sourceLibraries = []; });
+                return ServerSyncShared.apiRequest('GetSourceLibraries', 'POST', {
+                    ServerUrl: serverUrl,
+                    ApiKey: apiKey
+                }).then(function(libraries) {
+                    self.sourceLibraries = libraries || [];
+                    self.updateLibrarySelects();
+                }).catch(function(err) {
+                    console.error('Failed to fetch source libraries:', err);
+                    self.sourceLibraries = [];
+                });
             },
+        
             fetchLocalLibraries: function() {
                 var self = this;
-                return ApiClient.fetch({ url: ApiClient.getUrl('Library/VirtualFolders'), type: 'GET', dataType: 'json' }).then(function(folders) { self.localLibraries = (folders || []).map(function(folder) { return { Id: folder.ItemId, Name: folder.Name, Locations: folder.Locations || [] }; }); }).catch(function() { self.localLibraries = []; });
+                return ApiClient.fetch({
+                    url: ApiClient.getUrl('Library/VirtualFolders'),
+                    type: 'GET',
+                    dataType: 'json'
+                }).then(function(folders) {
+                    self.localLibraries = (folders || []).map(function(folder) {
+                        return {
+                            Id: folder.ItemId,
+                            Name: folder.Name,
+                            Locations: folder.Locations || []
+                        };
+                    });
+                }).catch(function() {
+                    self.localLibraries = [];
+                });
             },
+        
             updateLibrarySelects: function() {
                 var self = this;
                 document.querySelectorAll('.sourceLibrarySelect').forEach(function(select) {
                     var savedValue = select.dataset.savedValue || select.value;
                     select.innerHTML = '<option value="">Select source library...</option>';
-                    self.sourceLibraries.forEach(function(lib) { var option = document.createElement('option'); option.value = lib.Id; option.textContent = lib.Name; option.dataset.locations = JSON.stringify(lib.Locations); select.appendChild(option); });
-                    if (savedValue) { select.value = savedValue; }
+                    self.sourceLibraries.forEach(function(lib) {
+                        var option = document.createElement('option');
+                        option.value = lib.Id;
+                        option.textContent = lib.Name;
+                        option.dataset.locations = JSON.stringify(lib.Locations);
+                        select.appendChild(option);
+                    });
+                    if (savedValue) {
+                        select.value = savedValue;
+                    }
                 });
                 self.updateLocalLibrarySelects();
             },
+        
             updateLocalLibrarySelects: function() {
                 var self = this;
                 document.querySelectorAll('.localLibrarySelect').forEach(function(select) {
                     var savedValue = select.dataset.savedValue || select.value;
                     select.innerHTML = '<option value="">Select local library...</option>';
-                    self.localLibraries.forEach(function(lib) { var option = document.createElement('option'); option.value = lib.Id; option.textContent = lib.Name; option.dataset.locations = JSON.stringify(lib.Locations); select.appendChild(option); });
-                    if (savedValue) { select.value = savedValue; }
+                    self.localLibraries.forEach(function(lib) {
+                        var option = document.createElement('option');
+                        option.value = lib.Id;
+                        option.textContent = lib.Name;
+                        option.dataset.locations = JSON.stringify(lib.Locations);
+                        select.appendChild(option);
+                    });
+                    if (savedValue) {
+                        select.value = savedValue;
+                    }
                 });
             },
-            renderMappings: function(mappings) { var self = this; var container = document.getElementById('libraryMappingsContainer'); container.innerHTML = ''; mappings.forEach(function(mapping, index) { self.addMappingRow(mapping, index); }); },
-            addMapping: function() { var container = document.getElementById('libraryMappingsContainer'); this.addMappingRow({}, container.children.length); },
-            addMappingRow: function(mapping, index) {
-                var self = this; var container = document.getElementById('libraryMappingsContainer');
-                var div = document.createElement('div'); div.className = 'libraryMapping'; div.dataset.index = index;
-                div.innerHTML = '<div class="mappingHeader"><label class="checkboxContainer"><input is="emby-checkbox" type="checkbox" class="mappingEnabled" ' + (mapping.IsEnabled ? 'checked' : '') + ' /><span>Enabled</span></label><button is="emby-button" type="button" class="btnRemoveMapping raised button-destructive"><span>Remove</span></button></div><div class="mappingGrid"><div class="mappingColumn"><div class="inputContainer"><label class="inputLabel" for="sourceLibrary' + index + '">Source Library</label><select is="emby-select" id="sourceLibrary' + index + '" class="sourceLibrarySelect"></select></div><div class="inputContainer"><label class="inputLabel" for="sourceRootPath' + index + '">Source Root Path</label><input is="emby-input" type="text" id="sourceRootPath' + index + '" class="sourceRootPath" value="' + ServerSyncShared.escapeHtml(mapping.SourceRootPath || '') + '" /></div></div><div class="mappingColumn"><div class="inputContainer"><label class="inputLabel" for="localLibrary' + index + '">Local Library</label><select is="emby-select" id="localLibrary' + index + '" class="localLibrarySelect"></select></div><div class="inputContainer"><label class="inputLabel" for="localRootPath' + index + '">Local Root Path</label><input is="emby-input" type="text" id="localRootPath' + index + '" class="localRootPath" value="' + ServerSyncShared.escapeHtml(mapping.LocalRootPath || '') + '" /></div></div></div>';
-                container.appendChild(div);
-                var sourceSelect = div.querySelector('.sourceLibrarySelect');
-                if (mapping.SourceLibraryId) { sourceSelect.dataset.savedValue = mapping.SourceLibraryId; }
-                sourceSelect.innerHTML = '<option value="">Select source library...</option>';
-                self.sourceLibraries.forEach(function(lib) { var option = document.createElement('option'); option.value = lib.Id; option.textContent = lib.Name; option.dataset.locations = JSON.stringify(lib.Locations); sourceSelect.appendChild(option); });
-                if (mapping.SourceLibraryId) { sourceSelect.value = mapping.SourceLibraryId; }
-                sourceSelect.addEventListener('change', function() { var option = this.options[this.selectedIndex]; if (option && option.dataset.locations) { var locations = JSON.parse(option.dataset.locations); if (locations.length > 0) { div.querySelector('.sourceRootPath').value = locations[0]; } } });
-                var localSelect = div.querySelector('.localLibrarySelect');
-                if (mapping.LocalLibraryId) { localSelect.dataset.savedValue = mapping.LocalLibraryId; }
-                localSelect.innerHTML = '<option value="">Select local library...</option>';
-                self.localLibraries.forEach(function(lib) { var option = document.createElement('option'); option.value = lib.Id; option.textContent = lib.Name; option.dataset.locations = JSON.stringify(lib.Locations); localSelect.appendChild(option); });
-                if (mapping.LocalLibraryId) { localSelect.value = mapping.LocalLibraryId; }
-                localSelect.addEventListener('change', function() { var option = this.options[this.selectedIndex]; if (option && option.dataset.locations) { var locations = JSON.parse(option.dataset.locations); if (locations.length > 0) { div.querySelector('.localRootPath').value = locations[0]; } } });
-                div.querySelector('.btnRemoveMapping').addEventListener('click', function() { div.remove(); });
+        
+            renderMappings: function(mappings) {
+                var self = this;
+                var container = document.getElementById('libraryMappingsContainer');
+                container.innerHTML = '';
+                mappings.forEach(function(mapping, index) {
+                    self.addMappingRow(mapping, index);
+                });
             },
+        
+            addMapping: function() {
+                var container = document.getElementById('libraryMappingsContainer');
+                this.addMappingRow({}, container.children.length);
+            },
+        
+            addMappingRow: function(mapping, index) {
+                var self = this;
+                var container = document.getElementById('libraryMappingsContainer');
+        
+                var div = document.createElement('div');
+                div.className = 'libraryMapping';
+                div.dataset.index = index;
+        
+                div.innerHTML =
+                    '<div class="mappingHeader">' +
+                        '<label class="checkboxContainer">' +
+                            '<input is="emby-checkbox" type="checkbox" class="mappingEnabled" ' + (mapping.IsEnabled ? 'checked' : '') + ' />' +
+                            '<span>Enabled</span>' +
+                        '</label>' +
+                        '<button is="emby-button" type="button" class="btnRemoveMapping raised button-destructive">' +
+                            '<span>Remove</span>' +
+                        '</button>' +
+                    '</div>' +
+                    '<div class="mappingGrid">' +
+                        '<div class="mappingColumn">' +
+                            '<div class="inputContainer">' +
+                                '<label class="inputLabel" for="sourceLibrary' + index + '">Source Library</label>' +
+                                '<select is="emby-select" id="sourceLibrary' + index + '" class="sourceLibrarySelect"></select>' +
+                            '</div>' +
+                            '<div class="inputContainer">' +
+                                '<label class="inputLabel" for="sourceRootPath' + index + '">Source Root Path</label>' +
+                                '<input is="emby-input" type="text" id="sourceRootPath' + index + '" class="sourceRootPath" value="' + ServerSyncShared.escapeHtml(mapping.SourceRootPath || '') + '" />' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="mappingColumn">' +
+                            '<div class="inputContainer">' +
+                                '<label class="inputLabel" for="localLibrary' + index + '">Local Library</label>' +
+                                '<select is="emby-select" id="localLibrary' + index + '" class="localLibrarySelect"></select>' +
+                            '</div>' +
+                            '<div class="inputContainer">' +
+                                '<label class="inputLabel" for="localRootPath' + index + '">Local Root Path</label>' +
+                                '<input is="emby-input" type="text" id="localRootPath' + index + '" class="localRootPath" value="' + ServerSyncShared.escapeHtml(mapping.LocalRootPath || '') + '" />' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>';
+        
+                container.appendChild(div);
+        
+                // Populate source library select
+                var sourceSelect = div.querySelector('.sourceLibrarySelect');
+                if (mapping.SourceLibraryId) {
+                    sourceSelect.dataset.savedValue = mapping.SourceLibraryId;
+                }
+                sourceSelect.innerHTML = '<option value="">Select source library...</option>';
+                self.sourceLibraries.forEach(function(lib) {
+                    var option = document.createElement('option');
+                    option.value = lib.Id;
+                    option.textContent = lib.Name;
+                    option.dataset.locations = JSON.stringify(lib.Locations);
+                    sourceSelect.appendChild(option);
+                });
+        
+                if (mapping.SourceLibraryId) {
+                    sourceSelect.value = mapping.SourceLibraryId;
+                }
+        
+                sourceSelect.addEventListener('change', function() {
+                    var option = this.options[this.selectedIndex];
+                    if (option && option.dataset.locations) {
+                        var locations = JSON.parse(option.dataset.locations);
+                        if (locations.length > 0) {
+                            div.querySelector('.sourceRootPath').value = locations[0];
+                        }
+                    }
+                });
+        
+                // Populate local library select
+                var localSelect = div.querySelector('.localLibrarySelect');
+                if (mapping.LocalLibraryId) {
+                    localSelect.dataset.savedValue = mapping.LocalLibraryId;
+                }
+                localSelect.innerHTML = '<option value="">Select local library...</option>';
+                self.localLibraries.forEach(function(lib) {
+                    var option = document.createElement('option');
+                    option.value = lib.Id;
+                    option.textContent = lib.Name;
+                    option.dataset.locations = JSON.stringify(lib.Locations);
+                    localSelect.appendChild(option);
+                });
+        
+                if (mapping.LocalLibraryId) {
+                    localSelect.value = mapping.LocalLibraryId;
+                }
+        
+                localSelect.addEventListener('change', function() {
+                    var option = this.options[this.selectedIndex];
+                    if (option && option.dataset.locations) {
+                        var locations = JSON.parse(option.dataset.locations);
+                        if (locations.length > 0) {
+                            div.querySelector('.localRootPath').value = locations[0];
+                        }
+                    }
+                });
+        
+                div.querySelector('.btnRemoveMapping').addEventListener('click', function() {
+                    div.remove();
+                });
+            },
+        
             collectMappings: function() {
                 var mappings = [];
                 document.querySelectorAll('.libraryMapping').forEach(function(row) {
-                    var sourceSelect = row.querySelector('.sourceLibrarySelect'); var sourceOption = sourceSelect.options[sourceSelect.selectedIndex];
-                    var localSelect = row.querySelector('.localLibrarySelect'); var localOption = localSelect.options[localSelect.selectedIndex];
-                    mappings.push({ IsEnabled: row.querySelector('.mappingEnabled').checked, SourceLibraryId: sourceSelect.value, SourceLibraryName: sourceOption ? sourceOption.textContent : '', SourceRootPath: row.querySelector('.sourceRootPath').value, LocalLibraryId: localSelect.value, LocalLibraryName: localOption ? localOption.textContent : '', LocalRootPath: row.querySelector('.localRootPath').value });
+                    var sourceSelect = row.querySelector('.sourceLibrarySelect');
+                    var sourceOption = sourceSelect.options[sourceSelect.selectedIndex];
+                    var localSelect = row.querySelector('.localLibrarySelect');
+                    var localOption = localSelect.options[localSelect.selectedIndex];
+        
+                    mappings.push({
+                        IsEnabled: row.querySelector('.mappingEnabled').checked,
+                        SourceLibraryId: sourceSelect.value,
+                        SourceLibraryName: sourceOption ? sourceOption.textContent : '',
+                        SourceRootPath: row.querySelector('.sourceRootPath').value,
+                        LocalLibraryId: localSelect.value,
+                        LocalLibraryName: localOption ? localOption.textContent : '',
+                        LocalRootPath: row.querySelector('.localRootPath').value
+                    });
                 });
                 return mappings;
             }
         };
+        
     </script>
 
-    <!-- Scripts: paginatedTable.js -->
+    <!-- Scripts: PaginatedTable/paginatedTable.js -->
     <script type="text/javascript">
+        // PaginatedTable - Generic paginated table component for Server Sync plugin
+        // Provides reusable table functionality with infinite scroll pagination
+        
+        // PaginatedTable
+        // Constructor that initializes a new paginated table instance with the given options.
         var PaginatedTable = function(options) {
-            this.options = { containerId: '', endpoint: '', columns: [], selection: { enabled: false, idKey: 'id', onSelectionChange: null }, pagination: { pageSize: 50 }, filters: { options: [], buildParams: null }, actions: { onRowClick: null, onReload: null }, emptyState: { message: 'No items found' }, search: { enabled: true, placeholder: 'Search...', debounceMs: 300 }, getDisplayStatus: null, getStatusClass: null };
+            this.options = {
+                containerId: '',
+                endpoint: '',
+                columns: [],
+                selection: {
+                    enabled: false,
+                    idKey: 'id',
+                    onSelectionChange: null
+                },
+                pagination: {
+                    pageSize: 50
+                },
+                filters: {
+                    options: [],
+                    buildParams: null
+                },
+                actions: {
+                    onRowClick: null,
+                    onReload: null
+                },
+                emptyState: {
+                    message: 'No items found'
+                },
+                search: {
+                    enabled: true,
+                    placeholder: 'Search...',
+                    debounceMs: 300
+                },
+                getDisplayStatus: null,
+                getStatusClass: null
+            };
+        
             this._mergeOptions(options);
-            this.state = { items: [], totalCount: 0, currentPage: 1, pageSize: this.options.pagination.pageSize, selectedIds: new Set(), filterValue: '', searchQuery: '', isLoading: false, hasMore: true };
+        
+            this.state = {
+                items: [],
+                totalCount: 0,
+                currentPage: 1,
+                pageSize: this.options.pagination.pageSize,
+                selectedIds: new Set(),
+                filterValue: '',
+                searchQuery: '',
+                isLoading: false,
+                hasMore: true
+            };
+        
             this.elements = {};
             this.searchTimeout = null;
             this._init();
         };
+        
         PaginatedTable.prototype = {
-            _mergeOptions: function(options) { var self = this; Object.keys(options).forEach(function(key) { if (typeof options[key] === 'object' && options[key] !== null && !Array.isArray(options[key])) { self.options[key] = Object.assign({}, self.options[key], options[key]); } else { self.options[key] = options[key]; } }); },
-            _init: function() { this._createStructure(); this._bindEvents(); },
-            _createStructure: function() { var container = document.getElementById(this.options.containerId); if (!container) { console.error('PaginatedTable: Container not found:', this.options.containerId); return; } container.innerHTML = this._buildHTML(); this._cacheElements(container); },
-            _cacheElements: function(container) { this.elements = { container: container, search: container.querySelector('.pt-search'), filter: container.querySelector('.pt-filter'), selectAll: container.querySelector('.pt-select-all'), selectedCount: container.querySelector('.pt-selected-count'), bulkActions: container.querySelector('.pt-bulk-actions'), reloadBtn: container.querySelector('.pt-reload-btn'), body: container.querySelector('.pt-body'), loadingMore: container.querySelector('.pt-loading-more'), itemCount: container.querySelector('.pt-item-count') }; },
+        
+            // _mergeOptions
+            // Deep merges user-provided options with defaults.
+            _mergeOptions: function(options) {
+                var self = this;
+                Object.keys(options).forEach(function(key) {
+                    if (typeof options[key] === 'object' && options[key] !== null && !Array.isArray(options[key])) {
+                        self.options[key] = Object.assign({}, self.options[key], options[key]);
+                    } else {
+                        self.options[key] = options[key];
+                    }
+                });
+            },
+        
+            // _init
+            // Initializes the component by creating DOM structure and binding events.
+            _init: function() {
+                this._createStructure();
+                this._bindEvents();
+            },
+        
+            // _createStructure
+            // Builds and injects the table HTML into the container element.
+            _createStructure: function() {
+                var container = document.getElementById(this.options.containerId);
+                if (!container) {
+                    console.error('PaginatedTable: Container not found:', this.options.containerId);
+                    return;
+                }
+                container.innerHTML = this._buildHTML();
+                this._cacheElements(container);
+            },
+        
+            // _cacheElements
+            // Stores references to frequently accessed DOM elements.
+            _cacheElements: function(container) {
+                this.elements = {
+                    container: container,
+                    search: container.querySelector('.pt-search'),
+                    filter: container.querySelector('.pt-filter'),
+                    selectAll: container.querySelector('.pt-select-all'),
+                    selectedCount: container.querySelector('.pt-selected-count'),
+                    bulkActions: container.querySelector('.pt-bulk-actions'),
+                    reloadBtn: container.querySelector('.pt-reload-btn'),
+                    body: container.querySelector('.pt-body'),
+                    loadingMore: container.querySelector('.pt-loading-more'),
+                    itemCount: container.querySelector('.pt-item-count')
+                };
+            },
+        
+            // _buildHTML
+            // Generates the complete HTML structure for the table component.
             _buildHTML: function() {
-                var opts = this.options, html = '<div class="pt-wrapper">';
+                var opts = this.options;
+                var html = '<div class="pt-wrapper">';
+        
+                // Top row: Search + Filter
                 html += '<div class="pt-controls">';
-                if (opts.search && opts.search.enabled !== false) { html += '<input is="emby-input" type="text" class="pt-search" placeholder="' + ServerSyncShared.escapeHtml(opts.search.placeholder || 'Search...') + '" />'; }
-                if (opts.filters && opts.filters.options && opts.filters.options.length > 0) { html += '<select is="emby-select" class="pt-filter"><option value="">All</option>'; opts.filters.options.forEach(function(opt) { var style = opt.hidden ? ' style="display:none"' : ''; var id = opt.id ? ' id="' + opt.id + '"' : ''; html += '<option value="' + ServerSyncShared.escapeHtml(opt.value) + '"' + style + id + '>' + ServerSyncShared.escapeHtml(opt.label) + '</option>'; }); html += '</select>'; }
+                if (opts.search && opts.search.enabled !== false) {
+                    html += '<input is="emby-input" type="text" class="pt-search" placeholder="' +
+                        ServerSyncShared.escapeHtml(opts.search.placeholder || 'Search...') + '" />';
+                }
+                if (opts.filters && opts.filters.options && opts.filters.options.length > 0) {
+                    html += '<select is="emby-select" class="pt-filter">';
+                    html += '<option value="">All</option>';
+                    opts.filters.options.forEach(function(opt) {
+                        var style = opt.hidden ? ' style="display:none"' : '';
+                        var id = opt.id ? ' id="' + opt.id + '"' : '';
+                        html += '<option value="' + ServerSyncShared.escapeHtml(opt.value) + '"' + style + id + '>' +
+                            ServerSyncShared.escapeHtml(opt.label) + '</option>';
+                    });
+                    html += '</select>';
+                }
                 html += '</div>';
-                if (opts.selection && opts.selection.enabled) { html += '<div class="pt-selection-header"><label class="pt-select-all-container"><input type="checkbox" class="pt-select-all" /><span>Select All</span></label><span class="pt-selected-count">0 selected</span><div class="pt-bulk-actions"></div><span class="pt-header-spacer"></span><button is="emby-button" type="button" class="pt-reload-btn" title="Reload table data"><span class="material-icons pt-reload-icon">refresh</span></button></div>'; }
+        
+                // Bottom row: Selection controls + Bulk actions + Reload button
+                if (opts.selection && opts.selection.enabled) {
+                    html += '<div class="pt-selection-header">';
+                    html += '<label class="pt-select-all-container">';
+                    html += '<input type="checkbox" class="pt-select-all" />';
+                    html += '<span>Select All</span>';
+                    html += '</label>';
+                    html += '<span class="pt-selected-count">0 selected</span>';
+                    html += '<div class="pt-bulk-actions"></div>';
+                    html += '<span class="pt-header-spacer"></span>';
+                    html += '<button is="emby-button" type="button" class="pt-reload-btn" title="Reload table data">';
+                    html += '<span class="material-icons pt-reload-icon">refresh</span>';
+                    html += '</button>';
+                    html += '</div>';
+                }
+        
+                // Table body
                 html += '<div class="pt-body"></div>';
+        
+                // Loading indicator
                 html += '<div class="pt-loading-more" style="display:none;">Loading more...</div>';
-                html += '<div class="pt-footer"><span class="pt-item-count"></span></div>';
+        
+                // Footer
+                html += '<div class="pt-footer">';
+                html += '<span class="pt-item-count"></span>';
+                html += '</div>';
+        
                 html += '</div>';
                 return html;
             },
+        
+            // _bindEvents
+            // Attaches event listeners to interactive elements.
             _bindEvents: function() {
                 var self = this;
-                if (this.elements.search) { this.elements.search.addEventListener('input', function(e) { self._handleSearchInput(e.target.value); }); }
-                if (this.elements.filter) { this.elements.filter.addEventListener('change', function(e) { self.setFilter(e.target.value); }); }
-                if (this.elements.selectAll) { this.elements.selectAll.addEventListener('change', function(e) { self._toggleSelectAll(e.target.checked); }); }
-                if (this.elements.reloadBtn) { this.elements.reloadBtn.addEventListener('click', function() { self._handleReload(); }); }
-                if (this.elements.body) { this.elements.body.addEventListener('scroll', function() { self._handleScroll(); }); }
+        
+                if (this.elements.search) {
+                    this.elements.search.addEventListener('input', function(e) {
+                        self._handleSearchInput(e.target.value);
+                    });
+                }
+        
+                if (this.elements.filter) {
+                    this.elements.filter.addEventListener('change', function(e) {
+                        self.setFilter(e.target.value);
+                    });
+                }
+        
+                if (this.elements.selectAll) {
+                    this.elements.selectAll.addEventListener('change', function(e) {
+                        self._toggleSelectAll(e.target.checked);
+                    });
+                }
+        
+                if (this.elements.reloadBtn) {
+                    this.elements.reloadBtn.addEventListener('click', function() {
+                        self._handleReload();
+                    });
+                }
+        
+                if (this.elements.body) {
+                    this.elements.body.addEventListener('scroll', function() {
+                        self._handleScroll();
+                    });
+                }
             },
-            _handleSearchInput: function(value) { var self = this; if (this.searchTimeout) { clearTimeout(this.searchTimeout); } var debounceMs = this.options.search.debounceMs || 300; this.searchTimeout = setTimeout(function() { self.setSearch(value); }, debounceMs); },
+        
+            // _handleSearchInput
+            // Debounces search input to avoid excessive API calls.
+            _handleSearchInput: function(value) {
+                var self = this;
+                if (this.searchTimeout) {
+                    clearTimeout(this.searchTimeout);
+                }
+                var debounceMs = this.options.search.debounceMs || 300;
+                this.searchTimeout = setTimeout(function() {
+                    self.setSearch(value);
+                }, debounceMs);
+            },
+        
+            // _handleScroll
+            // Triggers loading more items when scrolled near the bottom.
             _handleScroll: function() {
                 var body = this.elements.body;
                 if (!body || this.state.isLoading || !this.state.hasMore) return;
-                var scrollTop = body.scrollTop, scrollHeight = body.scrollHeight, clientHeight = body.clientHeight;
-                if (scrollTop + clientHeight >= scrollHeight - 100) { this._loadMore(); }
+        
+                var scrollTop = body.scrollTop;
+                var scrollHeight = body.scrollHeight;
+                var clientHeight = body.clientHeight;
+        
+                // Load more when within 100px of bottom
+                if (scrollTop + clientHeight >= scrollHeight - 100) {
+                    this._loadMore();
+                }
             },
+        
+            // _handleReload
+            // Resets state and reloads all data from the first page.
             _handleReload: function() {
-                var self = this, btn = this.elements.reloadBtn;
-                if (btn) { btn.classList.add('spinning'); btn.disabled = true; }
-                this.state.items = []; this.state.currentPage = 1; this.state.hasMore = true; this.state.selectedIds.clear();
-                this.load().then(function() { if (btn) { btn.classList.remove('spinning'); btn.disabled = false; } if (self.options.actions && self.options.actions.onReload) { self.options.actions.onReload(); } }).catch(function() { if (btn) { btn.classList.remove('spinning'); btn.disabled = false; } });
+                var self = this;
+                var btn = this.elements.reloadBtn;
+        
+                if (btn) {
+                    btn.classList.add('spinning');
+                    btn.disabled = true;
+                }
+        
+                this.state.items = [];
+                this.state.currentPage = 1;
+                this.state.hasMore = true;
+                this.state.selectedIds.clear();
+        
+                this.load().then(function() {
+                    if (btn) {
+                        btn.classList.remove('spinning');
+                        btn.disabled = false;
+                    }
+                    if (self.options.actions && self.options.actions.onReload) {
+                        self.options.actions.onReload();
+                    }
+                }).catch(function() {
+                    if (btn) {
+                        btn.classList.remove('spinning');
+                        btn.disabled = false;
+                    }
+                });
             },
+        
+            // load
+            // Fetches items from the API for the current page.
             load: function() {
-                var self = this, state = this.state, opts = this.options;
+                var self = this;
+                var state = this.state;
+                var opts = this.options;
+        
                 if (state.isLoading) return Promise.resolve();
-                state.isLoading = true; this._setLoading(true);
-                var params = ['skip=' + ((state.currentPage - 1) * state.pageSize), 'take=' + state.pageSize];
-                if (state.searchQuery) { params.push('search=' + encodeURIComponent(state.searchQuery)); }
-                if (state.filterValue) { if (opts.filters && opts.filters.buildParams) { var filterParams = opts.filters.buildParams(state.filterValue); Object.keys(filterParams).forEach(function(key) { if (filterParams[key] !== null && filterParams[key] !== undefined) { params.push(key + '=' + encodeURIComponent(filterParams[key])); } }); } else { params.push('filter=' + encodeURIComponent(state.filterValue)); } }
+                state.isLoading = true;
+                this._setLoading(true);
+        
+                // Build query params
+                var params = [];
+                params.push('skip=' + ((state.currentPage - 1) * state.pageSize));
+                params.push('take=' + state.pageSize);
+        
+                if (state.searchQuery) {
+                    params.push('search=' + encodeURIComponent(state.searchQuery));
+                }
+        
+                if (state.filterValue) {
+                    if (opts.filters && opts.filters.buildParams) {
+                        // Custom filter param builder
+                        var filterParams = opts.filters.buildParams(state.filterValue);
+                        Object.keys(filterParams).forEach(function(key) {
+                            if (filterParams[key] !== null && filterParams[key] !== undefined) {
+                                params.push(key + '=' + encodeURIComponent(filterParams[key]));
+                            }
+                        });
+                    } else {
+                        params.push('filter=' + encodeURIComponent(state.filterValue));
+                    }
+                }
+        
                 var endpoint = opts.endpoint + (params.length ? '?' + params.join('&') : '');
+        
                 return ServerSyncShared.apiRequest(endpoint, 'GET').then(function(result) {
                     var newItems = result.Items || [];
                     state.totalCount = result.TotalCount || 0;
-                    if (state.currentPage === 1) { state.items = newItems; } else { state.items = state.items.concat(newItems); }
+        
+                    // First page replaces, subsequent pages append
+                    if (state.currentPage === 1) {
+                        state.items = newItems;
+                    } else {
+                        state.items = state.items.concat(newItems);
+                    }
+        
                     state.hasMore = state.items.length < state.totalCount;
-                    self._render(); state.isLoading = false; self._setLoading(false); return result;
-                }).catch(function(err) { console.error('PaginatedTable load error:', err); state.isLoading = false; self._setLoading(false); throw err; });
+        
+                    self._render();
+                    state.isLoading = false;
+                    self._setLoading(false);
+                    return result;
+                }).catch(function(err) {
+                    console.error('PaginatedTable load error:', err);
+                    state.isLoading = false;
+                    self._setLoading(false);
+                    throw err;
+                });
             },
+        
+            // _loadMore
+            // Increments page and loads the next batch of items.
             _loadMore: function() {
                 if (!this.state.hasMore || this.state.isLoading) return;
+        
                 this.state.currentPage++;
-                if (this.elements.loadingMore) { this.elements.loadingMore.style.display = 'block'; }
+        
+                if (this.elements.loadingMore) {
+                    this.elements.loadingMore.style.display = 'block';
+                }
+        
                 var self = this;
-                this.load().finally(function() { if (self.elements.loadingMore) { self.elements.loadingMore.style.display = 'none'; } });
+                this.load().finally(function() {
+                    if (self.elements.loadingMore) {
+                        self.elements.loadingMore.style.display = 'none';
+                    }
+                });
             },
-            _setLoading: function(loading) { if (this.elements.container) { if (loading && this.state.currentPage === 1) { this.elements.container.classList.add('pt-loading'); } else { this.elements.container.classList.remove('pt-loading'); } } },
-            _render: function() { this._renderBody(); this._updateItemCount(); this._updateSelectionUI(); },
+        
+            // _setLoading
+            // Toggles the loading state visual indicator.
+            _setLoading: function(loading) {
+                if (this.elements.container) {
+                    // Only show loading overlay on first page load
+                    if (loading && this.state.currentPage === 1) {
+                        this.elements.container.classList.add('pt-loading');
+                    } else {
+                        this.elements.container.classList.remove('pt-loading');
+                    }
+                }
+            },
+        
+            // _render
+            // Updates all rendered portions of the table.
+            _render: function() {
+                this._renderBody();
+                this._updateItemCount();
+                this._updateSelectionUI();
+            },
+        
+            // _renderBody
+            // Renders all table rows or empty state message.
             _renderBody: function() {
-                var self = this, state = this.state, opts = this.options, body = this.elements.body;
+                var self = this;
+                var state = this.state;
+                var opts = this.options;
+                var body = this.elements.body;
+        
                 if (!body) return;
-                if (state.items.length === 0) { body.innerHTML = '<div class="pt-empty">' + ServerSyncShared.escapeHtml(opts.emptyState.message) + '</div>'; return; }
-                body.innerHTML = state.items.map(function(item) { return self._renderRow(item); }).join('');
+        
+                if (state.items.length === 0) {
+                    body.innerHTML = '<div class="pt-empty">' +
+                        ServerSyncShared.escapeHtml(opts.emptyState.message) + '</div>';
+                    return;
+                }
+        
+                body.innerHTML = state.items.map(function(item) {
+                    return self._renderRow(item);
+                }).join('');
+        
                 this._bindRowEvents();
             },
+        
+            // _renderRow
+            // Generates HTML for a single table row.
             _renderRow: function(item) {
-                var self = this, opts = this.options, idKey = opts.selection && opts.selection.idKey || 'id', itemId = item[idKey];
+                var self = this;
+                var opts = this.options;
+                var idKey = opts.selection && opts.selection.idKey || 'id';
+                var itemId = item[idKey];
                 var visibleColumns = opts.columns.filter(function(col) { return !col.hidden; });
+        
                 var html = '<div class="pt-row" data-id="' + ServerSyncShared.escapeHtml(String(itemId)) + '">';
-                if (opts.selection && opts.selection.enabled) { var checked = this.state.selectedIds.has(String(itemId)) ? ' checked' : ''; html += '<div class="pt-cell pt-cell-checkbox"><input type="checkbox" class="pt-row-checkbox" data-id="' + ServerSyncShared.escapeHtml(String(itemId)) + '"' + checked + ' /></div>'; }
+        
+                // Checkbox cell
+                if (opts.selection && opts.selection.enabled) {
+                    var checked = this.state.selectedIds.has(String(itemId)) ? ' checked' : '';
+                    html += '<div class="pt-cell pt-cell-checkbox">';
+                    html += '<input type="checkbox" class="pt-row-checkbox" data-id="' +
+                        ServerSyncShared.escapeHtml(String(itemId)) + '"' + checked + ' />';
+                    html += '</div>';
+                }
+        
+                // Data cells
                 visibleColumns.forEach(function(col) {
-                    var value = item[col.key], cellClass = 'pt-cell', content = '';
-                    if (col.type === 'status') { cellClass += ' pt-cell-status'; var displayStatus = self._getDisplayStatus(item, value); var statusClass = self._getStatusClass(item, value); content = '<button type="button" class="pt-status-badge pt-status-btn ' + statusClass + '" data-id="' + ServerSyncShared.escapeHtml(String(itemId)) + '">' + ServerSyncShared.escapeHtml(displayStatus) + '</button>'; }
-                    else if (col.type === 'custom' && col.render) { content = col.render(item, value); }
-                    else { content = value !== null && value !== undefined ? ServerSyncShared.escapeHtml(String(value)) : ''; }
+                    var value = item[col.key];
+                    var cellClass = 'pt-cell';
+                    if (col.type === 'status') cellClass += ' pt-cell-status';
+                    if (col.className) cellClass += ' ' + col.className;
+                    var content = '';
+        
+                    if (col.type === 'status') {
+                        var displayStatus = self._getDisplayStatus(item, value);
+                        var statusClass = self._getStatusClass(item, value);
+                        content = '<button type="button" class="pt-status-badge pt-status-btn ' + statusClass + '" data-id="' +
+                            ServerSyncShared.escapeHtml(String(itemId)) + '">' +
+                            ServerSyncShared.escapeHtml(displayStatus) + '</button>';
+                    } else if (col.type === 'custom' && col.render) {
+                        content = col.render(item, value);
+                    } else {
+                        content = value !== null && value !== undefined ? ServerSyncShared.escapeHtml(String(value)) : '';
+                    }
+        
                     html += '<div class="' + cellClass + '">' + content + '</div>';
                 });
+        
                 html += '</div>';
                 return html;
             },
-            _getDisplayStatus: function(item, value) { if (this.options.getDisplayStatus) { return this.options.getDisplayStatus(item, value); } return value || ''; },
-            _getStatusClass: function(item, value) { if (this.options.getStatusClass) { return this.options.getStatusClass(item, value); } return value || ''; },
+        
+            // _getDisplayStatus
+            // Returns the display text for a status value.
+            _getDisplayStatus: function(item, value) {
+                if (this.options.getDisplayStatus) {
+                    return this.options.getDisplayStatus(item, value);
+                }
+                return value || '';
+            },
+        
+            // _getStatusClass
+            // Returns the CSS class for a status value.
+            _getStatusClass: function(item, value) {
+                if (this.options.getStatusClass) {
+                    return this.options.getStatusClass(item, value);
+                }
+                return value || '';
+            },
+        
+            // _bindRowEvents
+            // Attaches click and change handlers to row elements.
             _bindRowEvents: function() {
-                var self = this, body = this.elements.body;
+                var self = this;
+                var body = this.elements.body;
                 if (!body) return;
+        
                 body.querySelectorAll('.pt-row').forEach(function(row) {
-                    var handleRowAction = function(e) { if (e.target.type === 'checkbox' || e.target.classList.contains('pt-row-checkbox') || e.target.classList.contains('pt-status-btn')) return; var id = row.dataset.id; var item = self._getItemById(id); if (item && self.options.actions && self.options.actions.onRowClick) { e.preventDefault(); e.stopPropagation(); self.options.actions.onRowClick(item); } };
+                    var handleRowAction = function(e) {
+                        // Skip if clicking checkbox or status button (handled separately)
+                        if (e.target.type === 'checkbox' || e.target.classList.contains('pt-row-checkbox') ||
+                            e.target.classList.contains('pt-status-btn')) {
+                            return;
+                        }
+        
+                        var id = row.dataset.id;
+                        var item = self._getItemById(id);
+                        if (item && self.options.actions && self.options.actions.onRowClick) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            self.options.actions.onRowClick(item);
+                        }
+                    };
+        
                     row.addEventListener('click', handleRowAction);
                 });
+        
+                // Status badge buttons - explicit tap target for mobile
                 body.querySelectorAll('.pt-status-btn').forEach(function(btn) {
-                    btn.addEventListener('click', function(e) { e.preventDefault(); e.stopPropagation(); var id = btn.dataset.id; var item = self._getItemById(id); if (item && self.options.actions && self.options.actions.onRowClick) { self.options.actions.onRowClick(item); } });
+                    btn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        var id = btn.dataset.id;
+                        var item = self._getItemById(id);
+                        if (item && self.options.actions && self.options.actions.onRowClick) {
+                            self.options.actions.onRowClick(item);
+                        }
+                    });
                 });
+        
                 body.querySelectorAll('.pt-row-checkbox').forEach(function(checkbox) {
-                    checkbox.addEventListener('change', function(e) { e.stopPropagation(); var id = checkbox.dataset.id; if (checkbox.checked) { self.state.selectedIds.add(id); } else { self.state.selectedIds.delete(id); } self._updateSelectionUI(); self._notifySelectionChange(); });
-                    checkbox.addEventListener('click', function(e) { e.stopPropagation(); });
+                    checkbox.addEventListener('change', function(e) {
+                        e.stopPropagation();
+                        var id = checkbox.dataset.id;
+                        if (checkbox.checked) {
+                            self.state.selectedIds.add(id);
+                        } else {
+                            self.state.selectedIds.delete(id);
+                        }
+                        self._updateSelectionUI();
+                        self._notifySelectionChange();
+                    });
+        
+                    // Prevent row click when clicking checkbox
+                    checkbox.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                    });
                 });
             },
-            _getItemById: function(id) { var idKey = this.options.selection && this.options.selection.idKey || 'id'; return this.state.items.find(function(item) { return String(item[idKey]) === String(id); }); },
+        
+            // _getItemById
+            // Finds an item in the current items array by its ID.
+            _getItemById: function(id) {
+                var idKey = this.options.selection && this.options.selection.idKey || 'id';
+                return this.state.items.find(function(item) {
+                    return String(item[idKey]) === String(id);
+                });
+            },
+        
+            // _updateItemCount
+            // Updates the footer text showing loaded vs total item counts.
             _updateItemCount: function() {
                 if (this.elements.itemCount) {
-                    var loaded = this.state.items.length, total = this.state.totalCount;
-                    if (total === 0) { this.elements.itemCount.textContent = ''; }
-                    else if (loaded >= total) { this.elements.itemCount.textContent = total + ' items'; }
-                    else { this.elements.itemCount.textContent = 'Showing ' + loaded + ' of ' + total + ' items'; }
+                    var loaded = this.state.items.length;
+                    var total = this.state.totalCount;
+        
+                    if (total === 0) {
+                        this.elements.itemCount.textContent = '';
+                    } else if (loaded >= total) {
+                        this.elements.itemCount.textContent = total + ' items';
+                    } else {
+                        this.elements.itemCount.textContent = 'Showing ' + loaded + ' of ' + total + ' items';
+                    }
                 }
             },
+        
+            // _updateSelectionUI
+            // Syncs the selection count display and select-all checkbox state.
             _updateSelectionUI: function() {
                 var count = this.state.selectedIds.size;
-                if (this.elements.selectedCount) { this.elements.selectedCount.textContent = count + ' selected'; }
-                if (this.elements.selectAll) { var allSelected = count > 0 && count === this.state.items.length; var someSelected = count > 0 && count < this.state.items.length; this.elements.selectAll.checked = allSelected; this.elements.selectAll.indeterminate = someSelected; }
+        
+                if (this.elements.selectedCount) {
+                    this.elements.selectedCount.textContent = count + ' selected';
+                }
+        
+                if (this.elements.selectAll) {
+                    var allSelected = count > 0 && count === this.state.items.length;
+                    var someSelected = count > 0 && count < this.state.items.length;
+                    this.elements.selectAll.checked = allSelected;
+                    this.elements.selectAll.indeterminate = someSelected;
+                }
             },
+        
+            // _toggleSelectAll
+            // Selects or deselects all currently loaded items.
             _toggleSelectAll: function(checked) {
-                var self = this, idKey = this.options.selection && this.options.selection.idKey || 'id';
+                var self = this;
+                var idKey = this.options.selection && this.options.selection.idKey || 'id';
+        
                 this.state.selectedIds.clear();
-                if (checked) { this.state.items.forEach(function(item) { self.state.selectedIds.add(String(item[idKey])); }); }
-                if (this.elements.body) { this.elements.body.querySelectorAll('.pt-row-checkbox').forEach(function(cb) { cb.checked = checked; }); }
-                this._updateSelectionUI(); this._notifySelectionChange();
+        
+                if (checked) {
+                    this.state.items.forEach(function(item) {
+                        self.state.selectedIds.add(String(item[idKey]));
+                    });
+                }
+        
+                if (this.elements.body) {
+                    this.elements.body.querySelectorAll('.pt-row-checkbox').forEach(function(cb) {
+                        cb.checked = checked;
+                    });
+                }
+        
+                this._updateSelectionUI();
+                this._notifySelectionChange();
             },
-            _notifySelectionChange: function() { if (this.options.selection && this.options.selection.onSelectionChange) { this.options.selection.onSelectionChange(this.getSelectedIds()); } },
-            getSelectedIds: function() { return Array.from(this.state.selectedIds); },
-            getSelectedItems: function() { var self = this, idKey = this.options.selection && this.options.selection.idKey || 'id'; return this.state.items.filter(function(item) { return self.state.selectedIds.has(String(item[idKey])); }); },
-            clearSelection: function() { this.state.selectedIds.clear(); this._updateSelectionUI(); this._notifySelectionChange(); if (this.elements.body) { this.elements.body.querySelectorAll('.pt-row-checkbox').forEach(function(cb) { cb.checked = false; }); } if (this.elements.selectAll) { this.elements.selectAll.checked = false; this.elements.selectAll.indeterminate = false; } },
-            refresh: function() { this.state.items = []; this.state.currentPage = 1; this.state.hasMore = true; return this.load(); },
-            setFilter: function(value) { this.state.filterValue = value; this.state.items = []; this.state.currentPage = 1; this.state.hasMore = true; this.clearSelection(); return this.load(); },
-            setSearch: function(query) { this.state.searchQuery = query; this.state.items = []; this.state.currentPage = 1; this.state.hasMore = true; this.clearSelection(); return this.load(); },
-            getItems: function() { return this.state.items; },
-            getTotalCount: function() { return this.state.totalCount; },
-            getBulkActionsContainer: function() { return this.elements.bulkActions; },
-            setFilterOptionVisible: function(optionId, visible) { if (this.elements.filter) { var option = this.elements.filter.querySelector('#' + optionId); if (option) { option.style.display = visible ? 'block' : 'none'; } } },
-            setFilterValue: function(value) { this.state.filterValue = value; if (this.elements.filter) { this.elements.filter.value = value; } }
+        
+            // _notifySelectionChange
+            // Invokes the selection change callback if configured.
+            _notifySelectionChange: function() {
+                if (this.options.selection && this.options.selection.onSelectionChange) {
+                    this.options.selection.onSelectionChange(this.getSelectedIds());
+                }
+            },
+        
+            // ========================================
+            // Public API
+            // ========================================
+        
+            // getSelectedIds
+            // Returns an array of selected item IDs.
+            getSelectedIds: function() {
+                return Array.from(this.state.selectedIds);
+            },
+        
+            // getSelectedItems
+            // Returns an array of selected item objects.
+            getSelectedItems: function() {
+                var self = this;
+                var idKey = this.options.selection && this.options.selection.idKey || 'id';
+                return this.state.items.filter(function(item) {
+                    return self.state.selectedIds.has(String(item[idKey]));
+                });
+            },
+        
+            // clearSelection
+            // Clears all selected items and updates UI.
+            clearSelection: function() {
+                this.state.selectedIds.clear();
+                this._updateSelectionUI();
+                this._notifySelectionChange();
+        
+                if (this.elements.body) {
+                    this.elements.body.querySelectorAll('.pt-row-checkbox').forEach(function(cb) {
+                        cb.checked = false;
+                    });
+                }
+                if (this.elements.selectAll) {
+                    this.elements.selectAll.checked = false;
+                    this.elements.selectAll.indeterminate = false;
+                }
+            },
+        
+            // refresh
+            // Resets pagination and reloads data from the beginning.
+            refresh: function() {
+                this.state.items = [];
+                this.state.currentPage = 1;
+                this.state.hasMore = true;
+                return this.load();
+            },
+        
+            // setFilter
+            // Applies a filter value and reloads data.
+            setFilter: function(value) {
+                this.state.filterValue = value;
+                this.state.items = [];
+                this.state.currentPage = 1;
+                this.state.hasMore = true;
+                this.clearSelection();
+                return this.load();
+            },
+        
+            // setSearch
+            // Applies a search query and reloads data.
+            setSearch: function(query) {
+                this.state.searchQuery = query;
+                this.state.items = [];
+                this.state.currentPage = 1;
+                this.state.hasMore = true;
+                this.clearSelection();
+                return this.load();
+            },
+        
+            // getItems
+            // Returns all currently loaded items.
+            getItems: function() {
+                return this.state.items;
+            },
+        
+            // getTotalCount
+            // Returns the total number of items available on the server.
+            getTotalCount: function() {
+                return this.state.totalCount;
+            },
+        
+            // getBulkActionsContainer
+            // Returns the DOM element for injecting bulk action buttons.
+            getBulkActionsContainer: function() {
+                return this.elements.bulkActions;
+            },
+        
+            // setFilterOptionVisible
+            // Shows or hides a specific filter dropdown option.
+            setFilterOptionVisible: function(optionId, visible) {
+                if (this.elements.filter) {
+                    var option = this.elements.filter.querySelector('#' + optionId);
+                    if (option) {
+                        option.style.display = visible ? 'block' : 'none';
+                    }
+                }
+            },
+        
+            // setFilterValue
+            // Sets the filter value without triggering a reload.
+            setFilterValue: function(value) {
+                this.state.filterValue = value;
+                if (this.elements.filter) {
+                    this.elements.filter.value = value;
+                }
+            }
         };
+        
     </script>
 
-    <!-- Scripts: syncTable.js -->
+    <!-- Scripts: SyncTable/syncTable.js -->
     <script type="text/javascript">
+        // Sync Table module
+        // Uses the generic PaginatedTable component for content sync items
+        
         var SyncTableModule = {
-            table: null, currentModalItem: null, capabilities: null,
+            table: null,
+            currentModalItem: null,
+            capabilities: null,
+        
             init: function() {
                 var self = this;
+        
                 // Create the paginated table instance
                 this.table = new PaginatedTable({
                     containerId: 'syncItemsTableContainer',
                     endpoint: 'Items',
+        
                     columns: [
-                        { key: 'name', label: 'Name', type: 'custom', render: function(item) { var fileName = ServerSyncShared.getFileName(item.SourcePath); var localExists = item.Status === 'Synced'; var localPathClass = localExists ? '' : ' notExists'; var localPathDisplay = item.LocalPath ? ServerSyncShared.getFileName(item.LocalPath) : 'N/A'; var willSync = !localExists && item.LocalPath && item.Status !== 'Ignored' && !(item.Status === 'Pending' && item.PendingType === 'Deletion'); if (willSync) localPathDisplay = '(will sync to) ' + localPathDisplay; var errorPreview = ''; if (item.Status === 'Errored' && item.ErrorMessage) { errorPreview = '<div class="syncItemError" title="' + ServerSyncShared.escapeHtml(item.ErrorMessage) + '">' + ServerSyncShared.escapeHtml(item.ErrorMessage) + '</div>'; } return '<div class="syncItemInfo"><div class="syncItemName" title="' + ServerSyncShared.escapeHtml(item.SourcePath) + '">' + ServerSyncShared.escapeHtml(fileName) + '</div><div class="syncItemPath' + localPathClass + '" title="' + ServerSyncShared.escapeHtml(item.LocalPath || '') + '">' + ServerSyncShared.escapeHtml(localPathDisplay) + '</div>' + errorPreview + '</div>'; } },
-                        { key: 'details', label: 'Details', hidden: true, type: 'custom', render: function() { return ''; } },
-                        { key: 'Status', label: 'Status', type: 'status' }
+                        {
+                            key: 'name',
+                            label: 'Name',
+                            type: 'custom',
+                            render: function(item) {
+                                var fileName = ServerSyncShared.getFileName(item.SourcePath);
+                                var localExists = item.Status === 'Synced';
+                                var localPathClass = localExists ? '' : ' notExists';
+                                var localPathDisplay = item.LocalPath
+                                    ? ServerSyncShared.getFileName(item.LocalPath)
+                                    : 'N/A';
+        
+                                var willSync = !localExists && item.LocalPath &&
+                                    item.Status !== 'Ignored' &&
+                                    !(item.Status === 'Pending' && item.PendingType === 'Deletion');
+                                if (willSync) localPathDisplay = '(will sync to) ' + localPathDisplay;
+        
+                                var errorPreview = '';
+                                if (item.Status === 'Errored' && item.ErrorMessage) {
+                                    errorPreview = '<div class="syncItemError" title="' +
+                                        ServerSyncShared.escapeHtml(item.ErrorMessage) + '">' +
+                                        ServerSyncShared.escapeHtml(item.ErrorMessage) + '</div>';
+                                }
+        
+                                return '<div class="syncItemInfo">' +
+                                    '<div class="syncItemName" title="' +
+                                        ServerSyncShared.escapeHtml(item.SourcePath) + '">' +
+                                        ServerSyncShared.escapeHtml(fileName) + '</div>' +
+                                    '<div class="syncItemPath' + localPathClass + '" title="' +
+                                        ServerSyncShared.escapeHtml(item.LocalPath || '') + '">' +
+                                        ServerSyncShared.escapeHtml(localPathDisplay) + '</div>' +
+                                    errorPreview +
+                                '</div>';
+                            }
+                        },
+                        {
+                            key: 'details',
+                            label: 'Details',
+                            hidden: true,  // Hidden for content sync, available for future use
+                            type: 'custom',
+                            render: function() {
+                                return '';
+                            }
+                        },
+                        {
+                            key: 'Status',
+                            label: 'Status',
+                            type: 'status'
+                        }
                     ],
-                    selection: { enabled: true, idKey: 'SourceItemId', onSelectionChange: function(selectedIds) { self.updateBulkActionsVisibility(selectedIds.length); } },
-                    pagination: { pageSize: 50 },
-                    filters: { options: [ { value: 'Synced', label: 'Synced' }, { value: 'Queued', label: 'Queued' }, { value: 'Errored', label: 'Errored' }, { value: 'Ignored', label: 'Ignored' }, { value: 'Pending:Download', label: 'Pending Download', id: 'optPendingDownload', hidden: true }, { value: 'Pending:Replacement', label: 'Pending Replace', id: 'optPendingReplacement', hidden: true }, { value: 'Pending:Deletion', label: 'Pending Delete', id: 'optPendingDeletion', hidden: true }, { value: 'Deleting', label: 'Deleting', id: 'optDeleting', hidden: true } ], buildParams: function(filterValue) { if (filterValue.indexOf(':') > -1) { var parts = filterValue.split(':'); return { status: parts[0], pendingType: parts[1] }; } return { status: filterValue }; } },
-                    actions: { onRowClick: function(item) { self.showItemDetail(item.SourceItemId); }, onReload: function() { self.loadSyncStatus(); self.loadHealthStats(); } },
-                    getDisplayStatus: function(item) { if (item.Status === 'Pending' && item.PendingType) { return 'Pending ' + item.PendingType; } return item.Status; },
-                    getStatusClass: function(item) { if (item.Status === 'Pending' && item.PendingType) { return 'Pending-' + item.PendingType; } return item.Status; },
-                    emptyState: { message: 'No items found' }
+        
+                    selection: {
+                        enabled: true,
+                        idKey: 'SourceItemId',
+                        onSelectionChange: function(selectedIds) {
+                            self.updateBulkActionsVisibility(selectedIds.length);
+                        }
+                    },
+        
+                    pagination: {
+                        pageSize: 50
+                    },
+        
+                    filters: {
+                        options: [
+                            { value: 'Synced', label: 'Synced' },
+                            { value: 'Queued', label: 'Queued' },
+                            { value: 'Errored', label: 'Errored' },
+                            { value: 'Ignored', label: 'Ignored' },
+                            { value: 'Pending', label: 'Pending' },
+                            { value: 'Pending:Download', label: 'Pending Download', id: 'optPendingDownload', hidden: true },
+                            { value: 'Pending:Replacement', label: 'Pending Replace', id: 'optPendingReplacement', hidden: true },
+                            { value: 'Pending:Deletion', label: 'Pending Delete', id: 'optPendingDeletion', hidden: true },
+                            { value: 'Deleting', label: 'Deleting', id: 'optDeleting', hidden: true }
+                        ],
+                        buildParams: function(filterValue) {
+                            if (filterValue.indexOf(':') > -1) {
+                                var parts = filterValue.split(':');
+                                return { status: parts[0], pendingType: parts[1] };
+                            }
+                            return { status: filterValue };
+                        }
+                    },
+        
+                    actions: {
+                        onRowClick: function(item) {
+                            self.showItemDetail(item.SourceItemId);
+                        },
+                        onReload: function() {
+                            self.loadSyncStatus();
+                            self.loadHealthStats();
+                        }
+                    },
+        
+                    getDisplayStatus: function(item) {
+                        if (item.Status === 'Pending' && item.PendingType) {
+                            return 'Pending ' + item.PendingType;
+                        }
+                        return item.Status;
+                    },
+        
+                    getStatusClass: function(item) {
+                        if (item.Status === 'Pending' && item.PendingType) {
+                            return 'Pending-' + item.PendingType;
+                        }
+                        return item.Status;
+                    },
+        
+                    emptyState: {
+                        message: 'No items found'
+                    }
                 });
+        
+                // Bind module-specific events (buttons outside the table)
                 this._bindModuleEvents();
+        
+                // Inject bulk action buttons into the table's bulk actions container
                 this._injectBulkActions();
             },
+        
             _bindModuleEvents: function() {
                 var self = this;
+        
+                // Action buttons
                 document.getElementById('btnRefreshItems').addEventListener('click', function() { self.refreshSyncTable(); });
                 document.getElementById('btnTriggerSync').addEventListener('click', function() { self.triggerSync(); });
                 document.getElementById('btnRetryErrors').addEventListener('click', function() { self.retryErrors(); });
                 document.getElementById('btnResetDatabase').addEventListener('click', function() { self.resetDatabase(); });
+        
+                // Modal buttons
                 document.getElementById('btnModalIgnore').addEventListener('click', function() { self.modalIgnore(); });
                 document.getElementById('btnModalQueue').addEventListener('click', function() { self.modalQueue(); });
                 document.getElementById('btnModalDelete').addEventListener('click', function() { self.modalDelete(); });
                 document.getElementById('btnModalClose').addEventListener('click', function() { self.closeModal(); });
             },
+        
             _injectBulkActions: function() {
                 var self = this;
                 var bulkContainer = this.table.getBulkActionsContainer();
                 if (!bulkContainer) return;
-                bulkContainer.innerHTML = '<button is="emby-button" type="button" id="btnBulkIgnore" class="raised" disabled><span>Ignore</span></button><button is="emby-button" type="button" id="btnBulkQueue" class="raised button-primary" disabled><span>Queue</span></button><button is="emby-button" type="button" id="btnBulkDelete" class="raised button-destructive" title="Delete from local server only" disabled><span>Delete</span></button>';
+        
+                // Create bulk action buttons
+                bulkContainer.innerHTML =
+                    '<button is="emby-button" type="button" id="btnBulkIgnore" class="raised" disabled><span>Ignore</span></button>' +
+                    '<button is="emby-button" type="button" id="btnBulkQueue" class="raised button-primary" disabled><span>Queue</span></button>' +
+                    '<button is="emby-button" type="button" id="btnBulkDelete" class="raised button-destructive" title="Delete from local server only" disabled><span>Delete</span></button>';
+        
+                // Bind events
                 document.getElementById('btnBulkIgnore').addEventListener('click', function() { self.bulkIgnore(); });
                 document.getElementById('btnBulkQueue').addEventListener('click', function() { self.bulkQueue(); });
                 document.getElementById('btnBulkDelete').addEventListener('click', function() { self.bulkDelete(); });
             },
-            get syncItems() { return this.table ? this.table.getItems() : []; },
-            get filteredItems() { return this.table ? this.table.getItems() : []; },
-            get selectedItems() { return this.table ? new Set(this.table.getSelectedIds()) : new Set(); },
-            loadCapabilities: function() { var self = this; return ServerSyncShared.apiRequest('Capabilities', 'GET').then(function(capabilities) { self.capabilities = capabilities; self.updateDeleteCapabilityVisibility(capabilities.CanDeleteItems); }).catch(function() { self.capabilities = { CanDeleteItems: false }; self.updateDeleteCapabilityVisibility(false); }); },
-            updateDeleteCapabilityVisibility: function(canDelete) { var bulkDeleteBtn = document.getElementById('btnBulkDelete'); var modalDeleteRow = document.getElementById('modalDeleteRow'); if (bulkDeleteBtn) { bulkDeleteBtn.style.display = canDelete ? 'inline-block' : 'none'; } if (modalDeleteRow) { modalDeleteRow.style.display = canDelete ? 'block' : 'none'; } },
-            updatePendingVisibility: function(requireApproval) { document.getElementById('statusGroupPendingDownload').style.display = requireApproval ? 'block' : 'none'; this.table.setFilterOptionVisible('optPendingDownload', requireApproval); },
-            updateReplacementVisibility: function(requireApproval) { document.getElementById('statusGroupPendingReplacement').style.display = requireApproval ? 'block' : 'none'; this.table.setFilterOptionVisible('optPendingReplacement', requireApproval); },
-            updateDeletionVisibility: function(deleteIfMissing) { document.getElementById('statusGroupPendingDeletion').style.display = deleteIfMissing ? 'block' : 'none'; this.table.setFilterOptionVisible('optPendingDeletion', deleteIfMissing); document.getElementById('statusGroupDeleting').style.display = deleteIfMissing ? 'block' : 'none'; this.table.setFilterOptionVisible('optDeleting', deleteIfMissing); },
-            loadHealthStats: function() { return ServerSyncShared.apiRequest('Stats', 'GET').then(function(stats) { var lastSyncEl = document.getElementById('healthLastSync'); if (stats.LastSyncEndTime) { lastSyncEl.textContent = ServerSyncShared.formatRelativeTime(new Date(stats.LastSyncEndTime)); lastSyncEl.className = 'healthValue success'; } else { lastSyncEl.textContent = 'Never'; lastSyncEl.className = 'healthValue'; } var diskSpaceEl = document.getElementById('healthDiskSpace'); if (stats.FreeDiskSpaceBytes > 0) { diskSpaceEl.textContent = ServerSyncShared.formatSize(stats.FreeDiskSpaceBytes) + ' free'; diskSpaceEl.className = stats.HasSufficientDiskSpace ? 'healthValue success' : 'healthValue error'; } else { diskSpaceEl.textContent = 'Unknown'; diskSpaceEl.className = 'healthValue'; } var queuedSizeEl = document.getElementById('healthQueuedSize'); queuedSizeEl.textContent = ServerSyncShared.formatSize(stats.TotalQueuedBytes); queuedSizeEl.className = stats.QueuedItems > 0 ? 'healthValue warning' : 'healthValue'; }).catch(function() {}); },
-            triggerSync: function() { var self = this; var btn = document.getElementById('btnTriggerSync'); btn.disabled = true; btn.querySelector('span').textContent = 'Starting...'; ServerSyncShared.apiRequest('TriggerSync', 'POST').then(function() { ServerSyncShared.showAlert('Sync task started'); btn.querySelector('span').textContent = 'Sync'; btn.disabled = false; }).catch(function() { ServerSyncShared.showAlert('Failed to start sync task'); btn.querySelector('span').textContent = 'Sync'; btn.disabled = false; }); },
-            refreshSyncTable: function() { var self = this; var btn = document.getElementById('btnRefreshItems'); btn.disabled = true; btn.querySelector('span').textContent = 'Refreshing...'; ServerSyncShared.apiRequest('TriggerRefresh', 'POST').then(function() { ServerSyncShared.showAlert('Refresh task started'); btn.querySelector('span').textContent = 'Refresh'; btn.disabled = false; self.loadSyncStatus(); self.loadSyncItems(); self.loadHealthStats(); }).catch(function() { ServerSyncShared.showAlert('Failed to start refresh task'); btn.querySelector('span').textContent = 'Refresh'; btn.disabled = false; }); },
-            retryErrors: function() { var self = this; ServerSyncShared.apiRequest('RetryErroredItems', 'POST', {}).then(function() { ServerSyncShared.showAlert('Errored items queued for retry'); self.loadSyncStatus(); self.loadSyncItems(); }).catch(function() { ServerSyncShared.showAlert('Failed to retry errored items'); }); },
-            resetDatabase: function() { var self = this; if (!confirm('Are you sure you want to reset the sync database?\n\nThis will delete ALL tracking data and you will need to re-sync everything. This cannot be undone.')) { return; } ServerSyncShared.apiRequest('ResetSyncDatabase', 'POST').then(function() { ServerSyncShared.showAlert('Sync database has been reset'); self.loadSyncStatus(); self.loadSyncItems(); self.loadHealthStats(); }).catch(function() { ServerSyncShared.showAlert('Failed to reset sync database'); }); },
-            loadSyncStatus: function() { return ServerSyncShared.apiRequest('Status', 'GET').then(function(status) { document.getElementById('syncedCount').textContent = status.Synced || 0; document.getElementById('statusGroupSynced').setAttribute('title', 'Synced: ' + (status.Synced || 0)); document.getElementById('queuedCount').textContent = status.Queued || 0; document.getElementById('statusGroupQueued').setAttribute('title', 'Queued: ' + (status.Queued || 0)); document.getElementById('erroredCount').textContent = status.Errored || 0; document.getElementById('statusGroupErrored').setAttribute('title', 'Errored: ' + (status.Errored || 0)); document.getElementById('ignoredCount').textContent = status.Ignored || 0; document.getElementById('statusGroupIgnored').setAttribute('title', 'Ignored: ' + (status.Ignored || 0)); document.getElementById('pendingDownloadCount').textContent = status.PendingDownload || 0; document.getElementById('statusGroupPendingDownload').setAttribute('title', 'Pending Download: ' + (status.PendingDownload || 0)); document.getElementById('pendingReplacementCount').textContent = status.PendingReplacement || 0; document.getElementById('statusGroupPendingReplacement').setAttribute('title', 'Pending Replacement: ' + (status.PendingReplacement || 0)); document.getElementById('pendingDeletionCount').textContent = status.PendingDeletion || 0; document.getElementById('statusGroupPendingDeletion').setAttribute('title', 'Pending Deletion: ' + (status.PendingDeletion || 0)); document.getElementById('deletingCount').textContent = status.Deleting || 0; document.getElementById('statusGroupDeleting').setAttribute('title', 'Deleting: ' + (status.Deleting || 0)); }); },
-            loadSyncItems: function() { return this.table.load(); },
-            updateBulkActionsVisibility: function(count) { var hasSelection = count > 0; var ignoreBtn = document.getElementById('btnBulkIgnore'); var queueBtn = document.getElementById('btnBulkQueue'); var deleteBtn = document.getElementById('btnBulkDelete'); if (ignoreBtn) ignoreBtn.disabled = !hasSelection; if (queueBtn) queueBtn.disabled = !hasSelection; if (deleteBtn) deleteBtn.disabled = !hasSelection; },
-            bulkIgnore: function() { this.bulkAction('IgnoreItems'); },
-            bulkQueue: function() { var self = this; var ids = this.table.getSelectedIds(); if (ids.length === 0) return; var items = this.table.getItems(); var filteredIds = ids.filter(function(id) { var item = items.find(function(i) { return i.SourceItemId === id; }); if (item && item.Status === 'Pending' && item.PendingType === 'Deletion') { return false; } return true; }); if (filteredIds.length === 0) { ServerSyncShared.showAlert('No items to queue (deletion items cannot be queued)'); return; } ServerSyncShared.apiRequest('QueueItems', 'POST', { SourceItemIds: filteredIds }).then(function() { self.table.clearSelection(); self.loadSyncStatus(); self.loadSyncItems(); ServerSyncShared.showAlert(filteredIds.length + ' item(s) queued'); }).catch(function(err) { console.error('Bulk queue failed:', err); ServerSyncShared.showAlert('Failed to queue items'); }); },
-            bulkDelete: function() { var self = this; var ids = this.table.getSelectedIds(); if (ids.length === 0) return; if (!confirm('Delete ' + ids.length + ' item(s) from the LOCAL server? This cannot be undone.\n\nNote: This only deletes from this local server, never from the source server.')) { return; } ServerSyncShared.apiRequest('DeleteLocalItems', 'POST', { SourceItemIds: ids }).then(function(result) { self.table.clearSelection(); self.loadSyncStatus(); self.loadSyncItems(); if (result && result.Deleted > 0) { ServerSyncShared.showAlert('Deleted ' + result.Deleted + ' item(s)'); } }).catch(function() { ServerSyncShared.showAlert('Failed to delete items'); }); },
-            bulkAction: function(endpoint) { var self = this; var ids = this.table.getSelectedIds(); if (ids.length === 0) return; ServerSyncShared.apiRequest(endpoint, 'POST', { SourceItemIds: ids }).then(function() { self.table.clearSelection(); self.loadSyncStatus(); self.loadSyncItems(); ServerSyncShared.showAlert(ids.length + ' item(s) updated'); }).catch(function(err) { console.error('Bulk action failed:', err); ServerSyncShared.showAlert('Failed to update items'); }); },
-            getDisplayStatus: function(item) { if (item.Status === 'Pending' && item.PendingType) { return 'Pending ' + item.PendingType; } return item.Status; },
-            getStatusClass: function(item) { if (item.Status === 'Pending' && item.PendingType) { return 'Pending-' + item.PendingType; } return item.Status; },
-            showItemDetail: function(sourceItemId) { var self = this; var items = this.table.getItems(); var item = items.find(function(i) { return i.SourceItemId === sourceItemId; }); if (!item) return; self.currentModalItem = item; document.getElementById('modalTitle').textContent = ServerSyncShared.getFileName(item.SourcePath); var statusBadge = document.getElementById('modalStatusBadge'); var displayStatus = self.getDisplayStatus(item); var statusClass = self.getStatusClass(item); statusBadge.textContent = displayStatus; statusBadge.className = 'itemModal-statusBadge ' + statusClass; document.getElementById('modalSize').textContent = ServerSyncShared.formatSize(item.SourceSize); document.getElementById('modalSourcePath').textContent = item.SourcePath; var errorSection = document.getElementById('modalErrorSection'); if (item.Status === 'Errored' && item.ErrorMessage) { document.getElementById('modalError').textContent = item.ErrorMessage; errorSection.style.display = 'flex'; } else { errorSection.style.display = 'none'; } var retrySection = document.getElementById('modalRetrySection'); if (item.RetryCount > 0) { document.getElementById('modalRetryCount').textContent = item.RetryCount + ' attempt' + (item.RetryCount > 1 ? 's' : ''); retrySection.style.display = 'block'; } else { retrySection.style.display = 'none'; } var lastSyncSection = document.getElementById('modalLastSyncSection'); if (item.LastSyncTime) { document.getElementById('modalLastSync').textContent = new Date(item.LastSyncTime).toLocaleString(); lastSyncSection.style.display = 'block'; } else { lastSyncSection.style.display = 'none'; } var companionSection = document.getElementById('modalCompanionFilesSection'); if (item.CompanionFiles) { var companionList = item.CompanionFiles.split(',').map(function(f) { return f.trim(); }).filter(function(f) { return f.length > 0; }); if (companionList.length > 0) { document.getElementById('modalCompanionFiles').innerHTML = companionList.map(function(f) { return '<div class="itemModal-companionItem"><span class="itemModal-companionIcon">&#128196;</span><span class="itemModal-companionName">' + ServerSyncShared.escapeHtml(f) + '</span></div>'; }).join(''); companionSection.style.display = 'block'; } else { companionSection.style.display = 'none'; } } else { companionSection.style.display = 'none'; } var localPathEl = document.getElementById('modalLocalPath'); var localPathNoteEl = document.getElementById('modalLocalPathNote'); var localExists = item.Status === 'Synced'; if (item.LocalPath) { localPathEl.textContent = item.LocalPath; if (localExists) { localPathNoteEl.textContent = ''; localPathNoteEl.style.display = 'none'; } else { localPathNoteEl.textContent = 'File will be synced to this location'; localPathNoteEl.style.display = 'block'; } } else { localPathEl.textContent = 'N/A'; localPathNoteEl.style.display = 'none'; } var btnQueue = document.getElementById('btnModalQueue'); var modalDeleteRow = document.getElementById('modalDeleteRow'); var isPendingDeletion = item.Status === 'Pending' && item.PendingType === 'Deletion'; var isPendingDownloadOrReplacement = item.Status === 'Pending' && (item.PendingType === 'Download' || item.PendingType === 'Replacement'); if (isPendingDeletion) { btnQueue.style.display = 'none'; if (self.capabilities && self.capabilities.CanDeleteItems) { modalDeleteRow.style.display = 'block'; } } else if (isPendingDownloadOrReplacement) { btnQueue.style.display = 'inline-block'; modalDeleteRow.style.display = 'none'; } else { btnQueue.style.display = 'inline-block'; if (self.capabilities && self.capabilities.CanDeleteItems) { modalDeleteRow.style.display = 'block'; } } document.getElementById('itemDetailModal').style.display = 'flex'; },
-            closeModal: function() { document.getElementById('itemDetailModal').style.display = 'none'; this.currentModalItem = null; },
-            modalIgnore: function() { if (this.currentModalItem) { this.updateItemStatus(this.currentModalItem.SourceItemId, 'Ignored'); } },
-            modalQueue: function() { if (this.currentModalItem) { if (this.currentModalItem.Status === 'Pending' && this.currentModalItem.PendingType === 'Deletion') { return; } this.updateItemStatus(this.currentModalItem.SourceItemId, 'Queued'); } },
-            modalDelete: function() { var self = this; if (!this.currentModalItem) return; var fileName = ServerSyncShared.getFileName(this.currentModalItem.LocalPath || this.currentModalItem.SourcePath); if (!confirm('Delete "' + fileName + '" from the LOCAL server? This cannot be undone.\n\nNote: This only deletes from this local server, never from the source server.')) { return; } ServerSyncShared.apiRequest('DeleteLocalItems', 'POST', { SourceItemIds: [this.currentModalItem.SourceItemId] }).then(function() { self.closeModal(); self.loadSyncStatus(); self.loadSyncItems(); ServerSyncShared.showAlert('Item deleted'); }).catch(function() { ServerSyncShared.showAlert('Failed to delete item'); }); },
-            updateItemStatus: function(sourceItemId, status) { var self = this; ServerSyncShared.apiRequest('UpdateItemStatus', 'POST', { SourceItemId: sourceItemId, Status: status }).then(function() { self.closeModal(); self.loadSyncStatus(); self.loadSyncItems(); ServerSyncShared.showAlert('Item status updated to ' + status); }).catch(function(err) { console.error('Failed to update item status:', err); ServerSyncShared.showAlert('Failed to update item status'); }); }
+        
+            // Backward compatibility - expose items through table
+            get syncItems() {
+                return this.table ? this.table.getItems() : [];
+            },
+        
+            get filteredItems() {
+                return this.table ? this.table.getItems() : [];
+            },
+        
+            get selectedItems() {
+                return this.table ? new Set(this.table.getSelectedIds()) : new Set();
+            },
+        
+            loadCapabilities: function() {
+                var self = this;
+                return ServerSyncShared.apiRequest('Capabilities', 'GET').then(function(capabilities) {
+                    self.capabilities = capabilities;
+                    self.updateDeleteCapabilityVisibility(capabilities.CanDeleteItems);
+                }).catch(function() {
+                    self.capabilities = { CanDeleteItems: false };
+                    self.updateDeleteCapabilityVisibility(false);
+                });
+            },
+        
+            updateDeleteCapabilityVisibility: function(canDelete) {
+                var bulkDeleteBtn = document.getElementById('btnBulkDelete');
+                var modalDeleteRow = document.getElementById('modalDeleteRow');
+        
+                if (bulkDeleteBtn) {
+                    bulkDeleteBtn.style.display = canDelete ? 'inline-block' : 'none';
+                }
+                if (modalDeleteRow) {
+                    modalDeleteRow.style.display = canDelete ? 'block' : 'none';
+                }
+            },
+        
+            updatePendingVisibility: function(requireApproval) {
+                document.getElementById('statusGroupPendingDownload').style.display = requireApproval ? 'block' : 'none';
+                this.table.setFilterOptionVisible('optPendingDownload', requireApproval);
+            },
+        
+            updateReplacementVisibility: function(requireApproval) {
+                document.getElementById('statusGroupPendingReplacement').style.display = requireApproval ? 'block' : 'none';
+                this.table.setFilterOptionVisible('optPendingReplacement', requireApproval);
+            },
+        
+            updateDeletionVisibility: function(deleteIfMissing) {
+                document.getElementById('statusGroupPendingDeletion').style.display = deleteIfMissing ? 'block' : 'none';
+                this.table.setFilterOptionVisible('optPendingDeletion', deleteIfMissing);
+                document.getElementById('statusGroupDeleting').style.display = deleteIfMissing ? 'block' : 'none';
+                this.table.setFilterOptionVisible('optDeleting', deleteIfMissing);
+            },
+        
+            loadHealthStats: function() {
+                return ServerSyncShared.apiRequest('Stats', 'GET').then(function(stats) {
+                    // Last sync time
+                    var lastSyncEl = document.getElementById('healthLastSync');
+                    if (stats.LastSyncEndTime) {
+                        var lastSync = new Date(stats.LastSyncEndTime);
+                        lastSyncEl.textContent = ServerSyncShared.formatRelativeTime(lastSync);
+                        lastSyncEl.className = 'healthValue success';
+                    } else {
+                        lastSyncEl.textContent = 'Never';
+                        lastSyncEl.className = 'healthValue';
+                    }
+        
+                    // Disk space
+                    var diskSpaceEl = document.getElementById('healthDiskSpace');
+                    if (stats.FreeDiskSpaceBytes > 0) {
+                        var freeSpace = ServerSyncShared.formatSize(stats.FreeDiskSpaceBytes);
+                        diskSpaceEl.textContent = freeSpace + ' free';
+                        if (stats.HasSufficientDiskSpace) {
+                            diskSpaceEl.className = 'healthValue success';
+                        } else {
+                            diskSpaceEl.className = 'healthValue error';
+                        }
+                    } else {
+                        diskSpaceEl.textContent = 'Unknown';
+                        diskSpaceEl.className = 'healthValue';
+                    }
+        
+                    // Queued size
+                    var queuedSizeEl = document.getElementById('healthQueuedSize');
+                    queuedSizeEl.textContent = ServerSyncShared.formatSize(stats.TotalQueuedBytes);
+                    queuedSizeEl.className = stats.QueuedItems > 0 ? 'healthValue warning' : 'healthValue';
+                }).catch(function() {
+                    // Ignore errors
+                });
+            },
+        
+            triggerSync: function() {
+                var self = this;
+                var btn = document.getElementById('btnTriggerSync');
+                btn.disabled = true;
+                btn.querySelector('span').textContent = 'Starting...';
+        
+                ServerSyncShared.apiRequest('TriggerSync', 'POST').then(function() {
+                    ServerSyncShared.showAlert('Sync task started');
+                    btn.querySelector('span').textContent = 'Sync';
+                    btn.disabled = false;
+                }).catch(function() {
+                    ServerSyncShared.showAlert('Failed to start sync task');
+                    btn.querySelector('span').textContent = 'Sync';
+                    btn.disabled = false;
+                });
+            },
+        
+            refreshSyncTable: function() {
+                var self = this;
+                var btn = document.getElementById('btnRefreshItems');
+                btn.disabled = true;
+                btn.querySelector('span').textContent = 'Refreshing...';
+        
+                ServerSyncShared.apiRequest('TriggerRefresh', 'POST').then(function() {
+                    ServerSyncShared.showAlert('Refresh task started');
+                    btn.querySelector('span').textContent = 'Refresh';
+                    btn.disabled = false;
+                    // Also reload the items display
+                    self.loadSyncStatus();
+                    self.loadSyncItems();
+                    self.loadHealthStats();
+                }).catch(function() {
+                    ServerSyncShared.showAlert('Failed to start refresh task');
+                    btn.querySelector('span').textContent = 'Refresh';
+                    btn.disabled = false;
+                });
+            },
+        
+            retryErrors: function() {
+                var self = this;
+        
+                ServerSyncShared.apiRequest('RetryErroredItems', 'POST', {}).then(function() {
+                    ServerSyncShared.showAlert('Errored items queued for retry');
+                    self.loadSyncStatus();
+                    self.loadSyncItems();
+                }).catch(function() {
+                    ServerSyncShared.showAlert('Failed to retry errored items');
+                });
+            },
+        
+            resetDatabase: function() {
+                var self = this;
+        
+                if (!confirm('Are you sure you want to reset the sync database?\n\nThis will delete ALL tracking data and you will need to re-sync everything. This cannot be undone.')) {
+                    return;
+                }
+        
+                ServerSyncShared.apiRequest('ResetSyncDatabase', 'POST').then(function() {
+                    ServerSyncShared.showAlert('Sync database has been reset');
+                    self.loadSyncStatus();
+                    self.loadSyncItems();
+                    self.loadHealthStats();
+                }).catch(function() {
+                    ServerSyncShared.showAlert('Failed to reset sync database');
+                });
+            },
+        
+            loadSyncStatus: function() {
+                return ServerSyncShared.apiRequest('Status', 'GET').then(function(status) {
+                    var syncedCount = status.Synced || 0;
+                    var queuedCount = status.Queued || 0;
+                    var erroredCount = status.Errored || 0;
+                    var ignoredCount = status.Ignored || 0;
+                    var pendingDownloadCount = status.PendingDownload || 0;
+                    var pendingReplacementCount = status.PendingReplacement || 0;
+                    var pendingDeletionCount = status.PendingDeletion || 0;
+                    var deletingCount = status.Deleting || 0;
+        
+                    document.getElementById('syncedCount').textContent = syncedCount;
+                    document.getElementById('statusGroupSynced').setAttribute('title', 'Synced: ' + syncedCount);
+        
+                    document.getElementById('queuedCount').textContent = queuedCount;
+                    document.getElementById('statusGroupQueued').setAttribute('title', 'Queued: ' + queuedCount);
+        
+                    document.getElementById('erroredCount').textContent = erroredCount;
+                    document.getElementById('statusGroupErrored').setAttribute('title', 'Errored: ' + erroredCount);
+        
+                    document.getElementById('ignoredCount').textContent = ignoredCount;
+                    document.getElementById('statusGroupIgnored').setAttribute('title', 'Ignored: ' + ignoredCount);
+        
+                    document.getElementById('pendingDownloadCount').textContent = pendingDownloadCount;
+                    document.getElementById('statusGroupPendingDownload').setAttribute('title', 'Pending Download: ' + pendingDownloadCount);
+        
+                    document.getElementById('pendingReplacementCount').textContent = pendingReplacementCount;
+                    document.getElementById('statusGroupPendingReplacement').setAttribute('title', 'Pending Replacement: ' + pendingReplacementCount);
+        
+                    document.getElementById('pendingDeletionCount').textContent = pendingDeletionCount;
+                    document.getElementById('statusGroupPendingDeletion').setAttribute('title', 'Pending Deletion: ' + pendingDeletionCount);
+        
+                    document.getElementById('deletingCount').textContent = deletingCount;
+                    document.getElementById('statusGroupDeleting').setAttribute('title', 'Deleting: ' + deletingCount);
+                });
+            },
+        
+            loadSyncItems: function() {
+                return this.table.load();
+            },
+        
+            updateBulkActionsVisibility: function(count) {
+                var hasSelection = count > 0;
+                var ignoreBtn = document.getElementById('btnBulkIgnore');
+                var queueBtn = document.getElementById('btnBulkQueue');
+                var deleteBtn = document.getElementById('btnBulkDelete');
+        
+                if (ignoreBtn) ignoreBtn.disabled = !hasSelection;
+                if (queueBtn) queueBtn.disabled = !hasSelection;
+                if (deleteBtn) deleteBtn.disabled = !hasSelection;
+            },
+        
+            bulkIgnore: function() {
+                this.bulkAction('IgnoreItems');
+            },
+        
+            bulkQueue: function() {
+                var self = this;
+                var ids = this.table.getSelectedIds();
+                if (ids.length === 0) return;
+        
+                // Filter out pending deletion items - queuing them is a no-op
+                var items = this.table.getItems();
+                var filteredIds = ids.filter(function(id) {
+                    var item = items.find(function(i) { return i.SourceItemId === id; });
+                    if (item && item.Status === 'Pending' && item.PendingType === 'Deletion') {
+                        return false;
+                    }
+                    return true;
+                });
+        
+                if (filteredIds.length === 0) {
+                    ServerSyncShared.showAlert('No items to queue (deletion items cannot be queued)');
+                    return;
+                }
+        
+                ServerSyncShared.apiRequest('QueueItems', 'POST', { SourceItemIds: filteredIds }).then(function() {
+                    self.table.clearSelection();
+                    self.loadSyncStatus();
+                    self.loadSyncItems();
+                    ServerSyncShared.showAlert(filteredIds.length + ' item(s) queued');
+                }).catch(function(err) {
+                    console.error('Bulk queue failed:', err);
+                    ServerSyncShared.showAlert('Failed to queue items');
+                });
+            },
+        
+            bulkDelete: function() {
+                var self = this;
+                var ids = this.table.getSelectedIds();
+                if (ids.length === 0) return;
+        
+                if (!confirm('Delete ' + ids.length + ' item(s) from the LOCAL server? This cannot be undone.\n\nNote: This only deletes from this local server, never from the source server.')) {
+                    return;
+                }
+        
+                ServerSyncShared.apiRequest('DeleteLocalItems', 'POST', { SourceItemIds: ids }).then(function(result) {
+                    self.table.clearSelection();
+                    self.loadSyncStatus();
+                    self.loadSyncItems();
+                    if (result && result.Deleted > 0) {
+                        ServerSyncShared.showAlert('Deleted ' + result.Deleted + ' item(s)');
+                    }
+                }).catch(function() {
+                    ServerSyncShared.showAlert('Failed to delete items');
+                });
+            },
+        
+            bulkAction: function(endpoint) {
+                var self = this;
+                var ids = this.table.getSelectedIds();
+                if (ids.length === 0) return;
+        
+                ServerSyncShared.apiRequest(endpoint, 'POST', { SourceItemIds: ids }).then(function() {
+                    self.table.clearSelection();
+                    self.loadSyncStatus();
+                    self.loadSyncItems();
+                    ServerSyncShared.showAlert(ids.length + ' item(s) updated');
+                }).catch(function(err) {
+                    console.error('Bulk action failed:', err);
+                    ServerSyncShared.showAlert('Failed to update items');
+                });
+            },
+        
+            getDisplayStatus: function(item) {
+                if (item.Status === 'Pending' && item.PendingType) {
+                    return 'Pending ' + item.PendingType;
+                }
+                return item.Status;
+            },
+        
+            getStatusClass: function(item) {
+                if (item.Status === 'Pending' && item.PendingType) {
+                    return 'Pending-' + item.PendingType;
+                }
+                return item.Status;
+            },
+        
+            showItemDetail: function(sourceItemId) {
+                var self = this;
+                var items = this.table.getItems();
+                var item = items.find(function(i) { return i.SourceItemId === sourceItemId; });
+                if (!item) return;
+        
+                self.currentModalItem = item;
+        
+                // Title
+                document.getElementById('modalTitle').textContent = ServerSyncShared.getFileName(item.SourcePath);
+        
+                // Status badge
+                var statusBadge = document.getElementById('modalStatusBadge');
+                var displayStatus = self.getDisplayStatus(item);
+                var statusClass = self.getStatusClass(item);
+                statusBadge.textContent = displayStatus;
+                statusBadge.className = 'itemModal-statusBadge ' + statusClass;
+        
+                // Size
+                document.getElementById('modalSize').textContent = ServerSyncShared.formatSize(item.SourceSize);
+        
+                // Paths
+                document.getElementById('modalSourcePath').textContent = item.SourcePath;
+        
+                // Error message
+                var errorSection = document.getElementById('modalErrorSection');
+                if (item.Status === 'Errored' && item.ErrorMessage) {
+                    document.getElementById('modalError').textContent = item.ErrorMessage;
+                    errorSection.style.display = 'flex';
+                } else {
+                    errorSection.style.display = 'none';
+                }
+        
+                // Retry count
+                var retrySection = document.getElementById('modalRetrySection');
+                if (item.RetryCount > 0) {
+                    document.getElementById('modalRetryCount').textContent = item.RetryCount + ' attempt' + (item.RetryCount > 1 ? 's' : '');
+                    retrySection.style.display = 'block';
+                } else {
+                    retrySection.style.display = 'none';
+                }
+        
+                // Last sync time
+                var lastSyncSection = document.getElementById('modalLastSyncSection');
+                if (item.LastSyncTime) {
+                    var lastSync = new Date(item.LastSyncTime);
+                    document.getElementById('modalLastSync').textContent = lastSync.toLocaleString();
+                    lastSyncSection.style.display = 'block';
+                } else {
+                    lastSyncSection.style.display = 'none';
+                }
+        
+                // Companion files
+                var companionSection = document.getElementById('modalCompanionFilesSection');
+                if (item.CompanionFiles) {
+                    var companionList = item.CompanionFiles.split(',').map(function(f) {
+                        return f.trim();
+                    }).filter(function(f) {
+                        return f.length > 0;
+                    });
+                    if (companionList.length > 0) {
+                        document.getElementById('modalCompanionFiles').innerHTML = companionList.map(function(f) {
+                            return '<div class="itemModal-companionItem">' +
+                                '<span class="itemModal-companionIcon">&#128196;</span>' +
+                                '<span class="itemModal-companionName">' + ServerSyncShared.escapeHtml(f) + '</span>' +
+                                '</div>';
+                        }).join('');
+                        companionSection.style.display = 'block';
+                    } else {
+                        companionSection.style.display = 'none';
+                    }
+                } else {
+                    companionSection.style.display = 'none';
+                }
+        
+                // Local path
+                var localPathEl = document.getElementById('modalLocalPath');
+                var localPathNoteEl = document.getElementById('modalLocalPathNote');
+                var localExists = item.Status === 'Synced';
+                if (item.LocalPath) {
+                    localPathEl.textContent = item.LocalPath;
+                    if (localExists) {
+                        localPathNoteEl.textContent = '';
+                        localPathNoteEl.style.display = 'none';
+                    } else {
+                        localPathNoteEl.textContent = 'File will be synced to this location';
+                        localPathNoteEl.style.display = 'block';
+                    }
+                } else {
+                    localPathEl.textContent = 'N/A';
+                    localPathNoteEl.style.display = 'none';
+                }
+        
+                // Show/hide modal buttons based on pending type
+                var btnQueue = document.getElementById('btnModalQueue');
+                var modalDeleteRow = document.getElementById('modalDeleteRow');
+                var isPendingDeletion = item.Status === 'Pending' && item.PendingType === 'Deletion';
+                var isPendingDownloadOrReplacement = item.Status === 'Pending' && (item.PendingType === 'Download' || item.PendingType === 'Replacement');
+        
+                if (isPendingDeletion) {
+                    btnQueue.style.display = 'none';
+                    if (self.capabilities && self.capabilities.CanDeleteItems) {
+                        modalDeleteRow.style.display = 'block';
+                    }
+                } else if (isPendingDownloadOrReplacement) {
+                    btnQueue.style.display = 'inline-block';
+                    modalDeleteRow.style.display = 'none';
+                } else {
+                    btnQueue.style.display = 'inline-block';
+                    if (self.capabilities && self.capabilities.CanDeleteItems) {
+                        modalDeleteRow.style.display = 'block';
+                    }
+                }
+        
+                document.getElementById('itemDetailModal').style.display = 'flex';
+            },
+        
+            closeModal: function() {
+                document.getElementById('itemDetailModal').style.display = 'none';
+                this.currentModalItem = null;
+            },
+        
+            modalIgnore: function() {
+                if (this.currentModalItem) {
+                    this.updateItemStatus(this.currentModalItem.SourceItemId, 'Ignored');
+                }
+            },
+        
+            modalQueue: function() {
+                if (this.currentModalItem) {
+                    // Queuing a pending deletion item is a no-op
+                    if (this.currentModalItem.Status === 'Pending' && this.currentModalItem.PendingType === 'Deletion') {
+                        return;
+                    }
+                    this.updateItemStatus(this.currentModalItem.SourceItemId, 'Queued');
+                }
+            },
+        
+            modalDelete: function() {
+                var self = this;
+                if (!this.currentModalItem) return;
+        
+                var fileName = ServerSyncShared.getFileName(this.currentModalItem.LocalPath || this.currentModalItem.SourcePath);
+                if (!confirm('Delete "' + fileName + '" from the LOCAL server? This cannot be undone.\n\nNote: This only deletes from this local server, never from the source server.')) {
+                    return;
+                }
+        
+                ServerSyncShared.apiRequest('DeleteLocalItems', 'POST', { SourceItemIds: [this.currentModalItem.SourceItemId] }).then(function() {
+                    self.closeModal();
+                    self.loadSyncStatus();
+                    self.loadSyncItems();
+                    ServerSyncShared.showAlert('Item deleted');
+                }).catch(function() {
+                    ServerSyncShared.showAlert('Failed to delete item');
+                });
+            },
+        
+            updateItemStatus: function(sourceItemId, status) {
+                var self = this;
+        
+                ServerSyncShared.apiRequest('UpdateItemStatus', 'POST', { SourceItemId: sourceItemId, Status: status }).then(function() {
+                    self.closeModal();
+                    self.loadSyncStatus();
+                    self.loadSyncItems();
+                    ServerSyncShared.showAlert('Item status updated to ' + status);
+                }).catch(function(err) {
+                    console.error('Failed to update item status:', err);
+                    ServerSyncShared.showAlert('Failed to update item status');
+                });
+            }
         };
+        
     </script>
 
-    <!-- Scripts: main.js (orchestrator) -->
+    <!-- Scripts: main.js -->
     <script type="text/javascript">
+        // Main orchestrator for Server Sync plugin configuration
+        
         var ServerSyncConfig = {
             currentConfig: null,
+        
             init: function() {
                 var self = this;
-
+        
                 // Tab navigation
                 document.querySelectorAll('.tabButton').forEach(function(btn) {
                     btn.addEventListener('click', function() {
@@ -1337,19 +3430,19 @@
                         self.switchTab(this.dataset.tab);
                     });
                 });
-
+        
                 // Form submission
                 document.getElementById('ServerSyncConfigForm').addEventListener('submit', function(e) {
                     e.preventDefault();
                     self.saveConfig();
                 });
-
+        
                 // Load capabilities first, then config
                 self.loadCapabilities().then(function() {
                     self.loadConfig();
                 });
             },
-
+        
             switchTab: function(tabId) {
                 document.querySelectorAll('.tabButton').forEach(function(btn) {
                     btn.classList.toggle('active', btn.dataset.tab === tabId);
@@ -1358,59 +3451,59 @@
                     panel.style.display = panel.id === 'tab' + tabId.charAt(0).toUpperCase() + tabId.slice(1) ? 'block' : 'none';
                 });
             },
-
+        
             loadCapabilities: function() {
                 return Promise.all([
                     ContentConfigModule.loadCapabilities(),
                     SyncTableModule.loadCapabilities()
                 ]);
             },
-
+        
             loadConfig: function() {
                 var self = this;
-
+        
                 ServerSyncShared.getConfig().then(function(config) {
                     self.currentConfig = config;
-
+        
                     // Initialize modules with config
                     SourceServerModule.init(config);
                     ContentConfigModule.init(config);
                     SyncTableModule.init();
-
+        
                     // Load config into modules
                     ContentConfigModule.loadConfig(config);
-
+        
                     // Wire up cross-module communication
                     SourceServerModule.onConnectionSuccess = function() {
                         var values = SourceServerModule.getValues();
                         ContentConfigModule.fetchSourceLibraries(values.SourceServerUrl, values.SourceServerApiKey);
                     };
-
+        
                     // Fetch libraries then render mappings
                     var libraryPromises = [ContentConfigModule.fetchLocalLibraries()];
                     if (config.SourceServerUrl && config.SourceServerApiKey) {
                         libraryPromises.push(ContentConfigModule.fetchSourceLibraries(config.SourceServerUrl, config.SourceServerApiKey));
                     }
-
+        
                     Promise.all(libraryPromises).then(function() {
                         ContentConfigModule.renderMappings(config.LibraryMappings || []);
                     });
-
+        
                     // Load sync data
                     SyncTableModule.loadSyncStatus();
                     SyncTableModule.loadSyncItems();
                     SyncTableModule.loadHealthStats();
                 });
             },
-
+        
             saveConfig: function() {
                 var self = this;
                 var config = self.currentConfig || {};
-
+        
                 // Merge values from modules
                 Object.assign(config, SourceServerModule.getValues());
                 Object.assign(config, ContentConfigModule.getValues());
-
+        
                 ServerSyncShared.saveConfig(config).then(function() {
                     ServerSyncShared.showAlert('Settings saved');
                 }).catch(function(err) {
@@ -1419,13 +3512,15 @@
                 });
             }
         };
-
+        
+        // Initialize when page is shown
         (function() {
             var page = document.querySelector('#ServerSyncConfigPage');
             page.addEventListener('viewshow', function() {
                 ServerSyncConfig.init();
             });
         })();
+        
     </script>
 </div>
 </body>

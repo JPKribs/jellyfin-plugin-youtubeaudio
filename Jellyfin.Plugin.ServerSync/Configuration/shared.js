@@ -63,20 +63,22 @@ var ServerSyncShared = {
             type: method || 'GET'
         };
 
-        // Only use dataType:'json' for GET requests
-        // POST requests may return empty body or JSON, handle both
-        if (method === 'GET') {
-            options.dataType = 'json';
-        }
-
         if (data) {
             options.contentType = 'application/json';
             options.data = JSON.stringify(data);
         }
 
         return ApiClient.fetch(options).then(function(response) {
-            // If response is a string, try to parse as JSON
-            if (response && typeof response === 'string' && response.length > 0) {
+            // Handle empty responses (204 or empty 200)
+            if (!response || response === '') {
+                return null;
+            }
+            // If already parsed as object, return it
+            if (typeof response === 'object') {
+                return response;
+            }
+            // Try to parse string as JSON
+            if (typeof response === 'string') {
                 try {
                     return JSON.parse(response);
                 } catch (e) {

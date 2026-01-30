@@ -66,6 +66,23 @@
     border-left: 2px solid rgba(85, 85, 85, 0.3);
 }
 
+/* Input row - horizontal layout for input + select combinations */
+.inputRow {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.inputRow input[is="emby-input"],
+.inputRow .emby-input-wrapper {
+    flex: 1;
+    margin: 0 !important;
+    padding-left: 0 !important;
+}
+.inputRow .inputContainer {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
 /* Content section separator line */
 .contentSectionSeparator {
     border-bottom: 1px solid #555;

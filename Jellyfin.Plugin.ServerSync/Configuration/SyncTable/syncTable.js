@@ -84,6 +84,7 @@ var SyncTableModule = {
                     { value: 'Queued', label: 'Queued' },
                     { value: 'Errored', label: 'Errored' },
                     { value: 'Ignored', label: 'Ignored' },
+                    { value: 'Pending', label: 'Pending' },
                     { value: 'Pending:Download', label: 'Pending Download', id: 'optPendingDownload', hidden: true },
                     { value: 'Pending:Replacement', label: 'Pending Replace', id: 'optPendingReplacement', hidden: true },
                     { value: 'Pending:Deletion', label: 'Pending Delete', id: 'optPendingDeletion', hidden: true },
