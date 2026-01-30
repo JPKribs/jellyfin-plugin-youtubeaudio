@@ -2336,6 +2336,7 @@
             // reload
             // Public method to reset state and reload from page 1.
             reload: function() {
+                console.log('PaginatedTable reload called, clearing state');
                 this.state.items = [];
                 this.state.currentPage = 1;
                 this.state.hasMore = true;
@@ -3096,12 +3097,18 @@
                     return;
                 }
         
-                ServerSyncShared.apiRequest('ResetSyncDatabase', 'POST').then(function() {
+                ServerSyncShared.apiRequest('ResetSyncDatabase', 'POST').then(function(response) {
+                    console.log('ResetSyncDatabase response:', response);
                     ServerSyncShared.showAlert('Sync database has been reset');
                     self.loadSyncStatus();
-                    self.loadSyncItems();
+                    self.loadSyncItems().then(function() {
+                        console.log('loadSyncItems completed');
+                    }).catch(function(err) {
+                        console.error('loadSyncItems error:', err);
+                    });
                     self.loadHealthStats();
-                }).catch(function() {
+                }).catch(function(err) {
+                    console.error('ResetSyncDatabase error:', err);
                     ServerSyncShared.showAlert('Failed to reset sync database');
                 });
             },

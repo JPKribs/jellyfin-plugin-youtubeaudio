@@ -178,6 +178,38 @@ public class SourceServerClient : IDisposable
     }
 
     /// <summary>
+    /// GetLibraryItemCountAsync
+    /// Gets the total count of items in a library without fetching item details.
+    /// </summary>
+    /// <param name="libraryId">Library ID.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Total item count or 0 if failed.</returns>
+    public async Task<int> GetLibraryItemCountAsync(Guid libraryId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var client = GetApiClient();
+            var result = await client.Items.GetAsync(
+                config =>
+                {
+                    config.QueryParameters.ParentId = libraryId;
+                    config.QueryParameters.Recursive = true;
+                    config.QueryParameters.IncludeItemTypes = new[] { BaseItemKind.Movie, BaseItemKind.Episode, BaseItemKind.Audio, BaseItemKind.Video };
+                    config.QueryParameters.StartIndex = 0;
+                    config.QueryParameters.Limit = 0;
+                },
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+
+            return result?.TotalRecordCount ?? 0;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to get item count for library {LibraryId}", libraryId);
+            return 0;
+        }
+    }
+
+    /// <summary>
     /// GetItemDetailsAsync
     /// Gets detailed item info including media sources and streams.
     /// </summary>

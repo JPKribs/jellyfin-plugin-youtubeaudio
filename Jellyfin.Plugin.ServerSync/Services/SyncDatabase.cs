@@ -32,11 +32,85 @@ public class SyncDatabase : IDisposable
         InitializeDatabase();
     }
 
+    /// <summary>
+    /// Builds the SQLite connection string with hardened settings.
+    /// </summary>
+    private string BuildConnectionString()
+    {
+        // Use a connection string with settings for better reliability:
+        // - Mode=ReadWriteCreate: Create the file if it doesn't exist
+        // - Cache=Shared: Allow connection sharing within the process
+        // - Pooling=True: Enable connection pooling (default)
+        return $"Data Source={_dbPath};Mode=ReadWriteCreate;Cache=Shared";
+    }
+
+    /// <summary>
+    /// Deletes a file with retry logic for locked files.
+    /// </summary>
+    private void DeleteFileWithRetry(string filePath, int maxRetries = 3)
+    {
+        for (var i = 0; i < maxRetries; i++)
+        {
+            try
+            {
+                if (File.Exists(filePath))
+                {
+                    File.Delete(filePath);
+                }
+
+                return;
+            }
+            catch (IOException ex) when (i < maxRetries - 1)
+            {
+                _logger.LogDebug(ex, "Failed to delete {FilePath}, retrying ({Attempt}/{Max})", filePath, i + 1, maxRetries);
+                System.Threading.Thread.Sleep(100 * (i + 1)); // Exponential backoff
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to delete file {FilePath}", filePath);
+                throw;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Deletes WAL and SHM journal files associated with the database.
+    /// </summary>
+    private void DeleteWalFiles()
+    {
+        var walPath = _dbPath + "-wal";
+        var shmPath = _dbPath + "-shm";
+
+        try
+        {
+            if (File.Exists(walPath))
+            {
+                File.Delete(walPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to delete WAL file at {Path}", walPath);
+        }
+
+        try
+        {
+            if (File.Exists(shmPath))
+            {
+                File.Delete(shmPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to delete SHM file at {Path}", shmPath);
+        }
+    }
+
     private void InitializeDatabase()
     {
         try
         {
-            _connection = new SqliteConnection($"Data Source={_dbPath}");
+            _connection = new SqliteConnection(BuildConnectionString());
             _connection.Open();
 
             var currentVersion = DatabaseMigrationService.GetSchemaVersion(_connection);
@@ -80,9 +154,14 @@ public class SyncDatabase : IDisposable
     /// </summary>
     private void RecreateDatabase()
     {
+        _connection?.Close();
         _connection?.Dispose();
         _connection = null;
 
+        // Clear SQLite connection pool to release file handles
+        SqliteConnection.ClearAllPools();
+
+        // Delete main database file
         if (File.Exists(_dbPath))
         {
             try
@@ -95,7 +174,10 @@ public class SyncDatabase : IDisposable
             }
         }
 
-        _connection = new SqliteConnection($"Data Source={_dbPath}");
+        // Also delete WAL and SHM files if they exist
+        DeleteWalFiles();
+
+        _connection = new SqliteConnection(BuildConnectionString());
         _connection.Open();
         DatabaseMigrationService.CreateInitialSchema(_connection);
         DatabaseMigrationService.SetSchemaVersion(_connection, DatabaseMigrationService.CurrentSchemaVersion);
@@ -897,6 +979,7 @@ public class SyncDatabase : IDisposable
 
         try
         {
+            _connection?.Close();
             _connection?.Dispose();
         }
         catch (Exception ex)
@@ -904,9 +987,12 @@ public class SyncDatabase : IDisposable
             _logger.LogWarning(ex, "Error disposing old database connection");
         }
 
+        // Clear the connection pool to avoid stale cached connections
+        SqliteConnection.ClearAllPools();
+
         try
         {
-            _connection = new SqliteConnection($"Data Source={_dbPath}");
+            _connection = new SqliteConnection(BuildConnectionString());
             _connection.Open();
         }
         catch (Exception ex)
@@ -922,18 +1008,29 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public void ResetDatabase()
     {
-        _logger.LogWarning("Resetting sync database - all tracking data will be lost");
-
-        _connection?.Dispose();
-        _connection = null;
-
-        if (File.Exists(_dbPath))
+        lock (_writeLock)
         {
-            File.Delete(_dbPath);
-        }
+            _logger.LogWarning("Resetting sync database - all tracking data will be lost");
 
-        InitializeDatabase();
-        _logger.LogInformation("Sync database has been reset with fresh schema v{Version}", DatabaseMigrationService.CurrentSchemaVersion);
+            _connection?.Close();
+            _connection?.Dispose();
+            _connection = null;
+
+            // Clear SQLite connection pool to release file handles
+            SqliteConnection.ClearAllPools();
+
+            // Delete main database file with retry logic
+            if (File.Exists(_dbPath))
+            {
+                DeleteFileWithRetry(_dbPath);
+            }
+
+            // Also delete WAL and SHM files if they exist
+            DeleteWalFiles();
+
+            InitializeDatabase();
+            _logger.LogInformation("Sync database has been reset with fresh schema v{Version}", DatabaseMigrationService.CurrentSchemaVersion);
+        }
     }
 
     /// <summary>
@@ -1075,7 +1172,23 @@ public class SyncDatabase : IDisposable
     {
         if (!_disposed && disposing)
         {
-            _connection?.Dispose();
+            lock (_writeLock)
+            {
+                try
+                {
+                    _connection?.Close();
+                    _connection?.Dispose();
+                    _connection = null;
+
+                    // Clear the pool to ensure no stale connections remain
+                    SqliteConnection.ClearAllPools();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error during database disposal");
+                }
+            }
+
             _disposed = true;
         }
     }

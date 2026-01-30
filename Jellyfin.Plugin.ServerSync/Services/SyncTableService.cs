@@ -42,6 +42,7 @@ public class SyncTableService
     /// <param name="detectUpdatedFiles">Whether to detect updated files.</param>
     /// <param name="changeDetectionPolicy">Policy for detecting source changes.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="onItemProcessed">Optional callback invoked after each item is processed.</param>
     /// <returns>Number of items processed.</returns>
     public async Task<int> ProcessLibraryAsync(
         SourceServerClient client,
@@ -52,7 +53,8 @@ public class SyncTableService
         ApprovalMode deleteMissingMode,
         bool detectUpdatedFiles,
         ChangeDetectionPolicy changeDetectionPolicy,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action? onItemProcessed = null)
     {
         var startIndex = 0;
         var processedItems = 0;
@@ -147,6 +149,7 @@ public class SyncTableService
                 {
                     ProcessItem(database, mapping, item, existingItems, downloadNewMode, replaceExistingMode, detectUpdatedFiles, changeDetectionPolicy);
                     processedItems++;
+                    onItemProcessed?.Invoke();
                 }
                 catch (Exception ex)
                 {

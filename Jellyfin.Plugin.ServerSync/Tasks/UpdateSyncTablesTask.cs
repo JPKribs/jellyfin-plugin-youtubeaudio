@@ -85,8 +85,33 @@ public class UpdateSyncTablesTask : IScheduledTask
         var database = plugin.Database;
         var syncTableService = new SyncTableService(_logger, _libraryManager);
 
-        var totalMappings = enabledMappings.Count;
-        var processedMappings = 0;
+        // Progress tracking: 10% for init, 80% for processing items, 10% for finalization
+        const double InitProgress = 10.0;
+        const double ProcessingProgress = 80.0;
+
+        progress.Report(0);
+
+        // Get total item counts for all libraries to enable granular progress
+        var totalItems = 0;
+
+        foreach (var mapping in enabledMappings)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            var count = await client.GetLibraryItemCountAsync(
+                Guid.Parse(mapping.SourceLibraryId),
+                cancellationToken).ConfigureAwait(false);
+
+            totalItems += count;
+        }
+
+        progress.Report(InitProgress);
+
+        // Process each library with item-level progress tracking
+        var processedItems = 0;
 
         foreach (var mapping in enabledMappings)
         {
@@ -104,15 +129,24 @@ public class UpdateSyncTablesTask : IScheduledTask
                 config.DeleteMissingContentMode,
                 config.DetectUpdatedFiles,
                 config.ChangeDetectionPolicy,
-                cancellationToken).ConfigureAwait(false);
-
-            processedMappings++;
-            progress.Report((double)processedMappings / totalMappings * 100);
+                cancellationToken,
+                onItemProcessed: () =>
+                {
+                    processedItems++;
+                    if (totalItems > 0)
+                    {
+                        var itemProgress = (double)processedItems / totalItems * ProcessingProgress;
+                        progress.Report(InitProgress + itemProgress);
+                    }
+                }).ConfigureAwait(false);
         }
+
+        progress.Report(InitProgress + ProcessingProgress);
 
         // Resolve LocalItemIds for synced items that don't have them yet
         syncTableService.ResolveLocalItemIds(database);
 
+        progress.Report(100);
         _logger.LogInformation("Sync table update completed");
     }
 
