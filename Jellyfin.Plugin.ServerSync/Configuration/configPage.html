@@ -791,11 +791,12 @@
         }
         .modalButtonRow {
             display: flex;
-            gap: 8px;
-            margin-top: 8px;
+            gap: 12px;
+            margin-top: 16px;
         }
-        .modalButton {
-            flex: 1;
+        .modalButtonRow .modalButton {
+            flex: 1 1 0;
+            min-width: 0;
             text-align: center;
             justify-content: center;
         }
@@ -1268,6 +1269,19 @@
                     localPathEl.textContent = 'N/A';
                     localPathEl.style.color = '';
                     localPathNoteEl.style.display = 'none';
+                }
+                // Companion files
+                var companionSection = document.getElementById('modalCompanionFilesSection');
+                if (item.CompanionFiles && item.CompanionFiles.trim().length > 0) {
+                    var files = item.CompanionFiles.split(',').map(function(f) { return f.trim(); }).filter(function(f) { return f.length > 0; });
+                    if (files.length > 0) {
+                        document.getElementById('modalCompanionFiles').innerHTML = files.map(function(f) { return '<div style="margin-bottom: 4px;">\u2022 ' + ServerSyncShared.escapeHtml(f) + '</div>'; }).join('');
+                        companionSection.style.display = 'block';
+                    } else {
+                        companionSection.style.display = 'none';
+                    }
+                } else {
+                    companionSection.style.display = 'none';
                 }
                 document.getElementById('itemDetailModal').style.display = 'flex';
             },

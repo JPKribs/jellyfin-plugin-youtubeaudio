@@ -591,8 +591,24 @@ public class ConfigurationController : ControllerBase
             }
             else
             {
-                logger.LogError("FAILED DELETE: {FileName} - {Error}. Local path: {LocalPath}", fileName, result.ErrorMessage, item.LocalPath);
-                failedCount++;
+                // Check if file still exists after failed deletion attempt
+                // It may have been deleted externally (manually or by another process)
+                var stillExists = !string.IsNullOrEmpty(item.LocalPath) && System.IO.File.Exists(item.LocalPath);
+                if (!stillExists)
+                {
+                    // File is gone (deleted elsewhere) - remove from tracking
+                    logger.LogInformation(
+                        "DELETE (external): {FileName} - File no longer exists after deletion attempt, removing from tracking. Local path: {LocalPath}",
+                        fileName,
+                        item.LocalPath);
+                    plugin.Database.Delete(sourceItemId);
+                    deletedCount++;
+                }
+                else
+                {
+                    logger.LogError("FAILED DELETE: {FileName} - {Error}. Local path: {LocalPath}", fileName, result.ErrorMessage, item.LocalPath);
+                    failedCount++;
+                }
             }
         }
 
