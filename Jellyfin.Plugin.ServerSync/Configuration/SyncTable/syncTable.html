@@ -89,6 +89,9 @@
     <button is="emby-button" type="button" id="btnBulkDelete" class="raised button-destructive syncHeaderButton" title="Delete from local server only" disabled>
         <span>Delete</span>
     </button>
+    <button is="emby-button" type="button" id="btnReloadTable" class="reloadTableButton" title="Reload table data">
+        <span class="reloadIcon">&#x21bb;</span>
+    </button>
     <select is="emby-select" id="selStatusFilter" class="statusFilter">
         <option value="">All</option>
         <option value="Synced">Synced</option>
@@ -100,9 +103,6 @@
         <option value="Pending:Deletion" id="optPendingDeletion" style="display: none;">Pending Deletion</option>
         <option value="Deleting" id="optDeleting" style="display: none;">Deleting</option>
     </select>
-    <button is="emby-button" type="button" id="btnReloadTable" class="reloadTableButton" title="Reload table data">
-        <span class="reloadIcon">&#x21bb;</span>
-    </button>
 </div>
 
 <div id="syncItemsContainer" style="max-height: 400px; overflow-y: auto;">

@@ -95,7 +95,7 @@
 
         <div class="inputContainer">
             <label for="txtScheduledDownloadSpeed">Scheduled Download Speed:</label>
-            <div style="display: flex; gap: 8px; align-items: center;">
+            <div style="display: flex; gap: 8px; align-items: left;">
                 <input is="emby-input" type="number" id="txtScheduledDownloadSpeed" min="0" style="flex: 1;" />
                 <select is="emby-select" id="selScheduledDownloadSpeedUnit" style="width: auto;">
                     <option value="KB">KB/s</option>
@@ -121,9 +121,7 @@
     </button>
 
     <!-- Save Button -->
-    <div class="inputContainer" style="margin-top: 24px;">
-        <button is="emby-button" type="submit" class="raised button-submit block">
-            <span>Save</span>
-        </button>
-    </div>
+    <button is="emby-button" type="submit" class="raised button-submit block">
+        <span>Save</span>
+    </button>
 </div>

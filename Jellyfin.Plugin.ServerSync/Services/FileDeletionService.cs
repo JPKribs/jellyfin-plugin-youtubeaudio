@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -194,6 +195,7 @@ public static class FileDeletionService
 
     /// <summary>
     /// Processes all items marked for deletion in the sync database.
+    /// Uses batch operations for database consistency.
     /// </summary>
     /// <param name="database">Sync database.</param>
     /// <param name="config">Plugin configuration.</param>
@@ -215,9 +217,10 @@ public static class FileDeletionService
 
         logger.LogInformation("Processing {Count} items marked for deletion", itemsToDelete.Count);
 
-        var deleted = 0;
-        var failed = 0;
+        var successfulDeletes = new List<string>();
+        var failedItems = new List<(string SourceItemId, string Error)>();
 
+        // Process file deletions first
         foreach (var item in itemsToDelete)
         {
             if (cancellationToken.IsCancellationRequested)
@@ -236,22 +239,51 @@ public static class FileDeletionService
 
                 if (result.Success)
                 {
-                    database.Delete(item.SourceItemId);
-                    deleted++;
+                    successfulDeletes.Add(item.SourceItemId);
                     logger.LogInformation("DELETED: {FileName}", fileName);
                 }
                 else
                 {
-                    database.UpdateStatus(item.SourceItemId, SyncStatus.Errored, errorMessage: $"Deletion failed: {result.ErrorMessage}");
-                    failed++;
+                    failedItems.Add((item.SourceItemId, $"Deletion failed: {result.ErrorMessage}"));
                     logger.LogError("Failed to delete {FileName}: {Error}", fileName, result.ErrorMessage);
                 }
             }
             else
             {
-                // File doesn't exist, just remove the record
-                database.Delete(item.SourceItemId);
-                deleted++;
+                // File doesn't exist, mark for removal from database
+                successfulDeletes.Add(item.SourceItemId);
+            }
+        }
+
+        // Batch update database records
+        var deleted = 0;
+        var failed = 0;
+
+        if (successfulDeletes.Count > 0)
+        {
+            try
+            {
+                deleted = database.BatchDelete(successfulDeletes);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to batch delete {Count} database records", successfulDeletes.Count);
+            }
+        }
+
+        if (failedItems.Count > 0)
+        {
+            try
+            {
+                var errorMessage = "Deletion failed";
+                failed = database.BatchUpdateStatus(
+                    failedItems.Select(f => f.SourceItemId),
+                    SyncStatus.Errored,
+                    errorMessage);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to update error status for {Count} items", failedItems.Count);
             }
         }
 

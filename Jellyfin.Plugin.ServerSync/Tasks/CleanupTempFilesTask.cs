@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Plugin.ServerSync.Services;
 using Jellyfin.Plugin.ServerSync.Utilities;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.Logging;
@@ -17,6 +19,7 @@ public class CleanupTempFilesTask : IScheduledTask
 
     // MaxTempFileAgeHours
     // Maximum age in hours before a temp file is considered orphaned.
+    // Files older than this are deleted even if they appear to be active downloads.
     private const int MaxTempFileAgeHours = 24;
 
     public CleanupTempFilesTask(ILogger<CleanupTempFilesTask> logger)
@@ -52,6 +55,7 @@ public class CleanupTempFilesTask : IScheduledTask
         {
             var cutoffTime = DateTime.UtcNow.AddHours(-MaxTempFileAgeHours);
             var deletedCount = 0;
+            var skippedCount = 0;
             var errorCount = 0;
             var totalBytes = 0L;
 
@@ -72,6 +76,16 @@ public class CleanupTempFilesTask : IScheduledTask
                 return Task.CompletedTask;
             }
 
+            // Get list of temp files currently being used by active downloads
+            var activeTempFiles = ActiveDownloadTracker.GetActiveTempFiles()
+                .Select(f => f.ToLowerInvariant())
+                .ToHashSet();
+
+            if (activeTempFiles.Count > 0)
+            {
+                _logger.LogDebug("Protecting {Count} active download temp files from cleanup", activeTempFiles.Count);
+            }
+
             for (var i = 0; i < tempFiles.Length; i++)
             {
                 if (cancellationToken.IsCancellationRequested)
@@ -85,14 +99,33 @@ public class CleanupTempFilesTask : IScheduledTask
                 {
                     var fileInfo = new FileInfo(file);
 
+                    // Skip files that are currently being downloaded (unless they're very old)
+                    var isActiveDownload = activeTempFiles.Contains(file.ToLowerInvariant());
+                    var isOldEnoughToDelete = fileInfo.LastWriteTimeUtc < cutoffTime;
+
+                    if (isActiveDownload && !isOldEnoughToDelete)
+                    {
+                        _logger.LogDebug("Skipping active download: {FileName}", fileInfo.Name);
+                        skippedCount++;
+                        continue;
+                    }
+
                     // Delete files older than the cutoff time
-                    if (fileInfo.LastWriteTimeUtc < cutoffTime)
+                    if (isOldEnoughToDelete)
                     {
                         var fileSize = fileInfo.Length;
                         fileInfo.Delete();
                         deletedCount++;
                         totalBytes += fileSize;
-                        _logger.LogDebug("Deleted orphaned temp file: {FileName}", fileInfo.Name);
+
+                        if (isActiveDownload)
+                        {
+                            _logger.LogWarning("Deleted stale temp file that was marked as active: {FileName}", fileInfo.Name);
+                        }
+                        else
+                        {
+                            _logger.LogDebug("Deleted orphaned temp file: {FileName}", fileInfo.Name);
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -104,12 +137,13 @@ public class CleanupTempFilesTask : IScheduledTask
                 progress.Report((double)(i + 1) / totalFiles * 100);
             }
 
-            if (deletedCount > 0)
+            if (deletedCount > 0 || skippedCount > 0)
             {
                 _logger.LogInformation(
-                    "Cleanup complete: deleted {Count} orphaned temp files ({Size})",
+                    "Cleanup complete: deleted {DeletedCount} orphaned temp files ({Size}), skipped {SkippedCount} active downloads",
                     deletedCount,
-                    FormatUtilities.FormatBytes(totalBytes));
+                    FormatUtilities.FormatBytes(totalBytes),
+                    skippedCount);
             }
 
             if (errorCount > 0)

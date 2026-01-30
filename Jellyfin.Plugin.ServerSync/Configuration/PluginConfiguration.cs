@@ -156,6 +156,10 @@ public class PluginConfiguration : BasePluginConfiguration
     // Number of days to keep files in the recycling bin before permanent deletion.
     public int RecyclingBinRetentionDays { get; set; } = 7;
 
+    // MaxRetryCount
+    // Maximum number of times to retry failed downloads before giving up.
+    public int MaxRetryCount { get; set; } = 3;
+
     // ValidateConfiguration
     // Validates configuration values and returns a list of validation errors.
     public List<string> ValidateConfiguration()
@@ -270,6 +274,7 @@ public class PluginConfiguration : BasePluginConfiguration
         ScheduledEndHour = Math.Clamp(ScheduledEndHour, 0, 24);
         ScheduledDownloadSpeed = Math.Max(0, ScheduledDownloadSpeed);
         RecyclingBinRetentionDays = Math.Clamp(RecyclingBinRetentionDays, 1, 365);
+        MaxRetryCount = Math.Clamp(MaxRetryCount, 1, 10);
 
         // Normalize URL
         if (!string.IsNullOrWhiteSpace(SourceServerUrl))

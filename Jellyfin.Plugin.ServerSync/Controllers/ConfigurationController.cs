@@ -138,10 +138,13 @@ public class ConfigurationController : ControllerBase
     }
 
     // GetSyncItems
-    // Gets all sync items from the database.
+    // Gets sync items from the database with optional search and filter.
     [HttpGet("Items")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public ActionResult<List<SyncItemDto>> GetSyncItems()
+    public ActionResult<List<SyncItemDto>> GetSyncItems(
+        [FromQuery] string? search = null,
+        [FromQuery] string? status = null,
+        [FromQuery] string? pendingType = null)
     {
         var plugin = Plugin.Instance;
         if (plugin == null)
@@ -150,7 +153,25 @@ public class ConfigurationController : ControllerBase
         }
 
         var config = plugin.Configuration;
-        var items = plugin.Database.GetAll();
+
+        // Parse status filter
+        SyncStatus? statusFilter = null;
+        if (!string.IsNullOrEmpty(status) && Enum.TryParse<SyncStatus>(status, out var parsedStatus))
+        {
+            statusFilter = parsedStatus;
+        }
+
+        // Parse pending type filter
+        PendingType? pendingTypeFilter = null;
+        if (!string.IsNullOrEmpty(pendingType) && Enum.TryParse<PendingType>(pendingType, out var parsedPendingType))
+        {
+            pendingTypeFilter = parsedPendingType;
+        }
+
+        // Use Search method if any filters are provided, otherwise GetAll
+        var items = !string.IsNullOrEmpty(search) || statusFilter.HasValue || pendingTypeFilter.HasValue
+            ? plugin.Database.Search(search, statusFilter, pendingTypeFilter)
+            : plugin.Database.GetAll();
 
         return Ok(items.Select(i => new SyncItemDto
         {
@@ -325,7 +346,7 @@ public class ConfigurationController : ControllerBase
             }
         }
 
-        return Ok();
+        return Ok(new { Success = true });
     }
 
     // UpdateItemStatus
@@ -346,7 +367,7 @@ public class ConfigurationController : ControllerBase
         }
 
         plugin.Database.UpdateStatus(request.SourceItemId, status);
-        return Ok();
+        return Ok(new { Success = true });
     }
 
     // IgnoreItems

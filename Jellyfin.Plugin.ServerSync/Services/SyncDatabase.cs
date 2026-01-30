@@ -13,12 +13,14 @@ namespace Jellyfin.Plugin.ServerSync.Services;
 
 // SyncDatabase
 // SQLite database for tracking sync items between servers.
+// Uses a write lock to prevent concurrent write access issues with SQLite.
 public class SyncDatabase : IDisposable
 {
     private const int CurrentSchemaVersion = 5;
 
     private readonly ILogger<SyncDatabase> _logger;
     private readonly string _dbPath;
+    private readonly object _writeLock = new();
     private SqliteConnection? _connection;
     private bool _disposed;
 
@@ -389,6 +391,48 @@ public class SyncDatabase : IDisposable
         return items;
     }
 
+    // Search
+    // Searches sync items by filename with optional status and pending type filters.
+    public List<SyncItem> Search(string? searchTerm, SyncStatus? status = null, PendingType? pendingType = null)
+    {
+        EnsureConnection();
+
+        var items = new List<SyncItem>();
+        using var command = _connection!.CreateCommand();
+
+        var conditions = new List<string>();
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            // Search in filename portion of SourcePath (case-insensitive)
+            conditions.Add("(SourcePath LIKE @searchTerm OR LocalPath LIKE @searchTerm)");
+            command.Parameters.AddWithValue("@searchTerm", $"%{searchTerm}%");
+        }
+
+        if (status.HasValue)
+        {
+            conditions.Add("Status = @status");
+            command.Parameters.AddWithValue("@status", (int)status.Value);
+        }
+
+        if (pendingType.HasValue)
+        {
+            conditions.Add("PendingType = @pendingType");
+            command.Parameters.AddWithValue("@pendingType", (int)pendingType.Value);
+        }
+
+        command.CommandText = conditions.Count > 0
+            ? $"SELECT * FROM SyncItems WHERE {string.Join(" AND ", conditions)}"
+            : "SELECT * FROM SyncItems";
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            items.Add(ReadSyncItem(reader));
+        }
+
+        return items;
+    }
+
     // GetPendingByType
     // Retrieves all pending items with a specific pending type.
     public List<SyncItem> GetPendingByType(PendingType pendingType)
@@ -457,6 +501,14 @@ public class SyncDatabase : IDisposable
     // Inserts or updates a sync item in the database.
     public void Upsert(SyncItem item, SqliteTransaction? transaction = null)
     {
+        lock (_writeLock)
+        {
+            UpsertInternal(item, transaction);
+        }
+    }
+
+    private void UpsertInternal(SyncItem item, SqliteTransaction? transaction)
+    {
         EnsureConnection();
 
         using var command = _connection!.CreateCommand();
@@ -521,7 +573,9 @@ public class SyncDatabase : IDisposable
         string? sourceETag = null,
         long? sourceSize = null)
     {
-        EnsureConnection();
+        lock (_writeLock)
+        {
+            EnsureConnection();
 
         using var command = _connection!.CreateCommand();
 
@@ -606,12 +660,29 @@ public class SyncDatabase : IDisposable
 
         command.Parameters.AddWithValue("@errorMessage", errorMessage ?? (object)DBNull.Value);
 
-        command.ExecuteNonQuery();
+            command.ExecuteNonQuery();
+        }
     }
 
     // Delete
     // Deletes a sync item by its source item ID.
     public void Delete(string sourceItemId, SqliteTransaction? transaction = null)
+    {
+        // Only lock if we're not already inside a transaction (which would have its own lock)
+        if (transaction == null)
+        {
+            lock (_writeLock)
+            {
+                DeleteInternal(sourceItemId, null);
+            }
+        }
+        else
+        {
+            DeleteInternal(sourceItemId, transaction);
+        }
+    }
+
+    private void DeleteInternal(string sourceItemId, SqliteTransaction? transaction)
     {
         EnsureConnection();
 
@@ -686,21 +757,24 @@ public class SyncDatabase : IDisposable
     // Resets error status for items older than specified days.
     public int ClearStaleErrors(int olderThanDays)
     {
-        EnsureConnection();
+        lock (_writeLock)
+        {
+            EnsureConnection();
 
-        var cutoffDate = DateTime.UtcNow.AddDays(-olderThanDays).ToString("o");
+            var cutoffDate = DateTime.UtcNow.AddDays(-olderThanDays).ToString("o");
 
-        using var command = _connection!.CreateCommand();
-        command.CommandText = @"
-            UPDATE SyncItems
-            SET Status = @newStatus, RetryCount = 0, ErrorMessage = NULL
-            WHERE Status = @errorStatus AND StatusDate < @cutoffDate
-        ";
-        command.Parameters.AddWithValue("@newStatus", (int)SyncStatus.Queued);
-        command.Parameters.AddWithValue("@errorStatus", (int)SyncStatus.Errored);
-        command.Parameters.AddWithValue("@cutoffDate", cutoffDate);
+            using var command = _connection!.CreateCommand();
+            command.CommandText = @"
+                UPDATE SyncItems
+                SET Status = @newStatus, RetryCount = 0, ErrorMessage = NULL
+                WHERE Status = @errorStatus AND StatusDate < @cutoffDate
+            ";
+            command.Parameters.AddWithValue("@newStatus", (int)SyncStatus.Queued);
+            command.Parameters.AddWithValue("@errorStatus", (int)SyncStatus.Errored);
+            command.Parameters.AddWithValue("@cutoffDate", cutoffDate);
 
-        return command.ExecuteNonQuery();
+            return command.ExecuteNonQuery();
+        }
     }
 
     // ReadSyncItem
@@ -826,6 +900,122 @@ public class SyncDatabase : IDisposable
 
         InitializeDatabase();
         _logger.LogInformation("Sync database has been reset with fresh schema v{Version}", CurrentSchemaVersion);
+    }
+
+    // ExecuteInTransaction
+    // Executes multiple database operations within a transaction.
+    // Returns true if the transaction was committed successfully.
+    public bool ExecuteInTransaction(Action<SqliteTransaction> action)
+    {
+        lock (_writeLock)
+        {
+            EnsureConnection();
+
+            using var transaction = _connection!.BeginTransaction();
+            try
+            {
+                action(transaction);
+                transaction.Commit();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Transaction failed, rolling back");
+                try
+                {
+                transaction.Rollback();
+            }
+            catch (Exception rollbackEx)
+            {
+                _logger.LogError(rollbackEx, "Failed to rollback transaction");
+            }
+
+                return false;
+            }
+        }
+    }
+
+    // BatchDelete
+    // Deletes multiple items within a transaction.
+    public int BatchDelete(IEnumerable<string> sourceItemIds)
+    {
+        lock (_writeLock)
+        {
+            EnsureConnection();
+
+            var count = 0;
+            using var transaction = _connection!.BeginTransaction();
+            try
+            {
+                foreach (var sourceItemId in sourceItemIds)
+                {
+                    DeleteInternal(sourceItemId, transaction);
+                    count++;
+                }
+
+                transaction.Commit();
+                return count;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Batch delete failed after {Count} items, rolling back", count);
+                transaction.Rollback();
+                throw;
+            }
+        }
+    }
+
+    // BatchUpdateStatus
+    // Updates the status of multiple items within a transaction.
+    public int BatchUpdateStatus(IEnumerable<string> sourceItemIds, SyncStatus status, string? errorMessage = null)
+    {
+        lock (_writeLock)
+        {
+            EnsureConnection();
+
+            var count = 0;
+            using var transaction = _connection!.BeginTransaction();
+            try
+            {
+                foreach (var sourceItemId in sourceItemIds)
+                {
+                    using var command = _connection!.CreateCommand();
+                    command.Transaction = transaction;
+
+                    if (status == SyncStatus.Errored && errorMessage != null)
+                    {
+                        command.CommandText = @"
+                            UPDATE SyncItems
+                            SET Status = @status, StatusDate = @statusDate, ErrorMessage = @errorMessage, RetryCount = COALESCE(RetryCount, 0) + 1
+                            WHERE SourceItemId = @sourceItemId";
+                        command.Parameters.AddWithValue("@errorMessage", errorMessage);
+                    }
+                    else
+                    {
+                        command.CommandText = @"
+                            UPDATE SyncItems
+                            SET Status = @status, StatusDate = @statusDate, ErrorMessage = NULL, PendingType = NULL
+                            WHERE SourceItemId = @sourceItemId";
+                    }
+
+                    command.Parameters.AddWithValue("@sourceItemId", sourceItemId);
+                    command.Parameters.AddWithValue("@status", (int)status);
+                    command.Parameters.AddWithValue("@statusDate", DateTime.UtcNow.ToString("o"));
+
+                    command.ExecuteNonQuery();
+                    count++;
+                }
+
+                transaction.Commit();
+                return count;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Batch update status failed after {Count} items, rolling back", count);
+                transaction.Rollback();
+                throw;
+            }
+        }
     }
 
     public void Dispose()

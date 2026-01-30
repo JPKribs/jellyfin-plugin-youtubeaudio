@@ -157,9 +157,21 @@
                             </div>
 
                             <div class="inputContainer">
+                                <label for="txtMaxRetryCount">Max Retry Count:</label>
+                                <input is="emby-input" type="number" id="txtMaxRetryCount" min="1" max="10" />
+                                <div class="fieldDescription">Maximum number of times to retry failed downloads (1-10).</div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label for="txtTempDownloadPath">Temporary Download Path:</label>
+                                <input is="emby-input" type="text" id="txtTempDownloadPath" placeholder="(Uses default cache directory)" />
+                                <div class="fieldDescription">Directory for temporary downloads. Leave empty to use Jellyfin's cache directory.</div>
+                            </div>
+
+                            <div class="inputContainer">
                                 <label for="txtMaxDownloadSpeed">Max Download Speed:</label>
-                                <div style="display: flex; gap: 8px; align-items: center;">
-                                    <input is="emby-input" type="number" id="txtMaxDownloadSpeed" min="0" style="flex: 1;" />
+                                <div class="inputRow">
+                                    <input is="emby-input" type="number" id="txtMaxDownloadSpeed" min="0" />
                                     <select is="emby-select" id="selDownloadSpeedUnit" style="width: auto;">
                                         <option value="KB">KB/s</option>
                                         <option value="MB" selected>MB/s</option>
@@ -203,8 +215,8 @@
 
                                 <div class="inputContainer">
                                     <label for="txtScheduledDownloadSpeed">Scheduled Download Speed:</label>
-                                    <div style="display: flex; gap: 8px; align-items: center;">
-                                        <input is="emby-input" type="number" id="txtScheduledDownloadSpeed" min="0" style="flex: 1;" />
+                                    <div class="inputRow">
+                                        <input is="emby-input" type="number" id="txtScheduledDownloadSpeed" min="0" />
                                         <select is="emby-select" id="selScheduledDownloadSpeedUnit" style="width: auto;">
                                             <option value="KB">KB/s</option>
                                             <option value="MB" selected>MB/s</option>
@@ -294,14 +306,11 @@
                             </div>
 
                             <div class="syncActionButtonRow">
-                                <button is="emby-button" type="button" id="btnRefreshItems" class="raised syncActionButton">
-                                    <span>Refresh</span>
-                                </button>
                                 <button is="emby-button" type="button" id="btnTriggerSync" class="raised button-primary syncActionButton">
                                     <span>Sync</span>
                                 </button>
-                                <button is="emby-button" type="button" id="btnRetryErrors" class="raised syncActionButton">
-                                    <span>Retry Errors</span>
+                                <button is="emby-button" type="button" id="btnRefreshItems" class="raised syncActionButton">
+                                    <span>Refresh</span>
                                 </button>
                                 <button is="emby-button" type="button" id="btnResetDatabase" class="raised button-destructive syncActionButton">
                                     <span>Reset Database</span>
@@ -309,6 +318,21 @@
                             </div>
 
                             <div class="syncSectionSeparator"></div>
+
+                            <div class="syncTableControlsRow">
+                                <input is="emby-input" type="text" id="txtSearchItems" placeholder="Search items..." class="syncSearchInput" />
+                                <select is="emby-select" id="selStatusFilter" class="statusFilter">
+                                    <option value="">All</option>
+                                    <option value="Synced">Synced</option>
+                                    <option value="Queued">Queued</option>
+                                    <option value="Errored">Errored</option>
+                                    <option value="Ignored">Ignored</option>
+                                    <option value="Pending">All Pending</option>
+                                    <option value="Pending:Download">Pending Download</option>
+                                    <option value="Pending:Replacement">Pending Replace</option>
+                                    <option value="Pending:Deletion">Pending Delete</option>
+                                </select>
+                            </div>
 
                             <div class="syncTableHeader">
                                 <label class="selectAllContainer">
@@ -325,19 +349,9 @@
                                 <button is="emby-button" type="button" id="btnBulkDelete" class="raised button-destructive syncHeaderButton" title="Delete from local server only" disabled>
                                     <span>Delete</span>
                                 </button>
-                                <select is="emby-select" id="selStatusFilter" class="statusFilter">
-                                    <option value="">All</option>
-                                    <option value="Synced">Synced</option>
-                                    <option value="Queued">Queued</option>
-                                    <option value="Errored">Errored</option>
-                                    <option value="Ignored">Ignored</option>
-                                    <option value="Pending">All Pending</option>
-                                    <option value="Pending:Download">Pending Download</option>
-                                    <option value="Pending:Replacement">Pending Replace</option>
-                                    <option value="Pending:Deletion">Pending Delete</option>
-                                </select>
+                                <span class="syncHeaderSpacer"></span>
                                 <button is="emby-button" type="button" id="btnReloadTable" class="reloadTableButton" title="Reload table data">
-                                    <span class="reloadIcon">&#x27F3;</span>
+                                    <span class="material-icons reloadIcon">refresh</span>
                                 </button>
                             </div>
 
@@ -474,6 +488,21 @@
             padding-left: 1em;
             border-left: 2px solid rgba(85, 85, 85, 0.3);
         }
+        .inputRow {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .inputRow input[is="emby-input"],
+        .inputRow .emby-input-wrapper {
+            flex: 1;
+            margin: 0 !important;
+            padding-left: 0 !important;
+        }
+        .inputRow .inputContainer {
+            margin: 0 !important;
+            padding: 0 !important;
+        }
         .contentSectionSeparator {
             border-bottom: 1px solid #555;
             margin-top: 24px;
@@ -529,7 +558,6 @@
     <!-- Styles: sourceServer.css -->
     <style>
         #serverInfoContainer {
-            border-bottom: 1px solid #555;
             padding-bottom: 16px;
         }
         .sourceServerButtonRow {
@@ -719,37 +747,43 @@
             opacity: 0.4;
             cursor: not-allowed;
         }
+        .syncHeaderSpacer {
+            flex: 1;
+        }
+        .syncTableControlsRow {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .syncSearchInput {
+            flex: 1;
+            min-width: 150px;
+        }
         .statusFilter {
-            margin-left: auto;
             width: auto !important;
         }
         .reloadTableButton {
-            background: rgba(255,255,255,0.1) !important;
-            border: 1px solid rgba(255,255,255,0.2) !important;
-            border-radius: 4px !important;
-            padding: 4px 10px !important;
-            min-width: 36px !important;
-            height: 36px !important;
+            background: transparent !important;
+            border: none !important;
+            padding: 8px !important;
+            min-width: 40px !important;
+            height: 40px !important;
             cursor: pointer;
-            opacity: 0.8;
-            transition: opacity 0.2s, background 0.2s, transform 0.3s;
+            opacity: 0.7;
+            transition: opacity 0.2s;
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
         }
         .reloadTableButton:hover {
             opacity: 1;
-            background: rgba(255,255,255,0.2) !important;
         }
         .reloadTableButton.spinning .reloadIcon {
             animation: spin 0.8s linear infinite;
         }
         .reloadIcon {
-            font-size: 1.3em;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            line-height: 1;
+            font-size: 24px !important;
         }
         @keyframes spin {
             from { transform: rotate(0deg); }
@@ -811,15 +845,9 @@
             getConfig: function() { return ApiClient.getPluginConfiguration(this.pluginId); },
             saveConfig: function(config) { return ApiClient.updatePluginConfiguration(this.pluginId, config); },
             apiRequest: function(endpoint, method, data) {
-                var options = { url: ApiClient.getUrl('ServerSync/' + endpoint), type: method || 'GET' };
-                if (method === 'GET') { options.dataType = 'json'; }
+                var options = { url: ApiClient.getUrl('ServerSync/' + endpoint), type: method || 'GET', dataType: 'json' };
                 if (data) { options.contentType = 'application/json'; options.data = JSON.stringify(data); }
-                return ApiClient.fetch(options).then(function(response) {
-                    if (response && typeof response === 'string' && response.length > 0) {
-                        try { return JSON.parse(response); } catch (e) { return response; }
-                    }
-                    return response;
-                });
+                return ApiClient.fetch(options);
             }
         };
     </script>
@@ -918,6 +946,8 @@
                 // Update pending card visibility based on approval modes
                 self.updatePendingVisibility(downloadMode, replaceMode, deleteMode);
                 document.getElementById('txtMaxConcurrentDownloads').value = config.MaxConcurrentDownloads || 2;
+                document.getElementById('txtMaxRetryCount').value = config.MaxRetryCount || 3;
+                document.getElementById('txtTempDownloadPath').value = config.TempDownloadPath || '';
                 document.getElementById('txtMaxDownloadSpeed').value = config.MaxDownloadSpeed || 0;
                 document.getElementById('selDownloadSpeedUnit').value = config.DownloadSpeedUnit || 'MB';
                 document.getElementById('txtMinFreeDiskSpace').value = config.MinimumFreeDiskSpaceGb || 10;
@@ -942,6 +972,8 @@
                     ReplaceExistingContentMode: document.getElementById('selReplaceExistingContentMode').value,
                     DeleteMissingContentMode: document.getElementById('selDeleteMissingContentMode').value,
                     MaxConcurrentDownloads: parseInt(document.getElementById('txtMaxConcurrentDownloads').value, 10) || 2,
+                    MaxRetryCount: parseInt(document.getElementById('txtMaxRetryCount').value, 10) || 3,
+                    TempDownloadPath: document.getElementById('txtTempDownloadPath').value || null,
                     MaxDownloadSpeed: parseInt(document.getElementById('txtMaxDownloadSpeed').value, 10) || 0,
                     DownloadSpeedUnit: document.getElementById('selDownloadSpeedUnit').value,
                     MinimumFreeDiskSpaceGb: parseInt(document.getElementById('txtMinFreeDiskSpace').value, 10) || 10,
@@ -1039,11 +1071,17 @@
     <!-- Scripts: syncTable.js -->
     <script type="text/javascript">
         var SyncTableModule = {
-            syncItems: [], filteredItems: [], selectedItems: new Set(), currentModalItem: null, capabilities: null,
+            syncItems: [], filteredItems: [], selectedItems: new Set(), currentModalItem: null, capabilities: null, searchQuery: '', searchTimeout: null,
             init: function() {
                 var self = this;
                 document.getElementById('btnRefreshItems').addEventListener('click', function() { self.refreshSyncTable(); });
                 document.getElementById('selStatusFilter').addEventListener('change', function() { self.loadSyncItems(); });
+                document.getElementById('txtSearchItems').addEventListener('input', function() {
+                    self.searchQuery = this.value;
+                    // Debounce search to avoid too many API calls
+                    if (self.searchTimeout) clearTimeout(self.searchTimeout);
+                    self.searchTimeout = setTimeout(function() { self.loadSyncItems(); }, 300);
+                });
                 document.getElementById('btnReloadTable').addEventListener('click', function() { self.reloadTableData(); });
                 document.getElementById('btnBulkIgnore').addEventListener('click', function() { self.bulkIgnore(); });
                 document.getElementById('btnBulkQueue').addEventListener('click', function() { self.bulkQueue(); });
@@ -1054,7 +1092,6 @@
                 document.getElementById('btnModalDelete').addEventListener('click', function() { self.modalDelete(); });
                 document.getElementById('btnModalClose').addEventListener('click', function() { self.closeModal(); });
                 document.getElementById('btnTriggerSync').addEventListener('click', function() { self.triggerSync(); });
-                document.getElementById('btnRetryErrors').addEventListener('click', function() { self.retryErrors(); });
                 document.getElementById('btnResetDatabase').addEventListener('click', function() { self.resetDatabase(); });
             },
             loadCapabilities: function() {
@@ -1090,10 +1127,6 @@
             reloadTableData: function() {
                 var self = this; var btn = document.getElementById('btnReloadTable'); btn.classList.add('spinning'); btn.disabled = true;
                 Promise.all([self.loadSyncStatus(), self.loadSyncItems(), self.loadHealthStats()]).then(function() { btn.classList.remove('spinning'); btn.disabled = false; }).catch(function() { btn.classList.remove('spinning'); btn.disabled = false; });
-            },
-            retryErrors: function() {
-                var self = this;
-                ServerSyncShared.apiRequest('RetryErroredItems', 'POST', {}).then(function() { ServerSyncShared.showAlert('Errored items queued for retry'); self.loadSyncStatus(); self.loadSyncItems(); }).catch(function() { ServerSyncShared.showAlert('Failed to retry errored items'); });
             },
             resetDatabase: function() {
                 var self = this;
@@ -1131,34 +1164,47 @@
                 return item.Status;
             },
             loadSyncItems: function() {
-                var self = this; var container = document.getElementById('syncItemsContainer'); var filter = document.getElementById('selStatusFilter').value;
-                return ServerSyncShared.apiRequest('Items', 'GET').then(function(items) {
-                    self.syncItems = items || []; self.selectedItems.clear(); self.updateBulkActionsVisibility();
-                    var filteredItems = items;
-                    if (filter) {
-                        if (filter.indexOf(':') > -1) {
-                            // Filter by Status:PendingType (e.g., "Pending:Download")
-                            var parts = filter.split(':');
-                            filteredItems = items.filter(function(i) { return i.Status === parts[0] && i.PendingType === parts[1]; });
-                        } else {
-                            filteredItems = items.filter(function(i) { return i.Status === filter; });
-                        }
+                var self = this;
+                var filter = document.getElementById('selStatusFilter').value;
+                var search = self.searchQuery;
+                // Build query params for server-side filtering
+                var params = [];
+                if (search) params.push('search=' + encodeURIComponent(search));
+                if (filter) {
+                    if (filter.indexOf(':') > -1) {
+                        var parts = filter.split(':');
+                        params.push('status=' + encodeURIComponent(parts[0]));
+                        params.push('pendingType=' + encodeURIComponent(parts[1]));
+                    } else {
+                        params.push('status=' + encodeURIComponent(filter));
                     }
-                    self.filteredItems = filteredItems;
-                    document.getElementById('chkSelectAll').checked = false;
-                    if (filteredItems.length === 0) { container.innerHTML = '<div style="padding: 16px; opacity: 0.7;">No items found</div>'; return; }
-                    container.innerHTML = filteredItems.map(function(item) {
-                        var localExists = item.Status === 'Synced'; var localPathClass = localExists ? '' : ' notExists';
-                        var localPathDisplay = item.LocalPath ? ServerSyncShared.getFileName(item.LocalPath) : 'N/A';
-                        if (!localExists && item.LocalPath) { localPathDisplay = '(will sync to) ' + localPathDisplay; }
-                        var errorPreview = (item.Status === 'Errored' && item.ErrorMessage) ? '<div class="syncItemError" title="' + ServerSyncShared.escapeHtml(item.ErrorMessage) + '">' + ServerSyncShared.escapeHtml(item.ErrorMessage) + '</div>' : '';
-                        var displayStatus = self.getDisplayStatus(item);
-                        var statusClass = self.getStatusClass(item);
-                        return '<div class="syncItem" data-id="' + item.SourceItemId + '"><input type="checkbox" class="syncItemCheckbox" data-id="' + item.SourceItemId + '" /><div class="syncItemInfo"><div class="syncItemName" title="' + ServerSyncShared.escapeHtml(item.SourcePath) + '">' + ServerSyncShared.escapeHtml(ServerSyncShared.getFileName(item.SourcePath)) + '</div><div class="syncItemPath' + localPathClass + '" title="' + ServerSyncShared.escapeHtml(item.LocalPath || '') + '">' + ServerSyncShared.escapeHtml(localPathDisplay) + '</div>' + errorPreview + '</div><div class="syncItemStatus ' + statusClass + '">' + displayStatus + '</div></div>';
-                    }).join('');
-                    container.querySelectorAll('.syncItem').forEach(function(el) { el.addEventListener('click', function(e) { if (e.target.type !== 'checkbox') { self.showItemDetail(el.dataset.id); } }); });
-                    container.querySelectorAll('.syncItemCheckbox').forEach(function(cb) { cb.addEventListener('change', function() { if (this.checked) { self.selectedItems.add(this.dataset.id); } else { self.selectedItems.delete(this.dataset.id); } self.updateBulkActionsVisibility(); }); });
+                }
+                var endpoint = 'Items' + (params.length > 0 ? '?' + params.join('&') : '');
+                return ServerSyncShared.apiRequest(endpoint, 'GET').then(function(items) {
+                    self.syncItems = items || [];
+                    self.filteredItems = items || [];
+                    self.renderItems();
                 });
+            },
+            renderItems: function() {
+                var self = this;
+                var container = document.getElementById('syncItemsContainer');
+                self.selectedItems.clear();
+                self.updateBulkActionsVisibility();
+                document.getElementById('chkSelectAll').checked = false;
+                if (self.filteredItems.length === 0) { container.innerHTML = '<div style="padding: 16px; opacity: 0.7;">No items found</div>'; return; }
+                container.innerHTML = self.filteredItems.map(function(item) {
+                    var localExists = item.Status === 'Synced'; var localPathClass = localExists ? '' : ' notExists';
+                    var localPathDisplay = item.LocalPath ? ServerSyncShared.getFileName(item.LocalPath) : 'N/A';
+                    var willSync = !localExists && item.LocalPath && item.Status !== 'Ignored' && !(item.Status === 'Pending' && item.PendingType === 'Deletion');
+                    if (willSync) { localPathDisplay = '(will sync to) ' + localPathDisplay; }
+                    var errorPreview = (item.Status === 'Errored' && item.ErrorMessage) ? '<div class="syncItemError" title="' + ServerSyncShared.escapeHtml(item.ErrorMessage) + '">' + ServerSyncShared.escapeHtml(item.ErrorMessage) + '</div>' : '';
+                    var displayStatus = self.getDisplayStatus(item);
+                    var statusClass = self.getStatusClass(item);
+                    return '<div class="syncItem" data-id="' + item.SourceItemId + '"><input type="checkbox" class="syncItemCheckbox" data-id="' + item.SourceItemId + '" /><div class="syncItemInfo"><div class="syncItemName" title="' + ServerSyncShared.escapeHtml(item.SourcePath) + '">' + ServerSyncShared.escapeHtml(ServerSyncShared.getFileName(item.SourcePath)) + '</div><div class="syncItemPath' + localPathClass + '" title="' + ServerSyncShared.escapeHtml(item.LocalPath || '') + '">' + ServerSyncShared.escapeHtml(localPathDisplay) + '</div>' + errorPreview + '</div><div class="syncItemStatus ' + statusClass + '">' + displayStatus + '</div></div>';
+                }).join('');
+                container.querySelectorAll('.syncItem').forEach(function(el) { el.addEventListener('click', function(e) { if (e.target.type !== 'checkbox') { self.showItemDetail(el.dataset.id); } }); });
+                container.querySelectorAll('.syncItemCheckbox').forEach(function(cb) { cb.addEventListener('change', function() { if (this.checked) { self.selectedItems.add(this.dataset.id); } else { self.selectedItems.delete(this.dataset.id); } self.updateBulkActionsVisibility(); }); });
             },
             updateBulkActionsVisibility: function() {
                 var count = this.selectedItems.size; var hasSelection = count > 0;
@@ -1198,7 +1244,31 @@
                 var lastSyncSection = document.getElementById('modalLastSyncSection');
                 if (item.LastSyncTime) { document.getElementById('modalLastSync').textContent = new Date(item.LastSyncTime).toLocaleString(); lastSyncSection.style.display = 'block'; } else { lastSyncSection.style.display = 'none'; }
                 var localPathEl = document.getElementById('modalLocalPath'); var localPathNoteEl = document.getElementById('modalLocalPathNote'); var localExists = item.Status === 'Synced';
-                if (item.LocalPath) { localPathEl.textContent = item.LocalPath; localPathEl.style.color = ''; if (localExists) { localPathNoteEl.textContent = ''; localPathNoteEl.style.display = 'none'; } else { localPathNoteEl.textContent = 'File will be synced to this location'; localPathNoteEl.style.display = 'block'; localPathNoteEl.style.borderBottom = '1px solid #9b59b6'; localPathNoteEl.style.paddingBottom = '4px'; localPathNoteEl.style.color = '#9b59b6'; } } else { localPathEl.textContent = 'N/A'; localPathEl.style.color = ''; localPathNoteEl.style.display = 'none'; }
+                var isPendingDeletion = item.Status === 'Pending' && item.PendingType === 'Deletion';
+                var isIgnored = item.Status === 'Ignored';
+                // For Ignored items, only show local path if it actually exists on disk (i.e., was synced)
+                // For Pending Deletion, don't show "will be synced" note
+                if (isIgnored && !localExists) {
+                    localPathEl.textContent = 'N/A';
+                    localPathNoteEl.style.display = 'none';
+                } else if (item.LocalPath) {
+                    localPathEl.textContent = item.LocalPath;
+                    localPathEl.style.color = '';
+                    if (localExists || isIgnored || isPendingDeletion) {
+                        localPathNoteEl.textContent = '';
+                        localPathNoteEl.style.display = 'none';
+                    } else {
+                        localPathNoteEl.textContent = 'File will be synced to this location';
+                        localPathNoteEl.style.display = 'block';
+                        localPathNoteEl.style.borderBottom = '1px solid #9b59b6';
+                        localPathNoteEl.style.paddingBottom = '4px';
+                        localPathNoteEl.style.color = '#9b59b6';
+                    }
+                } else {
+                    localPathEl.textContent = 'N/A';
+                    localPathEl.style.color = '';
+                    localPathNoteEl.style.display = 'none';
+                }
                 document.getElementById('itemDetailModal').style.display = 'flex';
             },
             closeModal: function() { document.getElementById('itemDetailModal').style.display = 'none'; this.currentModalItem = null; },

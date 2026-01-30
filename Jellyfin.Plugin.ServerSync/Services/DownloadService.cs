@@ -16,13 +16,18 @@ public class DownloadService
 {
     private readonly ILogger _logger;
 
+    /// <summary>
+    /// Default retry count for network operations.
+    /// </summary>
+    private const int DefaultNetworkRetries = 3;
+
     public DownloadService(ILogger logger)
     {
         _logger = logger;
     }
 
     /// <summary>
-    /// Downloads a single item and its companion files.
+    /// Downloads a single item and its companion files with retry support.
     /// </summary>
     /// <param name="client">Source server client.</param>
     /// <param name="item">Sync item to download.</param>
@@ -46,31 +51,46 @@ public class DownloadService
             return new DownloadResult(false, "No local path configured");
         }
 
-        var tempFileName = $"{item.SourceItemId}_{Path.GetFileName(item.LocalPath)}";
+        var tempFileName = FileNameSanitizer.SanitizeTempFileName(item.SourceItemId, item.LocalPath);
         var tempFilePath = Path.Combine(tempPath, tempFileName);
         var itemId = Guid.Parse(item.SourceItemId);
+        var fileName = Path.GetFileName(item.LocalPath);
+        var networkRetries = config.MaxRetryCount > 0 ? config.MaxRetryCount : DefaultNetworkRetries;
 
         try
         {
-            using var sourceStream = await client.DownloadFileAsync(itemId, cancellationToken).ConfigureAwait(false);
+            // Download with retry support
+            await RetryPolicy.ExecuteWithRetryAsync(
+                async ct =>
+                {
+                    using var sourceStream = await client.DownloadFileAsync(itemId, ct).ConfigureAwait(false);
 
-            if (sourceStream == null)
-            {
-                return new DownloadResult(false, "No response from server");
-            }
+                    if (sourceStream == null)
+                    {
+                        throw new InvalidOperationException("No response from server");
+                    }
 
-            using (var fileStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
-            {
-                await StreamUtilities.CopyWithSpeedLimitAsync(sourceStream, fileStream, speedLimitBytesPerSecond, cancellationToken).ConfigureAwait(false);
-            }
+                    // Ensure we don't have a partial file from previous attempt
+                    CleanupTempFile(tempFilePath);
 
-            var downloadedInfo = new FileInfo(tempFilePath);
-            if (item.SourceSize > 0 && downloadedInfo.Length != item.SourceSize)
-            {
-                var errorMsg = $"Size mismatch: expected {FormatUtilities.FormatBytes(item.SourceSize)}, got {FormatUtilities.FormatBytes(downloadedInfo.Length)}";
-                File.Delete(tempFilePath);
-                return new DownloadResult(false, errorMsg);
-            }
+                    using (var fileStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        await StreamUtilities.CopyWithSpeedLimitAsync(sourceStream, fileStream, speedLimitBytesPerSecond, ct).ConfigureAwait(false);
+                    }
+
+                    // Verify size after download
+                    var downloadedInfo = new FileInfo(tempFilePath);
+                    if (item.SourceSize > 0 && downloadedInfo.Length != item.SourceSize)
+                    {
+                        var errorMsg = $"Size mismatch: expected {FormatUtilities.FormatBytes(item.SourceSize)}, got {FormatUtilities.FormatBytes(downloadedInfo.Length)}";
+                        CleanupTempFile(tempFilePath);
+                        throw new InvalidOperationException(errorMsg);
+                    }
+                },
+                networkRetries,
+                _logger,
+                $"Download {fileName}",
+                cancellationToken).ConfigureAwait(false);
 
             var targetDir = Path.GetDirectoryName(item.LocalPath);
             if (!string.IsNullOrEmpty(targetDir))
@@ -95,10 +115,16 @@ public class DownloadService
                     targetDir ?? Path.GetDirectoryName(item.LocalPath) ?? string.Empty,
                     tempPath,
                     speedLimitBytesPerSecond,
+                    config,
                     cancellationToken).ConfigureAwait(false);
             }
 
             return new DownloadResult(true);
+        }
+        catch (OperationCanceledException)
+        {
+            CleanupTempFile(tempFilePath);
+            throw;
         }
         catch (Exception ex)
         {
@@ -108,13 +134,14 @@ public class DownloadService
     }
 
     /// <summary>
-    /// Downloads external companion files (subtitles, etc.) for an item.
+    /// Downloads external companion files (subtitles, etc.) for an item with retry support.
     /// </summary>
     /// <param name="client">Source server client.</param>
     /// <param name="itemId">Item ID.</param>
     /// <param name="targetDir">Target directory for companion files.</param>
     /// <param name="tempPath">Temporary download path.</param>
     /// <param name="speedLimitBytesPerSecond">Download speed limit in bytes per second.</param>
+    /// <param name="config">Plugin configuration.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     public async Task DownloadCompanionFilesAsync(
         SourceServerClient client,
@@ -122,8 +149,11 @@ public class DownloadService
         string targetDir,
         string tempPath,
         long speedLimitBytesPerSecond,
+        PluginConfiguration config,
         CancellationToken cancellationToken)
     {
+        var networkRetries = config.MaxRetryCount > 0 ? config.MaxRetryCount : DefaultNetworkRetries;
+
         try
         {
             var companions = await client.GetCompanionFilesAsync(itemId, cancellationToken).ConfigureAwait(false);
@@ -137,31 +167,47 @@ public class DownloadService
 
             foreach (var companion in companions)
             {
+                var tempFileName = FileNameSanitizer.SanitizeTempFileName(itemId.ToString(), companion.FileName);
+                var tempFilePath = Path.Combine(tempPath, tempFileName);
+                var targetPath = Path.Combine(targetDir, companion.FileName);
+
                 try
                 {
-                    var tempFileName = $"{itemId}_{companion.FileName}";
-                    var tempFilePath = Path.Combine(tempPath, tempFileName);
-                    var targetPath = Path.Combine(targetDir, companion.FileName);
+                    await RetryPolicy.ExecuteWithRetryAsync(
+                        async ct =>
+                        {
+                            using var stream = await client.DownloadCompanionFileAsync(itemId, companion.SourcePath, ct).ConfigureAwait(false);
 
-                    using var stream = await client.DownloadCompanionFileAsync(itemId, companion.SourcePath, cancellationToken).ConfigureAwait(false);
+                            if (stream == null)
+                            {
+                                throw new InvalidOperationException($"No response for companion file {companion.FileName}");
+                            }
 
-                    if (stream == null)
-                    {
-                        _logger.LogWarning("Failed to download companion file {FileName}", companion.FileName);
-                        continue;
-                    }
+                            // Clean up any partial file from previous attempt
+                            CleanupTempFile(tempFilePath);
 
-                    using (var fileStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
-                    {
-                        await StreamUtilities.CopyWithSpeedLimitAsync(stream, fileStream, speedLimitBytesPerSecond, cancellationToken).ConfigureAwait(false);
-                    }
+                            using (var fileStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
+                            {
+                                await StreamUtilities.CopyWithSpeedLimitAsync(stream, fileStream, speedLimitBytesPerSecond, ct).ConfigureAwait(false);
+                            }
+                        },
+                        networkRetries,
+                        _logger,
+                        $"Download companion {companion.FileName}",
+                        cancellationToken).ConfigureAwait(false);
 
                     FileOperationUtilities.MoveFileWithOverwrite(tempFilePath, targetPath, _logger);
                     _logger.LogInformation("Downloaded companion file {FileName}", companion.FileName);
                 }
+                catch (OperationCanceledException)
+                {
+                    CleanupTempFile(tempFilePath);
+                    throw;
+                }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to download companion file {FileName}", companion.FileName);
+                    CleanupTempFile(tempFilePath);
+                    _logger.LogWarning(ex, "Failed to download companion file {FileName} after retries", companion.FileName);
                 }
             }
         }

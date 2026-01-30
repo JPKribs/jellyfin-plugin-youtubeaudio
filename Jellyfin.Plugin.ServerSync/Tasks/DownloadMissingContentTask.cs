@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -24,12 +23,14 @@ public class DownloadMissingContentTask : IScheduledTask
     private readonly ILibraryManager _libraryManager;
 
     /// <summary>
-    /// Tracks items currently being downloaded to prevent duplicate downloads.
+    /// Default maximum retry count if not configured.
     /// </summary>
-    private static readonly ConcurrentDictionary<string, DateTime> ActiveDownloads = new();
+    private const int DefaultMaxRetries = 3;
 
-    private const int StaleDownloadHours = 1;
-    private const int MaxRetries = 3;
+    /// <summary>
+    /// Circuit breaker for source server failures.
+    /// </summary>
+    private static CircuitBreaker? _circuitBreaker;
 
     public DownloadMissingContentTask(ILogger<DownloadMissingContentTask> logger, ILibraryManager libraryManager)
     {
@@ -78,10 +79,16 @@ public class DownloadMissingContentTask : IScheduledTask
 
         var database = plugin.Database;
 
-        CleanupStaleDownloadEntries();
+        // Cleanup stale download entries
+        var staleCount = ActiveDownloadTracker.CleanupStaleEntries();
+        if (staleCount > 0)
+        {
+            _logger.LogInformation("Cleaned up {Count} stale download entries", staleCount);
+        }
 
+        var maxRetries = config.MaxRetryCount > 0 ? config.MaxRetryCount : DefaultMaxRetries;
         var itemsToSync = database.GetByStatus(SyncStatus.Queued)
-            .Concat(database.GetErroredItemsForRetry(maxRetries: MaxRetries))
+            .Concat(database.GetErroredItemsForRetry(maxRetries: maxRetries))
             .ToList();
 
         if (itemsToSync.Count == 0)
@@ -103,12 +110,30 @@ public class DownloadMissingContentTask : IScheduledTask
             config.SourceServerUrl,
             config.SourceServerApiKey);
 
+        // Initialize or get circuit breaker
+        _circuitBreaker ??= new CircuitBreaker(
+            _logger,
+            "SourceServer",
+            failureThreshold: 5,
+            cooldownPeriod: TimeSpan.FromMinutes(5));
+
+        // Check circuit breaker before attempting connection
+        if (!_circuitBreaker.AllowOperation(out var circuitReason))
+        {
+            _logger.LogWarning("Sync skipped: {Reason}", circuitReason);
+            return;
+        }
+
         var connectionResult = await client.TestConnectionAsync(cancellationToken).ConfigureAwait(false);
         if (!connectionResult.Success)
         {
+            _circuitBreaker.RecordFailure(connectionResult.ErrorMessage);
             _logger.LogError("Failed to connect to source server: {Message}", connectionResult.ErrorMessage);
             return;
         }
+
+        // Connection succeeded, record success
+        _circuitBreaker.RecordSuccess();
 
         var tempPath = plugin.GetTempDownloadPath();
         Directory.CreateDirectory(tempPath);
@@ -179,6 +204,11 @@ public class DownloadMissingContentTask : IScheduledTask
         var downloadTasks = itemsToSync.Select(async item =>
         {
             await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+            // Generate sanitized temp file path for this item
+            var tempFileName = FileNameSanitizer.SanitizeTempFileName(item.SourceItemId, item.LocalPath);
+            var tempFilePath = Path.Combine(tempPath, tempFileName);
+
             try
             {
                 if (cancellationToken.IsCancellationRequested)
@@ -186,7 +216,8 @@ public class DownloadMissingContentTask : IScheduledTask
                     return;
                 }
 
-                if (!ActiveDownloads.TryAdd(item.SourceItemId, DateTime.UtcNow))
+                // Register download with the centralized tracker
+                if (!ActiveDownloadTracker.TryStartDownload(item.SourceItemId, tempFilePath))
                 {
                     _logger.LogDebug("Item {SourceItemId} is already being downloaded, skipping", item.SourceItemId);
                     return;
@@ -210,7 +241,7 @@ public class DownloadMissingContentTask : IScheduledTask
             }
             finally
             {
-                ActiveDownloads.TryRemove(item.SourceItemId, out _);
+                ActiveDownloadTracker.CompleteDownload(item.SourceItemId);
                 semaphore.Release();
             }
         });
@@ -241,8 +272,28 @@ public class DownloadMissingContentTask : IScheduledTask
         PluginConfiguration config,
         CancellationToken cancellationToken)
     {
+        // Guard against null LocalPath
+        if (string.IsNullOrEmpty(item.LocalPath))
+        {
+            var errorMsg = "Item has no local path configured";
+            database.UpdateStatus(item.SourceItemId, SyncStatus.Errored, errorMessage: errorMsg);
+            _logger.LogError("FAILED: {SourceItemId} - {Error}", item.SourceItemId, errorMsg);
+            return new DownloadResult(false, errorMsg);
+        }
+
         var fileName = Path.GetFileName(item.LocalPath);
         var fileSize = FormatUtilities.FormatBytes(item.SourceSize);
+
+        // Per-file disk space check before download
+        if (!DiskSpaceService.HasSufficientSpaceForFile(item.LocalPath, item.SourceSize, config.MinimumFreeDiskSpaceGb))
+        {
+            var errorMsg = $"Insufficient disk space for {fileName} ({fileSize}). " +
+                           $"Required: {fileSize} + {config.MinimumFreeDiskSpaceGb} GB reserve";
+            database.UpdateStatus(item.SourceItemId, SyncStatus.Errored, errorMessage: errorMsg);
+            _logger.LogError("DISK FULL: {FileName} ({Size}) - Not enough space on target drive. " +
+                            "Stopping download to prevent disk exhaustion.", fileName, fileSize);
+            return new DownloadResult(false, errorMsg);
+        }
 
         var (isValid, validationError) = DownloadService.ValidateForDownload(item, config, database);
         if (!isValid)
@@ -267,40 +318,20 @@ public class DownloadMissingContentTask : IScheduledTask
 
         if (result.Success)
         {
+            _circuitBreaker?.RecordSuccess();
             database.UpdateStatus(item.SourceItemId, SyncStatus.Synced,
                 localPath: item.LocalPath, sourceETag: item.SourceETag, sourceSize: item.SourceSize);
             _logger.LogInformation("DOWNLOADED: {FileName} ({Size}) -> {LocalPath}", fileName, fileSize, item.LocalPath);
         }
         else
         {
+            _circuitBreaker?.RecordFailure(result.ErrorMessage);
             database.UpdateStatus(item.SourceItemId, SyncStatus.Errored, errorMessage: result.ErrorMessage);
             _logger.LogError("FAILED: {FileName} ({Size}) - {Error}. Source: {SourcePath}",
                 fileName, fileSize, result.ErrorMessage, item.SourcePath);
         }
 
         return result;
-    }
-
-    private void CleanupStaleDownloadEntries()
-    {
-        var staleThreshold = DateTime.UtcNow.AddHours(-StaleDownloadHours);
-        var staleEntries = ActiveDownloads
-            .Where(kvp => kvp.Value < staleThreshold)
-            .Select(kvp => kvp.Key)
-            .ToList();
-
-        foreach (var key in staleEntries)
-        {
-            if (ActiveDownloads.TryRemove(key, out _))
-            {
-                _logger.LogDebug("Removed stale download entry for {SourceItemId}", key);
-            }
-        }
-
-        if (staleEntries.Count > 0)
-        {
-            _logger.LogInformation("Cleaned up {Count} stale download entries", staleEntries.Count);
-        }
     }
 
     public IEnumerable<TaskTriggerInfo> GetDefaultTriggers()
