@@ -32,7 +32,6 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages, IDisposable
         : base(applicationPaths, xmlSerializer)
     {
         Instance = this;
-
         _logger = logger;
         _loggerFactory = loggerFactory;
         _applicationPaths = applicationPaths;
