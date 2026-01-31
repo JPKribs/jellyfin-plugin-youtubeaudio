@@ -32,12 +32,12 @@
                                 <div class="fieldDescription">Generate one in the source server's Dashboard &gt; API Keys.</div>
                             </div>
 
-                            <div id="serverInfoContainer" style="display: none; margin-bottom: 16px; padding: 12px; background: rgba(0,0,0,0.3); border-radius: 4px;">
-                                <div style="display: flex; gap: 24px;">
+                            <div id="serverInfoContainer" class="server-info-box hidden">
+                                <div class="flex gap-lg">
                                     <div>
-                                        <span style="opacity: 0.7;">Server:</span>
+                                        <span class="text-muted">Server:</span>
                                         <span id="txtSourceServerName"></span>
-                                        <span style="opacity: 0.5;">(<span id="txtSourceServerId"></span>)</span>
+                                        <span class="text-muted">(<span id="txtSourceServerId"></span>)</span>
                                     </div>
                                 </div>
                             </div>
@@ -50,22 +50,22 @@
                                     <span>Test Connection</span>
                                 </button>
                             </div>
-                            <span id="connectionStatus" style="display: block; margin-top: 8px;"></span>
+                            <span id="connectionStatus" class="mt-sm"></span>
                         </div>
                     </div>
 
                     <!-- Libraries Subsection (collapsible) -->
-                    <div class="collapsibleSection" id="librariesSection" style="display: none;">
+                    <div class="collapsibleSection hidden" id="librariesSection">
                         <button type="button" class="collapsibleHeader collapsed" data-target="librariesConfigContent">
                             <span class="collapsibleTitle">Libraries</span>
                             <span class="collapsibleIcon">▼</span>
                         </button>
                         <div id="librariesConfigContent" class="collapsibleContent collapsed">
-                            <div class="fieldDescription" style="margin-bottom: 12px;">Map source libraries to local libraries. Used for content sync and watch history sync.</div>
+                            <div class="fieldDescription mb-md">Map source libraries to local libraries. Used for content sync and watch history sync.</div>
 
                             <div id="libraryMappingsContainer"></div>
 
-                            <button is="emby-button" type="button" id="btnAddMapping" class="raised button-primary" style="margin-top: 8px;">
+                            <button is="emby-button" type="button" id="btnAddMapping" class="raised button-primary mt-sm">
                                 <span>Add Library Mapping</span>
                             </button>
 
@@ -78,17 +78,17 @@
                     </div>
 
                     <!-- Users Subsection (collapsible) -->
-                    <div class="collapsibleSection" id="usersSection" style="display: none;">
+                    <div class="collapsibleSection hidden" id="usersSection">
                         <button type="button" class="collapsibleHeader collapsed" data-target="usersConfigContent">
                             <span class="collapsibleTitle">Users</span>
                             <span class="collapsibleIcon">▼</span>
                         </button>
                         <div id="usersConfigContent" class="collapsibleContent collapsed">
-                            <div class="fieldDescription" style="margin-bottom: 12px;">Map source users to local users. Used for watch history sync.</div>
+                            <div class="fieldDescription mb-md">Map source users to local users. Used for watch history sync.</div>
 
                             <div id="userMappingsContainer"></div>
 
-                            <button is="emby-button" type="button" id="btnAddUserMapping" class="raised button-primary" style="margin-top: 8px;">
+                            <button is="emby-button" type="button" id="btnAddUserMapping" class="raised button-primary mt-sm">
                                 <span>Add User Mapping</span>
                             </button>
 
@@ -101,7 +101,7 @@
                     </div>
 
                     <!-- Tab Navigation -->
-                    <div class="tabContainer" style="margin-bottom: 16px;">
+                    <div class="tabContainer mb-lg">
                         <button is="emby-button" type="button" class="tabButton raised active" data-tab="content">
                             <span>Content</span>
                         </button>
@@ -139,7 +139,7 @@
                                         <div class="fieldDescription">Re-queue files if the source file size differs or if the source was modified after last sync.</div>
                                     </div>
 
-                                    <div id="detectUpdatedFilesSettings" class="nested-settings" style="display: none;">
+                                    <div id="detectUpdatedFilesSettings" class="nested-settings hidden">
                                         <div class="inputContainer">
                                             <label for="selChangeDetectionPolicy">Change Detection Policy:</label>
                                             <select is="emby-select" id="selChangeDetectionPolicy">
@@ -206,7 +206,7 @@
                                         <div class="fieldDescription">Move deleted/replaced files to a recycling bin instead of permanent deletion.</div>
                                     </div>
 
-                                    <div id="recyclingBinSettings" class="nested-settings" style="display: none;">
+                                    <div id="recyclingBinSettings" class="nested-settings hidden">
                                         <div class="inputContainer">
                                             <label for="txtRecyclingBinPath">Recycling Bin Path:</label>
                                             <input is="emby-input" type="text" id="txtRecyclingBinPath" placeholder="/path/to/recycling-bin" />
@@ -251,7 +251,7 @@
                                         <label for="txtMaxDownloadSpeed">Max Download Speed:</label>
                                         <div class="inputRow">
                                             <input is="emby-input" type="number" id="txtMaxDownloadSpeed" min="0" />
-                                            <select is="emby-select" id="selDownloadSpeedUnit" style="width: auto;">
+                                            <select is="emby-select" id="selDownloadSpeedUnit" class="w-auto">
                                                 <option value="KB">KB/s</option>
                                                 <option value="MB" selected>MB/s</option>
                                                 <option value="GB">GB/s</option>
@@ -283,15 +283,15 @@
                                         <div class="fieldDescription">Use an alternate download speed during scheduled hours.</div>
                                     </div>
 
-                                    <div id="bandwidthScheduleContainer" class="nested-settings" style="display: none;">
-                                        <div class="inputContainer" style="display: flex; gap: 16px; align-items: center;">
+                                    <div id="bandwidthScheduleContainer" class="nested-settings hidden">
+                                        <div class="inputContainer inline-inputs">
                                             <div>
                                                 <label for="txtScheduledStartHour">Start Hour:</label>
-                                                <input is="emby-input" type="number" id="txtScheduledStartHour" min="0" max="23" style="width: 80px;" />
+                                                <input is="emby-input" type="number" id="txtScheduledStartHour" min="0" max="23" class="w-80" />
                                             </div>
                                             <div>
                                                 <label for="txtScheduledEndHour">End Hour:</label>
-                                                <input is="emby-input" type="number" id="txtScheduledEndHour" min="0" max="24" style="width: 80px;" />
+                                                <input is="emby-input" type="number" id="txtScheduledEndHour" min="0" max="24" class="w-80" />
                                             </div>
                                         </div>
                                         <div class="fieldDescription">24-hour format. Set 22 to 6 for overnight scheduling.</div>
@@ -300,7 +300,7 @@
                                             <label for="txtScheduledDownloadSpeed">Scheduled Download Speed:</label>
                                             <div class="inputRow">
                                                 <input is="emby-input" type="number" id="txtScheduledDownloadSpeed" min="0" />
-                                                <select is="emby-select" id="selScheduledDownloadSpeedUnit" style="width: auto;">
+                                                <select is="emby-select" id="selScheduledDownloadSpeedUnit" class="w-auto">
                                                     <option value="KB">KB/s</option>
                                                     <option value="MB" selected>MB/s</option>
                                                     <option value="GB">GB/s</option>
@@ -312,13 +312,13 @@
                                 </div>
                             </div>
 
-                            <div class="inputContainer" style="margin-top: 16px;">
+                            <div class="inputContainer mt-md">
                                 <button is="emby-button" type="submit" class="raised button-submit block">
                                     <span>Save Content Settings</span>
                                 </button>
                             </div>
 
-                            <!-- Library Items Section (non-collapsible) -->
+                            <!-- Library Items Section -->
                             <div class="sectionTitleContainer">
                                 <h2 class="sectionTitle">Library Items</h2>
                             </div>
@@ -344,16 +344,16 @@
                                     </div>
                                 </div>
                                 <!-- Row 2: Pending statuses (only shown when approval required) -->
-                                <div class="statusCards" id="pendingStatusRow" style="display: none;">
-                                    <div class="statusCard statusCard-pendingDownload" id="statusGroupPendingDownload" title="" style="display: none;">
+                                <div class="statusCards hidden" id="pendingStatusRow">
+                                    <div class="statusCard statusCard-pendingDownload hidden" id="statusGroupPendingDownload" title="">
                                         <span class="statusCard-count" id="pendingDownloadCount">0</span>
                                         <span class="statusCard-label">Pending Download</span>
                                     </div>
-                                    <div class="statusCard statusCard-pendingReplacement" id="statusGroupPendingReplacement" title="" style="display: none;">
+                                    <div class="statusCard statusCard-pendingReplacement hidden" id="statusGroupPendingReplacement" title="">
                                         <span class="statusCard-count" id="pendingReplacementCount">0</span>
                                         <span class="statusCard-label">Pending Replace</span>
                                     </div>
-                                    <div class="statusCard statusCard-pendingDeletion" id="statusGroupPendingDeletion" title="" style="display: none;">
+                                    <div class="statusCard statusCard-pendingDeletion hidden" id="statusGroupPendingDeletion" title="">
                                         <span class="statusCard-count" id="pendingDeletionCount">0</span>
                                         <span class="statusCard-label">Pending Delete</span>
                                     </div>
@@ -402,7 +402,7 @@
                     </div>
 
                     <!-- History Tab -->
-                    <div id="tabHistory" class="tabPanel" style="display: none;">
+                    <div id="tabHistory" class="tabPanel hidden">
                         <div class="inputContainer">
                             <label class="checkboxContainer">
                                 <input is="emby-checkbox" type="checkbox" id="chkEnableHistorySync" />
@@ -461,13 +461,13 @@
                                 </div>
                             </div>
 
-                            <div class="inputContainer" style="margin-top: 16px;">
+                            <div class="inputContainer mt-md">
                                 <button is="emby-button" type="button" id="btnSaveHistorySettings" class="raised button-submit block">
                                     <span>Save History Settings</span>
                                 </button>
                             </div>
 
-                            <!-- History Items Section (non-collapsible) -->
+                            <!-- History Items Section -->
                             <div class="sectionTitleContainer">
                                 <h2 class="sectionTitle">History Items</h2>
                             </div>
@@ -535,8 +535,8 @@
                     </div>
 
                     <!-- Users Tab -->
-                    <div id="tabUsers" class="tabPanel" style="display: none;">
-                        <div style="padding: 16px; opacity: 0.7;">Users sync feature coming soon.</div>
+                    <div id="tabUsers" class="tabPanel hidden">
+                        <div class="placeholder-text">Users sync feature coming soon.</div>
                     </div>
 
                 </div>
@@ -544,44 +544,44 @@
         </div>
     </div>
 
-    <!-- Item Detail Modal -->
-    <div id="itemDetailModal" class="dialog" style="display: none;">
-        <div class="dialogContent" style="max-width: 600px; position: relative;">
+    <!-- Item Detail Modal (Content Sync) -->
+    <div id="itemDetailModal" class="dialog hidden">
+        <div class="dialogContent max-w-600 modal-relative">
             <button type="button" id="btnModalClose" class="dialogCloseBtn" title="Close">&times;</button>
-            <h2 id="modalTitle" style="margin-top: 0; padding-right: 32px;"></h2>
-            <div id="modalContent" style="margin: 16px 0;">
-                <div style="margin-bottom: 12px;">
-                    <div style="opacity: 0.7; margin-bottom: 4px;">Status</div>
+            <h2 id="modalTitle" class="modal-title"></h2>
+            <div id="modalContent" class="modal-body">
+                <div class="modal-field">
+                    <div class="modal-field-label">Status</div>
                     <span id="modalStatusBadge" class="itemModal-statusBadge"></span>
                 </div>
-                <div id="modalErrorSection" style="margin-bottom: 12px; display: none;">
-                    <div style="opacity: 0.7; margin-bottom: 4px;">Error</div>
+                <div id="modalErrorSection" class="modal-field hidden">
+                    <div class="modal-field-label">Error</div>
                     <div id="modalError" class="errorMessage"></div>
                 </div>
-                <div id="modalRetrySection" style="margin-bottom: 12px; display: none;">
-                    <div style="opacity: 0.7; margin-bottom: 4px;">Retry Count</div>
+                <div id="modalRetrySection" class="modal-field hidden">
+                    <div class="modal-field-label">Retry Count</div>
                     <div id="modalRetryCount"></div>
                 </div>
-                <div style="margin-bottom: 12px;">
-                    <div style="opacity: 0.7; margin-bottom: 4px;">Size</div>
+                <div class="modal-field">
+                    <div class="modal-field-label">Size</div>
                     <div id="modalSize"></div>
                 </div>
-                <div style="margin-bottom: 12px;">
-                    <div style="opacity: 0.7; margin-bottom: 4px;">Source Path</div>
-                    <div id="modalSourcePath" style="word-break: break-all;"></div>
+                <div class="modal-field">
+                    <div class="modal-field-label">Source Path</div>
+                    <div id="modalSourcePath" class="modal-field-value"></div>
                 </div>
-                <div style="margin-bottom: 12px;">
-                    <div style="opacity: 0.7; margin-bottom: 4px;">Local Path</div>
-                    <div id="modalLocalPath" style="word-break: break-all;"></div>
-                    <div id="modalLocalPathNote" class="fieldDescription" style="margin-top: 4px;"></div>
+                <div class="modal-field">
+                    <div class="modal-field-label">Local Path</div>
+                    <div id="modalLocalPath" class="modal-field-value"></div>
+                    <div id="modalLocalPathNote" class="fieldDescription mt-sm"></div>
                 </div>
-                <div id="modalLastSyncSection" style="margin-bottom: 12px; display: none;">
-                    <div style="opacity: 0.7; margin-bottom: 4px;">Last Sync</div>
+                <div id="modalLastSyncSection" class="modal-field hidden">
+                    <div class="modal-field-label">Last Sync</div>
                     <div id="modalLastSync"></div>
                 </div>
-                <div id="modalCompanionFilesSection" style="margin-bottom: 12px; display: none;">
-                    <div style="opacity: 0.7; margin-bottom: 4px;">Companion Files</div>
-                    <div id="modalCompanionFiles" style="word-break: break-all;"></div>
+                <div id="modalCompanionFilesSection" class="modal-field hidden">
+                    <div class="modal-field-label">Companion Files</div>
+                    <div id="modalCompanionFiles" class="modal-field-value"></div>
                 </div>
             </div>
             <div class="modalButtonRow">
@@ -601,27 +601,27 @@
     </div>
 
     <!-- History Item Detail Modal -->
-    <div id="historyItemDetailModal" class="dialog" style="display: none;">
-        <div class="dialogContent" style="max-width: 700px; position: relative;">
+    <div id="historyItemDetailModal" class="dialog hidden">
+        <div class="dialogContent max-w-700 modal-relative">
             <button type="button" id="btnHistoryModalClose" class="dialogCloseBtn" title="Close">&times;</button>
-            <h2 id="historyModalTitle" style="margin-top: 0; padding-right: 32px;"></h2>
-            <div id="historyModalContent" style="margin: 16px 0;">
-                <div style="margin-bottom: 12px;">
-                    <div style="opacity: 0.7; margin-bottom: 4px;">Status</div>
+            <h2 id="historyModalTitle" class="modal-title"></h2>
+            <div id="historyModalContent" class="modal-body">
+                <div class="modal-field">
+                    <div class="modal-field-label">Status</div>
                     <span id="historyModalStatusBadge" class="itemModal-statusBadge"></span>
                 </div>
-                <div id="historyModalLastSyncSection" style="margin-bottom: 12px; display: none;">
-                    <div style="opacity: 0.7; margin-bottom: 4px;">Last Sync</div>
+                <div id="historyModalLastSyncSection" class="modal-field hidden">
+                    <div class="modal-field-label">Last Sync</div>
                     <div id="historyModalLastSync"></div>
                 </div>
-                <div id="historyModalErrorSection" style="margin-bottom: 12px; display: none;">
-                    <div style="opacity: 0.7; margin-bottom: 4px;">Error</div>
+                <div id="historyModalErrorSection" class="modal-field hidden">
+                    <div class="modal-field-label">Error</div>
                     <div id="historyModalError" class="errorMessage"></div>
                 </div>
 
                 <!-- User Mapping -->
-                <div style="margin-bottom: 16px;">
-                    <div style="opacity: 0.7; margin-bottom: 4px;">User</div>
+                <div class="modal-field mb-lg">
+                    <div class="modal-field-label">User</div>
                     <div id="historyModalUser"></div>
                 </div>
 
@@ -643,6 +643,12 @@
                             <td id="historyModalMergedPlayed" class="historyCompareTable-value historyCompareTable-merged">-</td>
                         </tr>
                         <tr>
+                            <td class="historyCompareTable-property">Favorite</td>
+                            <td id="historyModalSourceFavorite" class="historyCompareTable-value">-</td>
+                            <td id="historyModalLocalFavorite" class="historyCompareTable-value">-</td>
+                            <td id="historyModalMergedFavorite" class="historyCompareTable-value historyCompareTable-merged">-</td>
+                        </tr>
+                        <tr>
                             <td class="historyCompareTable-property">Play Count</td>
                             <td id="historyModalSourcePlayCount" class="historyCompareTable-value">-</td>
                             <td id="historyModalLocalPlayCount" class="historyCompareTable-value">-</td>
@@ -659,12 +665,6 @@
                             <td id="historyModalSourceLastPlayed" class="historyCompareTable-value">-</td>
                             <td id="historyModalLocalLastPlayed" class="historyCompareTable-value">-</td>
                             <td id="historyModalMergedLastPlayed" class="historyCompareTable-value historyCompareTable-merged">-</td>
-                        </tr>
-                        <tr>
-                            <td class="historyCompareTable-property">Favorite</td>
-                            <td id="historyModalSourceFavorite" class="historyCompareTable-value">-</td>
-                            <td id="historyModalLocalFavorite" class="historyCompareTable-value">-</td>
-                            <td id="historyModalMergedFavorite" class="historyCompareTable-value historyCompareTable-merged">-</td>
                         </tr>
                     </tbody>
                 </table>
@@ -908,7 +908,59 @@
             text-align: center;
             justify-content: center;
         }
-        
+
+        /* Layout utility classes */
+        .hidden { display: none; }
+        .flex { display: flex; }
+        .flex-center { display: flex; align-items: center; }
+        .flex-col { display: flex; flex-direction: column; }
+        .gap-sm { gap: 8px; }
+        .gap-md { gap: 16px; }
+        .gap-lg { gap: 24px; }
+
+        /* Spacing utility classes */
+        .mt-sm { margin-top: 8px; }
+        .mt-md { margin-top: 16px; }
+        .mb-sm { margin-bottom: 8px; }
+        .mb-md { margin-bottom: 12px; }
+        .mb-lg { margin-bottom: 16px; }
+        .p-md { padding: 16px; }
+
+        /* Width utility classes */
+        .w-auto { width: auto !important; }
+        .w-80 { width: 80px; }
+        .max-w-600 { max-width: 600px; }
+        .max-w-700 { max-width: 700px; }
+
+        /* Modal field layout */
+        .modal-field { margin-bottom: 12px; }
+        .modal-field-label { opacity: 0.7; margin-bottom: 4px; }
+        .modal-field-value { word-break: break-all; }
+        .modal-title { margin-top: 0; padding-right: 32px; }
+        .modal-body { margin: 16px 0; }
+        .modal-relative { position: relative; }
+
+        /* Server info display */
+        .server-info-box {
+            margin-bottom: 16px;
+            padding: 12px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+        }
+
+        /* Inline form layout */
+        .inline-inputs {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        /* Placeholder text */
+        .placeholder-text {
+            padding: 16px;
+            opacity: 0.7;
+        }
+
     </style>
 
     <!-- Styles: SourceServer/sourceServer.css -->
@@ -1058,7 +1110,7 @@
             color: var(--status-synced-color);
         }
         .historyCompareTable .value-no {
-            opacity: 0.5;
+            color: var(--status-errored-color);
         }
         .historyCompareTable .value-favorite {
             color: #f0ad4e;
@@ -1722,7 +1774,7 @@
             font-weight: 500;
         }
         
-        /* Legacy modal button layout (kept for compatibility) */
+        /* Modal button layout */
         .modalButtonRow {
             display: flex;
             gap: 8px;
