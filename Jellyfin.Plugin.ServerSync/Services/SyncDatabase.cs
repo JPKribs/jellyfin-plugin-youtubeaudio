@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using Jellyfin.Plugin.ServerSync.Models.Common;
 using Jellyfin.Plugin.ServerSync.Models.ContentSync;
 using Jellyfin.Plugin.ServerSync.Models.HistorySync;
 using Microsoft.Data.Sqlite;
@@ -1035,6 +1036,33 @@ public class SyncDatabase : IDisposable
     }
 
     /// <summary>
+    /// ResetHistoryDatabase
+    /// Clears all history sync items from the database.
+    /// </summary>
+    public void ResetHistoryDatabase()
+    {
+        lock (_writeLock)
+        {
+            _logger.LogWarning("Resetting history sync database - all history tracking data will be lost");
+
+            EnsureConnection();
+            using var command = _connection!.CreateCommand();
+            // Use DELETE with IF EXISTS logic - if table doesn't exist, this is a no-op
+            command.CommandText = "DELETE FROM HistorySyncItems WHERE 1=1";
+            try
+            {
+                var deleted = command.ExecuteNonQuery();
+                _logger.LogInformation("History sync database has been reset, {Count} items removed", deleted);
+            }
+            catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.SqliteErrorCode == 1)
+            {
+                // Table doesn't exist - that's fine, nothing to delete
+                _logger.LogInformation("History sync table does not exist yet, nothing to reset");
+            }
+        }
+    }
+
+    /// <summary>
     /// ExecuteInTransaction
     /// Executes multiple database operations within a transaction.
     /// </summary>
@@ -1208,7 +1236,7 @@ public class SyncDatabase : IDisposable
     /// <summary>
     /// Gets all history sync items with a specific status.
     /// </summary>
-    public List<HistorySyncItem> GetHistoryItemsByStatus(HistorySyncStatus status)
+    public List<HistorySyncItem> GetHistoryItemsByStatus(BaseSyncStatus status)
     {
         EnsureConnection();
 
@@ -1231,7 +1259,7 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public (List<HistorySyncItem> Items, int TotalCount) SearchHistoryItemsPaginated(
         string? searchTerm = null,
-        HistorySyncStatus? status = null,
+        BaseSyncStatus? status = null,
         string? sourceUserId = null,
         int skip = 0,
         int take = 50)
@@ -1324,18 +1352,18 @@ public class SyncDatabase : IDisposable
     /// <summary>
     /// Gets history sync status counts.
     /// </summary>
-    public Dictionary<HistorySyncStatus, int> GetHistoryStatusCounts()
+    public Dictionary<BaseSyncStatus, int> GetHistoryStatusCounts()
     {
         EnsureConnection();
 
-        var counts = new Dictionary<HistorySyncStatus, int>();
+        var counts = new Dictionary<BaseSyncStatus, int>();
         using var command = _connection!.CreateCommand();
         command.CommandText = "SELECT Status, COUNT(*) as Count FROM HistorySyncItems GROUP BY Status";
 
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
-            var status = (HistorySyncStatus)reader.GetInt32(0);
+            var status = (BaseSyncStatus)reader.GetInt32(0);
             var count = reader.GetInt32(1);
             counts[status] = count;
         }
@@ -1446,7 +1474,7 @@ public class SyncDatabase : IDisposable
     public void UpdateHistoryItemStatus(
         string sourceUserId,
         string sourceItemId,
-        HistorySyncStatus status,
+        BaseSyncStatus status,
         string? errorMessage = null)
     {
         lock (_writeLock)
@@ -1455,14 +1483,14 @@ public class SyncDatabase : IDisposable
 
             using var command = _connection!.CreateCommand();
 
-            if (status == HistorySyncStatus.Synced)
+            if (status == BaseSyncStatus.Synced)
             {
                 command.CommandText = @"
                     UPDATE HistorySyncItems
                     SET Status = @status, StatusDate = @statusDate, LastSyncTime = @statusDate, ErrorMessage = NULL
                     WHERE SourceUserId = @sourceUserId AND SourceItemId = @sourceItemId";
             }
-            else if (status == HistorySyncStatus.Errored)
+            else if (status == BaseSyncStatus.Errored)
             {
                 command.CommandText = @"
                     UPDATE HistorySyncItems
@@ -1490,7 +1518,7 @@ public class SyncDatabase : IDisposable
     /// <summary>
     /// Batch updates status for multiple history sync items.
     /// </summary>
-    public int BatchUpdateHistoryItemStatus(IEnumerable<(string SourceUserId, string SourceItemId)> items, HistorySyncStatus status)
+    public int BatchUpdateHistoryItemStatus(IEnumerable<(string SourceUserId, string SourceItemId)> items, BaseSyncStatus status)
     {
         lock (_writeLock)
         {
@@ -1535,7 +1563,7 @@ public class SyncDatabase : IDisposable
     /// <param name="id">Database ID of the item.</param>
     /// <param name="status">New status.</param>
     /// <param name="errorMessage">Optional error message.</param>
-    public void UpdateHistoryItemStatusById(long id, HistorySyncStatus status, string? errorMessage = null)
+    public void UpdateHistoryItemStatusById(long id, BaseSyncStatus status, string? errorMessage = null)
     {
         lock (_writeLock)
         {
@@ -1543,7 +1571,7 @@ public class SyncDatabase : IDisposable
 
             using var command = _connection!.CreateCommand();
 
-            if (status == HistorySyncStatus.Synced)
+            if (status == BaseSyncStatus.Synced)
             {
                 command.CommandText = @"
                     UPDATE HistorySyncItems
@@ -1578,7 +1606,7 @@ public class SyncDatabase : IDisposable
     /// <param name="ids">List of database IDs.</param>
     /// <param name="status">New status.</param>
     /// <returns>Number of items updated.</returns>
-    public int BatchUpdateHistoryItemStatusByIds(IEnumerable<long> ids, HistorySyncStatus status)
+    public int BatchUpdateHistoryItemStatusByIds(IEnumerable<long> ids, BaseSyncStatus status)
     {
         lock (_writeLock)
         {
@@ -1630,7 +1658,7 @@ public class SyncDatabase : IDisposable
             SourceLibraryId = reader.GetString(reader.GetOrdinal("SourceLibraryId")),
             LocalLibraryId = reader.GetString(reader.GetOrdinal("LocalLibraryId")),
             SourceItemId = reader.GetString(reader.GetOrdinal("SourceItemId")),
-            Status = (HistorySyncStatus)reader.GetInt32(reader.GetOrdinal("Status")),
+            Status = (BaseSyncStatus)reader.GetInt32(reader.GetOrdinal("Status")),
             StatusDate = ParseDateTimeSafe(reader.GetString(reader.GetOrdinal("StatusDate")))
         };
 

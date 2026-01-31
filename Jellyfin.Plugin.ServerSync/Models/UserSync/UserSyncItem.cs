@@ -1,4 +1,5 @@
 using System;
+using Jellyfin.Plugin.ServerSync.Models.Common;
 
 namespace Jellyfin.Plugin.ServerSync.Models.UserSync;
 
@@ -46,7 +47,7 @@ public class UserSyncItem
     /// <summary>
     /// Gets or sets the sync status.
     /// </summary>
-    public UserSyncStatus Status { get; set; }
+    public BaseSyncStatus Status { get; set; }
 
     /// <summary>
     /// Gets or sets when the status was last changed.

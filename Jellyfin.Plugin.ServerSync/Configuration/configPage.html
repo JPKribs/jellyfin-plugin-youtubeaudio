@@ -15,11 +15,11 @@
 
                     <!-- Server Subsection (collapsible) -->
                     <div class="collapsibleSection">
-                        <button type="button" class="collapsibleHeader" data-target="serverConfigContent">
+                        <button type="button" class="collapsibleHeader collapsed" data-target="serverConfigContent">
                             <span class="collapsibleTitle">Server</span>
                             <span class="collapsibleIcon">▼</span>
                         </button>
-                        <div id="serverConfigContent" class="collapsibleContent">
+                        <div id="serverConfigContent" class="collapsibleContent collapsed">
                             <div class="inputContainer">
                                 <label for="txtSourceServerUrl">Server URL:</label>
                                 <input is="emby-input" type="text" id="txtSourceServerUrl" placeholder="http://server:8096" />
@@ -56,11 +56,11 @@
 
                     <!-- Libraries Subsection (collapsible) -->
                     <div class="collapsibleSection" id="librariesSection" style="display: none;">
-                        <button type="button" class="collapsibleHeader" data-target="librariesConfigContent">
+                        <button type="button" class="collapsibleHeader collapsed" data-target="librariesConfigContent">
                             <span class="collapsibleTitle">Libraries</span>
                             <span class="collapsibleIcon">▼</span>
                         </button>
-                        <div id="librariesConfigContent" class="collapsibleContent">
+                        <div id="librariesConfigContent" class="collapsibleContent collapsed">
                             <div class="fieldDescription" style="margin-bottom: 12px;">Map source libraries to local libraries. Used for content sync and watch history sync.</div>
 
                             <div id="libraryMappingsContainer"></div>
@@ -79,11 +79,11 @@
 
                     <!-- Users Subsection (collapsible) -->
                     <div class="collapsibleSection" id="usersSection" style="display: none;">
-                        <button type="button" class="collapsibleHeader" data-target="usersConfigContent">
+                        <button type="button" class="collapsibleHeader collapsed" data-target="usersConfigContent">
                             <span class="collapsibleTitle">Users</span>
                             <span class="collapsibleIcon">▼</span>
                         </button>
-                        <div id="usersConfigContent" class="collapsibleContent">
+                        <div id="usersConfigContent" class="collapsibleContent collapsed">
                             <div class="fieldDescription" style="margin-bottom: 12px;">Map source users to local users. Used for watch history sync.</div>
 
                             <div id="userMappingsContainer"></div>
@@ -520,6 +520,9 @@
                                 <button is="emby-button" type="button" id="btnRetryHistoryErrors" class="raised syncActionButton">
                                     <span>Retry Errors</span>
                                 </button>
+                                <button is="emby-button" type="button" id="btnResetHistoryDatabase" class="raised button-destructive syncActionButton">
+                                    <span>Reset Database</span>
+                                </button>
                             </div>
 
                             <div class="syncSectionSeparator"></div>
@@ -607,6 +610,10 @@
                     <div style="opacity: 0.7; margin-bottom: 4px;">Status</div>
                     <span id="historyModalStatusBadge" class="itemModal-statusBadge"></span>
                 </div>
+                <div id="historyModalLastSyncSection" style="margin-bottom: 12px; display: none;">
+                    <div style="opacity: 0.7; margin-bottom: 4px;">Last Sync</div>
+                    <div id="historyModalLastSync"></div>
+                </div>
                 <div id="historyModalErrorSection" style="margin-bottom: 12px; display: none;">
                     <div style="opacity: 0.7; margin-bottom: 4px;">Error</div>
                     <div id="historyModalError" class="errorMessage"></div>
@@ -661,11 +668,6 @@
                         </tr>
                     </tbody>
                 </table>
-
-                <div id="historyModalLastSyncSection" style="margin-top: 16px; display: none;">
-                    <div style="opacity: 0.7; margin-bottom: 4px;">Last Sync</div>
-                    <div id="historyModalLastSync"></div>
-                </div>
             </div>
             <div class="modalButtonRow">
                 <button is="emby-button" type="button" id="btnHistoryModalIgnore" class="raised modalButton">
@@ -4171,7 +4173,11 @@
                             type: 'custom',
                             render: function(item) {
                                 var itemName = item.ItemName || 'Unknown Item';
-                                var userDisplay = (item.SourceUserId || 'Unknown') + ' → Local';
+                                // Look up user names from mappings (no GUIDs in table)
+                                var userMapping = self.findUserMapping(item.SourceUserId, item.LocalUserId);
+                                var sourceUserName = userMapping ? userMapping.SourceUserName : 'Unknown';
+                                var localUserName = userMapping ? userMapping.LocalUserName : 'Unknown';
+                                var userDisplay = sourceUserName + ' → ' + localUserName;
 
                                 return '<div class="historyItemInfo">' +
                                     '<div class="historyItemName" title="' + ServerSyncShared.escapeHtml(itemName) + '">' +
@@ -4200,8 +4206,8 @@
                                     }
                                     if (item.MergedIsFavorite !== item.LocalIsFavorite) {
                                         var favClass = item.MergedIsFavorite ? 'favorite' : '';
-                                        details.push('<span class="historyItemDetail"><span class="label">Fav:</span> <span class="value ' + favClass + '">' +
-                                            (item.MergedIsFavorite ? '★' : '☆') + '</span></span>');
+                                        details.push('<span class="historyItemDetail"><span class="label">Favorited:</span> <span class="value ' + favClass + '">' +
+                                            (item.MergedIsFavorite ? 'Yes' : 'No') + '</span></span>');
                                     }
                                 }
 
@@ -4315,6 +4321,7 @@
                 document.getElementById('btnRefreshHistoryItems').addEventListener('click', function() { self.refreshHistoryTable(); });
                 document.getElementById('btnTriggerHistorySync').addEventListener('click', function() { self.triggerHistorySync(); });
                 document.getElementById('btnRetryHistoryErrors').addEventListener('click', function() { self.retryErrors(); });
+                document.getElementById('btnResetHistoryDatabase').addEventListener('click', function() { self.resetHistoryDatabase(); });
 
                 // Modal buttons
                 document.getElementById('btnHistoryModalIgnore').addEventListener('click', function() { self.modalIgnore(); });
@@ -4450,6 +4457,24 @@
                 });
             },
 
+            resetHistoryDatabase: function() {
+                var self = this;
+
+                if (!confirm('Are you sure you want to reset the history sync database?\n\nThis will delete ALL history tracking data and you will need to re-sync everything. This cannot be undone.')) {
+                    return;
+                }
+
+                ServerSyncShared.apiRequest('ResetHistorySyncDatabase', 'POST').then(function(response) {
+                    ServerSyncShared.showAlert('History sync database has been reset');
+                    self.loadHistoryStatus();
+                    self.loadHistoryItems();
+                    self.loadHealthStats();
+                }).catch(function(err) {
+                    console.error('ResetHistorySyncDatabase error:', err);
+                    ServerSyncShared.showAlert('Failed to reset history sync database');
+                });
+            },
+
             updateBulkActionsVisibility: function(count) {
                 var hasSelection = count > 0;
                 var ignoreBtn = document.getElementById('btnHistoryBulkIgnore');
@@ -4527,9 +4552,9 @@
                 );
                 document.getElementById('historyModalUser').innerHTML = sourceUserDisplay + ' → ' + localUserDisplay;
 
-                // Set server names in table headers
+                // Set server names in table headers (no GUIDs in table headers)
                 var sourceServerName = (self.currentConfig && self.currentConfig.SourceServerName) || 'Source';
-                var localServerName = 'Local';  // Could add config for local server name if needed
+                var localServerName = 'Local';
                 document.getElementById('historyModalSourceHeader').textContent = sourceServerName;
                 document.getElementById('historyModalLocalHeader').textContent = localServerName;
 
@@ -4650,10 +4675,15 @@
             },
 
             formatUserDisplay: function(userName, userId) {
-                if (userName) {
+                // Modal shows: username (GUID)
+                if (userName && userId) {
                     return ServerSyncShared.escapeHtml(userName) +
-                        ' <span class="historyModalUserGuid">(' + ServerSyncShared.escapeHtml(userId || 'Unknown') + ')</span>';
+                        ' <span class="historyModalUserGuid">(' + ServerSyncShared.escapeHtml(userId) + ')</span>';
                 }
+                if (userName) {
+                    return ServerSyncShared.escapeHtml(userName);
+                }
+                // Fallback to GUID only if no username available
                 return '<span class="historyModalUserGuid">' + ServerSyncShared.escapeHtml(userId || 'Unknown') + '</span>';
             },
 

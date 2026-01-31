@@ -17,13 +17,14 @@ public static class DatabaseMigrationService
     public const int CurrentSchemaVersion = 7;
 
     /// <summary>
-    /// Creates the initial database schema.
+    /// Creates the initial database schema including all tables for the current version.
     /// </summary>
     /// <param name="connection">Database connection.</param>
     public static void CreateInitialSchema(SqliteConnection connection)
     {
-        using var command = connection.CreateCommand();
-        command.CommandText = @"
+        // Create SyncItems table (Content Sync)
+        using var syncItemsCmd = connection.CreateCommand();
+        syncItemsCmd.CommandText = @"
             CREATE TABLE IF NOT EXISTS SyncItems (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
                 SourceLibraryId TEXT NOT NULL,
@@ -50,7 +51,70 @@ public static class DatabaseMigrationService
             CREATE INDEX IF NOT EXISTS idx_source_library ON SyncItems(SourceLibraryId);
             CREATE INDEX IF NOT EXISTS idx_local_path ON SyncItems(LocalPath);
         ";
-        command.ExecuteNonQuery();
+        syncItemsCmd.ExecuteNonQuery();
+
+        // Create HistorySyncItems table (History Sync)
+        using var historyCmd = connection.CreateCommand();
+        historyCmd.CommandText = @"
+            CREATE TABLE IF NOT EXISTS HistorySyncItems (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                SourceUserId TEXT NOT NULL,
+                LocalUserId TEXT NOT NULL,
+                SourceLibraryId TEXT NOT NULL,
+                LocalLibraryId TEXT NOT NULL,
+                SourceItemId TEXT NOT NULL,
+                LocalItemId TEXT,
+                ItemName TEXT,
+                SourcePath TEXT,
+                LocalPath TEXT,
+                SourceIsPlayed INTEGER,
+                SourcePlayCount INTEGER,
+                SourcePlaybackPositionTicks INTEGER,
+                SourceLastPlayedDate TEXT,
+                SourceIsFavorite INTEGER,
+                LocalIsPlayed INTEGER,
+                LocalPlayCount INTEGER,
+                LocalPlaybackPositionTicks INTEGER,
+                LocalLastPlayedDate TEXT,
+                LocalIsFavorite INTEGER,
+                MergedIsPlayed INTEGER,
+                MergedPlayCount INTEGER,
+                MergedPlaybackPositionTicks INTEGER,
+                MergedLastPlayedDate TEXT,
+                MergedIsFavorite INTEGER,
+                Status INTEGER NOT NULL,
+                StatusDate TEXT NOT NULL,
+                LastSyncTime TEXT,
+                ErrorMessage TEXT,
+                UNIQUE(SourceUserId, SourceItemId)
+            );
+            CREATE INDEX IF NOT EXISTS idx_history_user ON HistorySyncItems(SourceUserId, LocalUserId);
+            CREATE INDEX IF NOT EXISTS idx_history_status ON HistorySyncItems(Status);
+            CREATE INDEX IF NOT EXISTS idx_history_library ON HistorySyncItems(SourceLibraryId);
+        ";
+        historyCmd.ExecuteNonQuery();
+
+        // Create UserSyncItems table (User Sync - scaffolding for future use)
+        using var userCmd = connection.CreateCommand();
+        userCmd.CommandText = @"
+            CREATE TABLE IF NOT EXISTS UserSyncItems (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                SourceUserId TEXT NOT NULL,
+                LocalUserId TEXT NOT NULL,
+                PropertyName TEXT NOT NULL,
+                SourceValue TEXT,
+                LocalValue TEXT,
+                MergedValue TEXT,
+                Status INTEGER NOT NULL,
+                StatusDate TEXT NOT NULL,
+                LastSyncTime TEXT,
+                ErrorMessage TEXT,
+                UNIQUE(SourceUserId, PropertyName)
+            );
+            CREATE INDEX IF NOT EXISTS idx_user_sync_user ON UserSyncItems(SourceUserId, LocalUserId);
+            CREATE INDEX IF NOT EXISTS idx_user_sync_status ON UserSyncItems(Status);
+        ";
+        userCmd.ExecuteNonQuery();
     }
 
     /// <summary>

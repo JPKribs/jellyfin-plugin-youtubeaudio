@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Database.Implementations.Entities;
+using Jellyfin.Plugin.ServerSync.Models.Common;
 using Jellyfin.Plugin.ServerSync.Models.Configuration;
 using Jellyfin.Plugin.ServerSync.Models.HistorySync;
 using Jellyfin.Plugin.ServerSync.Utilities;
@@ -289,7 +290,7 @@ public class HistorySyncTableService
             SourceIsPlayed = sourceItem.UserData?.Played,
             SourcePlayCount = sourceItem.UserData?.PlayCount,
             SourcePlaybackPositionTicks = sourceItem.UserData?.PlaybackPositionTicks,
-            SourceLastPlayedDate = sourceItem.UserData?.LastPlayedDate?.DateTime,
+            SourceLastPlayedDate = sourceItem.UserData?.LastPlayedDate?.UtcDateTime,
             SourceIsFavorite = sourceItem.UserData?.IsFavorite,
 
             // Local history state
@@ -300,7 +301,7 @@ public class HistorySyncTableService
             LocalIsFavorite = localUserData?.IsFavorite,
 
             // Tracking
-            Status = HistorySyncStatus.Queued,
+            Status = BaseSyncStatus.Queued,
             StatusDate = DateTime.UtcNow
         };
 
@@ -311,17 +312,17 @@ public class HistorySyncTableService
         if (string.IsNullOrEmpty(localItemId))
         {
             // Local item not found - can't sync yet, keep queued until content syncs
-            item.Status = HistorySyncStatus.Queued;
+            item.Status = BaseSyncStatus.Queued;
         }
         else if (HistorySyncMergeService.HasChangesToSync(item))
         {
             // Has changes - queue for sync (no approval needed for history)
-            item.Status = HistorySyncStatus.Queued;
+            item.Status = BaseSyncStatus.Queued;
         }
         else
         {
             // No changes needed - already in sync
-            item.Status = HistorySyncStatus.Synced;
+            item.Status = BaseSyncStatus.Synced;
             item.LastSyncTime = DateTime.UtcNow;
         }
 
@@ -348,7 +349,7 @@ public class HistorySyncTableService
         item.SourceIsPlayed = sourceItem.UserData?.Played;
         item.SourcePlayCount = sourceItem.UserData?.PlayCount;
         item.SourcePlaybackPositionTicks = sourceItem.UserData?.PlaybackPositionTicks;
-        item.SourceLastPlayedDate = sourceItem.UserData?.LastPlayedDate?.DateTime;
+        item.SourceLastPlayedDate = sourceItem.UserData?.LastPlayedDate?.UtcDateTime;
         item.SourceIsFavorite = sourceItem.UserData?.IsFavorite;
 
         // Update local state
@@ -362,15 +363,15 @@ public class HistorySyncTableService
         HistorySyncMergeService.MergeHistoryData(item);
 
         // Update status if it was already synced but now has new changes
-        if (item.Status == HistorySyncStatus.Synced && HistorySyncMergeService.HasChangesToSync(item))
+        if (item.Status == BaseSyncStatus.Synced && HistorySyncMergeService.HasChangesToSync(item))
         {
-            item.Status = HistorySyncStatus.Queued;
+            item.Status = BaseSyncStatus.Queued;
             item.StatusDate = DateTime.UtcNow;
         }
-        else if (item.Status == HistorySyncStatus.Queued && !HistorySyncMergeService.HasChangesToSync(item) && !string.IsNullOrEmpty(localItemId))
+        else if (item.Status == BaseSyncStatus.Queued && !HistorySyncMergeService.HasChangesToSync(item) && !string.IsNullOrEmpty(localItemId))
         {
             // Previously queued but now in sync
-            item.Status = HistorySyncStatus.Synced;
+            item.Status = BaseSyncStatus.Synced;
             item.StatusDate = DateTime.UtcNow;
             item.LastSyncTime = DateTime.UtcNow;
         }

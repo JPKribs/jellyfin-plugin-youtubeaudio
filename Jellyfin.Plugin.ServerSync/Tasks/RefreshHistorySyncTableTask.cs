@@ -37,7 +37,7 @@ public class RefreshHistorySyncTableTask : IScheduledTask
     }
 
     /// <inheritdoc />
-    public string Name => "Refresh History Sync Table";
+    public string Name => "Refresh Sync Table";
 
     /// <inheritdoc />
     public string Key => "ServerSyncRefreshHistoryTable";

@@ -411,6 +411,7 @@ public class SourceServerClient : IDisposable
                         ItemFields.DateCreated,
                         ItemFields.MediaSources
                     };
+                    config.QueryParameters.EnableUserData = true;
                     config.QueryParameters.StartIndex = startIndex;
                     config.QueryParameters.Limit = limit;
                 },
@@ -455,6 +456,7 @@ public class SourceServerClient : IDisposable
                         ItemFields.DateCreated,
                         ItemFields.MediaSources
                     };
+                    config.QueryParameters.EnableUserData = true;
                     config.QueryParameters.IsPlayed = true;
                     config.QueryParameters.StartIndex = startIndex;
                     config.QueryParameters.Limit = limit;
@@ -500,6 +502,7 @@ public class SourceServerClient : IDisposable
                         ItemFields.DateCreated,
                         ItemFields.MediaSources
                     };
+                    config.QueryParameters.EnableUserData = true;
                     config.QueryParameters.IsFavorite = true;
                     config.QueryParameters.StartIndex = startIndex;
                     config.QueryParameters.Limit = limit;

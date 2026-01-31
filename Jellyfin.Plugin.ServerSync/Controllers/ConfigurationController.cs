@@ -849,6 +849,36 @@ public class ConfigurationController : ControllerBase
     }
 
     /// <summary>
+    /// ResetHistorySyncDatabase
+    /// Resets the history sync database, removing all tracked history items.
+    /// </summary>
+    /// <returns>Action result with success status.</returns>
+    [HttpPost("ResetHistorySyncDatabase")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult ResetHistorySyncDatabase()
+    {
+        var plugin = Plugin.Instance;
+        if (plugin == null)
+        {
+            return NotFound();
+        }
+
+        var logger = plugin.LoggerFactory.CreateLogger<ConfigurationController>();
+
+        try
+        {
+            plugin.Database.ResetHistoryDatabase();
+            logger.LogInformation("History sync database has been reset");
+            return Ok(new { Success = true, Message = "History database reset successfully" });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to reset history sync database");
+            return StatusCode(500, new { Success = false, Error = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// ValidateServerUrl
     /// Validates and normalizes a server URL.
     /// </summary>
@@ -992,8 +1022,8 @@ public class ConfigurationController : ControllerBase
         skip = Math.Max(0, skip);
 
         // Parse status filter
-        HistorySyncStatus? statusFilter = null;
-        if (!string.IsNullOrEmpty(status) && Enum.TryParse<HistorySyncStatus>(status, out var parsedStatus))
+        BaseSyncStatus? statusFilter = null;
+        if (!string.IsNullOrEmpty(status) && Enum.TryParse<BaseSyncStatus>(status, out var parsedStatus))
         {
             statusFilter = parsedStatus;
         }
@@ -1017,7 +1047,7 @@ public class ConfigurationController : ControllerBase
     /// <returns>History sync status response with counts.</returns>
     [HttpGet("HistoryStatus")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public ActionResult<HistorySyncStatusResponse> GetHistoryStatus()
+    public ActionResult<BaseSyncStatusResponse> GetHistoryStatus()
     {
         var plugin = Plugin.Instance;
         if (plugin == null)
@@ -1027,13 +1057,13 @@ public class ConfigurationController : ControllerBase
 
         var counts = plugin.Database.GetHistoryStatusCounts();
 
-        return Ok(new HistorySyncStatusResponse
+        return Ok(new BaseSyncStatusResponse
         {
-            Pending = counts.GetValueOrDefault(HistorySyncStatus.Pending, 0),
-            Queued = counts.GetValueOrDefault(HistorySyncStatus.Queued, 0),
-            Synced = counts.GetValueOrDefault(HistorySyncStatus.Synced, 0),
-            Errored = counts.GetValueOrDefault(HistorySyncStatus.Errored, 0),
-            Ignored = counts.GetValueOrDefault(HistorySyncStatus.Ignored, 0)
+            Pending = counts.GetValueOrDefault(BaseSyncStatus.Pending, 0),
+            Queued = counts.GetValueOrDefault(BaseSyncStatus.Queued, 0),
+            Synced = counts.GetValueOrDefault(BaseSyncStatus.Synced, 0),
+            Errored = counts.GetValueOrDefault(BaseSyncStatus.Errored, 0),
+            Ignored = counts.GetValueOrDefault(BaseSyncStatus.Ignored, 0)
         });
     }
 
@@ -1053,7 +1083,7 @@ public class ConfigurationController : ControllerBase
             return NotFound();
         }
 
-        if (!Enum.TryParse<HistorySyncStatus>(request.Status, out var status))
+        if (!Enum.TryParse<BaseSyncStatus>(request.Status, out var status))
         {
             return BadRequest("Invalid status value");
         }
@@ -1102,7 +1132,7 @@ public class ConfigurationController : ControllerBase
         {
             try
             {
-                successCount = plugin.Database.BatchUpdateHistoryItemStatusByIds(request.Ids, HistorySyncStatus.Queued);
+                successCount = plugin.Database.BatchUpdateHistoryItemStatusByIds(request.Ids, BaseSyncStatus.Queued);
             }
             catch (Exception ex)
             {
@@ -1117,7 +1147,7 @@ public class ConfigurationController : ControllerBase
             {
                 try
                 {
-                    plugin.Database.UpdateHistoryItemStatus(item.SourceUserId, item.SourceItemId, HistorySyncStatus.Queued);
+                    plugin.Database.UpdateHistoryItemStatus(item.SourceUserId, item.SourceItemId, BaseSyncStatus.Queued);
                     successCount++;
                 }
                 catch (Exception ex)
@@ -1163,7 +1193,7 @@ public class ConfigurationController : ControllerBase
         {
             try
             {
-                successCount = plugin.Database.BatchUpdateHistoryItemStatusByIds(request.Ids, HistorySyncStatus.Ignored);
+                successCount = plugin.Database.BatchUpdateHistoryItemStatusByIds(request.Ids, BaseSyncStatus.Ignored);
             }
             catch (Exception ex)
             {
@@ -1178,7 +1208,7 @@ public class ConfigurationController : ControllerBase
             {
                 try
                 {
-                    plugin.Database.UpdateHistoryItemStatus(item.SourceUserId, item.SourceItemId, HistorySyncStatus.Ignored);
+                    plugin.Database.UpdateHistoryItemStatus(item.SourceUserId, item.SourceItemId, BaseSyncStatus.Ignored);
                     successCount++;
                 }
                 catch (Exception ex)

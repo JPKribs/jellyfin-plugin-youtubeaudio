@@ -4,6 +4,12 @@ A Jellyfin plugin that enables one-way synchronization from a source Jellyfin se
 
 ---
 
+# WORK IN PROGRESS
+
+THIS IS NOT CURRENTLY READY FOR PRODUCTION USAGE! FEEL FREE TO TEST THIS OUT BUT DO NOT USE THIS FOR ANYTHING CRITICAL!
+
+---
+
 ## Source Server
 
 The source server is the Jellyfin server you want to sync content **from**. This plugin runs on your local (destination) server and pulls content from the source server.
@@ -32,13 +38,15 @@ Content syncing enables one-way media file synchronization from the source serve
 
 ## History Syncing
 
-*Work in Progress*
+History syncing enables bidirectional watch history synchronization between servers. The plugin tracks played/unplayed status, play counts, playback positions (resume points), and favorites for each user's items. Using intelligent two-way merge logic, it combines data from both servers: maximum play count, most recent playback position, and preserves played/favorite status if either server has them. History sync requires user mappings and library mappings but operates independently from content sync. For complete documentation, see **[Documentation/History.md](Documentation/History.md)**.
 
 ---
 
 ## User Syncing
 
 *Work in Progress*
+
+---
 
 ## Installation
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Plugin.ServerSync.Models.Common;
 using Jellyfin.Plugin.ServerSync.Models.HistorySync;
 using Jellyfin.Plugin.ServerSync.Services;
 using MediaBrowser.Controller.Library;
@@ -70,7 +71,7 @@ public class SyncMissingHistoryTask : IScheduledTask
         var localClient = new LocalServerClient(_logger, _libraryManager, _userManager, _userDataManager);
 
         // Get all queued history items
-        var queuedItems = database.GetHistoryItemsByStatus(HistorySyncStatus.Queued);
+        var queuedItems = database.GetHistoryItemsByStatus(BaseSyncStatus.Queued);
         var totalItems = queuedItems.Count;
 
         if (totalItems == 0)
@@ -109,7 +110,7 @@ public class SyncMissingHistoryTask : IScheduledTask
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to sync history item {ItemName}", item.ItemName);
-                item.Status = HistorySyncStatus.Errored;
+                item.Status = BaseSyncStatus.Errored;
                 item.ErrorMessage = ex.Message;
                 item.StatusDate = DateTime.UtcNow;
                 database.UpsertHistoryItem(item);
@@ -139,7 +140,7 @@ public class SyncMissingHistoryTask : IScheduledTask
         if (string.IsNullOrEmpty(item.LocalItemId))
         {
             _logger.LogWarning("Cannot sync history for {ItemName}: local item not found", item.ItemName);
-            item.Status = HistorySyncStatus.Errored;
+            item.Status = BaseSyncStatus.Errored;
             item.ErrorMessage = "Local item not found";
             item.StatusDate = DateTime.UtcNow;
             database.UpsertHistoryItem(item);
@@ -150,7 +151,7 @@ public class SyncMissingHistoryTask : IScheduledTask
         if (string.IsNullOrEmpty(item.LocalUserId))
         {
             _logger.LogWarning("Cannot sync history for {ItemName}: local user not found", item.ItemName);
-            item.Status = HistorySyncStatus.Errored;
+            item.Status = BaseSyncStatus.Errored;
             item.ErrorMessage = "Local user not found";
             item.StatusDate = DateTime.UtcNow;
             database.UpsertHistoryItem(item);
@@ -162,7 +163,7 @@ public class SyncMissingHistoryTask : IScheduledTask
             !Guid.TryParse(item.LocalItemId, out var localItemId))
         {
             _logger.LogWarning("Cannot sync history for {ItemName}: invalid user or item ID", item.ItemName);
-            item.Status = HistorySyncStatus.Errored;
+            item.Status = BaseSyncStatus.Errored;
             item.ErrorMessage = "Invalid user or item ID";
             item.StatusDate = DateTime.UtcNow;
             database.UpsertHistoryItem(item);
@@ -187,7 +188,7 @@ public class SyncMissingHistoryTask : IScheduledTask
                 HistorySyncMergeService.GetChangeSummary(item));
 
             // Update item status
-            item.Status = HistorySyncStatus.Synced;
+            item.Status = BaseSyncStatus.Synced;
             item.LastSyncTime = DateTime.UtcNow;
             item.StatusDate = DateTime.UtcNow;
             item.ErrorMessage = null;
@@ -205,7 +206,7 @@ public class SyncMissingHistoryTask : IScheduledTask
         else
         {
             _logger.LogWarning("Failed to sync history for {ItemName}", item.ItemName);
-            item.Status = HistorySyncStatus.Errored;
+            item.Status = BaseSyncStatus.Errored;
             item.ErrorMessage = "Failed to update user data";
             item.StatusDate = DateTime.UtcNow;
             database.UpsertHistoryItem(item);
