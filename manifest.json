@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "10.11.14",
+        "changelog": "## Features\r\n- Add collapsible Server/Libraries/Users sections in Source Server config\r\n- Add user mappings for watch history sync preparation\r\n- Rename Sync Items to Library Items\r\n- History Syncing\r\n\r\n## Improvements\r\n- Harden database with SQLite connection pool management\r\n- Add per-item progress tracking for sync table refresh task\r\n- Clean up Content tab layout (remove redundant separators)\r\n- Refactor CSS with shared status color variables\r\n- Add shared JS utilities (populateSelect, setVisible, getStatusInfo)\r\n- Consolidate duplicate animation keyframes\r\n\r\n## Fixes\r\n- Fix sync table not refreshing after database reset\r\n- Fix Test Connection always failing (missing dataType in API request)",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-serversync/releases/download/v10.11.14/jellyfin-plugin-serversync-10.11.14.zip",
+        "checksum": "e247b49de4d935364d531ad7216e2689",
+        "timestamp": "2026-01-31T06:42:24Z"
+      },
+      {
         "version": "10.11.13",
         "changelog": "## Improvements\r\n- Harden database with SQLite connection pool management\r\n- Add per-item progress tracking for sync table refresh task\r\n\r\n## Fixes\r\n- Fix sync table not refreshing after database reset\r\n- Fix Test Connection always failing (missing dataType in API request)",
         "targetAbi": "10.11.0.0",
