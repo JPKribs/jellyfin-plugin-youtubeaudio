@@ -44,7 +44,7 @@ public class DownloadMissingContentTask : IScheduledTask
 
     public string Description => "Downloads queued content from the source server.";
 
-    public string Category => "Server Sync";
+    public string Category => "Content Sync";
 
     public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {

@@ -35,12 +35,18 @@ public class CleanupTempFilesTask : IScheduledTask
 
     public string Description => "Removes orphaned temporary files from failed sync downloads.";
 
-    public string Category => "Server Sync";
+    public string Category => "Content Sync";
 
     public Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
         var plugin = Plugin.Instance;
         if (plugin == null)
+        {
+            return Task.CompletedTask;
+        }
+
+        var config = plugin.Configuration;
+        if (!config.EnableContentSync)
         {
             return Task.CompletedTask;
         }

@@ -141,6 +141,27 @@ public class SourceServerClient : IDisposable
     }
 
     /// <summary>
+    /// GetUsersAsync
+    /// Gets all users from the source server.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>List of user DTOs.</returns>
+    public async Task<List<UserDto>> GetUsersAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var client = GetApiClient();
+            var users = await client.Users.GetAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            return users ?? new List<UserDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get users from source server");
+            return new List<UserDto>();
+        }
+    }
+
+    /// <summary>
     /// GetLibraryItemsAsync
     /// Gets items from a library with pagination support.
     /// </summary>
@@ -352,6 +373,179 @@ public class SourceServerClient : IDisposable
         {
             _logger.LogError(ex, "Failed to download companion file {FilePath} for {ItemId}", filePath, itemId);
             return null;
+        }
+    }
+
+    // ===== History Sync Methods =====
+
+    /// <summary>
+    /// Gets items with user playback data for a specific user in a library.
+    /// Uses the Items endpoint with UserId parameter to get user-specific data.
+    /// </summary>
+    /// <param name="userId">User ID on the source server.</param>
+    /// <param name="libraryId">Library ID.</param>
+    /// <param name="startIndex">Starting index for pagination.</param>
+    /// <param name="limit">Maximum items to return.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Query result with items including user data.</returns>
+    public async Task<BaseItemDtoQueryResult?> GetUserLibraryItemsAsync(
+        Guid userId,
+        Guid libraryId,
+        int startIndex = 0,
+        int limit = 100,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var client = GetApiClient();
+            return await client.Items.GetAsync(
+                config =>
+                {
+                    config.QueryParameters.UserId = userId;
+                    config.QueryParameters.ParentId = libraryId;
+                    config.QueryParameters.Recursive = true;
+                    config.QueryParameters.IncludeItemTypes = new[] { BaseItemKind.Movie, BaseItemKind.Episode, BaseItemKind.Audio, BaseItemKind.Video };
+                    config.QueryParameters.Fields = new[]
+                    {
+                        ItemFields.Path,
+                        ItemFields.DateCreated,
+                        ItemFields.MediaSources
+                    };
+                    config.QueryParameters.StartIndex = startIndex;
+                    config.QueryParameters.Limit = limit;
+                },
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get user items for user {UserId} in library {LibraryId}", userId, libraryId);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Gets items that have been played by a specific user in a library.
+    /// </summary>
+    /// <param name="userId">User ID on the source server.</param>
+    /// <param name="libraryId">Library ID.</param>
+    /// <param name="startIndex">Starting index for pagination.</param>
+    /// <param name="limit">Maximum items to return.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Query result with played items.</returns>
+    public async Task<BaseItemDtoQueryResult?> GetUserPlayedItemsAsync(
+        Guid userId,
+        Guid libraryId,
+        int startIndex = 0,
+        int limit = 100,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var client = GetApiClient();
+            return await client.Items.GetAsync(
+                config =>
+                {
+                    config.QueryParameters.UserId = userId;
+                    config.QueryParameters.ParentId = libraryId;
+                    config.QueryParameters.Recursive = true;
+                    config.QueryParameters.IncludeItemTypes = new[] { BaseItemKind.Movie, BaseItemKind.Episode, BaseItemKind.Audio, BaseItemKind.Video };
+                    config.QueryParameters.Fields = new[]
+                    {
+                        ItemFields.Path,
+                        ItemFields.DateCreated,
+                        ItemFields.MediaSources
+                    };
+                    config.QueryParameters.IsPlayed = true;
+                    config.QueryParameters.StartIndex = startIndex;
+                    config.QueryParameters.Limit = limit;
+                },
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get played items for user {UserId} in library {LibraryId}", userId, libraryId);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Gets the user's favorite items in a library.
+    /// </summary>
+    /// <param name="userId">User ID on the source server.</param>
+    /// <param name="libraryId">Library ID.</param>
+    /// <param name="startIndex">Starting index for pagination.</param>
+    /// <param name="limit">Maximum items to return.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Query result with favorite items.</returns>
+    public async Task<BaseItemDtoQueryResult?> GetUserFavoritesAsync(
+        Guid userId,
+        Guid libraryId,
+        int startIndex = 0,
+        int limit = 100,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var client = GetApiClient();
+            return await client.Items.GetAsync(
+                config =>
+                {
+                    config.QueryParameters.UserId = userId;
+                    config.QueryParameters.ParentId = libraryId;
+                    config.QueryParameters.Recursive = true;
+                    config.QueryParameters.IncludeItemTypes = new[] { BaseItemKind.Movie, BaseItemKind.Episode, BaseItemKind.Audio, BaseItemKind.Video };
+                    config.QueryParameters.Fields = new[]
+                    {
+                        ItemFields.Path,
+                        ItemFields.DateCreated,
+                        ItemFields.MediaSources
+                    };
+                    config.QueryParameters.IsFavorite = true;
+                    config.QueryParameters.StartIndex = startIndex;
+                    config.QueryParameters.Limit = limit;
+                },
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get favorites for user {UserId} in library {LibraryId}", userId, libraryId);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Gets count of items with history data for a user in a library.
+    /// </summary>
+    /// <param name="userId">User ID on the source server.</param>
+    /// <param name="libraryId">Library ID.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Total count of items with history.</returns>
+    public async Task<int> GetUserLibraryItemCountAsync(
+        Guid userId,
+        Guid libraryId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var client = GetApiClient();
+            var result = await client.Items.GetAsync(
+                config =>
+                {
+                    config.QueryParameters.UserId = userId;
+                    config.QueryParameters.ParentId = libraryId;
+                    config.QueryParameters.Recursive = true;
+                    config.QueryParameters.IncludeItemTypes = new[] { BaseItemKind.Movie, BaseItemKind.Episode, BaseItemKind.Audio, BaseItemKind.Video };
+                    config.QueryParameters.StartIndex = 0;
+                    config.QueryParameters.Limit = 0;
+                },
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+
+            return result?.TotalRecordCount ?? 0;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to get item count for user {UserId} in library {LibraryId}", userId, libraryId);
+            return 0;
         }
     }
 

@@ -7,8 +7,10 @@ using System.Threading.Tasks;
 using Jellyfin.Plugin.ServerSync.Configuration;
 using Jellyfin.Plugin.ServerSync.Models;
 using Jellyfin.Plugin.ServerSync.Models.Configuration;
-using Jellyfin.Plugin.ServerSync.Models.ContentSync.Configuration;
 using Jellyfin.Plugin.ServerSync.Models.ContentSync;
+using Jellyfin.Plugin.ServerSync.Models.ContentSync.Configuration;
+using Jellyfin.Plugin.ServerSync.Models.Common;
+using Jellyfin.Plugin.ServerSync.Models.HistorySync;
 using Jellyfin.Plugin.ServerSync.Services;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Tasks;
@@ -150,6 +152,32 @@ public class ConfigurationController : ControllerBase
             Id = l.ItemId ?? string.Empty,
             Name = l.Name ?? string.Empty,
             Locations = l.Locations?.ToList() ?? new List<string>()
+        }).ToList());
+    }
+
+    /// <summary>
+    /// GetSourceUsers
+    /// Gets users from the source server.
+    /// </summary>
+    /// <param name="request">Connection request with credentials.</param>
+    /// <returns>List of user info DTOs.</returns>
+    [HttpPost("GetSourceUsers")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<UserInfoDto>>> GetSourceUsers([FromBody] TestConnectionRequest request)
+    {
+        var plugin = Plugin.Instance!;
+
+        using var client = new SourceServerClient(
+            plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
+            request.ServerUrl,
+            request.ApiKey);
+
+        var users = await client.GetUsersAsync().ConfigureAwait(false);
+
+        return Ok(users.Select(u => new UserInfoDto
+        {
+            Id = u.Id?.ToString() ?? string.Empty,
+            Name = u.Name ?? string.Empty
         }).ToList());
     }
 
@@ -710,6 +738,19 @@ public class ConfigurationController : ControllerBase
     }
 
     /// <summary>
+    /// GetStatusMetadata
+    /// Returns metadata for all status types including display names and colors.
+    /// Used by the frontend to render status badges consistently.
+    /// </summary>
+    /// <returns>Dictionary of status metadata.</returns>
+    [HttpGet("StatusMetadata")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<Dictionary<string, StatusMetadata>> GetStatusMetadata()
+    {
+        return Ok(StatusAppearanceHelper.GetStatusMetadata());
+    }
+
+    /// <summary>
     /// ResolveLocalItemIds
     /// Attempts to find and store the local Jellyfin item IDs for synced items.
     /// </summary>
@@ -919,4 +960,322 @@ public class ConfigurationController : ControllerBase
         return Ok(new { Message = "Configuration sanitized" });
     }
 
+    // ===== History Sync Endpoints =====
+
+    /// <summary>
+    /// GetHistoryItems
+    /// Gets paginated history sync items from the database with optional search and filter.
+    /// </summary>
+    /// <param name="search">Optional search term.</param>
+    /// <param name="status">Optional status filter.</param>
+    /// <param name="sourceUserId">Optional source user ID filter.</param>
+    /// <param name="skip">Number of items to skip (default 0).</param>
+    /// <param name="take">Maximum items to return (default 50, max 200).</param>
+    /// <returns>Paginated result of history sync item DTOs.</returns>
+    [HttpGet("HistoryItems")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<PaginatedResult<HistorySyncItemDto>> GetHistoryItems(
+        [FromQuery] string? search = null,
+        [FromQuery] string? status = null,
+        [FromQuery] string? sourceUserId = null,
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 50)
+    {
+        var plugin = Plugin.Instance;
+        if (plugin == null)
+        {
+            return NotFound();
+        }
+
+        // Clamp pagination values
+        take = Math.Clamp(take, 1, 200);
+        skip = Math.Max(0, skip);
+
+        // Parse status filter
+        HistorySyncStatus? statusFilter = null;
+        if (!string.IsNullOrEmpty(status) && Enum.TryParse<HistorySyncStatus>(status, out var parsedStatus))
+        {
+            statusFilter = parsedStatus;
+        }
+
+        // Get paginated results
+        var (items, totalCount) = plugin.Database.SearchHistoryItemsPaginated(search, statusFilter, sourceUserId, skip, take);
+
+        return Ok(new PaginatedResult<HistorySyncItemDto>
+        {
+            Items = items.Select(i => MapToHistorySyncItemDto(i)).ToList(),
+            TotalCount = totalCount,
+            Skip = skip,
+            Take = take
+        });
+    }
+
+    /// <summary>
+    /// GetHistoryStatus
+    /// Gets history sync status counts.
+    /// </summary>
+    /// <returns>History sync status response with counts.</returns>
+    [HttpGet("HistoryStatus")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<HistorySyncStatusResponse> GetHistoryStatus()
+    {
+        var plugin = Plugin.Instance;
+        if (plugin == null)
+        {
+            return NotFound();
+        }
+
+        var counts = plugin.Database.GetHistoryStatusCounts();
+
+        return Ok(new HistorySyncStatusResponse
+        {
+            Pending = counts.GetValueOrDefault(HistorySyncStatus.Pending, 0),
+            Queued = counts.GetValueOrDefault(HistorySyncStatus.Queued, 0),
+            Synced = counts.GetValueOrDefault(HistorySyncStatus.Synced, 0),
+            Errored = counts.GetValueOrDefault(HistorySyncStatus.Errored, 0),
+            Ignored = counts.GetValueOrDefault(HistorySyncStatus.Ignored, 0)
+        });
+    }
+
+    /// <summary>
+    /// UpdateHistoryItemStatus
+    /// Updates the status of a history sync item.
+    /// </summary>
+    /// <param name="request">Status update request.</param>
+    /// <returns>Action result with success status.</returns>
+    [HttpPost("HistoryItems/UpdateStatus")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult UpdateHistoryItemStatus([FromBody] UpdateHistoryItemStatusRequest request)
+    {
+        var plugin = Plugin.Instance;
+        if (plugin == null)
+        {
+            return NotFound();
+        }
+
+        if (!Enum.TryParse<HistorySyncStatus>(request.Status, out var status))
+        {
+            return BadRequest("Invalid status value");
+        }
+
+        // Prefer database ID if provided
+        if (request.Id.HasValue)
+        {
+            plugin.Database.UpdateHistoryItemStatusById(request.Id.Value, status);
+        }
+        else
+        {
+            plugin.Database.UpdateHistoryItemStatus(request.SourceUserId, request.SourceItemId, status);
+        }
+
+        return Ok(new { Success = true });
+    }
+
+    /// <summary>
+    /// QueueHistoryItems
+    /// Moves history items to Queued status.
+    /// </summary>
+    /// <param name="request">Bulk history items request.</param>
+    /// <returns>Action result with updated count.</returns>
+    [HttpPost("HistoryItems/Queue")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public ActionResult QueueHistoryItems([FromBody] BulkHistoryItemsRequest request)
+    {
+        var plugin = Plugin.Instance;
+        if (plugin == null)
+        {
+            return NotFound();
+        }
+
+        // Support both Ids (preferred) and Items (legacy)
+        if ((request?.Ids == null || request.Ids.Count == 0) &&
+            (request?.Items == null || request.Items.Count == 0))
+        {
+            return BadRequest("No items specified");
+        }
+
+        var successCount = 0;
+
+        // Process by database ID if provided
+        if (request?.Ids != null && request.Ids.Count > 0)
+        {
+            try
+            {
+                successCount = plugin.Database.BatchUpdateHistoryItemStatusByIds(request.Ids, HistorySyncStatus.Queued);
+            }
+            catch (Exception ex)
+            {
+                plugin.LoggerFactory.CreateLogger<ConfigurationController>()
+                    .LogWarning(ex, "Failed to queue history items by IDs");
+            }
+        }
+        // Fallback to legacy Items property
+        else if (request?.Items != null)
+        {
+            foreach (var item in request.Items)
+            {
+                try
+                {
+                    plugin.Database.UpdateHistoryItemStatus(item.SourceUserId, item.SourceItemId, HistorySyncStatus.Queued);
+                    successCount++;
+                }
+                catch (Exception ex)
+                {
+                    plugin.LoggerFactory.CreateLogger<ConfigurationController>()
+                        .LogWarning(ex, "Failed to queue history item {SourceUserId}/{SourceItemId}",
+                            SanitizeForLog(item.SourceUserId), SanitizeForLog(item.SourceItemId));
+                }
+            }
+        }
+
+        return Ok(new { Updated = successCount });
+    }
+
+    /// <summary>
+    /// IgnoreHistoryItems
+    /// Marks history items as ignored.
+    /// </summary>
+    /// <param name="request">Bulk history items request.</param>
+    /// <returns>Action result with updated count.</returns>
+    [HttpPost("HistoryItems/Ignore")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public ActionResult IgnoreHistoryItems([FromBody] BulkHistoryItemsRequest request)
+    {
+        var plugin = Plugin.Instance;
+        if (plugin == null)
+        {
+            return NotFound();
+        }
+
+        // Support both Ids (preferred) and Items (legacy)
+        if ((request?.Ids == null || request.Ids.Count == 0) &&
+            (request?.Items == null || request.Items.Count == 0))
+        {
+            return BadRequest("No items specified");
+        }
+
+        var successCount = 0;
+
+        // Process by database ID if provided
+        if (request?.Ids != null && request.Ids.Count > 0)
+        {
+            try
+            {
+                successCount = plugin.Database.BatchUpdateHistoryItemStatusByIds(request.Ids, HistorySyncStatus.Ignored);
+            }
+            catch (Exception ex)
+            {
+                plugin.LoggerFactory.CreateLogger<ConfigurationController>()
+                    .LogWarning(ex, "Failed to ignore history items by IDs");
+            }
+        }
+        // Fallback to legacy Items property
+        else if (request?.Items != null)
+        {
+            foreach (var item in request.Items)
+            {
+                try
+                {
+                    plugin.Database.UpdateHistoryItemStatus(item.SourceUserId, item.SourceItemId, HistorySyncStatus.Ignored);
+                    successCount++;
+                }
+                catch (Exception ex)
+                {
+                    plugin.LoggerFactory.CreateLogger<ConfigurationController>()
+                        .LogWarning(ex, "Failed to ignore history item {SourceUserId}/{SourceItemId}",
+                            SanitizeForLog(item.SourceUserId), SanitizeForLog(item.SourceItemId));
+                }
+            }
+        }
+
+        return Ok(new { Updated = successCount });
+    }
+
+    /// <summary>
+    /// TriggerHistoryRefresh
+    /// Manually triggers the refresh history sync table task.
+    /// </summary>
+    /// <returns>Action result with status message.</returns>
+    [HttpPost("TriggerHistoryRefresh")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult TriggerHistoryRefresh()
+    {
+        var refreshTask = _taskManager.ScheduledTasks
+            .FirstOrDefault(t => t.ScheduledTask.Key == "ServerSyncRefreshHistoryTable");
+
+        if (refreshTask == null)
+        {
+            return NotFound("History refresh task not found");
+        }
+
+        _taskManager.Execute(refreshTask, new TaskOptions());
+
+        return Ok(new { Message = "History refresh task started" });
+    }
+
+    /// <summary>
+    /// TriggerHistorySync
+    /// Manually triggers the sync missing history task.
+    /// </summary>
+    /// <returns>Action result with status message.</returns>
+    [HttpPost("TriggerHistorySync")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult TriggerHistorySync()
+    {
+        var syncTask = _taskManager.ScheduledTasks
+            .FirstOrDefault(t => t.ScheduledTask.Key == "ServerSyncMissingHistory");
+
+        if (syncTask == null)
+        {
+            return NotFound("History sync task not found");
+        }
+
+        _taskManager.Execute(syncTask, new TaskOptions());
+
+        return Ok(new { Message = "History sync task started" });
+    }
+
+    /// <summary>
+    /// Maps a HistorySyncItem to a DTO.
+    /// </summary>
+    private static HistorySyncItemDto MapToHistorySyncItemDto(HistorySyncItem item)
+    {
+        return new HistorySyncItemDto
+        {
+            Id = item.Id,
+            SourceUserId = item.SourceUserId,
+            LocalUserId = item.LocalUserId,
+            SourceLibraryId = item.SourceLibraryId,
+            LocalLibraryId = item.LocalLibraryId,
+            SourceItemId = item.SourceItemId,
+            LocalItemId = item.LocalItemId,
+            ItemName = item.ItemName,
+            SourcePath = item.SourcePath,
+            LocalPath = item.LocalPath,
+            SourceIsPlayed = item.SourceIsPlayed,
+            SourcePlayCount = item.SourcePlayCount,
+            SourcePlaybackPositionTicks = item.SourcePlaybackPositionTicks,
+            SourceLastPlayedDate = item.SourceLastPlayedDate,
+            SourceIsFavorite = item.SourceIsFavorite,
+            LocalIsPlayed = item.LocalIsPlayed,
+            LocalPlayCount = item.LocalPlayCount,
+            LocalPlaybackPositionTicks = item.LocalPlaybackPositionTicks,
+            LocalLastPlayedDate = item.LocalLastPlayedDate,
+            LocalIsFavorite = item.LocalIsFavorite,
+            MergedIsPlayed = item.MergedIsPlayed,
+            MergedPlayCount = item.MergedPlayCount,
+            MergedPlaybackPositionTicks = item.MergedPlaybackPositionTicks,
+            MergedLastPlayedDate = item.MergedLastPlayedDate,
+            MergedIsFavorite = item.MergedIsFavorite,
+            Status = item.Status.ToString(),
+            StatusDate = item.StatusDate,
+            LastSyncTime = item.LastSyncTime,
+            ErrorMessage = item.ErrorMessage,
+            HasChanges = item.HasChanges
+        };
+    }
 }

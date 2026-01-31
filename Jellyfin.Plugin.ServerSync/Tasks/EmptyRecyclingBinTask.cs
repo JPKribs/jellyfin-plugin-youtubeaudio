@@ -27,7 +27,7 @@ public class EmptyRecyclingBinTask : IScheduledTask
 
     public string Description => "Permanently deletes files that have been in the recycling bin longer than the configured retention period.";
 
-    public string Category => "Server Sync";
+    public string Category => "Content Sync";
 
     public Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
@@ -38,6 +38,12 @@ public class EmptyRecyclingBinTask : IScheduledTask
         }
 
         var config = plugin.Configuration;
+
+        // Skip if content sync is not enabled
+        if (!config.EnableContentSync)
+        {
+            return Task.CompletedTask;
+        }
 
         // Skip if recycling bin is not enabled
         if (!config.EnableRecyclingBin)

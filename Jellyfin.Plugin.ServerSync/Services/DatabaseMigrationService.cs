@@ -14,7 +14,7 @@ public static class DatabaseMigrationService
     /// <summary>
     /// Current schema version. Increment this when adding new migrations.
     /// </summary>
-    public const int CurrentSchemaVersion = 6;
+    public const int CurrentSchemaVersion = 7;
 
     /// <summary>
     /// Creates the initial database schema.
@@ -115,6 +115,11 @@ public static class DatabaseMigrationService
             if (fromVersion < 6)
             {
                 MigrateToV6(connection, transaction, logger);
+            }
+
+            if (fromVersion < 7)
+            {
+                MigrateToV7(connection, transaction, logger);
             }
 
             SetSchemaVersion(connection, CurrentSchemaVersion);
@@ -231,6 +236,79 @@ public static class DatabaseMigrationService
             logger);
 
         logger.LogInformation("Migration v6: Added CompanionFiles column for tracking companion files");
+    }
+
+    /// <summary>
+    /// Migration to v7: Add HistorySyncItems and UserSyncItems tables for modular sync.
+    /// </summary>
+    private static void MigrateToV7(SqliteConnection connection, SqliteTransaction transaction, ILogger logger)
+    {
+        // Create HistorySyncItems table
+        using var historyCmd = connection.CreateCommand();
+        historyCmd.Transaction = transaction;
+        historyCmd.CommandText = @"
+            CREATE TABLE IF NOT EXISTS HistorySyncItems (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                SourceUserId TEXT NOT NULL,
+                LocalUserId TEXT NOT NULL,
+                SourceLibraryId TEXT NOT NULL,
+                LocalLibraryId TEXT NOT NULL,
+                SourceItemId TEXT NOT NULL,
+                LocalItemId TEXT,
+                ItemName TEXT,
+                SourcePath TEXT,
+                LocalPath TEXT,
+                SourceIsPlayed INTEGER,
+                SourcePlayCount INTEGER,
+                SourcePlaybackPositionTicks INTEGER,
+                SourceLastPlayedDate TEXT,
+                SourceIsFavorite INTEGER,
+                LocalIsPlayed INTEGER,
+                LocalPlayCount INTEGER,
+                LocalPlaybackPositionTicks INTEGER,
+                LocalLastPlayedDate TEXT,
+                LocalIsFavorite INTEGER,
+                MergedIsPlayed INTEGER,
+                MergedPlayCount INTEGER,
+                MergedPlaybackPositionTicks INTEGER,
+                MergedLastPlayedDate TEXT,
+                MergedIsFavorite INTEGER,
+                Status INTEGER NOT NULL,
+                StatusDate TEXT NOT NULL,
+                LastSyncTime TEXT,
+                ErrorMessage TEXT,
+                UNIQUE(SourceUserId, SourceItemId)
+            );
+            CREATE INDEX IF NOT EXISTS idx_history_user ON HistorySyncItems(SourceUserId, LocalUserId);
+            CREATE INDEX IF NOT EXISTS idx_history_status ON HistorySyncItems(Status);
+            CREATE INDEX IF NOT EXISTS idx_history_library ON HistorySyncItems(SourceLibraryId);
+        ";
+        historyCmd.ExecuteNonQuery();
+
+        // Create UserSyncItems table (scaffolding for future use)
+        using var userCmd = connection.CreateCommand();
+        userCmd.Transaction = transaction;
+        userCmd.CommandText = @"
+            CREATE TABLE IF NOT EXISTS UserSyncItems (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                SourceUserId TEXT NOT NULL,
+                LocalUserId TEXT NOT NULL,
+                PropertyName TEXT NOT NULL,
+                SourceValue TEXT,
+                LocalValue TEXT,
+                MergedValue TEXT,
+                Status INTEGER NOT NULL,
+                StatusDate TEXT NOT NULL,
+                LastSyncTime TEXT,
+                ErrorMessage TEXT,
+                UNIQUE(SourceUserId, PropertyName)
+            );
+            CREATE INDEX IF NOT EXISTS idx_user_sync_user ON UserSyncItems(SourceUserId, LocalUserId);
+            CREATE INDEX IF NOT EXISTS idx_user_sync_status ON UserSyncItems(Status);
+        ";
+        userCmd.ExecuteNonQuery();
+
+        logger.LogInformation("Migration v7: Added HistorySyncItems and UserSyncItems tables");
     }
 
     /// <summary>

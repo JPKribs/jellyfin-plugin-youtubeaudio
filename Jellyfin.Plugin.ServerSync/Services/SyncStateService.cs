@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Jellyfin.Plugin.ServerSync.Configuration;
+using Jellyfin.Plugin.ServerSync.Models.Configuration;
 using Jellyfin.Plugin.ServerSync.Models.ContentSync;
 using Jellyfin.Plugin.ServerSync.Models.ContentSync.Configuration;
 using Microsoft.Extensions.Logging;

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Jellyfin.Plugin.ServerSync.Models.Configuration;
 using Jellyfin.Plugin.ServerSync.Models.ContentSync.Configuration;
 using MediaBrowser.Model.Plugins;
 
@@ -12,6 +13,8 @@ namespace Jellyfin.Plugin.ServerSync.Configuration;
 /// </summary>
 public class PluginConfiguration : BasePluginConfiguration
 {
+    // ===== Source Server Configuration =====
+
     public string SourceServerUrl { get; set; } = string.Empty;
 
     public string SourceServerApiKey { get; set; } = string.Empty;
@@ -20,9 +23,21 @@ public class PluginConfiguration : BasePluginConfiguration
 
     public string SourceServerId { get; set; } = string.Empty;
 
-    public bool EnableContentSync { get; set; }
-
+    /// <summary>
+    /// Library mappings between source and local servers.
+    /// Shared by ContentSync and HistorySync features.
+    /// </summary>
     public List<LibraryMapping> LibraryMappings { get; set; } = new();
+
+    /// <summary>
+    /// User mappings between source and local servers.
+    /// Used by HistorySync and UserSync features.
+    /// </summary>
+    public List<UserMapping> UserMappings { get; set; } = new();
+
+    // ===== Content Sync Configuration =====
+
+    public bool EnableContentSync { get; set; }
 
     public string? TempDownloadPath { get; set; }
 
@@ -186,6 +201,56 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public int MaxRetryCount { get; set; } = 3;
 
+    // ===== History Sync Configuration =====
+
+    /// <summary>
+    /// Enable watch history synchronization between servers.
+    /// </summary>
+    public bool EnableHistorySync { get; set; }
+
+    /// <summary>
+    /// Sync played/unplayed status.
+    /// </summary>
+    public bool HistorySyncPlayedStatus { get; set; } = true;
+
+    /// <summary>
+    /// Sync playback position (resume point).
+    /// </summary>
+    public bool HistorySyncPlaybackPosition { get; set; } = true;
+
+    /// <summary>
+    /// Sync play count.
+    /// </summary>
+    public bool HistorySyncPlayCount { get; set; } = true;
+
+    /// <summary>
+    /// Sync last played date.
+    /// </summary>
+    public bool HistorySyncLastPlayedDate { get; set; } = true;
+
+    /// <summary>
+    /// Sync favorite status.
+    /// </summary>
+    public bool HistorySyncFavorites { get; set; } = true;
+
+    /// <summary>
+    /// Timestamp when the last history sync completed.
+    /// </summary>
+    public DateTime? LastHistorySyncTime { get; set; }
+
+    // ===== User Sync Configuration (Scaffolding) =====
+
+    /// <summary>
+    /// Enable user settings synchronization between servers.
+    /// This is scaffolding for future functionality.
+    /// </summary>
+    public bool EnableUserSync { get; set; }
+
+    /// <summary>
+    /// Timestamp when the last user sync completed.
+    /// </summary>
+    public DateTime? LastUserSyncTime { get; set; }
+
     /// <summary>
     /// ValidateConfiguration
     /// Validates configuration values and returns a list of validation errors.
@@ -268,6 +333,20 @@ public class PluginConfiguration : BasePluginConfiguration
             }
         }
 
+        // Validate user mappings
+        foreach (var mapping in UserMappings.Where(m => m.IsEnabled))
+        {
+            if (string.IsNullOrWhiteSpace(mapping.SourceUserId))
+            {
+                errors.Add($"User mapping '{mapping.SourceUserName}' is missing source user ID");
+            }
+
+            if (string.IsNullOrWhiteSpace(mapping.LocalUserId))
+            {
+                errors.Add($"User mapping '{mapping.SourceUserName}' is missing local user ID");
+            }
+        }
+
         // Validate recycling bin settings
         if (EnableRecyclingBin)
         {
@@ -279,6 +358,32 @@ public class PluginConfiguration : BasePluginConfiguration
             if (RecyclingBinRetentionDays < 1 || RecyclingBinRetentionDays > 365)
             {
                 errors.Add("Recycling bin retention must be between 1 and 365 days");
+            }
+        }
+
+        // Validate history sync settings
+        if (EnableHistorySync)
+        {
+            if (string.IsNullOrWhiteSpace(SourceServerUrl))
+            {
+                errors.Add("Source server URL is required when history sync is enabled");
+            }
+
+            if (string.IsNullOrWhiteSpace(SourceServerApiKey))
+            {
+                errors.Add("API key is required when history sync is enabled");
+            }
+
+            var enabledUserMappings = UserMappings?.Where(m => m.IsEnabled).ToList() ?? new List<UserMapping>();
+            if (enabledUserMappings.Count == 0)
+            {
+                errors.Add("At least one user mapping must be enabled for history sync");
+            }
+
+            var enabledLibraryMappings = LibraryMappings?.Where(m => m.IsEnabled).ToList() ?? new List<LibraryMapping>();
+            if (enabledLibraryMappings.Count == 0)
+            {
+                errors.Add("At least one library mapping must be enabled for history sync");
             }
         }
 

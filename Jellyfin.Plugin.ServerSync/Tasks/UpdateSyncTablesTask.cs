@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Plugin.ServerSync.Models.Configuration;
 using Jellyfin.Plugin.ServerSync.Models.ContentSync.Configuration;
 using Jellyfin.Plugin.ServerSync.Services;
 using MediaBrowser.Controller.Library;
@@ -31,7 +32,7 @@ public class UpdateSyncTablesTask : IScheduledTask
 
     public string Description => "Fetches item list from source server and updates the sync tracking table.";
 
-    public string Category => "Server Sync";
+    public string Category => "Content Sync";
 
     public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
