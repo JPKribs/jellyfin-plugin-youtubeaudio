@@ -238,13 +238,27 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public DateTime? LastHistorySyncTime { get; set; }
 
-    // ===== User Sync Configuration (Scaffolding) =====
+    // ===== User Sync Configuration =====
 
     /// <summary>
     /// Enable user settings synchronization between servers.
-    /// This is scaffolding for future functionality.
     /// </summary>
     public bool EnableUserSync { get; set; }
+
+    /// <summary>
+    /// Sync user policy (permissions, restrictions).
+    /// </summary>
+    public bool UserSyncPolicy { get; set; } = true;
+
+    /// <summary>
+    /// Sync user configuration (preferences, settings).
+    /// </summary>
+    public bool UserSyncConfiguration { get; set; } = true;
+
+    /// <summary>
+    /// Sync user profile images.
+    /// </summary>
+    public bool UserSyncProfileImage { get; set; } = true;
 
     /// <summary>
     /// Timestamp when the last user sync completed.
@@ -384,6 +398,31 @@ public class PluginConfiguration : BasePluginConfiguration
             if (enabledLibraryMappings.Count == 0)
             {
                 errors.Add("At least one library mapping must be enabled for history sync");
+            }
+        }
+
+        // Validate user sync settings
+        if (EnableUserSync)
+        {
+            if (string.IsNullOrWhiteSpace(SourceServerUrl))
+            {
+                errors.Add("Source server URL is required when user sync is enabled");
+            }
+
+            if (string.IsNullOrWhiteSpace(SourceServerApiKey))
+            {
+                errors.Add("API key is required when user sync is enabled");
+            }
+
+            var enabledUserMappings = UserMappings?.Where(m => m.IsEnabled).ToList() ?? new List<UserMapping>();
+            if (enabledUserMappings.Count == 0)
+            {
+                errors.Add("At least one user mapping must be enabled for user sync");
+            }
+
+            if (!UserSyncPolicy && !UserSyncConfiguration && !UserSyncProfileImage)
+            {
+                errors.Add("At least one user sync option (Policy, Configuration, or Profile Image) must be enabled");
             }
         }
 

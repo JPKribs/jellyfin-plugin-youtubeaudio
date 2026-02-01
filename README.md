@@ -44,7 +44,7 @@ History syncing enables bidirectional watch history synchronization between serv
 
 ## User Syncing
 
-*Work in Progress*
+User syncing enables one-way synchronization of user settings from the source server to your local server. The plugin syncs three property categories independently: user policies (permissions and restrictions), user configuration (preferences), and profile images. Each category can be individually enabled and uses intelligent comparison—semantic JSON diffing for policies/configuration and SHA256 hash comparison for profile images. Library-specific permissions are automatically translated using your library mappings, ensuring access controls work correctly even when library IDs differ between servers. For complete documentation, see **[Documentation/Users.md](Documentation/Users.md)**.
 
 ---
 

@@ -6,6 +6,7 @@ using System.IO;
 using Jellyfin.Plugin.ServerSync.Models.Common;
 using Jellyfin.Plugin.ServerSync.Models.ContentSync;
 using Jellyfin.Plugin.ServerSync.Models.HistorySync;
+using Jellyfin.Plugin.ServerSync.Models.UserSync;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
@@ -969,6 +970,22 @@ public class SyncDatabase : IDisposable
     }
 
     /// <summary>
+    /// Safely tries to get a column ordinal, returning -1 if column doesn't exist.
+    /// Used for columns that may not exist in older schema versions.
+    /// </summary>
+    private static int TryGetOrdinal(SqliteDataReader reader, string columnName)
+    {
+        try
+        {
+            return reader.GetOrdinal(columnName);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return -1;
+        }
+    }
+
+    /// <summary>
     /// EnsureConnection
     /// Ensures the database connection is open, reopening if necessary.
     /// </summary>
@@ -1781,6 +1798,558 @@ public class SyncDatabase : IDisposable
         }
 
         // Sync tracking
+        var lastSyncTimeOrdinal = reader.GetOrdinal("LastSyncTime");
+        if (!reader.IsDBNull(lastSyncTimeOrdinal))
+        {
+            item.LastSyncTime = ParseDateTimeSafe(reader.GetString(lastSyncTimeOrdinal));
+        }
+
+        var errorMessageOrdinal = reader.GetOrdinal("ErrorMessage");
+        if (!reader.IsDBNull(errorMessageOrdinal))
+        {
+            item.ErrorMessage = reader.GetString(errorMessageOrdinal);
+        }
+
+        return item;
+    }
+
+    // ============================================
+    // User Sync Methods
+    // ============================================
+
+    /// <summary>
+    /// Gets a user sync item by its ID.
+    /// </summary>
+    public UserSyncItem? GetUserSyncItemById(long id)
+    {
+        EnsureConnection();
+
+        using var command = _connection!.CreateCommand();
+        command.CommandText = "SELECT * FROM UserSyncItems WHERE Id = @id";
+        command.Parameters.AddWithValue("@id", id);
+
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadUserSyncItem(reader) : null;
+    }
+
+    /// <summary>
+    /// Gets a user sync item by user mapping and property category.
+    /// </summary>
+    public UserSyncItem? GetUserSyncItem(string sourceUserId, string localUserId, string propertyCategory)
+    {
+        EnsureConnection();
+
+        using var command = _connection!.CreateCommand();
+        command.CommandText = @"
+            SELECT * FROM UserSyncItems
+            WHERE SourceUserId = @sourceUserId
+              AND LocalUserId = @localUserId
+              AND PropertyCategory = @propertyCategory";
+        command.Parameters.AddWithValue("@sourceUserId", sourceUserId);
+        command.Parameters.AddWithValue("@localUserId", localUserId);
+        command.Parameters.AddWithValue("@propertyCategory", propertyCategory);
+
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadUserSyncItem(reader) : null;
+    }
+
+    /// <summary>
+    /// Gets all user sync items for a specific user mapping.
+    /// </summary>
+    public List<UserSyncItem> GetUserSyncItemsByUserMapping(string sourceUserId, string localUserId)
+    {
+        EnsureConnection();
+
+        var items = new List<UserSyncItem>();
+        using var command = _connection!.CreateCommand();
+        command.CommandText = "SELECT * FROM UserSyncItems WHERE SourceUserId = @sourceUserId AND LocalUserId = @localUserId ORDER BY PropertyCategory";
+        command.Parameters.AddWithValue("@sourceUserId", sourceUserId);
+        command.Parameters.AddWithValue("@localUserId", localUserId);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            items.Add(ReadUserSyncItem(reader));
+        }
+
+        return items;
+    }
+
+    /// <summary>
+    /// Gets all user sync items.
+    /// </summary>
+    public List<UserSyncItem> GetAllUserSyncItems()
+    {
+        EnsureConnection();
+
+        var items = new List<UserSyncItem>();
+        using var command = _connection!.CreateCommand();
+        command.CommandText = "SELECT * FROM UserSyncItems ORDER BY SourceUserName, LocalUserName";
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            items.Add(ReadUserSyncItem(reader));
+        }
+
+        return items;
+    }
+
+    /// <summary>
+    /// Gets all user sync items with a specific status.
+    /// </summary>
+    public List<UserSyncItem> GetUserSyncItemsByStatus(BaseSyncStatus status)
+    {
+        EnsureConnection();
+
+        var items = new List<UserSyncItem>();
+        using var command = _connection!.CreateCommand();
+        command.CommandText = "SELECT * FROM UserSyncItems WHERE Status = @status";
+        command.Parameters.AddWithValue("@status", (int)status);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            items.Add(ReadUserSyncItem(reader));
+        }
+
+        return items;
+    }
+
+    /// <summary>
+    /// Searches user sync items with pagination support.
+    /// </summary>
+    public (List<UserSyncItem> Items, int TotalCount) SearchUserSyncItemsPaginated(
+        string? searchTerm = null,
+        BaseSyncStatus? status = null,
+        string? sourceUserId = null,
+        string? propertyCategory = null,
+        int skip = 0,
+        int take = 50)
+    {
+        EnsureConnection();
+
+        var conditions = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            conditions.Add("(SourceUserName LIKE @searchTerm OR LocalUserName LIKE @searchTerm)");
+        }
+
+        if (status.HasValue)
+        {
+            conditions.Add("Status = @status");
+        }
+
+        if (!string.IsNullOrWhiteSpace(sourceUserId))
+        {
+            conditions.Add("SourceUserId = @sourceUserId");
+        }
+
+        if (!string.IsNullOrWhiteSpace(propertyCategory))
+        {
+            conditions.Add("PropertyCategory = @propertyCategory");
+        }
+
+        var whereClause = conditions.Count > 0
+            ? $"WHERE {string.Join(" AND ", conditions)}"
+            : string.Empty;
+
+        // Get total count
+        int totalCount;
+        using (var countCommand = _connection!.CreateCommand())
+        {
+            countCommand.CommandText = $"SELECT COUNT(*) FROM UserSyncItems {whereClause}";
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                countCommand.Parameters.AddWithValue("@searchTerm", $"%{searchTerm}%");
+            }
+
+            if (status.HasValue)
+            {
+                countCommand.Parameters.AddWithValue("@status", (int)status.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(sourceUserId))
+            {
+                countCommand.Parameters.AddWithValue("@sourceUserId", sourceUserId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(propertyCategory))
+            {
+                countCommand.Parameters.AddWithValue("@propertyCategory", propertyCategory);
+            }
+
+            totalCount = Convert.ToInt32(countCommand.ExecuteScalar());
+        }
+
+        // Get paginated data
+        var items = new List<UserSyncItem>();
+        using (var dataCommand = _connection!.CreateCommand())
+        {
+            dataCommand.CommandText = $@"
+                SELECT * FROM UserSyncItems
+                {whereClause}
+                ORDER BY SourceUserName, LocalUserName, PropertyCategory
+                LIMIT @take OFFSET @skip";
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                dataCommand.Parameters.AddWithValue("@searchTerm", $"%{searchTerm}%");
+            }
+
+            if (status.HasValue)
+            {
+                dataCommand.Parameters.AddWithValue("@status", (int)status.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(sourceUserId))
+            {
+                dataCommand.Parameters.AddWithValue("@sourceUserId", sourceUserId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(propertyCategory))
+            {
+                dataCommand.Parameters.AddWithValue("@propertyCategory", propertyCategory);
+            }
+
+            dataCommand.Parameters.AddWithValue("@take", take);
+            dataCommand.Parameters.AddWithValue("@skip", skip);
+
+            using var reader = dataCommand.ExecuteReader();
+            while (reader.Read())
+            {
+                items.Add(ReadUserSyncItem(reader));
+            }
+        }
+
+        return (items, totalCount);
+    }
+
+    /// <summary>
+    /// Gets user sync status counts.
+    /// </summary>
+    public Dictionary<BaseSyncStatus, int> GetUserSyncStatusCounts()
+    {
+        EnsureConnection();
+
+        var counts = new Dictionary<BaseSyncStatus, int>();
+        using var command = _connection!.CreateCommand();
+        command.CommandText = "SELECT Status, COUNT(*) as Count FROM UserSyncItems GROUP BY Status";
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            var syncStatus = (BaseSyncStatus)reader.GetInt32(0);
+            var count = reader.GetInt32(1);
+            counts[syncStatus] = count;
+        }
+
+        return counts;
+    }
+
+    /// <summary>
+    /// Upserts a user sync item.
+    /// </summary>
+    public void UpsertUserSyncItem(UserSyncItem item, SqliteTransaction? transaction = null)
+    {
+        lock (_writeLock)
+        {
+            EnsureConnection();
+
+            using var command = _connection!.CreateCommand();
+            command.Transaction = transaction;
+
+            // Insert or update user sync item (one record per property category per user mapping)
+            // Preserve Ignored status - don't overwrite if user explicitly ignored the item
+            // Preserve SyncedImageHash/Size when updating (unless explicitly provided)
+            command.CommandText = @"
+                INSERT INTO UserSyncItems (
+                    SourceUserId, LocalUserId, SourceUserName, LocalUserName,
+                    PropertyCategory, SourceValue, LocalValue, MergedValue,
+                    SourceImageHash, LocalImageHash, SyncedImageHash,
+                    SourceImageSize, LocalImageSize, SyncedImageSize,
+                    Status, StatusDate, LastSyncTime, ErrorMessage
+                ) VALUES (
+                    @sourceUserId, @localUserId, @sourceUserName, @localUserName,
+                    @propertyCategory, @sourceValue, @localValue, @mergedValue,
+                    @sourceImageHash, @localImageHash, @syncedImageHash,
+                    @sourceImageSize, @localImageSize, @syncedImageSize,
+                    @status, @statusDate, @lastSyncTime, @errorMessage
+                )
+                ON CONFLICT(SourceUserId, LocalUserId, PropertyCategory) DO UPDATE SET
+                    SourceUserName = @sourceUserName,
+                    LocalUserName = @localUserName,
+                    SourceValue = @sourceValue,
+                    LocalValue = @localValue,
+                    MergedValue = @mergedValue,
+                    SourceImageHash = @sourceImageHash,
+                    LocalImageHash = @localImageHash,
+                    SyncedImageHash = CASE
+                        WHEN @syncedImageHash IS NOT NULL THEN @syncedImageHash
+                        ELSE UserSyncItems.SyncedImageHash
+                    END,
+                    SourceImageSize = @sourceImageSize,
+                    LocalImageSize = @localImageSize,
+                    SyncedImageSize = CASE
+                        WHEN @syncedImageSize IS NOT NULL THEN @syncedImageSize
+                        ELSE UserSyncItems.SyncedImageSize
+                    END,
+                    Status = CASE
+                        WHEN UserSyncItems.Status = @ignoredStatus THEN @ignoredStatus
+                        WHEN UserSyncItems.Status = @syncedStatus AND @sourceValue = UserSyncItems.LocalValue THEN @syncedStatus
+                        ELSE @status
+                    END,
+                    StatusDate = CASE
+                        WHEN UserSyncItems.Status = @ignoredStatus THEN UserSyncItems.StatusDate
+                        WHEN UserSyncItems.Status = @syncedStatus AND @sourceValue = UserSyncItems.LocalValue THEN UserSyncItems.StatusDate
+                        ELSE @statusDate
+                    END,
+                    LastSyncTime = CASE
+                        WHEN UserSyncItems.Status = @ignoredStatus THEN UserSyncItems.LastSyncTime
+                        WHEN UserSyncItems.Status = @syncedStatus AND @sourceValue = UserSyncItems.LocalValue THEN UserSyncItems.LastSyncTime
+                        ELSE @lastSyncTime
+                    END,
+                    ErrorMessage = CASE
+                        WHEN UserSyncItems.Status = @ignoredStatus THEN UserSyncItems.ErrorMessage
+                        ELSE @errorMessage
+                    END
+            ";
+
+            command.Parameters.AddWithValue("@sourceUserId", item.SourceUserId);
+            command.Parameters.AddWithValue("@localUserId", item.LocalUserId);
+            command.Parameters.AddWithValue("@sourceUserName", item.SourceUserName ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@localUserName", item.LocalUserName ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@propertyCategory", item.PropertyCategory);
+            command.Parameters.AddWithValue("@sourceValue", item.SourceValue ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@localValue", item.LocalValue ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@mergedValue", item.MergedValue ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@sourceImageHash", item.SourceImageHash ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@localImageHash", item.LocalImageHash ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@syncedImageHash", item.SyncedImageHash ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@sourceImageSize", item.SourceImageSize ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@localImageSize", item.LocalImageSize ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@syncedImageSize", item.SyncedImageSize ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@status", (int)item.Status);
+            command.Parameters.AddWithValue("@statusDate", item.StatusDate.ToString("o"));
+            command.Parameters.AddWithValue("@lastSyncTime", item.LastSyncTime?.ToString("o") ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@errorMessage", item.ErrorMessage ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@ignoredStatus", (int)BaseSyncStatus.Ignored);
+            command.Parameters.AddWithValue("@syncedStatus", (int)BaseSyncStatus.Synced);
+
+            command.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>
+    /// Updates the status of a user sync item by database ID.
+    /// </summary>
+    public void UpdateUserSyncItemStatusById(long id, BaseSyncStatus status, string? errorMessage = null)
+    {
+        lock (_writeLock)
+        {
+            EnsureConnection();
+
+            using var command = _connection!.CreateCommand();
+
+            if (status == BaseSyncStatus.Synced)
+            {
+                command.CommandText = @"
+                    UPDATE UserSyncItems
+                    SET Status = @status,
+                        StatusDate = @statusDate,
+                        LastSyncTime = @statusDate,
+                        ErrorMessage = NULL
+                    WHERE Id = @id";
+            }
+            else
+            {
+                command.CommandText = @"
+                    UPDATE UserSyncItems
+                    SET Status = @status,
+                        StatusDate = @statusDate,
+                        ErrorMessage = @errorMessage
+                    WHERE Id = @id";
+                command.Parameters.AddWithValue("@errorMessage", errorMessage ?? (object)DBNull.Value);
+            }
+
+            command.Parameters.AddWithValue("@id", id);
+            command.Parameters.AddWithValue("@status", (int)status);
+            command.Parameters.AddWithValue("@statusDate", DateTime.UtcNow.ToString("o"));
+
+            command.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>
+    /// Batch updates status for multiple user sync items by their database IDs.
+    /// </summary>
+    public int BatchUpdateUserSyncItemStatusByIds(IEnumerable<long> ids, BaseSyncStatus status)
+    {
+        lock (_writeLock)
+        {
+            EnsureConnection();
+
+            var count = 0;
+            using var transaction = _connection!.BeginTransaction();
+            try
+            {
+                foreach (var id in ids)
+                {
+                    using var command = _connection!.CreateCommand();
+                    command.Transaction = transaction;
+                    command.CommandText = @"
+                        UPDATE UserSyncItems
+                        SET Status = @status,
+                            StatusDate = @statusDate
+                        WHERE Id = @id";
+
+                    command.Parameters.AddWithValue("@id", id);
+                    command.Parameters.AddWithValue("@status", (int)status);
+                    command.Parameters.AddWithValue("@statusDate", DateTime.UtcNow.ToString("o"));
+
+                    count += command.ExecuteNonQuery();
+                }
+
+                transaction.Commit();
+                return count;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Batch update user sync status by IDs failed after {Count} items, rolling back", count);
+                transaction.Rollback();
+                throw;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Deletes all user sync items for a specific user mapping.
+    /// </summary>
+    public int DeleteUserSyncItemsByUserMapping(string sourceUserId, string localUserId)
+    {
+        lock (_writeLock)
+        {
+            EnsureConnection();
+
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "DELETE FROM UserSyncItems WHERE SourceUserId = @sourceUserId AND LocalUserId = @localUserId";
+            command.Parameters.AddWithValue("@sourceUserId", sourceUserId);
+            command.Parameters.AddWithValue("@localUserId", localUserId);
+
+            return command.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>
+    /// Resets the user sync database by clearing all items.
+    /// </summary>
+    public void ResetUserSyncDatabase()
+    {
+        lock (_writeLock)
+        {
+            _logger.LogWarning("Resetting user sync database - all user sync tracking data will be lost");
+
+            EnsureConnection();
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "DELETE FROM UserSyncItems WHERE 1=1";
+            try
+            {
+                var deleted = command.ExecuteNonQuery();
+                _logger.LogInformation("User sync database has been reset, {Count} items removed", deleted);
+            }
+            catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.SqliteErrorCode == 1)
+            {
+                _logger.LogInformation("User sync table does not exist yet, nothing to reset");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reads a UserSyncItem from the database reader.
+    /// </summary>
+    private static UserSyncItem ReadUserSyncItem(SqliteDataReader reader)
+    {
+        var item = new UserSyncItem
+        {
+            Id = reader.GetInt64(reader.GetOrdinal("Id")),
+            SourceUserId = reader.GetString(reader.GetOrdinal("SourceUserId")),
+            LocalUserId = reader.GetString(reader.GetOrdinal("LocalUserId")),
+            PropertyCategory = reader.GetString(reader.GetOrdinal("PropertyCategory")),
+            Status = (BaseSyncStatus)reader.GetInt32(reader.GetOrdinal("Status")),
+            StatusDate = ParseDateTimeSafe(reader.GetString(reader.GetOrdinal("StatusDate")))
+        };
+
+        // Optional string fields
+        var sourceUserNameOrdinal = reader.GetOrdinal("SourceUserName");
+        if (!reader.IsDBNull(sourceUserNameOrdinal))
+        {
+            item.SourceUserName = reader.GetString(sourceUserNameOrdinal);
+        }
+
+        var localUserNameOrdinal = reader.GetOrdinal("LocalUserName");
+        if (!reader.IsDBNull(localUserNameOrdinal))
+        {
+            item.LocalUserName = reader.GetString(localUserNameOrdinal);
+        }
+
+        var sourceValueOrdinal = reader.GetOrdinal("SourceValue");
+        if (!reader.IsDBNull(sourceValueOrdinal))
+        {
+            item.SourceValue = reader.GetString(sourceValueOrdinal);
+        }
+
+        var localValueOrdinal = reader.GetOrdinal("LocalValue");
+        if (!reader.IsDBNull(localValueOrdinal))
+        {
+            item.LocalValue = reader.GetString(localValueOrdinal);
+        }
+
+        var mergedValueOrdinal = reader.GetOrdinal("MergedValue");
+        if (!reader.IsDBNull(mergedValueOrdinal))
+        {
+            item.MergedValue = reader.GetString(mergedValueOrdinal);
+        }
+
+        // Image hash fields
+        var sourceImageHashOrdinal = TryGetOrdinal(reader, "SourceImageHash");
+        if (sourceImageHashOrdinal >= 0 && !reader.IsDBNull(sourceImageHashOrdinal))
+        {
+            item.SourceImageHash = reader.GetString(sourceImageHashOrdinal);
+        }
+
+        var localImageHashOrdinal = TryGetOrdinal(reader, "LocalImageHash");
+        if (localImageHashOrdinal >= 0 && !reader.IsDBNull(localImageHashOrdinal))
+        {
+            item.LocalImageHash = reader.GetString(localImageHashOrdinal);
+        }
+
+        var syncedImageHashOrdinal = TryGetOrdinal(reader, "SyncedImageHash");
+        if (syncedImageHashOrdinal >= 0 && !reader.IsDBNull(syncedImageHashOrdinal))
+        {
+            item.SyncedImageHash = reader.GetString(syncedImageHashOrdinal);
+        }
+
+        // Image size fields (legacy, kept for backward compatibility)
+        var sourceImageSizeOrdinal = reader.GetOrdinal("SourceImageSize");
+        if (!reader.IsDBNull(sourceImageSizeOrdinal))
+        {
+            item.SourceImageSize = reader.GetInt64(sourceImageSizeOrdinal);
+        }
+
+        var localImageSizeOrdinal = reader.GetOrdinal("LocalImageSize");
+        if (!reader.IsDBNull(localImageSizeOrdinal))
+        {
+            item.LocalImageSize = reader.GetInt64(localImageSizeOrdinal);
+        }
+
+        var syncedImageSizeOrdinal = reader.GetOrdinal("SyncedImageSize");
+        if (!reader.IsDBNull(syncedImageSizeOrdinal))
+        {
+            item.SyncedImageSize = reader.GetInt64(syncedImageSizeOrdinal);
+        }
+
         var lastSyncTimeOrdinal = reader.GetOrdinal("LastSyncTime");
         if (!reader.IsDBNull(lastSyncTimeOrdinal))
         {

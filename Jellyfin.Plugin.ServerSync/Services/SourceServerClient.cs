@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.ServerSync.Models.Configuration;
 using Jellyfin.Plugin.ServerSync.Models.ContentSync;
+using Jellyfin.Plugin.ServerSync.Utilities;
 using Jellyfin.Sdk;
 using Jellyfin.Sdk.Generated.Models;
 using Microsoft.Extensions.Logging;
@@ -372,6 +373,120 @@ public class SourceServerClient : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to download companion file {FilePath} for {ItemId}", filePath, itemId);
+            return null;
+        }
+    }
+
+    // ===== User Sync Methods =====
+
+    /// <summary>
+    /// Gets a user's full details including Policy and Configuration.
+    /// </summary>
+    /// <param name="userId">User ID on the source server.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>User details or null if not found.</returns>
+    public async Task<UserDto?> GetUserAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var client = GetApiClient();
+            return await client.Users[userId].GetAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get user details for {UserId}", userId);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Gets a user's profile image as a stream.
+    /// </summary>
+    /// <param name="userId">User ID on the source server.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Image stream or null if not found.</returns>
+    public async Task<Stream?> GetUserImageAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var url = $"{_serverUrl}/Users/{userId}/Images/Primary";
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            AddAuthorizationHeader(request);
+
+            var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    // User has no profile image
+                    return null;
+                }
+
+                response.EnsureSuccessStatusCode();
+            }
+
+            return await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get profile image for user {UserId}", userId);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Gets the content length of a user's profile image without downloading.
+    /// </summary>
+    /// <param name="userId">User ID on the source server.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Image size in bytes, or null if no image.</returns>
+    public async Task<long?> GetUserImageSizeAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var url = $"{_serverUrl}/Users/{userId}/Images/Primary";
+            using var request = new HttpRequestMessage(HttpMethod.Head, url);
+            AddAuthorizationHeader(request);
+
+            var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            return response.Content.Headers.ContentLength;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to get profile image size for user {UserId}", userId);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Gets the SHA256 hash of a user's profile image.
+    /// Downloads the image to compute hash, then disposes of the data.
+    /// </summary>
+    /// <param name="userId">User ID on the source server.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>SHA256 hash (truncated) as hex string, or null if no image.</returns>
+    public async Task<string?> GetUserImageHashAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var imageStream = await GetUserImageAsync(userId, cancellationToken).ConfigureAwait(false);
+            if (imageStream == null)
+            {
+                return null;
+            }
+
+            return HashUtilities.ComputeSha256Hash(imageStream);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to get profile image hash for user {UserId}", userId);
             return null;
         }
     }

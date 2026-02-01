@@ -108,7 +108,7 @@
                         <button is="emby-button" type="button" class="tabButton raised" data-tab="history">
                             <span>History</span>
                         </button>
-                        <button is="emby-button" type="button" class="tabButton raised" data-tab="users" disabled>
+                        <button is="emby-button" type="button" class="tabButton raised" data-tab="users">
                             <span>Users</span>
                         </button>
                     </div>
@@ -536,7 +536,119 @@
 
                     <!-- Users Tab -->
                     <div id="tabUsers" class="tabPanel hidden">
-                        <div class="placeholder-text">Users sync feature coming soon.</div>
+                        <div class="inputContainer">
+                            <label class="checkboxContainer">
+                                <input is="emby-checkbox" type="checkbox" id="chkEnableUserSync" />
+                                <span>Enable User Sync</span>
+                            </label>
+                            <div class="fieldDescription">Sync user settings (policy, configuration, profile images) from source to local server for mapped users.</div>
+                        </div>
+
+                        <div id="userSyncSettings">
+                            <!-- Settings Collapsible -->
+                            <div class="collapsibleSection">
+                                <button type="button" class="collapsibleHeader collapsed" data-target="userSettingsContent">
+                                    <span class="collapsibleTitle">Settings</span>
+                                    <span class="collapsibleIcon">▼</span>
+                                </button>
+                                <div id="userSettingsContent" class="collapsibleContent collapsed">
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkUserSyncPolicy" checked />
+                                            <span>User Policy (Permissions)</span>
+                                        </label>
+                                        <div class="fieldDescription">Sync permission settings like admin status, parental ratings, library access.</div>
+                                    </div>
+
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkUserSyncConfiguration" checked />
+                                            <span>User Configuration (Preferences)</span>
+                                        </label>
+                                        <div class="fieldDescription">Sync user preferences like subtitle mode, audio language, display settings.</div>
+                                    </div>
+
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkUserSyncProfileImage" checked />
+                                            <span>Profile Image</span>
+                                        </label>
+                                        <div class="fieldDescription">Sync user profile pictures from source to local server.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="inputContainer mt-md">
+                                <button is="emby-button" type="button" id="btnSaveUserSettings" class="raised button-submit block">
+                                    <span>Save User Sync Settings</span>
+                                </button>
+                            </div>
+
+                            <!-- User Sync Items Section -->
+                            <div class="sectionTitleContainer">
+                                <h2 class="sectionTitle">Users</h2>
+                            </div>
+
+                            <div id="userSyncStatusSummary">
+                                <div class="statusCards">
+                                    <div class="statusCard statusCard-synced" title="">
+                                        <span class="statusCard-count" id="userSyncedCount">0</span>
+                                        <span class="statusCard-label">Synced</span>
+                                    </div>
+                                    <div class="statusCard statusCard-queued" title="">
+                                        <span class="statusCard-count" id="userQueuedCount">0</span>
+                                        <span class="statusCard-label">Queued</span>
+                                    </div>
+                                    <div class="statusCard statusCard-errored" title="">
+                                        <span class="statusCard-count" id="userErroredCount">0</span>
+                                        <span class="statusCard-label">Errored</span>
+                                    </div>
+                                    <div class="statusCard statusCard-ignored" title="">
+                                        <span class="statusCard-count" id="userIgnoredCount">0</span>
+                                        <span class="statusCard-label">Ignored</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="userHealthDashboard" class="healthDashboard">
+                                <div class="healthRow">
+                                    <div class="healthCard">
+                                        <span class="healthLabel">Last User Sync</span>
+                                        <span class="healthValue" id="userHealthLastSync">Never</span>
+                                    </div>
+                                    <div class="healthCard">
+                                        <span class="healthLabel">Users Mapped</span>
+                                        <span class="healthValue" id="userHealthUserCount">0</span>
+                                    </div>
+                                    <div class="healthCard">
+                                        <span class="healthLabel">Pending</span>
+                                        <span class="healthValue" id="userHealthPendingCount">0</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="syncActionButtonRow">
+                                <button is="emby-button" type="button" id="btnRefreshUserItems" class="raised syncActionButton">
+                                    <span>Refresh</span>
+                                </button>
+                                <button is="emby-button" type="button" id="btnTriggerUserSync" class="raised button-primary syncActionButton">
+                                    <span>Sync</span>
+                                </button>
+                                <button is="emby-button" type="button" id="btnRetryUserErrors" class="raised syncActionButton">
+                                    <span>Retry Errors</span>
+                                </button>
+                                <button is="emby-button" type="button" id="btnResetUserDatabase" class="raised button-destructive syncActionButton">
+                                    <span>Reset Database</span>
+                                </button>
+                            </div>
+
+                            <div class="syncSectionSeparator"></div>
+
+                            <!-- Paginated Table Container for User Sync Items -->
+                            <div id="userSyncItemsTableContainer">
+                                <!-- PaginatedTable will generate its structure here -->
+                            </div>
+                        </div>
                     </div>
 
                 </div>
@@ -674,6 +786,59 @@
                     <span>Ignore</span>
                 </button>
                 <button is="emby-button" type="button" id="btnHistoryModalQueue" class="raised button-primary modalButton">
+                    <span>Queue</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Sync Item Detail Modal -->
+    <div id="userSyncItemDetailModal" class="dialog hidden">
+        <div class="dialogContent max-w-700 modal-relative">
+            <button type="button" id="btnUserSyncModalClose" class="dialogCloseBtn" title="Close">&times;</button>
+            <h2 id="userSyncModalTitle" class="modal-title"></h2>
+            <div class="modal-body">
+                <div class="modal-field">
+                    <div class="modal-field-label">Status</div>
+                    <span id="userSyncModalStatusBadge" class="itemModal-statusBadge"></span>
+                </div>
+                <div id="userSyncModalLastSyncSection" class="modal-field hidden">
+                    <div class="modal-field-label">Last Sync</div>
+                    <div id="userSyncModalLastSync"></div>
+                </div>
+                <div id="userSyncModalErrorSection" class="modal-field hidden">
+                    <div class="modal-field-label">Error</div>
+                    <div id="userSyncModalError" class="errorMessage"></div>
+                </div>
+
+                <!-- User Mapping -->
+                <div class="modal-field mb-lg">
+                    <div class="modal-field-label">User</div>
+                    <div id="userSyncModalUser"></div>
+                </div>
+
+                <!-- Property Comparison Table -->
+                <div class="userSyncModal-tableContainer">
+                    <table class="historyCompareTable">
+                        <thead>
+                            <tr>
+                                <th class="historyCompareTable-property">Property</th>
+                                <th id="userSyncModalSourceHeader" class="historyCompareTable-server">Source</th>
+                                <th id="userSyncModalLocalHeader" class="historyCompareTable-server">Local</th>
+                                <th class="historyCompareTable-merged">After Sync</th>
+                            </tr>
+                        </thead>
+                        <tbody id="userSyncModalTableBody">
+                            <!-- Rows populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modalButtonRow">
+                <button is="emby-button" type="button" id="btnUserSyncModalIgnore" class="raised modalButton">
+                    <span>Ignore</span>
+                </button>
+                <button is="emby-button" type="button" id="btnUserSyncModalQueue" class="raised button-primary modalButton">
                     <span>Queue</span>
                 </button>
             </div>
@@ -1123,6 +1288,31 @@
         .historyModalUserGuid {
             opacity: 0.5;
             font-size: 0.85em;
+        }
+
+        /* User Sync Modal Table Container - scrollable */
+        .userSyncModal-tableContainer {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 4px;
+        }
+        .userSyncModal-tableContainer table {
+            margin: 0;
+        }
+        .userSyncModal-tableContainer thead {
+            position: sticky;
+            top: 0;
+            background: #1a1a1a;
+            z-index: 1;
+        }
+
+        /* Highlight changed rows in user sync modal */
+        .userSyncModal-changedRow {
+            background: rgba(240, 173, 78, 0.1);
+        }
+        .userSyncModal-changedRow td:first-child {
+            border-left: 3px solid #f0ad4e;
         }
 
         /* History item row styling */
@@ -2199,6 +2389,42 @@
                 }
 
                 return statusMap[status] || { text: status || 'Unknown', cssClass: 'Ignored' };
+            },
+
+            // Safe event binding - binds event only if element exists
+            bindEvent: function(id, event, handler, moduleName) {
+                var el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener(event, handler);
+                } else if (moduleName) {
+                    console.error(moduleName + ': ' + id + ' not found');
+                }
+                return el;
+            },
+
+            // Safe click binding shorthand
+            bindClick: function(id, handler, moduleName) {
+                return this.bindEvent(id, 'click', handler, moduleName);
+            },
+
+            // Load status counts into status card elements
+            // config: { endpoint, prefix, fields }
+            // fields is array of { key, countId, groupId? }
+            loadStatusCounts: function(config) {
+                var prefix = config.prefix || '';
+                return this.apiRequest(config.endpoint, 'GET').then(function(status) {
+                    if (!status) return;
+                    (config.fields || []).forEach(function(field) {
+                        var count = status[field.key] || 0;
+                        var countEl = document.getElementById(prefix + field.countId);
+                        if (countEl) countEl.textContent = count;
+                        if (field.groupId) {
+                            var groupEl = document.getElementById(prefix + field.groupId);
+                            if (groupEl) groupEl.setAttribute('title', field.key + ': ' + count);
+                        }
+                    });
+                    return status;
+                });
             }
         };
         
@@ -2214,10 +2440,10 @@
             init: function(config) {
                 var self = this;
                 self.currentConfig = config;
-        
-                document.getElementById('btnSaveServer').addEventListener('click', function() { self.saveServerConfig(); });
-                document.getElementById('btnTestConnection').addEventListener('click', function() { self.testConnection(); });
-        
+
+                ServerSyncShared.bindClick('btnSaveServer', function() { self.saveServerConfig(); }, 'SourceServerModule');
+                ServerSyncShared.bindClick('btnTestConnection', function() { self.testConnection(); }, 'SourceServerModule');
+
                 self.loadConfig(config);
             },
         
@@ -2317,39 +2543,16 @@
             init: function(config) {
                 var self = this;
                 self.currentConfig = config;
-        
-                document.getElementById('btnAddMapping').addEventListener('click', function() {
-                    self.addMapping();
-                });
-        
-                document.getElementById('chkEnableContentSync').addEventListener('change', function() {
-                    self.updateContentSyncVisibility(this.checked);
-                });
-        
-                document.getElementById('chkDetectUpdatedFiles').addEventListener('change', function() {
-                    self.updateDetectUpdatedFilesVisibility(this.checked);
-                });
-        
-                document.getElementById('chkEnableBandwidthScheduling').addEventListener('change', function() {
-                    self.updateBandwidthSchedulingVisibility(this.checked);
-                });
-        
-                document.getElementById('chkEnableRecyclingBin').addEventListener('change', function() {
-                    self.updateRecyclingBinVisibility(this.checked);
-                });
-        
-                // Update pending visibility when approval modes change
-                document.getElementById('selDownloadNewContentMode').addEventListener('change', function() {
-                    self.updatePendingVisibilityFromUI();
-                });
-        
-                document.getElementById('selReplaceExistingContentMode').addEventListener('change', function() {
-                    self.updatePendingVisibilityFromUI();
-                });
-        
-                document.getElementById('selDeleteMissingContentMode').addEventListener('change', function() {
-                    self.updatePendingVisibilityFromUI();
-                });
+                var bind = function(id, event, handler) { ServerSyncShared.bindEvent(id, event, handler, 'ContentConfigModule'); };
+
+                bind('btnAddMapping', 'click', function() { self.addMapping(); });
+                bind('chkEnableContentSync', 'change', function() { self.updateContentSyncVisibility(this.checked); });
+                bind('chkDetectUpdatedFiles', 'change', function() { self.updateDetectUpdatedFilesVisibility(this.checked); });
+                bind('chkEnableBandwidthScheduling', 'change', function() { self.updateBandwidthSchedulingVisibility(this.checked); });
+                bind('chkEnableRecyclingBin', 'change', function() { self.updateRecyclingBinVisibility(this.checked); });
+                bind('selDownloadNewContentMode', 'change', function() { self.updatePendingVisibilityFromUI(); });
+                bind('selReplaceExistingContentMode', 'change', function() { self.updatePendingVisibilityFromUI(); });
+                bind('selDeleteMissingContentMode', 'change', function() { self.updatePendingVisibilityFromUI(); });
             },
         
             updatePendingVisibilityFromUI: function() {
@@ -3693,18 +3896,19 @@
         
             _bindModuleEvents: function() {
                 var self = this;
-        
+                var bind = function(id, handler) { ServerSyncShared.bindClick(id, handler, 'SyncTableModule'); };
+
                 // Action buttons
-                document.getElementById('btnRefreshItems').addEventListener('click', function() { self.refreshSyncTable(); });
-                document.getElementById('btnTriggerSync').addEventListener('click', function() { self.triggerSync(); });
-                document.getElementById('btnRetryErrors').addEventListener('click', function() { self.retryErrors(); });
-                document.getElementById('btnResetDatabase').addEventListener('click', function() { self.resetDatabase(); });
-        
+                bind('btnRefreshItems', function() { self.refreshSyncTable(); });
+                bind('btnTriggerSync', function() { self.triggerSync(); });
+                bind('btnRetryErrors', function() { self.retryErrors(); });
+                bind('btnResetDatabase', function() { self.resetDatabase(); });
+
                 // Modal buttons
-                document.getElementById('btnModalIgnore').addEventListener('click', function() { self.modalIgnore(); });
-                document.getElementById('btnModalQueue').addEventListener('click', function() { self.modalQueue(); });
-                document.getElementById('btnModalDelete').addEventListener('click', function() { self.modalDelete(); });
-                document.getElementById('btnModalClose').addEventListener('click', function() { self.closeModal(); });
+                bind('btnModalIgnore', function() { self.modalIgnore(); });
+                bind('btnModalQueue', function() { self.modalQueue(); });
+                bind('btnModalDelete', function() { self.modalDelete(); });
+                bind('btnModalClose', function() { self.closeModal(); });
             },
         
             _injectBulkActions: function() {
@@ -4358,27 +4562,24 @@
 
             _bindModuleEvents: function() {
                 var self = this;
+                var bind = function(id, event, handler) { ServerSyncShared.bindEvent(id, event, handler, 'HistorySyncTableModule'); };
 
                 // Enable checkbox
-                document.getElementById('chkEnableHistorySync').addEventListener('change', function() {
-                    self.updateHistorySyncVisibility(this.checked);
-                });
+                bind('chkEnableHistorySync', 'change', function() { self.updateHistorySyncVisibility(this.checked); });
 
                 // Save button
-                document.getElementById('btnSaveHistorySettings').addEventListener('click', function() {
-                    self.saveHistorySettings();
-                });
+                bind('btnSaveHistorySettings', 'click', function() { self.saveHistorySettings(); });
 
                 // Action buttons
-                document.getElementById('btnRefreshHistoryItems').addEventListener('click', function() { self.refreshHistoryTable(); });
-                document.getElementById('btnTriggerHistorySync').addEventListener('click', function() { self.triggerHistorySync(); });
-                document.getElementById('btnRetryHistoryErrors').addEventListener('click', function() { self.retryErrors(); });
-                document.getElementById('btnResetHistoryDatabase').addEventListener('click', function() { self.resetHistoryDatabase(); });
+                bind('btnRefreshHistoryItems', 'click', function() { self.refreshHistoryTable(); });
+                bind('btnTriggerHistorySync', 'click', function() { self.triggerHistorySync(); });
+                bind('btnRetryHistoryErrors', 'click', function() { self.retryErrors(); });
+                bind('btnResetHistoryDatabase', 'click', function() { self.resetHistoryDatabase(); });
 
                 // Modal buttons
-                document.getElementById('btnHistoryModalIgnore').addEventListener('click', function() { self.modalIgnore(); });
-                document.getElementById('btnHistoryModalQueue').addEventListener('click', function() { self.modalQueue(); });
-                document.getElementById('btnHistoryModalClose').addEventListener('click', function() { self.closeModal(); });
+                bind('btnHistoryModalIgnore', 'click', function() { self.modalIgnore(); });
+                bind('btnHistoryModalQueue', 'click', function() { self.modalQueue(); });
+                bind('btnHistoryModalClose', 'click', function() { self.closeModal(); });
             },
 
             _injectBulkActions: function() {
@@ -4773,6 +4974,510 @@
 
     </script>
 
+    <!-- Scripts: UserSyncTable/userSyncTable.js -->
+    <script type="text/javascript">
+        // User Sync Table module
+        var UserSyncTableModule = {
+            table: null,
+            currentModalItem: null,
+            currentConfig: null,
+
+            init: function(config) {
+                var self = this;
+                self.currentConfig = config;
+
+                // Create the paginated table instance
+                this.table = new PaginatedTable({
+                    containerId: 'userSyncItemsTableContainer',
+                    endpoint: 'UserItems',
+
+                    columns: [
+                        {
+                            key: 'item',
+                            label: 'Item',
+                            type: 'custom',
+                            render: function(item) {
+                                var category = item.PropertyCategory || 'Unknown';
+                                if (category === 'ProfileImage') category = 'Profile Image';
+                                var sourceUserName = item.SourceUserName || 'Unknown';
+                                var localUserName = item.LocalUserName || 'Unknown';
+
+                                return '<div class="syncItemInfo">' +
+                                    '<div class="syncItemName">' + ServerSyncShared.escapeHtml(category) + '</div>' +
+                                    '<div class="syncItemPath">' + ServerSyncShared.escapeHtml(sourceUserName) + ' → ' + ServerSyncShared.escapeHtml(localUserName) + '</div>' +
+                                    '</div>';
+                            }
+                        },
+                        {
+                            key: 'changes',
+                            label: 'Changes',
+                            type: 'custom',
+                            render: function(item) {
+                                if (!item.HasChanges) {
+                                    return '<span style="opacity: 0.5;">No changes</span>';
+                                }
+                                if (item.PropertyCategory === 'ProfileImage') {
+                                    return ServerSyncShared.escapeHtml(item.SourceImageSizeFormatted || 'Image update');
+                                }
+                                return ServerSyncShared.escapeHtml(item.ChangesSummary || 'Changes pending');
+                            }
+                        },
+                        {
+                            key: 'Status',
+                            label: 'Status',
+                            type: 'status'
+                        }
+                    ],
+
+                    selection: {
+                        enabled: true,
+                        idKey: 'Id',
+                        onSelectionChange: function(selectedIds) {
+                            self.updateBulkActionsVisibility(selectedIds.length);
+                        }
+                    },
+
+                    pagination: {
+                        pageSize: 50
+                    },
+
+                    filters: {
+                        options: [
+                            { value: 'Synced', label: 'Synced' },
+                            { value: 'Queued', label: 'Queued' },
+                            { value: 'Errored', label: 'Errored' },
+                            { value: 'Ignored', label: 'Ignored' }
+                        ],
+                        buildParams: function(filterValue) {
+                            return { status: filterValue };
+                        }
+                    },
+
+                    actions: {
+                        onRowClick: function(item) {
+                            self.showItemDetail(item.Id);
+                        },
+                        onReload: function() {
+                            self.loadUserStatus();
+                            self.loadHealthStats();
+                        }
+                    },
+
+                    emptyState: {
+                        message: 'No user sync items found. Run a refresh to scan for user data.'
+                    }
+                });
+
+                // Bind module-specific events
+                this._bindModuleEvents();
+
+                // Inject bulk action buttons
+                this._injectBulkActions();
+
+                // Load settings from config
+                this.loadConfig(config);
+            },
+
+            loadConfig: function(config) {
+                this.currentConfig = config;
+
+                document.getElementById('chkEnableUserSync').checked = config.EnableUserSync || false;
+                document.getElementById('chkUserSyncPolicy').checked = config.UserSyncPolicy !== false;
+                document.getElementById('chkUserSyncConfiguration').checked = config.UserSyncConfiguration !== false;
+                document.getElementById('chkUserSyncProfileImage').checked = config.UserSyncProfileImage !== false;
+
+                this.updateUserSyncVisibility(config.EnableUserSync || false);
+            },
+
+            getValues: function() {
+                return {
+                    EnableUserSync: document.getElementById('chkEnableUserSync').checked,
+                    UserSyncPolicy: document.getElementById('chkUserSyncPolicy').checked,
+                    UserSyncConfiguration: document.getElementById('chkUserSyncConfiguration').checked,
+                    UserSyncProfileImage: document.getElementById('chkUserSyncProfileImage').checked
+                };
+            },
+
+            updateUserSyncVisibility: function(enabled) {
+                ServerSyncShared.setVisible('userSyncSettings', enabled);
+            },
+
+            _bindModuleEvents: function() {
+                var self = this;
+                var bind = function(id, event, handler) { ServerSyncShared.bindEvent(id, event, handler, 'UserSyncTableModule'); };
+
+                bind('chkEnableUserSync', 'change', function() { self.updateUserSyncVisibility(this.checked); });
+                bind('btnSaveUserSettings', 'click', function() { self.saveUserSettings(); });
+                bind('btnRefreshUserItems', 'click', function() { self.triggerRefresh(); });
+                bind('btnTriggerUserSync', 'click', function() { self.triggerSync(); });
+                bind('btnRetryUserErrors', 'click', function() { self.retryErrors(); });
+                bind('btnResetUserDatabase', 'click', function() { self.resetUserDatabase(); });
+
+                // Modal buttons
+                bind('btnUserSyncModalIgnore', 'click', function() { self.modalIgnore(); });
+                bind('btnUserSyncModalQueue', 'click', function() { self.modalQueue(); });
+                bind('btnUserSyncModalClose', 'click', function() { self.closeModal(); });
+            },
+
+            _injectBulkActions: function() {
+                var self = this;
+                var bulkContainer = this.table.getBulkActionsContainer();
+                if (!bulkContainer) return;
+
+                bulkContainer.innerHTML =
+                    '<button is="emby-button" type="button" id="btnUserBulkIgnore" class="raised" disabled><span>Ignore</span></button>' +
+                    '<button is="emby-button" type="button" id="btnUserBulkQueue" class="raised button-primary" disabled><span>Queue</span></button>';
+
+                document.getElementById('btnUserBulkIgnore').addEventListener('click', function() { self.bulkIgnore(); });
+                document.getElementById('btnUserBulkQueue').addEventListener('click', function() { self.bulkQueue(); });
+            },
+
+            saveUserSettings: function() {
+                var self = this;
+                var config = self.currentConfig || {};
+
+                Object.assign(config, self.getValues());
+
+                ServerSyncShared.saveConfig(config).then(function() {
+                    ServerSyncShared.showAlert('User sync settings saved');
+                }).catch(function(err) {
+                    console.error('Failed to save user settings:', err);
+                    ServerSyncShared.showAlert('Failed to save user settings');
+                });
+            },
+
+            loadUserStatus: function() {
+                ServerSyncShared.apiRequest('UserStatus').then(function(status) {
+                    if (status) {
+                        document.getElementById('userSyncedCount').textContent = status.Synced || 0;
+                        document.getElementById('userQueuedCount').textContent = status.Queued || 0;
+                        document.getElementById('userErroredCount').textContent = status.Errored || 0;
+                        document.getElementById('userIgnoredCount').textContent = status.Ignored || 0;
+                    }
+                }).catch(function() {
+                    // Ignore errors
+                });
+            },
+
+            loadUserItems: function() {
+                if (this.table) {
+                    return this.table.reload();
+                }
+                return Promise.resolve();
+            },
+
+            loadHealthStats: function() {
+                var self = this;
+                ServerSyncShared.apiRequest('UserStatus').then(function(status) {
+                    if (status) {
+                        document.getElementById('userHealthLastSync').textContent =
+                            status.LastSyncTime ? ServerSyncShared.formatRelativeTime(new Date(status.LastSyncTime)) : 'Never';
+                        document.getElementById('userHealthUserCount').textContent = status.UserCount || 0;
+                        var pending = (status.Queued || 0);
+                        document.getElementById('userHealthPendingCount').textContent = pending;
+                    }
+                }).catch(function() {
+                    // Ignore errors
+                });
+            },
+
+            triggerRefresh: function() {
+                var self = this;
+                var btn = document.getElementById('btnRefreshUserItems');
+                btn.disabled = true;
+                btn.querySelector('span').textContent = 'Refreshing...';
+
+                ServerSyncShared.apiRequest('TriggerUserRefresh', 'POST').then(function() {
+                    ServerSyncShared.showAlert('User refresh started');
+                    btn.querySelector('span').textContent = 'Refresh';
+                    btn.disabled = false;
+                    self.loadUserStatus();
+                    self.loadUserItems();
+                    self.loadHealthStats();
+                }).catch(function() {
+                    ServerSyncShared.showAlert('Failed to start user refresh');
+                    btn.querySelector('span').textContent = 'Refresh';
+                    btn.disabled = false;
+                });
+            },
+
+            triggerSync: function() {
+                var self = this;
+                var btn = document.getElementById('btnTriggerUserSync');
+                btn.disabled = true;
+                btn.querySelector('span').textContent = 'Syncing...';
+
+                ServerSyncShared.apiRequest('TriggerUserSync', 'POST').then(function() {
+                    ServerSyncShared.showAlert('User sync started');
+                    btn.querySelector('span').textContent = 'Sync';
+                    btn.disabled = false;
+                    self.loadUserStatus();
+                    self.loadUserItems();
+                    self.loadHealthStats();
+                }).catch(function() {
+                    ServerSyncShared.showAlert('Failed to start user sync');
+                    btn.querySelector('span').textContent = 'Sync';
+                    btn.disabled = false;
+                });
+            },
+
+            retryErrors: function() {
+                var self = this;
+
+                ServerSyncShared.apiRequest('UserItems/Queue', 'POST', { Ids: [], Status: 'Errored' }).then(function() {
+                    ServerSyncShared.showAlert('Errored user items queued for retry');
+                    self.loadUserStatus();
+                    self.loadUserItems();
+                }).catch(function() {
+                    ServerSyncShared.showAlert('Failed to retry errored items');
+                });
+            },
+
+            resetUserDatabase: function() {
+                var self = this;
+
+                if (!confirm('Are you sure you want to reset the user sync database?\n\nThis will delete ALL user sync tracking data. This cannot be undone.')) {
+                    return;
+                }
+
+                ServerSyncShared.apiRequest('ResetUserSyncDatabase', 'POST').then(function() {
+                    ServerSyncShared.showAlert('User sync database has been reset');
+                    self.loadUserStatus();
+                    self.loadUserItems();
+                    self.loadHealthStats();
+                }).catch(function() {
+                    ServerSyncShared.showAlert('Failed to reset user sync database');
+                });
+            },
+
+            updateBulkActionsVisibility: function(count) {
+                var hasSelection = count > 0;
+                var ignoreBtn = document.getElementById('btnUserBulkIgnore');
+                var queueBtn = document.getElementById('btnUserBulkQueue');
+
+                if (ignoreBtn) ignoreBtn.disabled = !hasSelection;
+                if (queueBtn) queueBtn.disabled = !hasSelection;
+            },
+
+            bulkIgnore: function() {
+                var self = this;
+                var ids = this.table.getSelectedIds();
+                if (ids.length === 0) return;
+
+                ServerSyncShared.apiRequest('UserItems/Ignore', 'POST', { Ids: ids }).then(function() {
+                    self.table.clearSelection();
+                    self.loadUserStatus();
+                    self.loadUserItems();
+                    ServerSyncShared.showAlert(ids.length + ' item(s) ignored');
+                }).catch(function() {
+                    ServerSyncShared.showAlert('Failed to ignore items');
+                });
+            },
+
+            bulkQueue: function() {
+                var self = this;
+                var ids = this.table.getSelectedIds();
+                if (ids.length === 0) return;
+
+                ServerSyncShared.apiRequest('UserItems/Queue', 'POST', { Ids: ids }).then(function() {
+                    self.table.clearSelection();
+                    self.loadUserStatus();
+                    self.loadUserItems();
+                    ServerSyncShared.showAlert(ids.length + ' item(s) queued');
+                }).catch(function() {
+                    ServerSyncShared.showAlert('Failed to queue items');
+                });
+            },
+
+            showItemDetail: function(itemId) {
+                var self = this;
+
+                // Fetch full item details from API
+                ServerSyncShared.apiRequest('UserItems/' + itemId).then(function(item) {
+                    if (!item) {
+                        ServerSyncShared.showAlert('Item not found');
+                        return;
+                    }
+
+                    self.currentModalItem = item;
+
+                    // Title
+                    var category = item.PropertyCategory || 'Unknown';
+                    if (category === 'ProfileImage') category = 'Profile Image';
+                    document.getElementById('userSyncModalTitle').textContent =
+                        (item.SourceUserName || 'Unknown') + ' → ' + (item.LocalUserName || 'Unknown') + ' (' + category + ')';
+
+                    // Status badge
+                    var statusBadge = document.getElementById('userSyncModalStatusBadge');
+                    statusBadge.textContent = item.Status || 'Unknown';
+                    statusBadge.className = 'itemModal-statusBadge ' + (item.Status || 'unknown');
+
+                    // Last sync
+                    var lastSyncSection = document.getElementById('userSyncModalLastSyncSection');
+                    if (item.LastSyncTime) {
+                        lastSyncSection.style.display = 'block';
+                        document.getElementById('userSyncModalLastSync').textContent =
+                            ServerSyncShared.formatRelativeTime(new Date(item.LastSyncTime));
+                    } else {
+                        lastSyncSection.style.display = 'none';
+                    }
+
+                    // Error section
+                    var errorSection = document.getElementById('userSyncModalErrorSection');
+                    if (item.Status === 'Errored' && item.ErrorMessage) {
+                        errorSection.style.display = 'block';
+                        document.getElementById('userSyncModalError').textContent = item.ErrorMessage;
+                    } else {
+                        errorSection.style.display = 'none';
+                    }
+
+                    // User info
+                    document.getElementById('userSyncModalUser').textContent =
+                        (item.SourceUserName || 'Unknown') + ' → ' + (item.LocalUserName || 'Unknown');
+
+                    // Table headers
+                    document.getElementById('userSyncModalSourceHeader').textContent =
+                        (self.currentConfig && self.currentConfig.SourceServerName) || 'Source';
+                    document.getElementById('userSyncModalLocalHeader').textContent = 'Local';
+
+                    // Build comparison table
+                    var tbody = document.getElementById('userSyncModalTableBody');
+                    tbody.innerHTML = '';
+
+                    if (item.PropertyCategory === 'ProfileImage') {
+                        var hasChange = item.HasChanges;
+                        var row = self._createTableRow(
+                            'Profile Image',
+                            item.SourceImageSizeFormatted || 'No image',
+                            item.LocalImageSizeFormatted || 'No image',
+                            hasChange ? (item.SourceImageSizeFormatted || 'No image') : '-',
+                            hasChange
+                        );
+                        tbody.appendChild(row);
+                    } else {
+                        // Parse JSON and show each property
+                        var sourceObj = self._parseJson(item.SourceValue);
+                        var localObj = self._parseJson(item.LocalValue);
+                        var mergedObj = self._parseJson(item.MergedValue);
+
+                        var allKeys = new Set();
+                        Object.keys(sourceObj).forEach(function(k) { allKeys.add(k); });
+                        Object.keys(localObj).forEach(function(k) { allKeys.add(k); });
+
+                        var sortedKeys = Array.from(allKeys).sort();
+                        sortedKeys.forEach(function(key) {
+                            var sourceVal = sourceObj[key];
+                            var localVal = localObj[key];
+                            var mergedVal = mergedObj[key];
+                            var hasChange = JSON.stringify(sourceVal) !== JSON.stringify(localVal);
+
+                            var row = self._createTableRow(
+                                key,
+                                self._formatValue(sourceVal),
+                                self._formatValue(localVal),
+                                hasChange ? self._formatValue(mergedVal) : '-',
+                                hasChange
+                            );
+                            tbody.appendChild(row);
+                        });
+                    }
+
+                    document.getElementById('userSyncItemDetailModal').style.display = 'flex';
+                }).catch(function(err) {
+                    console.error('Failed to load item detail:', err);
+                    ServerSyncShared.showAlert('Failed to load item details');
+                });
+            },
+
+            _createTableRow: function(property, sourceVal, localVal, mergedVal, hasChange) {
+                var row = document.createElement('tr');
+                if (hasChange) {
+                    row.className = 'userSyncModal-changedRow';
+                }
+
+                var propCell = document.createElement('td');
+                propCell.className = 'historyCompareTable-property';
+                propCell.textContent = property;
+                row.appendChild(propCell);
+
+                var sourceCell = document.createElement('td');
+                sourceCell.className = 'historyCompareTable-value';
+                sourceCell.textContent = sourceVal;
+                row.appendChild(sourceCell);
+
+                var localCell = document.createElement('td');
+                localCell.className = 'historyCompareTable-value';
+                localCell.textContent = localVal;
+                row.appendChild(localCell);
+
+                var mergedCell = document.createElement('td');
+                mergedCell.className = 'historyCompareTable-value historyCompareTable-merged';
+                mergedCell.textContent = mergedVal;
+                row.appendChild(mergedCell);
+
+                return row;
+            },
+
+            _parseJson: function(jsonStr) {
+                if (!jsonStr) return {};
+                try {
+                    return JSON.parse(jsonStr);
+                } catch (e) {
+                    return {};
+                }
+            },
+
+            _formatValue: function(val) {
+                if (val === undefined || val === null) return '-';
+                if (typeof val === 'boolean') return val ? 'Yes' : 'No';
+                if (typeof val === 'number') return String(val);
+                if (typeof val === 'string') return val || '-';
+                if (Array.isArray(val)) {
+                    if (val.length === 0) return '(empty)';
+                    return val.length + ' items';
+                }
+                if (typeof val === 'object') {
+                    var keys = Object.keys(val);
+                    if (keys.length === 0) return '(empty)';
+                    return keys.length + ' values';
+                }
+                return String(val);
+            },
+
+            closeModal: function() {
+                document.getElementById('userSyncItemDetailModal').style.display = 'none';
+                this.currentModalItem = null;
+            },
+
+            modalIgnore: function() {
+                if (this.currentModalItem) {
+                    this.updateItemStatus(this.currentModalItem.Id, 'Ignored');
+                }
+            },
+
+            modalQueue: function() {
+                if (this.currentModalItem) {
+                    this.updateItemStatus(this.currentModalItem.Id, 'Queued');
+                }
+            },
+
+            updateItemStatus: function(itemId, status) {
+                var self = this;
+
+                ServerSyncShared.apiRequest('UserItems/UpdateStatus', 'POST', { Id: itemId, Status: status }).then(function() {
+                    self.closeModal();
+                    self.loadUserStatus();
+                    self.loadUserItems();
+                    ServerSyncShared.showAlert('Item status updated to ' + status);
+                }).catch(function(err) {
+                    console.error('Failed to update item status:', err);
+                    ServerSyncShared.showAlert('Failed to update item status');
+                });
+            }
+        };
+
+    </script>
+
     <!-- Scripts: main.js -->
     <script type="text/javascript">
         // Main orchestrator for Server Sync plugin configuration
@@ -4809,6 +5514,10 @@
 
                 // Load capabilities first, then config
                 self.loadCapabilities().then(function() {
+                    console.log('Capabilities loaded, now loading config...');
+                    self.loadConfig();
+                }).catch(function(err) {
+                    console.error('Failed to load capabilities, loading config anyway:', err);
                     self.loadConfig();
                 });
             },
@@ -4845,9 +5554,12 @@
                     ContentConfigModule.init(config);
                     SyncTableModule.init();
                     HistorySyncTableModule.init(config);
+                    UserSyncTableModule.init(config);
 
                     // Load config into modules
                     ContentConfigModule.loadConfig(config);
+                    HistorySyncTableModule.loadConfig(config);
+                    UserSyncTableModule.loadConfig(config);
 
                     // Wire up cross-module communication
                     SourceServerModule.onConnectionSuccess = function() {
@@ -4901,6 +5613,11 @@
                     HistorySyncTableModule.loadHistoryStatus();
                     HistorySyncTableModule.loadHistoryItems();
                     HistorySyncTableModule.loadHealthStats();
+
+                    // Load user sync data
+                    UserSyncTableModule.loadUserStatus();
+                    UserSyncTableModule.loadUserItems();
+                    UserSyncTableModule.loadHealthStats();
                 });
             },
 
@@ -4955,10 +5672,17 @@
         
         // Initialize when page is shown
         (function() {
+            console.log('ServerSync: Setting up viewshow listener');
             var page = document.querySelector('#ServerSyncConfigPage');
+            if (!page) {
+                console.error('ServerSync: Could not find #ServerSyncConfigPage');
+                return;
+            }
             page.addEventListener('viewshow', function() {
+                console.log('ServerSync: viewshow event fired');
                 ServerSyncConfig.init();
             });
+            console.log('ServerSync: viewshow listener attached');
         })();
         
     </script>

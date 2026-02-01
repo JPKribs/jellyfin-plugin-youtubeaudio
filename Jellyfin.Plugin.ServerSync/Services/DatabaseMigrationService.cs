@@ -14,7 +14,7 @@ public static class DatabaseMigrationService
     /// <summary>
     /// Current schema version. Increment this when adding new migrations.
     /// </summary>
-    public const int CurrentSchemaVersion = 7;
+    public const int CurrentSchemaVersion = 11;
 
     /// <summary>
     /// Creates the initial database schema including all tables for the current version.
@@ -94,25 +94,34 @@ public static class DatabaseMigrationService
         ";
         historyCmd.ExecuteNonQuery();
 
-        // Create UserSyncItems table (User Sync - scaffolding for future use)
+        // Create UserSyncItems table (User Sync) - v11 schema: per-property records with hash-based image comparison
         using var userCmd = connection.CreateCommand();
         userCmd.CommandText = @"
             CREATE TABLE IF NOT EXISTS UserSyncItems (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
                 SourceUserId TEXT NOT NULL,
                 LocalUserId TEXT NOT NULL,
-                PropertyName TEXT NOT NULL,
+                SourceUserName TEXT,
+                LocalUserName TEXT,
+                PropertyCategory TEXT NOT NULL,
                 SourceValue TEXT,
                 LocalValue TEXT,
                 MergedValue TEXT,
-                Status INTEGER NOT NULL,
+                SourceImageHash TEXT,
+                LocalImageHash TEXT,
+                SyncedImageHash TEXT,
+                SourceImageSize INTEGER,
+                LocalImageSize INTEGER,
+                SyncedImageSize INTEGER,
+                Status INTEGER NOT NULL DEFAULT 1,
                 StatusDate TEXT NOT NULL,
                 LastSyncTime TEXT,
                 ErrorMessage TEXT,
-                UNIQUE(SourceUserId, PropertyName)
+                UNIQUE(SourceUserId, LocalUserId, PropertyCategory)
             );
-            CREATE INDEX IF NOT EXISTS idx_user_sync_user ON UserSyncItems(SourceUserId, LocalUserId);
+            CREATE INDEX IF NOT EXISTS idx_user_sync_mapping ON UserSyncItems(SourceUserId, LocalUserId);
             CREATE INDEX IF NOT EXISTS idx_user_sync_status ON UserSyncItems(Status);
+            CREATE INDEX IF NOT EXISTS idx_user_sync_category ON UserSyncItems(PropertyCategory);
         ";
         userCmd.ExecuteNonQuery();
     }
@@ -184,6 +193,26 @@ public static class DatabaseMigrationService
             if (fromVersion < 7)
             {
                 MigrateToV7(connection, transaction, logger);
+            }
+
+            if (fromVersion < 8)
+            {
+                MigrateToV8(connection, transaction, logger);
+            }
+
+            if (fromVersion < 9)
+            {
+                MigrateToV9(connection, transaction, logger);
+            }
+
+            if (fromVersion < 10)
+            {
+                MigrateToV10(connection, transaction, logger);
+            }
+
+            if (fromVersion < 11)
+            {
+                MigrateToV11(connection, transaction, logger);
             }
 
             SetSchemaVersion(connection, CurrentSchemaVersion);
@@ -373,6 +402,159 @@ public static class DatabaseMigrationService
         userCmd.ExecuteNonQuery();
 
         logger.LogInformation("Migration v7: Added HistorySyncItems and UserSyncItems tables");
+    }
+
+    /// <summary>
+    /// Migration to v8: Update UserSyncItems table with new schema for full user sync.
+    /// </summary>
+    private static void MigrateToV8(SqliteConnection connection, SqliteTransaction transaction, ILogger logger)
+    {
+        // Drop and recreate UserSyncItems table with new schema
+        // The old table was scaffolding only, so no data migration needed
+        using var dropCmd = connection.CreateCommand();
+        dropCmd.Transaction = transaction;
+        dropCmd.CommandText = "DROP TABLE IF EXISTS UserSyncItems";
+        dropCmd.ExecuteNonQuery();
+
+        // Create new UserSyncItems table with updated schema
+        using var createCmd = connection.CreateCommand();
+        createCmd.Transaction = transaction;
+        createCmd.CommandText = @"
+            CREATE TABLE UserSyncItems (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                SourceUserId TEXT NOT NULL,
+                LocalUserId TEXT NOT NULL,
+                SourceUserName TEXT,
+                LocalUserName TEXT,
+                PropertyCategory TEXT NOT NULL,
+                PropertyName TEXT NOT NULL,
+                SourceValue TEXT,
+                LocalValue TEXT,
+                MergedValue TEXT,
+                Status INTEGER NOT NULL DEFAULT 1,
+                StatusDate TEXT NOT NULL,
+                LastSyncTime TEXT,
+                ErrorMessage TEXT,
+                UNIQUE(SourceUserId, LocalUserId, PropertyCategory, PropertyName)
+            );
+            CREATE INDEX idx_user_sync_mapping ON UserSyncItems(SourceUserId, LocalUserId);
+            CREATE INDEX idx_user_sync_status ON UserSyncItems(Status);
+            CREATE INDEX idx_user_sync_category ON UserSyncItems(PropertyCategory);
+        ";
+        createCmd.ExecuteNonQuery();
+
+        logger.LogInformation("Migration v8: Updated UserSyncItems table with full user sync schema");
+    }
+
+    /// <summary>
+    /// Migration to v9: Restructure UserSyncItems to one record per user (aggregated settings).
+    /// </summary>
+    private static void MigrateToV9(SqliteConnection connection, SqliteTransaction transaction, ILogger logger)
+    {
+        // Drop old per-property UserSyncItems table and create new aggregated schema
+        using var dropCmd = connection.CreateCommand();
+        dropCmd.Transaction = transaction;
+        dropCmd.CommandText = "DROP TABLE IF EXISTS UserSyncItems";
+        dropCmd.ExecuteNonQuery();
+
+        // Create new UserSyncItems table with one record per user mapping
+        using var createCmd = connection.CreateCommand();
+        createCmd.Transaction = transaction;
+        createCmd.CommandText = @"
+            CREATE TABLE UserSyncItems (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                SourceUserId TEXT NOT NULL,
+                LocalUserId TEXT NOT NULL,
+                SourceUserName TEXT,
+                LocalUserName TEXT,
+                SourcePolicy TEXT,
+                LocalPolicy TEXT,
+                MergedPolicy TEXT,
+                SourceConfiguration TEXT,
+                LocalConfiguration TEXT,
+                MergedConfiguration TEXT,
+                SourceImageTag TEXT,
+                SyncedImageTag TEXT,
+                LocalHasImage INTEGER NOT NULL DEFAULT 0,
+                SyncPolicy INTEGER NOT NULL DEFAULT 1,
+                SyncConfiguration INTEGER NOT NULL DEFAULT 1,
+                SyncProfileImage INTEGER NOT NULL DEFAULT 1,
+                Status INTEGER NOT NULL DEFAULT 1,
+                StatusDate TEXT NOT NULL,
+                LastSyncTime TEXT,
+                ErrorMessage TEXT,
+                UNIQUE(SourceUserId, LocalUserId)
+            );
+            CREATE INDEX idx_user_sync_mapping ON UserSyncItems(SourceUserId, LocalUserId);
+            CREATE INDEX idx_user_sync_status ON UserSyncItems(Status);
+        ";
+        createCmd.ExecuteNonQuery();
+
+        logger.LogInformation("Migration v9: Restructured UserSyncItems to one record per user mapping");
+    }
+
+    /// <summary>
+    /// Migration to v10: Restructure UserSyncItems to per-property records with size-based image comparison.
+    /// </summary>
+    private static void MigrateToV10(SqliteConnection connection, SqliteTransaction transaction, ILogger logger)
+    {
+        // Drop old aggregated UserSyncItems table and create per-property schema
+        using var dropCmd = connection.CreateCommand();
+        dropCmd.Transaction = transaction;
+        dropCmd.CommandText = "DROP TABLE IF EXISTS UserSyncItems";
+        dropCmd.ExecuteNonQuery();
+
+        // Create new UserSyncItems table with per-property records and image size columns
+        using var createCmd = connection.CreateCommand();
+        createCmd.Transaction = transaction;
+        createCmd.CommandText = @"
+            CREATE TABLE UserSyncItems (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                SourceUserId TEXT NOT NULL,
+                LocalUserId TEXT NOT NULL,
+                SourceUserName TEXT,
+                LocalUserName TEXT,
+                PropertyCategory TEXT NOT NULL,
+                SourceValue TEXT,
+                LocalValue TEXT,
+                MergedValue TEXT,
+                SourceImageSize INTEGER,
+                LocalImageSize INTEGER,
+                SyncedImageSize INTEGER,
+                Status INTEGER NOT NULL DEFAULT 1,
+                StatusDate TEXT NOT NULL,
+                LastSyncTime TEXT,
+                ErrorMessage TEXT,
+                UNIQUE(SourceUserId, LocalUserId, PropertyCategory)
+            );
+            CREATE INDEX idx_user_sync_mapping ON UserSyncItems(SourceUserId, LocalUserId);
+            CREATE INDEX idx_user_sync_status ON UserSyncItems(Status);
+            CREATE INDEX idx_user_sync_category ON UserSyncItems(PropertyCategory);
+        ";
+        createCmd.ExecuteNonQuery();
+
+        logger.LogInformation("Migration v10: UserSyncItems now uses per-property records with size-based image comparison");
+    }
+
+    /// <summary>
+    /// Migration to v11: Add hash columns for more accurate profile image comparison.
+    /// </summary>
+    private static void MigrateToV11(SqliteConnection connection, SqliteTransaction transaction, ILogger logger)
+    {
+        // Add hash columns to UserSyncItems table
+        var alterStatements = new[]
+        {
+            "ALTER TABLE UserSyncItems ADD COLUMN SourceImageHash TEXT",
+            "ALTER TABLE UserSyncItems ADD COLUMN LocalImageHash TEXT",
+            "ALTER TABLE UserSyncItems ADD COLUMN SyncedImageHash TEXT"
+        };
+
+        foreach (var statement in alterStatements)
+        {
+            ExecuteAlterIfColumnMissing(connection, transaction, statement, logger);
+        }
+
+        logger.LogInformation("Migration v11: Added hash columns for profile image comparison");
     }
 
     /// <summary>
