@@ -1637,6 +1637,372 @@ public class ConfigurationController : ControllerBase
     }
 
     // ============================================
+    // User Sync Consolidated Endpoints
+    // ============================================
+
+    /// <summary>
+    /// GetUserSyncUsers
+    /// Gets paginated list of user sync users (consolidated view).
+    /// Groups UserSyncItems by (SourceUserId, LocalUserId) showing one row per user.
+    /// </summary>
+    /// <param name="search">Optional search term (matches usernames).</param>
+    /// <param name="status">Optional status filter (matches any category with this status).</param>
+    /// <param name="skip">Number of items to skip (default 0).</param>
+    /// <param name="take">Maximum items to return (default 50, max 200).</param>
+    /// <returns>Paginated result of user sync user DTOs.</returns>
+    [HttpGet("UserSyncUsers")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<PaginatedResult<UserSyncUserDto>> GetUserSyncUsers(
+        [FromQuery] string? search = null,
+        [FromQuery] string? status = null,
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 50)
+    {
+        var plugin = Plugin.Instance;
+        if (plugin == null)
+        {
+            return NotFound();
+        }
+
+        // Clamp pagination values
+        take = Math.Clamp(take, 1, 200);
+        skip = Math.Max(0, skip);
+
+        // Parse status filter
+        BaseSyncStatus? statusFilter = null;
+        if (!string.IsNullOrEmpty(status) && Enum.TryParse<BaseSyncStatus>(status, out var parsedStatus))
+        {
+            statusFilter = parsedStatus;
+        }
+
+        // Get paginated results
+        var (users, totalCount) = plugin.Database.GetUserSyncUsersPaginated(search, statusFilter, skip, take);
+
+        // Map to DTOs
+        var config = plugin.Configuration;
+        var dtos = users.Select(u => MapToUserSyncUserDto(
+            u.SourceUserId,
+            u.LocalUserId,
+            u.SourceUserName,
+            u.LocalUserName,
+            u.Items,
+            config)).ToList();
+
+        return Ok(new PaginatedResult<UserSyncUserDto>
+        {
+            Items = dtos,
+            TotalCount = totalCount
+        });
+    }
+
+    /// <summary>
+    /// GetUserSyncUserDetail
+    /// Gets detailed information for a specific user mapping.
+    /// Returns all property categories for the modal view.
+    /// </summary>
+    /// <param name="sourceUserId">The source server user ID.</param>
+    /// <param name="localUserId">The local server user ID.</param>
+    /// <returns>User sync user detail DTO.</returns>
+    [HttpGet("UserSyncUsers/{sourceUserId}/{localUserId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult<UserSyncUserDetailDto> GetUserSyncUserDetail(string sourceUserId, string localUserId)
+    {
+        var plugin = Plugin.Instance;
+        if (plugin == null)
+        {
+            return NotFound();
+        }
+
+        var items = plugin.Database.GetUserSyncUserDetail(sourceUserId, localUserId);
+        if (items.Count == 0)
+        {
+            return NotFound();
+        }
+
+        var config = plugin.Configuration;
+        var dto = MapToUserSyncUserDetailDto(sourceUserId, localUserId, items, config);
+
+        return Ok(dto);
+    }
+
+    /// <summary>
+    /// IgnoreUserSyncUsers
+    /// Ignores all categories for specified user mappings.
+    /// </summary>
+    /// <param name="request">Bulk user mappings request.</param>
+    /// <returns>Action result with updated count.</returns>
+    [HttpPost("UserSyncUsers/Ignore")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public ActionResult IgnoreUserSyncUsers([FromBody] BulkUserMappingsRequest request)
+    {
+        var plugin = Plugin.Instance;
+        if (plugin == null)
+        {
+            return NotFound();
+        }
+
+        if (request?.UserMappings == null || request.UserMappings.Count == 0)
+        {
+            return BadRequest("No user mappings specified");
+        }
+
+        var mappings = request.UserMappings.Select(m => (m.SourceUserId, m.LocalUserId));
+        var successCount = plugin.Database.BatchUpdateUserSyncStatusByMappings(mappings, BaseSyncStatus.Ignored);
+
+        return Ok(new { Updated = successCount });
+    }
+
+    /// <summary>
+    /// QueueUserSyncUsers
+    /// Queues all categories for specified user mappings.
+    /// </summary>
+    /// <param name="request">Bulk user mappings request.</param>
+    /// <returns>Action result with updated count.</returns>
+    [HttpPost("UserSyncUsers/Queue")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public ActionResult QueueUserSyncUsers([FromBody] BulkUserMappingsRequest request)
+    {
+        var plugin = Plugin.Instance;
+        if (plugin == null)
+        {
+            return NotFound();
+        }
+
+        if (request?.UserMappings == null || request.UserMappings.Count == 0)
+        {
+            return BadRequest("No user mappings specified");
+        }
+
+        var mappings = request.UserMappings.Select(m => (m.SourceUserId, m.LocalUserId));
+        var successCount = plugin.Database.BatchUpdateUserSyncStatusByMappings(mappings, BaseSyncStatus.Queued);
+
+        return Ok(new { Updated = successCount });
+    }
+
+    /// <summary>
+    /// Maps user sync items to a consolidated UserSyncUserDto.
+    /// </summary>
+    private static UserSyncUserDto MapToUserSyncUserDto(
+        string sourceUserId,
+        string localUserId,
+        string? sourceUserName,
+        string? localUserName,
+        List<UserSyncItem> items,
+        PluginConfiguration config)
+    {
+        var policyItem = items.FirstOrDefault(i => i.PropertyCategory == UserPropertyCategory.Policy);
+        var configItem = items.FirstOrDefault(i => i.PropertyCategory == UserPropertyCategory.Configuration);
+        var imageItem = items.FirstOrDefault(i => i.PropertyCategory == UserPropertyCategory.ProfileImage);
+
+        var dto = new UserSyncUserDto
+        {
+            SourceUserId = sourceUserId,
+            LocalUserId = localUserId,
+            SourceUserName = sourceUserName ?? items.FirstOrDefault()?.SourceUserName,
+            LocalUserName = localUserName ?? items.FirstOrDefault()?.LocalUserName,
+
+            // Record IDs
+            PolicyId = policyItem?.Id,
+            ConfigurationId = configItem?.Id,
+            ProfileImageId = imageItem?.Id,
+
+            // Individual statuses
+            PolicyStatus = policyItem?.Status.ToString(),
+            ConfigurationStatus = configItem?.Status.ToString(),
+            ProfileImageStatus = imageItem?.Status.ToString(),
+
+            // Individual change flags
+            PolicyHasChanges = policyItem?.HasChanges ?? false,
+            ConfigurationHasChanges = configItem?.HasChanges ?? false,
+            ProfileImageHasChanges = imageItem?.HasChanges ?? false,
+
+            // Individual change summaries
+            PolicyChangesSummary = policyItem?.ChangesSummary,
+            ConfigurationChangesSummary = configItem?.ChangesSummary,
+            ProfileImageChangesSummary = imageItem?.ChangesSummary,
+
+            // Aggregate has changes
+            HasChanges = (policyItem?.HasChanges ?? false) ||
+                        (configItem?.HasChanges ?? false) ||
+                        (imageItem?.HasChanges ?? false),
+
+            // Aggregate last sync time (most recent)
+            LastSyncTime = new[] { policyItem?.LastSyncTime, configItem?.LastSyncTime, imageItem?.LastSyncTime }
+                .Where(t => t.HasValue)
+                .Select(t => t!.Value)
+                .DefaultIfEmpty()
+                .Max(),
+
+            // Aggregate error message
+            ErrorMessage = string.Join("; ", new[] { policyItem?.ErrorMessage, configItem?.ErrorMessage, imageItem?.ErrorMessage }
+                .Where(e => !string.IsNullOrEmpty(e)))
+        };
+
+        // Compute overall status (Errored > Queued > Ignored > Synced)
+        var statuses = new[] { policyItem?.Status, configItem?.Status, imageItem?.Status }
+            .Where(s => s.HasValue)
+            .Select(s => s!.Value)
+            .ToList();
+
+        if (statuses.Any(s => s == BaseSyncStatus.Errored))
+        {
+            dto.OverallStatus = "Errored";
+        }
+        else if (statuses.Any(s => s == BaseSyncStatus.Queued))
+        {
+            dto.OverallStatus = "Queued";
+        }
+        else if (statuses.All(s => s == BaseSyncStatus.Ignored))
+        {
+            dto.OverallStatus = "Ignored";
+        }
+        else
+        {
+            dto.OverallStatus = "Synced";
+        }
+
+        // Compute total changes display
+        dto.TotalChanges = ComputeTotalChangesDisplay(
+            policyItem?.HasChanges ?? false, policyItem?.ChangesSummary,
+            configItem?.HasChanges ?? false, configItem?.ChangesSummary,
+            imageItem?.HasChanges ?? false);
+
+        // Set empty error message to null
+        if (string.IsNullOrEmpty(dto.ErrorMessage))
+        {
+            dto.ErrorMessage = null;
+        }
+
+        return dto;
+    }
+
+    /// <summary>
+    /// Maps user sync items to a detailed UserSyncUserDetailDto for the modal.
+    /// </summary>
+    private static UserSyncUserDetailDto MapToUserSyncUserDetailDto(
+        string sourceUserId,
+        string localUserId,
+        List<UserSyncItem> items,
+        PluginConfiguration config)
+    {
+        var policyItem = items.FirstOrDefault(i => i.PropertyCategory == UserPropertyCategory.Policy);
+        var configItem = items.FirstOrDefault(i => i.PropertyCategory == UserPropertyCategory.Configuration);
+        var imageItem = items.FirstOrDefault(i => i.PropertyCategory == UserPropertyCategory.ProfileImage);
+
+        var dto = new UserSyncUserDetailDto
+        {
+            SourceUserId = sourceUserId,
+            LocalUserId = localUserId,
+            SourceUserName = items.FirstOrDefault()?.SourceUserName,
+            LocalUserName = items.FirstOrDefault()?.LocalUserName,
+
+            // Map full item details
+            PolicyItem = policyItem != null ? MapToUserSyncItemDto(policyItem) : null,
+            ConfigurationItem = configItem != null ? MapToUserSyncItemDto(configItem) : null,
+            ProfileImageItem = imageItem != null ? MapToUserSyncItemDto(imageItem) : null,
+
+            // Config flags
+            PolicyEnabled = config.UserSyncPolicy,
+            ConfigurationEnabled = config.UserSyncConfiguration,
+            ProfileImageEnabled = config.UserSyncProfileImage,
+
+            // Aggregate last sync time
+            LastSyncTime = new[] { policyItem?.LastSyncTime, configItem?.LastSyncTime, imageItem?.LastSyncTime }
+                .Where(t => t.HasValue)
+                .Select(t => t!.Value)
+                .DefaultIfEmpty()
+                .Max(),
+
+            // Aggregate error message
+            ErrorMessage = string.Join("; ", new[] { policyItem?.ErrorMessage, configItem?.ErrorMessage, imageItem?.ErrorMessage }
+                .Where(e => !string.IsNullOrEmpty(e)))
+        };
+
+        // Compute overall status
+        var statuses = new[] { policyItem?.Status, configItem?.Status, imageItem?.Status }
+            .Where(s => s.HasValue)
+            .Select(s => s!.Value)
+            .ToList();
+
+        if (statuses.Any(s => s == BaseSyncStatus.Errored))
+        {
+            dto.OverallStatus = "Errored";
+        }
+        else if (statuses.Any(s => s == BaseSyncStatus.Queued))
+        {
+            dto.OverallStatus = "Queued";
+        }
+        else if (statuses.All(s => s == BaseSyncStatus.Ignored))
+        {
+            dto.OverallStatus = "Ignored";
+        }
+        else
+        {
+            dto.OverallStatus = "Synced";
+        }
+
+        // Set empty error message to null
+        if (string.IsNullOrEmpty(dto.ErrorMessage))
+        {
+            dto.ErrorMessage = null;
+        }
+
+        return dto;
+    }
+
+    /// <summary>
+    /// Computes the total changes display string (e.g., "1 policy, 2 config").
+    /// </summary>
+    private static string ComputeTotalChangesDisplay(
+        bool policyHasChanges, string? policySummary,
+        bool configHasChanges, string? configSummary,
+        bool imageHasChanges)
+    {
+        var parts = new List<string>();
+
+        if (policyHasChanges)
+        {
+            var count = ExtractChangeCount(policySummary);
+            parts.Add(count > 1 ? $"{count} policy" : "1 policy");
+        }
+
+        if (configHasChanges)
+        {
+            var count = ExtractChangeCount(configSummary);
+            parts.Add(count > 1 ? $"{count} config" : "1 config");
+        }
+
+        if (imageHasChanges)
+        {
+            parts.Add("1 image");
+        }
+
+        return parts.Count == 0 ? "No Changes" : string.Join(", ", parts);
+    }
+
+    /// <summary>
+    /// Extracts the change count from a summary string like "X differences".
+    /// </summary>
+    private static int ExtractChangeCount(string? summary)
+    {
+        if (string.IsNullOrEmpty(summary))
+        {
+            return 1;
+        }
+
+        var match = System.Text.RegularExpressions.Regex.Match(summary, @"(\d+)\s+difference");
+        if (match.Success && int.TryParse(match.Groups[1].Value, out var count))
+        {
+            return count;
+        }
+
+        return 1;
+    }
+
+    // ============================================
     // Metadata Sync Endpoints
     // ============================================
 
@@ -1669,12 +2035,11 @@ public class ConfigurationController : ControllerBase
     /// <summary>
     /// GetMetadataSyncItems
     /// Gets paginated metadata sync items from the database with optional search and filter.
-    /// One record per property category (Metadata, Images, People) per item.
+    /// One record per item containing all categories (Metadata, Images, People).
     /// </summary>
     /// <param name="search">Optional search term (matches item names or paths).</param>
     /// <param name="status">Optional status filter.</param>
     /// <param name="sourceLibraryId">Optional source library ID filter.</param>
-    /// <param name="propertyCategory">Optional property category filter.</param>
     /// <param name="skip">Number of items to skip (default 0).</param>
     /// <param name="take">Maximum items to return (default 50, max 200).</param>
     /// <returns>Paginated result of metadata sync item DTOs.</returns>
@@ -1684,7 +2049,6 @@ public class ConfigurationController : ControllerBase
         [FromQuery] string? search = null,
         [FromQuery] string? status = null,
         [FromQuery] string? sourceLibraryId = null,
-        [FromQuery] string? propertyCategory = null,
         [FromQuery] int skip = 0,
         [FromQuery] int take = 50)
     {
@@ -1707,7 +2071,7 @@ public class ConfigurationController : ControllerBase
 
         // Get paginated results
         var (items, totalCount) = plugin.Database.SearchMetadataSyncItemsPaginated(
-            search, statusFilter, sourceLibraryId, propertyCategory, skip, take);
+            search, statusFilter, sourceLibraryId, skip, take);
 
         var libraryMappings = plugin.Configuration.LibraryMappings;
 
@@ -1928,13 +2292,13 @@ public class ConfigurationController : ControllerBase
     /// <summary>
     /// Maps a MetadataSyncItem to a DTO.
     /// </summary>
-    private static MetadataSyncItemDto MapToMetadataSyncItemDto(MetadataSyncItem item, List<LibraryMapping> libraryMappings)
+    private static MetadataSyncItemDto MapToMetadataSyncItemDto(MetadataSyncItem item, List<LibraryMapping>? libraryMappings)
     {
         // Look up library names
         string? sourceLibraryName = null;
         string? localLibraryName = null;
 
-        var mapping = libraryMappings.FirstOrDefault(m => m.SourceLibraryId == item.SourceLibraryId);
+        var mapping = libraryMappings?.FirstOrDefault(m => m.SourceLibraryId == item.SourceLibraryId);
         if (mapping != null)
         {
             sourceLibraryName = mapping.SourceLibraryName;
@@ -1953,7 +2317,15 @@ public class ConfigurationController : ControllerBase
             ItemName = item.ItemName,
             SourcePath = item.SourcePath,
             LocalPath = item.LocalPath,
-            PropertyCategory = item.PropertyCategory,
+            SourceMetadataValue = item.SourceMetadataValue,
+            LocalMetadataValue = item.LocalMetadataValue,
+            SourceImagesValue = item.SourceImagesValue,
+            LocalImagesValue = item.LocalImagesValue,
+            SourcePeopleValue = item.SourcePeopleValue,
+            LocalPeopleValue = item.LocalPeopleValue,
+            HasMetadataChanges = item.HasMetadataChanges,
+            HasImagesChanges = item.HasImagesChanges,
+            HasPeopleChanges = item.HasPeopleChanges,
             HasChanges = item.HasChanges,
             ChangesSummary = item.ChangesSummary,
             Status = item.Status.ToString(),

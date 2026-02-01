@@ -164,7 +164,29 @@ public static class JsonComparisonUtility
                 return true;
 
             case JsonValueKind.String:
-                return e1.GetString() == e2.GetString();
+                var s1 = e1.GetString();
+                var s2 = e2.GetString();
+
+                // Both null or empty are considered equal
+                if (string.IsNullOrEmpty(s1) && string.IsNullOrEmpty(s2))
+                {
+                    return true;
+                }
+
+                // Direct string match
+                if (s1 == s2)
+                {
+                    return true;
+                }
+
+                // Try to parse as dates and compare (handles timezone format differences)
+                if (DateTime.TryParse(s1, out var dt1) && DateTime.TryParse(s2, out var dt2))
+                {
+                    // Compare as UTC to handle timezone differences like +00:00 vs Z
+                    return dt1.ToUniversalTime() == dt2.ToUniversalTime();
+                }
+
+                return false;
 
             case JsonValueKind.Number:
                 return e1.GetRawText() == e2.GetRawText();

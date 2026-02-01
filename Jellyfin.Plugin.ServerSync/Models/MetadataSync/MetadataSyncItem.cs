@@ -1,32 +1,12 @@
 using System;
 using Jellyfin.Plugin.ServerSync.Models.Common;
+using Jellyfin.Plugin.ServerSync.Utilities;
 
 namespace Jellyfin.Plugin.ServerSync.Models.MetadataSync;
 
 /// <summary>
-/// Property categories for metadata sync items.
-/// </summary>
-public static class MetadataPropertyCategory
-{
-    /// <summary>
-    /// Item metadata (title, overview, genres, tags, ratings, etc.).
-    /// </summary>
-    public const string Metadata = "Metadata";
-
-    /// <summary>
-    /// Item images (Primary, Backdrop, Logo, Thumb, etc.).
-    /// </summary>
-    public const string Images = "Images";
-
-    /// <summary>
-    /// People associated with the item (actors, directors, writers).
-    /// </summary>
-    public const string People = "People";
-}
-
-/// <summary>
 /// Represents a metadata sync record for an item.
-/// One record per property category (Metadata, Images, People) per item.
+/// One record per item, containing all three categories (Metadata, Images, People).
 /// Matches items by file path using library mappings.
 /// </summary>
 public class MetadataSyncItem
@@ -73,46 +53,51 @@ public class MetadataSyncItem
     /// </summary>
     public string? LocalPath { get; set; }
 
-    // ===== Property Category =====
+    // ===== Metadata Category =====
 
     /// <summary>
-    /// Gets or sets the property category (Metadata, Images, People).
+    /// Gets or sets the source metadata value (JSON).
     /// </summary>
-    public string PropertyCategory { get; set; } = string.Empty;
-
-    // ===== Values =====
+    public string? SourceMetadataValue { get; set; }
 
     /// <summary>
-    /// Gets or sets the source value (JSON representation of the metadata/images/people).
+    /// Gets or sets the local metadata value (JSON).
     /// </summary>
-    public string? SourceValue { get; set; }
+    public string? LocalMetadataValue { get; set; }
+
+    // ===== Images Category =====
 
     /// <summary>
-    /// Gets or sets the local value (JSON representation).
+    /// Gets or sets the source images value (JSON with image tags).
     /// </summary>
-    public string? LocalValue { get; set; }
+    public string? SourceImagesValue { get; set; }
 
     /// <summary>
-    /// Gets or sets the merged value (what will be applied - source wins).
+    /// Gets or sets the local images value (JSON).
     /// </summary>
-    public string? MergedValue { get; set; }
-
-    // ===== Image Hashes (for Images category) =====
+    public string? LocalImagesValue { get; set; }
 
     /// <summary>
-    /// Gets or sets the source images hash (combined hash of all images).
+    /// Gets or sets the source images hash (for change detection).
     /// </summary>
     public string? SourceImagesHash { get; set; }
-
-    /// <summary>
-    /// Gets or sets the local images hash.
-    /// </summary>
-    public string? LocalImagesHash { get; set; }
 
     /// <summary>
     /// Gets or sets the last synced images hash.
     /// </summary>
     public string? SyncedImagesHash { get; set; }
+
+    // ===== People Category =====
+
+    /// <summary>
+    /// Gets or sets the source people value (JSON).
+    /// </summary>
+    public string? SourcePeopleValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the local people value (JSON).
+    /// </summary>
+    public string? LocalPeopleValue { get; set; }
 
     // ===== Sync Tracking =====
 
@@ -139,47 +124,66 @@ public class MetadataSyncItem
     // ===== Computed Properties =====
 
     /// <summary>
-    /// Gets a value indicating whether there are changes to sync.
-    /// For Images: compares source hash to synced hash (what we last synced).
-    /// For others: compares source value to synced local value.
+    /// Gets a value indicating whether metadata has changes.
     /// </summary>
-    public bool HasChanges
+    public bool HasMetadataChanges
     {
         get
         {
-            // No local item = can't sync yet
-            if (string.IsNullOrEmpty(LocalItemId))
+            if (string.IsNullOrEmpty(LocalItemId) || string.IsNullOrEmpty(SourceMetadataValue))
             {
                 return false;
             }
 
-            if (PropertyCategory == MetadataPropertyCategory.Images)
-            {
-                // For images, compare source hash to what we last synced
-                // If SyncedImagesHash is null, we haven't synced yet
-                if (!string.IsNullOrEmpty(SourceImagesHash))
-                {
-                    // If we've never synced, there are changes
-                    if (string.IsNullOrEmpty(SyncedImagesHash))
-                    {
-                        return true;
-                    }
-
-                    // Compare source to what we synced
-                    return !string.Equals(SourceImagesHash, SyncedImagesHash, StringComparison.OrdinalIgnoreCase);
-                }
-
-                return false;
-            }
-
-            // For Metadata and People, compare source value (what we want) to local value (what exists)
-            // LocalValue is updated after successful sync to match what was applied
-            return !JsonComparisonUtility.JsonEquals(SourceValue, LocalValue);
+            return !JsonComparisonUtility.JsonEquals(SourceMetadataValue, LocalMetadataValue);
         }
     }
 
     /// <summary>
-    /// Gets a display-friendly summary of the change.
+    /// Gets a value indicating whether images have changes.
+    /// </summary>
+    public bool HasImagesChanges
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(LocalItemId) || string.IsNullOrEmpty(SourceImagesHash))
+            {
+                return false;
+            }
+
+            // If we've never synced images, there are changes
+            if (string.IsNullOrEmpty(SyncedImagesHash))
+            {
+                return true;
+            }
+
+            return !string.Equals(SourceImagesHash, SyncedImagesHash, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether people have changes.
+    /// </summary>
+    public bool HasPeopleChanges
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(LocalItemId) || string.IsNullOrEmpty(SourcePeopleValue))
+            {
+                return false;
+            }
+
+            return !JsonComparisonUtility.JsonEquals(SourcePeopleValue, LocalPeopleValue);
+        }
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether there are any changes to sync.
+    /// </summary>
+    public bool HasChanges => HasMetadataChanges || HasImagesChanges || HasPeopleChanges;
+
+    /// <summary>
+    /// Gets a display-friendly summary of the changes.
     /// </summary>
     public string ChangesSummary
     {
@@ -195,19 +199,25 @@ public class MetadataSyncItem
                 return "No changes";
             }
 
-            if (PropertyCategory == MetadataPropertyCategory.Images)
+            var changes = new System.Collections.Generic.List<string>();
+
+            if (HasMetadataChanges)
             {
-                return "Images differ";
+                var diffCount = JsonComparisonUtility.CountDifferences(SourceMetadataValue, LocalMetadataValue);
+                changes.Add(diffCount == 1 ? "1 metadata field" : $"{diffCount} metadata fields");
             }
 
-            // Count the number of differing properties
-            var diffCount = JsonComparisonUtility.CountDifferences(MergedValue, LocalValue);
-            if (diffCount == 0)
+            if (HasImagesChanges)
             {
-                return "No changes";
+                changes.Add("Images");
             }
 
-            return diffCount == 1 ? "1 difference" : $"{diffCount} differences";
+            if (HasPeopleChanges)
+            {
+                changes.Add("People");
+            }
+
+            return string.Join(", ", changes);
         }
     }
 }

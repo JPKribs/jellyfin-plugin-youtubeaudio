@@ -4,6 +4,7 @@ namespace Jellyfin.Plugin.ServerSync.Models.MetadataSync;
 
 /// <summary>
 /// Metadata sync item information for API responses.
+/// One record per item containing all categories.
 /// </summary>
 public class MetadataSyncItemDto
 {
@@ -59,17 +60,57 @@ public class MetadataSyncItemDto
     /// </summary>
     public string? LocalPath { get; set; }
 
-    // ===== Property Category =====
+    // ===== Category Values (for modal display) =====
 
     /// <summary>
-    /// Gets or sets the property category (Metadata, Images, People).
+    /// Gets or sets the source metadata value (JSON).
     /// </summary>
-    public string PropertyCategory { get; set; } = string.Empty;
+    public string? SourceMetadataValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the local metadata value (JSON).
+    /// </summary>
+    public string? LocalMetadataValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the source images value (JSON).
+    /// </summary>
+    public string? SourceImagesValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the local images value (JSON).
+    /// </summary>
+    public string? LocalImagesValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the source people value (JSON).
+    /// </summary>
+    public string? SourcePeopleValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the local people value (JSON).
+    /// </summary>
+    public string? LocalPeopleValue { get; set; }
 
     // ===== Change Detection =====
 
     /// <summary>
-    /// Gets or sets whether there are changes to sync.
+    /// Gets or sets whether metadata has changes.
+    /// </summary>
+    public bool HasMetadataChanges { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether images have changes.
+    /// </summary>
+    public bool HasImagesChanges { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether people have changes.
+    /// </summary>
+    public bool HasPeopleChanges { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether there are any changes to sync.
     /// </summary>
     public bool HasChanges { get; set; }
 

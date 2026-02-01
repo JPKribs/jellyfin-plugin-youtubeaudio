@@ -123,7 +123,7 @@
                                 <input is="emby-checkbox" type="checkbox" id="chkEnableContentSync" />
                                 <span>Enable Content Sync</span>
                             </label>
-                            <div class="fieldDescription">Enable syncing content from the source server.</div>
+                            <div class="fieldDescription">Sync content files between source and local servers for mapped libraries.</div>
                         </div>
 
                         <div id="contentSyncSettings">
@@ -1492,6 +1492,22 @@
             border-left: 3px solid #f0ad4e;
         }
 
+        /* Section headers in user sync modal */
+        .userSyncModal-sectionHeader td {
+            background: rgba(255, 255, 255, 0.08);
+            font-weight: bold;
+            padding: 8px 12px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+            text-transform: uppercase;
+            font-size: 0.85em;
+            letter-spacing: 0.5px;
+        }
+
+        /* Disabled category row */
+        .userSyncModal-disabledRow td {
+            padding: 8px 12px;
+        }
+
         /* Metadata Sync Modal Table Container - scrollable */
         .metadataSyncModal-tableContainer {
             max-height: 400px;
@@ -1515,6 +1531,16 @@
         }
         .metadataSyncModal-changedRow td:first-child {
             border-left: 3px solid #f0ad4e;
+        }
+
+        /* Category header rows in metadata sync modal */
+        .metadataSyncModal-categoryHeader {
+            background: rgba(82, 181, 223, 0.15);
+        }
+        .metadataSyncModal-categoryHeader td {
+            padding: 8px 12px;
+            font-size: 0.9em;
+            color: #52b5df;
         }
 
         /* Sync section separator */
@@ -3265,7 +3291,17 @@
         };
         
         PaginatedTable.prototype = {
-        
+
+            // _getItemId
+            // Gets the ID for an item. Supports idKey as string (property name) or function.
+            _getItemId: function(item) {
+                var idKey = this.options.selection && this.options.selection.idKey || 'id';
+                if (typeof idKey === 'function') {
+                    return idKey(item);
+                }
+                return item[idKey];
+            },
+
             // _mergeOptions
             // Deep merges user-provided options with defaults.
             _mergeOptions: function(options) {
@@ -3608,8 +3644,7 @@
             _renderRow: function(item) {
                 var self = this;
                 var opts = this.options;
-                var idKey = opts.selection && opts.selection.idKey || 'id';
-                var itemId = item[idKey];
+                var itemId = this._getItemId(item);
                 var visibleColumns = opts.columns.filter(function(col) { return !col.hidden; });
         
                 var html = '<div class="pt-row" data-id="' + ServerSyncShared.escapeHtml(String(itemId)) + '">';
@@ -3731,9 +3766,9 @@
             // _getItemById
             // Finds an item in the current items array by its ID.
             _getItemById: function(id) {
-                var idKey = this.options.selection && this.options.selection.idKey || 'id';
+                var self = this;
                 return this.state.items.find(function(item) {
-                    return String(item[idKey]) === String(id);
+                    return String(self._getItemId(item)) === String(id);
                 });
             },
         
@@ -3775,13 +3810,12 @@
             // Selects or deselects all currently loaded items.
             _toggleSelectAll: function(checked) {
                 var self = this;
-                var idKey = this.options.selection && this.options.selection.idKey || 'id';
-        
+
                 this.state.selectedIds.clear();
-        
+
                 if (checked) {
                     this.state.items.forEach(function(item) {
-                        self.state.selectedIds.add(String(item[idKey]));
+                        self.state.selectedIds.add(String(self._getItemId(item)));
                     });
                 }
         
@@ -3817,9 +3851,8 @@
             // Returns an array of selected item objects.
             getSelectedItems: function() {
                 var self = this;
-                var idKey = this.options.selection && this.options.selection.idKey || 'id';
                 return this.state.items.filter(function(item) {
-                    return self.state.selectedIds.has(String(item[idKey]));
+                    return self.state.selectedIds.has(String(self._getItemId(item)));
                 });
             },
         
@@ -5131,32 +5164,29 @@
         // User Sync Table module
         var UserSyncTableModule = {
             table: null,
-            currentModalItem: null,
+            currentModalDetail: null,
             currentConfig: null,
 
             init: function(config) {
                 var self = this;
                 self.currentConfig = config;
 
-                // Create the paginated table instance
+                // Create the paginated table instance (consolidated view - 1 row per user)
                 this.table = new PaginatedTable({
                     containerId: 'userSyncItemsTableContainer',
-                    endpoint: 'UserItems',
+                    endpoint: 'UserSyncUsers',
 
                     columns: [
                         {
-                            key: 'item',
-                            label: 'Item',
+                            key: 'user',
+                            label: 'User',
                             type: 'custom',
                             render: function(item) {
-                                var category = item.PropertyCategory || 'Unknown';
-                                if (category === 'ProfileImage') category = 'Profile Image';
                                 var sourceUserName = item.SourceUserName || 'Unknown';
                                 var localUserName = item.LocalUserName || 'Unknown';
 
                                 return '<div class="syncItemInfo">' +
-                                    '<div class="syncItemName">' + ServerSyncShared.escapeHtml(category) + '</div>' +
-                                    '<div class="syncItemPath">' + ServerSyncShared.escapeHtml(sourceUserName) + ' → ' + ServerSyncShared.escapeHtml(localUserName) + '</div>' +
+                                    '<div class="syncItemName">' + ServerSyncShared.escapeHtml(sourceUserName) + ' → ' + ServerSyncShared.escapeHtml(localUserName) + '</div>' +
                                     '</div>';
                             }
                         },
@@ -5166,16 +5196,13 @@
                             type: 'custom',
                             render: function(item) {
                                 if (!item.HasChanges) {
-                                    return '<span style="opacity: 0.5;">No changes</span>';
+                                    return '<span style="opacity: 0.5;">No Changes</span>';
                                 }
-                                if (item.PropertyCategory === 'ProfileImage') {
-                                    return ServerSyncShared.escapeHtml(item.SourceImageSizeFormatted || 'Image update');
-                                }
-                                return ServerSyncShared.escapeHtml(item.ChangesSummary || 'Changes pending');
+                                return ServerSyncShared.escapeHtml(item.TotalChanges || 'Changes pending');
                             }
                         },
                         {
-                            key: 'Status',
+                            key: 'OverallStatus',
                             label: 'Status',
                             type: 'status'
                         }
@@ -5183,7 +5210,9 @@
 
                     selection: {
                         enabled: true,
-                        idKey: 'Id',
+                        idKey: function(item) {
+                            return item.SourceUserId + '|' + item.LocalUserId;
+                        },
                         onSelectionChange: function(selectedIds) {
                             self.updateBulkActionsVisibility(selectedIds.length);
                         }
@@ -5207,7 +5236,7 @@
 
                     actions: {
                         onRowClick: function(item) {
-                            self.showItemDetail(item.Id);
+                            self.showUserDetail(item);
                         },
                         onReload: function() {
                             self.loadUserStatus();
@@ -5413,135 +5442,199 @@
 
             bulkIgnore: function() {
                 var self = this;
-                var ids = this.table.getSelectedIds();
-                if (ids.length === 0) return;
+                var selectedKeys = this.table.getSelectedIds();
+                if (selectedKeys.length === 0) return;
 
-                ServerSyncShared.apiRequest('UserItems/Ignore', 'POST', { Ids: ids }).then(function() {
+                var userMappings = selectedKeys.map(function(key) {
+                    var parts = key.split('|');
+                    return { SourceUserId: parts[0], LocalUserId: parts[1] };
+                });
+
+                ServerSyncShared.apiRequest('UserSyncUsers/Ignore', 'POST', { UserMappings: userMappings }).then(function() {
                     self.table.clearSelection();
                     self.loadUserStatus();
                     self.loadUserItems();
-                    ServerSyncShared.showAlert(ids.length + ' item(s) ignored');
+                    ServerSyncShared.showAlert(selectedKeys.length + ' user(s) ignored');
                 }).catch(function() {
-                    ServerSyncShared.showAlert('Failed to ignore items');
+                    ServerSyncShared.showAlert('Failed to ignore users');
                 });
             },
 
             bulkQueue: function() {
                 var self = this;
-                var ids = this.table.getSelectedIds();
-                if (ids.length === 0) return;
+                var selectedKeys = this.table.getSelectedIds();
+                if (selectedKeys.length === 0) return;
 
-                ServerSyncShared.apiRequest('UserItems/Queue', 'POST', { Ids: ids }).then(function() {
+                var userMappings = selectedKeys.map(function(key) {
+                    var parts = key.split('|');
+                    return { SourceUserId: parts[0], LocalUserId: parts[1] };
+                });
+
+                ServerSyncShared.apiRequest('UserSyncUsers/Queue', 'POST', { UserMappings: userMappings }).then(function() {
                     self.table.clearSelection();
                     self.loadUserStatus();
                     self.loadUserItems();
-                    ServerSyncShared.showAlert(ids.length + ' item(s) queued');
+                    ServerSyncShared.showAlert(selectedKeys.length + ' user(s) queued');
                 }).catch(function() {
-                    ServerSyncShared.showAlert('Failed to queue items');
+                    ServerSyncShared.showAlert('Failed to queue users');
                 });
             },
 
-            showItemDetail: function(itemId) {
+            showUserDetail: function(item) {
                 var self = this;
+                var sourceUserId = item.SourceUserId;
+                var localUserId = item.LocalUserId;
 
-                // Fetch full item details from API
-                ServerSyncShared.apiRequest('UserItems/' + itemId).then(function(item) {
-                    if (!item) {
-                        ServerSyncShared.showAlert('Item not found');
+                // Fetch full user details from API
+                ServerSyncShared.apiRequest('UserSyncUsers/' + encodeURIComponent(sourceUserId) + '/' + encodeURIComponent(localUserId)).then(function(detail) {
+                    if (!detail) {
+                        ServerSyncShared.showAlert('User not found');
                         return;
                     }
 
-                    self.currentModalItem = item;
+                    self.currentModalDetail = detail;
 
                     // Title
-                    var category = item.PropertyCategory || 'Unknown';
-                    if (category === 'ProfileImage') category = 'Profile Image';
                     document.getElementById('userSyncModalTitle').textContent =
-                        (item.SourceUserName || 'Unknown') + ' → ' + (item.LocalUserName || 'Unknown') + ' (' + category + ')';
+                        (detail.SourceUserName || 'Unknown') + ' → ' + (detail.LocalUserName || 'Unknown');
 
                     // Status badge
                     var statusBadge = document.getElementById('userSyncModalStatusBadge');
-                    statusBadge.textContent = item.Status || 'Unknown';
-                    statusBadge.className = 'itemModal-statusBadge ' + (item.Status || 'unknown');
+                    statusBadge.textContent = detail.OverallStatus || 'Unknown';
+                    statusBadge.className = 'itemModal-statusBadge ' + (detail.OverallStatus || 'unknown');
 
                     // Last sync
                     var lastSyncSection = document.getElementById('userSyncModalLastSyncSection');
-                    if (item.LastSyncTime) {
+                    if (detail.LastSyncTime) {
                         lastSyncSection.style.display = 'block';
                         document.getElementById('userSyncModalLastSync').textContent =
-                            ServerSyncShared.formatRelativeTime(new Date(item.LastSyncTime));
+                            ServerSyncShared.formatRelativeTime(new Date(detail.LastSyncTime));
                     } else {
                         lastSyncSection.style.display = 'none';
                     }
 
                     // Error section
                     var errorSection = document.getElementById('userSyncModalErrorSection');
-                    if (item.Status === 'Errored' && item.ErrorMessage) {
+                    if (detail.OverallStatus === 'Errored' && detail.ErrorMessage) {
                         errorSection.style.display = 'block';
-                        document.getElementById('userSyncModalError').textContent = item.ErrorMessage;
+                        document.getElementById('userSyncModalError').textContent = detail.ErrorMessage;
                     } else {
                         errorSection.style.display = 'none';
                     }
 
                     // User info
                     document.getElementById('userSyncModalUser').textContent =
-                        (item.SourceUserName || 'Unknown') + ' → ' + (item.LocalUserName || 'Unknown');
+                        (detail.SourceUserName || 'Unknown') + ' → ' + (detail.LocalUserName || 'Unknown');
 
-                    // Table headers
+                    // Table headers - use 4 columns now: Property | Source | Local | Changed?
                     document.getElementById('userSyncModalSourceHeader').textContent =
                         (self.currentConfig && self.currentConfig.SourceServerName) || 'Source';
                     document.getElementById('userSyncModalLocalHeader').textContent = 'Local';
 
-                    // Build comparison table
+                    // Build comparison table with all categories
                     var tbody = document.getElementById('userSyncModalTableBody');
                     tbody.innerHTML = '';
 
-                    if (item.PropertyCategory === 'ProfileImage') {
-                        var hasChange = item.HasChanges;
-                        var row = self._createTableRow(
-                            'Profile Image',
-                            item.SourceImageSizeFormatted || 'No image',
-                            item.LocalImageSizeFormatted || 'No image',
-                            hasChange ? (item.SourceImageSizeFormatted || 'No image') : '-',
-                            hasChange
-                        );
-                        tbody.appendChild(row);
-                    } else {
-                        // Parse JSON and show each property
-                        var sourceObj = self._parseJson(item.SourceValue);
-                        var localObj = self._parseJson(item.LocalValue);
-                        var mergedObj = self._parseJson(item.MergedValue);
+                    // Policy section
+                    if (detail.PolicyEnabled) {
+                        if (detail.PolicyItem) {
+                            tbody.appendChild(self._createSectionHeader('Policy'));
+                            self._addPropertyRows(tbody, detail.PolicyItem);
+                        } else {
+                            tbody.appendChild(self._createDisabledRow('Policy', 'Not available'));
+                        }
+                    }
 
-                        var allKeys = new Set();
-                        Object.keys(sourceObj).forEach(function(k) { allKeys.add(k); });
-                        Object.keys(localObj).forEach(function(k) { allKeys.add(k); });
+                    // Configuration section
+                    if (detail.ConfigurationEnabled) {
+                        if (detail.ConfigurationItem) {
+                            tbody.appendChild(self._createSectionHeader('Configuration'));
+                            self._addPropertyRows(tbody, detail.ConfigurationItem);
+                        } else {
+                            tbody.appendChild(self._createDisabledRow('Configuration', 'Not available'));
+                        }
+                    }
 
-                        var sortedKeys = Array.from(allKeys).sort();
-                        sortedKeys.forEach(function(key) {
-                            var sourceVal = sourceObj[key];
-                            var localVal = localObj[key];
-                            var mergedVal = mergedObj[key];
-                            var hasChange = JSON.stringify(sourceVal) !== JSON.stringify(localVal);
-
-                            var row = self._createTableRow(
-                                key,
-                                self._formatValue(sourceVal),
-                                self._formatValue(localVal),
-                                hasChange ? self._formatValue(mergedVal) : '-',
-                                hasChange
-                            );
-                            tbody.appendChild(row);
-                        });
+                    // Profile Image section
+                    if (detail.ProfileImageEnabled) {
+                        if (detail.ProfileImageItem) {
+                            tbody.appendChild(self._createSectionHeader('Profile Image'));
+                            self._addProfileImageRow(tbody, detail.ProfileImageItem);
+                        } else {
+                            tbody.appendChild(self._createDisabledRow('Profile Image', 'Not available'));
+                        }
                     }
 
                     document.getElementById('userSyncItemDetailModal').style.display = 'flex';
                 }).catch(function(err) {
-                    console.error('Failed to load item detail:', err);
-                    ServerSyncShared.showAlert('Failed to load item details');
+                    console.error('Failed to load user detail:', err);
+                    ServerSyncShared.showAlert('Failed to load user details');
                 });
             },
 
-            _createTableRow: function(property, sourceVal, localVal, mergedVal, hasChange) {
+            _createSectionHeader: function(title) {
+                var row = document.createElement('tr');
+                row.className = 'userSyncModal-sectionHeader';
+                var cell = document.createElement('td');
+                cell.colSpan = 4;
+                cell.textContent = title;
+                row.appendChild(cell);
+                return row;
+            },
+
+            _createDisabledRow: function(category, message) {
+                var row = document.createElement('tr');
+                row.className = 'userSyncModal-disabledRow';
+                var cell = document.createElement('td');
+                cell.colSpan = 4;
+                cell.textContent = category + ': ' + message;
+                cell.style.opacity = '0.5';
+                cell.style.fontStyle = 'italic';
+                row.appendChild(cell);
+                return row;
+            },
+
+            _addPropertyRows: function(tbody, item) {
+                var self = this;
+                var sourceObj = self._parseJson(item.SourceValue);
+                var localObj = self._parseJson(item.LocalValue);
+                var mergedObj = self._parseJson(item.MergedValue);
+
+                var allKeys = new Set();
+                Object.keys(sourceObj).forEach(function(k) { allKeys.add(k); });
+                Object.keys(localObj).forEach(function(k) { allKeys.add(k); });
+
+                var sortedKeys = Array.from(allKeys).sort();
+                sortedKeys.forEach(function(key) {
+                    var sourceVal = sourceObj[key];
+                    var localVal = localObj[key];
+                    var mergedVal = mergedObj[key];
+                    var hasChange = JSON.stringify(sourceVal) !== JSON.stringify(localVal);
+
+                    var row = self._createTableRow(
+                        key,
+                        self._formatValue(sourceVal),
+                        self._formatValue(localVal),
+                        hasChange ? self._formatValue(mergedVal) : '-',
+                        hasChange
+                    );
+                    tbody.appendChild(row);
+                });
+            },
+
+            _addProfileImageRow: function(tbody, item) {
+                var hasChange = item.HasChanges;
+                var row = this._createTableRow(
+                    'Image',
+                    item.SourceImageSizeFormatted || 'No image',
+                    item.LocalImageSizeFormatted || 'No image',
+                    hasChange ? (item.SourceImageSizeFormatted || 'Source image') : '-',
+                    hasChange
+                );
+                tbody.appendChild(row);
+            },
+
+            _createTableRow: function(property, sourceVal, localVal, afterSyncVal, hasChange) {
                 var row = document.createElement('tr');
                 if (hasChange) {
                     row.className = 'userSyncModal-changedRow';
@@ -5562,10 +5655,10 @@
                 localCell.textContent = localVal;
                 row.appendChild(localCell);
 
-                var mergedCell = document.createElement('td');
-                mergedCell.className = 'historyCompareTable-value historyCompareTable-merged';
-                mergedCell.textContent = mergedVal;
-                row.appendChild(mergedCell);
+                var afterSyncCell = document.createElement('td');
+                afterSyncCell.className = 'historyCompareTable-value historyCompareTable-merged';
+                afterSyncCell.textContent = afterSyncVal;
+                row.appendChild(afterSyncCell);
 
                 return row;
             },
@@ -5598,32 +5691,42 @@
 
             closeModal: function() {
                 document.getElementById('userSyncItemDetailModal').style.display = 'none';
-                this.currentModalItem = null;
+                this.currentModalDetail = null;
             },
 
             modalIgnore: function() {
-                if (this.currentModalItem) {
-                    this.updateItemStatus(this.currentModalItem.Id, 'Ignored');
-                }
-            },
-
-            modalQueue: function() {
-                if (this.currentModalItem) {
-                    this.updateItemStatus(this.currentModalItem.Id, 'Queued');
-                }
-            },
-
-            updateItemStatus: function(itemId, status) {
                 var self = this;
+                var detail = self.currentModalDetail;
+                if (!detail) return;
 
-                ServerSyncShared.apiRequest('UserItems/UpdateStatus', 'POST', { Id: itemId, Status: status }).then(function() {
+                ServerSyncShared.apiRequest('UserSyncUsers/Ignore', 'POST', {
+                    UserMappings: [{ SourceUserId: detail.SourceUserId, LocalUserId: detail.LocalUserId }]
+                }).then(function() {
                     self.closeModal();
                     self.loadUserStatus();
                     self.loadUserItems();
-                    ServerSyncShared.showAlert('Item status updated to ' + status);
+                    ServerSyncShared.showAlert('User ignored');
                 }).catch(function(err) {
-                    console.error('Failed to update item status:', err);
-                    ServerSyncShared.showAlert('Failed to update item status');
+                    console.error('Failed to ignore user:', err);
+                    ServerSyncShared.showAlert('Failed to ignore user');
+                });
+            },
+
+            modalQueue: function() {
+                var self = this;
+                var detail = self.currentModalDetail;
+                if (!detail) return;
+
+                ServerSyncShared.apiRequest('UserSyncUsers/Queue', 'POST', {
+                    UserMappings: [{ SourceUserId: detail.SourceUserId, LocalUserId: detail.LocalUserId }]
+                }).then(function() {
+                    self.closeModal();
+                    self.loadUserStatus();
+                    self.loadUserItems();
+                    ServerSyncShared.showAlert('User queued');
+                }).catch(function(err) {
+                    console.error('Failed to queue user:', err);
+                    ServerSyncShared.showAlert('Failed to queue user');
                 });
             }
         };
@@ -5653,15 +5756,14 @@
                             label: 'Item',
                             type: 'custom',
                             render: function(item) {
-                                var category = item.PropertyCategory || 'Unknown';
                                 var itemName = item.ItemName || 'Unknown';
                                 var sourceLib = item.SourceLibraryName || 'Unknown';
                                 var localLib = item.LocalLibraryName || 'Unknown';
                                 var libraryDisplay = sourceLib + ' → ' + localLib;
 
                                 return '<div class="syncItemInfo">' +
-                                    '<div class="syncItemName" title="' + ServerSyncShared.escapeHtml(itemName + ' (' + category + ')') + '">' +
-                                    ServerSyncShared.escapeHtml(itemName) + ' <span style="opacity:0.6;">(' + ServerSyncShared.escapeHtml(category) + ')</span></div>' +
+                                    '<div class="syncItemName" title="' + ServerSyncShared.escapeHtml(itemName) + '">' +
+                                    ServerSyncShared.escapeHtml(itemName) + '</div>' +
                                     '<div class="syncItemPath">' + ServerSyncShared.escapeHtml(libraryDisplay) + '</div>' +
                                 '</div>';
                             }
@@ -5674,9 +5776,6 @@
                                 if (!item.HasChanges) {
                                     return '<span style="opacity: 0.5;">No changes</span>';
                                 }
-                                if (item.PropertyCategory === 'Images') {
-                                    return 'Image update';
-                                }
                                 return item.ChangesSummary || 'Changes pending';
                             }
                         },
@@ -5688,27 +5787,19 @@
                     ],
 
                     filters: {
-                        type: 'select',
-                        label: 'Status',
                         options: [
-                            { value: '', label: 'All Statuses' },
-                            { value: 'Synced', label: 'Synced', id: 'optMetadataSynced' },
-                            { value: 'Queued', label: 'Queued', id: 'optMetadataQueued' },
-                            { value: 'Errored', label: 'Errored', id: 'optMetadataErrored' },
-                            { value: 'Ignored', label: 'Ignored', id: 'optMetadataIgnored' }
+                            { value: 'Synced', label: 'Synced' },
+                            { value: 'Queued', label: 'Queued' },
+                            { value: 'Errored', label: 'Errored' },
+                            { value: 'Ignored', label: 'Ignored' }
                         ],
-                        onChange: function(value) {
-                            self.table.setParam('status', value);
-                            self.table.reload();
+                        buildParams: function(filterValue) {
+                            return { status: filterValue };
                         }
                     },
 
                     search: {
-                        placeholder: 'Search items...',
-                        onSearch: function(query) {
-                            self.table.setParam('search', query);
-                            self.table.reload();
-                        }
+                        placeholder: 'Search items...'
                     },
 
                     selection: {
@@ -5969,9 +6060,8 @@
                     self.currentModalItem = item;
 
                     // Title
-                    var category = item.PropertyCategory || 'Unknown';
                     var itemName = item.ItemName || 'Unknown';
-                    document.getElementById('metadataSyncModalTitle').textContent = itemName + ' (' + category + ')';
+                    document.getElementById('metadataSyncModalTitle').textContent = itemName;
 
                     // Status badge
                     var statusBadge = document.getElementById('metadataSyncModalStatusBadge');
@@ -6005,46 +6095,96 @@
                         (self.currentConfig && self.currentConfig.SourceServerName) || 'Source';
                     document.getElementById('metadataSyncModalLocalHeader').textContent = 'Local';
 
-                    // Build comparison table
+                    // Build comparison table with all categories
                     var tbody = document.getElementById('metadataSyncModalTableBody');
                     tbody.innerHTML = '';
 
-                    if (item.PropertyCategory === 'Images') {
-                        var hasChange = item.HasChanges;
-                        var row = self._createTableRow(
-                            'Images',
-                            item.SourceImagesHash ? 'Has Images' : 'No Images',
-                            item.LocalImagesHash ? 'Has Images' : 'No Images',
-                            hasChange ? 'Source Images' : '-',
-                            hasChange
-                        );
-                        tbody.appendChild(row);
-                    } else {
-                        // Parse JSON and show each property
-                        var sourceObj = self._parseJson(item.SourceValue);
-                        var localObj = self._parseJson(item.LocalValue);
-                        var mergedObj = self._parseJson(item.MergedValue);
+                    // Add a category header row helper
+                    var addCategoryHeader = function(categoryName) {
+                        var headerRow = document.createElement('tr');
+                        headerRow.className = 'metadataSyncModal-categoryHeader';
+                        var headerCell = document.createElement('td');
+                        headerCell.colSpan = 4;
+                        headerCell.innerHTML = '<strong>' + categoryName + '</strong>';
+                        headerRow.appendChild(headerCell);
+                        tbody.appendChild(headerRow);
+                    };
 
-                        var allKeys = new Set();
-                        Object.keys(sourceObj).forEach(function(k) { allKeys.add(k); });
-                        Object.keys(localObj).forEach(function(k) { allKeys.add(k); });
+                    // Metadata section
+                    addCategoryHeader('Metadata');
+                    if (item.SourceMetadataValue) {
+                        var sourceMetaObj = self._parseJson(item.SourceMetadataValue);
+                        var localMetaObj = self._parseJson(item.LocalMetadataValue);
 
-                        var sortedKeys = Array.from(allKeys).sort();
-                        sortedKeys.forEach(function(key) {
-                            var sourceVal = sourceObj[key];
-                            var localVal = localObj[key];
-                            var mergedVal = mergedObj[key];
+                        var metaKeys = new Set();
+                        Object.keys(sourceMetaObj).forEach(function(k) { metaKeys.add(k); });
+                        Object.keys(localMetaObj).forEach(function(k) { metaKeys.add(k); });
+
+                        var sortedMetaKeys = Array.from(metaKeys).sort();
+                        sortedMetaKeys.forEach(function(key) {
+                            var sourceVal = sourceMetaObj[key];
+                            var localVal = localMetaObj[key];
                             var hasChange = JSON.stringify(sourceVal) !== JSON.stringify(localVal);
 
                             var row = self._createTableRow(
                                 key,
                                 self._formatValue(sourceVal),
                                 self._formatValue(localVal),
-                                hasChange ? self._formatValue(mergedVal) : '-',
+                                hasChange ? self._formatValue(sourceVal) : '-',
                                 hasChange
                             );
                             tbody.appendChild(row);
                         });
+                    } else {
+                        var noDataRow = self._createTableRow('(Metadata sync disabled)', '-', '-', '-', false);
+                        tbody.appendChild(noDataRow);
+                    }
+
+                    // Images section
+                    addCategoryHeader('Images');
+                    if (item.SourceImagesValue) {
+                        var hasImagesChange = item.HasImagesChanges;
+                        var sourceImgObj = self._parseJson(item.SourceImagesValue);
+                        var localImgObj = self._parseJson(item.LocalImagesValue);
+
+                        // Show image tags summary
+                        var sourceHasImages = sourceImgObj.ImageTags || sourceImgObj.BackdropTags;
+                        var localHasImages = Object.values(localImgObj || {}).some(function(v) { return v === true; });
+
+                        var row = self._createTableRow(
+                            'Images Available',
+                            sourceHasImages ? 'Yes' : 'No',
+                            localHasImages ? 'Yes' : 'No',
+                            hasImagesChange ? 'Will sync from source' : '-',
+                            hasImagesChange
+                        );
+                        tbody.appendChild(row);
+                    } else {
+                        var noDataRow = self._createTableRow('(Images sync disabled)', '-', '-', '-', false);
+                        tbody.appendChild(noDataRow);
+                    }
+
+                    // People section
+                    addCategoryHeader('People');
+                    if (item.SourcePeopleValue) {
+                        var sourcePeopleArr = self._parseJson(item.SourcePeopleValue);
+                        var localPeopleArr = self._parseJson(item.LocalPeopleValue);
+                        var hasPeopleChange = item.HasPeopleChanges;
+
+                        var sourceCount = Array.isArray(sourcePeopleArr) ? sourcePeopleArr.length : 0;
+                        var localCount = Array.isArray(localPeopleArr) ? localPeopleArr.length : 0;
+
+                        var row = self._createTableRow(
+                            'People Count',
+                            sourceCount + ' people',
+                            localCount + ' people',
+                            hasPeopleChange ? 'Will sync from source' : '-',
+                            hasPeopleChange
+                        );
+                        tbody.appendChild(row);
+                    } else {
+                        var noDataRow = self._createTableRow('(People sync disabled)', '-', '-', '-', false);
+                        tbody.appendChild(noDataRow);
                     }
 
                     document.getElementById('metadataSyncItemDetailModal').style.display = 'flex';
@@ -6054,7 +6194,7 @@
                 });
             },
 
-            _createTableRow: function(property, sourceVal, localVal, mergedVal, hasChange) {
+            _createTableRow: function(property, sourceVal, localVal, actionVal, hasChange) {
                 var row = document.createElement('tr');
                 if (hasChange) {
                     row.className = 'metadataSyncModal-changedRow';
@@ -6075,10 +6215,10 @@
                 localCell.textContent = localVal;
                 row.appendChild(localCell);
 
-                var mergedCell = document.createElement('td');
-                mergedCell.className = 'historyCompareTable-value historyCompareTable-merged';
-                mergedCell.textContent = mergedVal;
-                row.appendChild(mergedCell);
+                var actionCell = document.createElement('td');
+                actionCell.className = 'historyCompareTable-value historyCompareTable-merged';
+                actionCell.textContent = actionVal;
+                row.appendChild(actionCell);
 
                 return row;
             },

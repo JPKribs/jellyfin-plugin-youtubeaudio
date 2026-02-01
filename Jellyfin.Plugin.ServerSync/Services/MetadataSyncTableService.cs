@@ -44,7 +44,9 @@ public class MetadataSyncTableService
     /// <param name="client">Source server client.</param>
     /// <param name="database">Sync database.</param>
     /// <param name="libraryMapping">Library mapping.</param>
-    /// <param name="enabledCategories">List of enabled property categories to sync.</param>
+    /// <param name="syncMetadata">Whether to sync metadata fields.</param>
+    /// <param name="syncImages">Whether to sync images.</param>
+    /// <param name="syncPeople">Whether to sync people.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <param name="onItemProcessed">Optional callback after each item is processed.</param>
     /// <returns>Number of items processed.</returns>
@@ -52,7 +54,9 @@ public class MetadataSyncTableService
         SourceServerClient client,
         SyncDatabase database,
         LibraryMapping libraryMapping,
-        List<string> enabledCategories,
+        bool syncMetadata,
+        bool syncImages,
+        bool syncPeople,
         CancellationToken cancellationToken,
         Action? onItemProcessed = null)
     {
@@ -62,20 +66,14 @@ public class MetadataSyncTableService
         var processedItems = 0;
         var consecutiveErrors = 0;
 
-        // Load existing metadata items for this library
-        var existingItems = new Dictionary<string, Dictionary<string, MetadataSyncItem>>();
+        // Load existing metadata items for this library (one record per item now)
+        var existingItems = new Dictionary<string, MetadataSyncItem>();
         try
         {
             var items = database.GetMetadataSyncItemsByLibrary(libraryMapping.SourceLibraryId);
             foreach (var item in items)
             {
-                if (!existingItems.TryGetValue(item.SourceItemId, out var categoryDict))
-                {
-                    categoryDict = new Dictionary<string, MetadataSyncItem>();
-                    existingItems[item.SourceItemId] = categoryDict;
-                }
-
-                categoryDict[item.PropertyCategory] = item;
+                existingItems[item.SourceItemId] = item;
             }
         }
         catch (Exception ex)
@@ -86,8 +84,8 @@ public class MetadataSyncTableService
         }
 
         _logger.LogInformation(
-            "Processing metadata for library {Library} with categories: {Categories}",
-            libraryMapping.SourceLibraryName, string.Join(", ", enabledCategories));
+            "Processing metadata for library {Library} (Metadata: {Metadata}, Images: {Images}, People: {People})",
+            libraryMapping.SourceLibraryName, syncMetadata, syncImages, syncPeople);
 
         while (true)
         {
@@ -161,7 +159,9 @@ public class MetadataSyncTableService
                         database,
                         libraryMapping,
                         sourceItem,
-                        enabledCategories,
+                        syncMetadata,
+                        syncImages,
+                        syncPeople,
                         existingItems);
 
                     processedItems++;
@@ -196,8 +196,10 @@ public class MetadataSyncTableService
         SyncDatabase database,
         LibraryMapping libraryMapping,
         BaseItemDto sourceItem,
-        List<string> enabledCategories,
-        Dictionary<string, Dictionary<string, MetadataSyncItem>> existingItems)
+        bool syncMetadata,
+        bool syncImages,
+        bool syncPeople,
+        Dictionary<string, MetadataSyncItem> existingItems)
     {
         var sourceItemId = sourceItem.Id!.Value.ToString("N", CultureInfo.InvariantCulture);
         var sourcePath = sourceItem.Path!;
@@ -209,40 +211,36 @@ public class MetadataSyncTableService
         var localItem = _libraryManager.FindByPath(localPath, isFolder: false);
         string? localItemId = localItem?.Id.ToString("N", CultureInfo.InvariantCulture);
 
-        // Get existing items for this source item
-        var existingForItem = existingItems.GetValueOrDefault(sourceItemId) ?? new Dictionary<string, MetadataSyncItem>();
+        // Get existing item for this source item
+        var existingItem = existingItems.GetValueOrDefault(sourceItemId);
 
-        // Process each enabled category
-        foreach (var category in enabledCategories)
+        if (existingItem != null)
         {
-            var existingItem = existingForItem.GetValueOrDefault(category);
+            // Update existing item with all category values
+            UpdateMetadataItem(existingItem, sourceItem, localItem, localPath, localItemId, syncMetadata, syncImages, syncPeople);
+            database.UpsertMetadataSyncItem(existingItem);
+        }
+        else
+        {
+            // Create new item with all category values
+            var newItem = CreateMetadataItem(
+                libraryMapping,
+                sourceItem,
+                sourceItemId,
+                sourcePath,
+                localPath,
+                localItemId,
+                localItem,
+                syncMetadata,
+                syncImages,
+                syncPeople);
 
-            if (existingItem != null)
-            {
-                // Update existing item
-                UpdateMetadataItem(existingItem, sourceItem, localItem, localPath, localItemId, category);
-                database.UpsertMetadataSyncItem(existingItem);
-            }
-            else
-            {
-                // Create new item
-                var newItem = CreateMetadataItem(
-                    libraryMapping,
-                    sourceItem,
-                    sourceItemId,
-                    sourcePath,
-                    localPath,
-                    localItemId,
-                    localItem,
-                    category);
-
-                database.UpsertMetadataSyncItem(newItem);
-            }
+            database.UpsertMetadataSyncItem(newItem);
         }
     }
 
     /// <summary>
-    /// Creates a new metadata sync item.
+    /// Creates a new metadata sync item with all category values.
     /// </summary>
     private MetadataSyncItem CreateMetadataItem(
         LibraryMapping libraryMapping,
@@ -252,7 +250,9 @@ public class MetadataSyncTableService
         string localPath,
         string? localItemId,
         BaseItem? localItem,
-        string propertyCategory)
+        bool syncMetadata,
+        bool syncImages,
+        bool syncPeople)
     {
         var item = new MetadataSyncItem
         {
@@ -267,16 +267,26 @@ public class MetadataSyncTableService
             SourcePath = sourcePath,
             LocalPath = localPath,
 
-            // Property category
-            PropertyCategory = propertyCategory,
-
             // Tracking
             Status = BaseSyncStatus.Queued,
             StatusDate = DateTime.UtcNow
         };
 
-        // Extract and set values based on category
-        SetMetadataValues(item, sourceItem, localItem, propertyCategory);
+        // Set values for each enabled category
+        if (syncMetadata)
+        {
+            SetMetadataFieldValues(item, sourceItem, localItem);
+        }
+
+        if (syncImages)
+        {
+            SetImagesValues(item, sourceItem, localItem);
+        }
+
+        if (syncPeople)
+        {
+            SetPeopleValues(item, sourceItem, localItem);
+        }
 
         // Determine initial status based on whether there are changes
         if (string.IsNullOrEmpty(localItemId))
@@ -308,15 +318,49 @@ public class MetadataSyncTableService
         BaseItem? localItem,
         string localPath,
         string? localItemId,
-        string propertyCategory)
+        bool syncMetadata,
+        bool syncImages,
+        bool syncPeople)
     {
         // Update identification
         item.LocalItemId = localItemId;
         item.LocalPath = localPath;
         item.ItemName = sourceItem.Name ?? item.ItemName;
 
-        // Update values based on category
-        SetMetadataValues(item, sourceItem, localItem, propertyCategory);
+        // Update values for each enabled category
+        if (syncMetadata)
+        {
+            SetMetadataFieldValues(item, sourceItem, localItem);
+        }
+        else
+        {
+            // Clear metadata if disabled
+            item.SourceMetadataValue = null;
+            item.LocalMetadataValue = null;
+        }
+
+        if (syncImages)
+        {
+            SetImagesValues(item, sourceItem, localItem);
+        }
+        else
+        {
+            // Clear images if disabled
+            item.SourceImagesValue = null;
+            item.LocalImagesValue = null;
+            item.SourceImagesHash = null;
+        }
+
+        if (syncPeople)
+        {
+            SetPeopleValues(item, sourceItem, localItem);
+        }
+        else
+        {
+            // Clear people if disabled
+            item.SourcePeopleValue = null;
+            item.LocalPeopleValue = null;
+        }
 
         // Preserve Ignored status - don't change status for ignored items
         if (item.Status == BaseSyncStatus.Ignored)
@@ -336,29 +380,6 @@ public class MetadataSyncTableService
             item.Status = BaseSyncStatus.Synced;
             item.StatusDate = DateTime.UtcNow;
             item.LastSyncTime = DateTime.UtcNow;
-        }
-    }
-
-    /// <summary>
-    /// Sets the source, local, and merged values based on the property category.
-    /// </summary>
-    private void SetMetadataValues(
-        MetadataSyncItem item,
-        BaseItemDto sourceItem,
-        BaseItem? localItem,
-        string propertyCategory)
-    {
-        switch (propertyCategory)
-        {
-            case MetadataPropertyCategory.Metadata:
-                SetMetadataFieldValues(item, sourceItem, localItem);
-                break;
-            case MetadataPropertyCategory.Images:
-                SetImagesValues(item, sourceItem, localItem);
-                break;
-            case MetadataPropertyCategory.People:
-                SetPeopleValues(item, sourceItem, localItem);
-                break;
         }
     }
 
@@ -388,7 +409,7 @@ public class MetadataSyncTableService
             ["ProviderIds"] = sourceItem.ProviderIds
         };
 
-        item.SourceValue = JsonSerializer.Serialize(sourceMetadata);
+        item.SourceMetadataValue = JsonSerializer.Serialize(sourceMetadata);
 
         // Extract local metadata if item exists
         if (localItem != null)
@@ -413,11 +434,8 @@ public class MetadataSyncTableService
                 ["ProviderIds"] = localItem.ProviderIds
             };
 
-            item.LocalValue = JsonSerializer.Serialize(localMetadata);
+            item.LocalMetadataValue = JsonSerializer.Serialize(localMetadata);
         }
-
-        // Source wins - merged value is always source value
-        item.MergedValue = item.SourceValue;
     }
 
     /// <summary>
@@ -425,27 +443,14 @@ public class MetadataSyncTableService
     /// </summary>
     private void SetImagesValues(MetadataSyncItem item, BaseItemDto sourceItem, BaseItem? localItem)
     {
-        // For images, we track what image types exist on source and local
-        // Use consistent format for both so comparison works properly
-        var sourceImageInfo = new SortedDictionary<string, bool>
-        {
-            ["Primary"] = sourceItem.ImageTags?.AdditionalData?.ContainsKey("Primary") == true,
-            ["Backdrop"] = sourceItem.BackdropImageTags?.Count > 0,
-            ["Logo"] = sourceItem.ImageTags?.AdditionalData?.ContainsKey("Logo") == true,
-            ["Thumb"] = sourceItem.ImageTags?.AdditionalData?.ContainsKey("Thumb") == true,
-            ["Banner"] = sourceItem.ImageTags?.AdditionalData?.ContainsKey("Banner") == true,
-            ["Art"] = sourceItem.ImageTags?.AdditionalData?.ContainsKey("Art") == true,
-            ["Disc"] = sourceItem.ImageTags?.AdditionalData?.ContainsKey("Disc") == true
-        };
-
-        // Also include the actual image tags for tracking when images change on source
+        // Track image tags from source for sync task to use
         var sourceTagInfo = new SortedDictionary<string, object?>
         {
             ["ImageTags"] = sourceItem.ImageTags?.AdditionalData,
             ["BackdropTags"] = sourceItem.BackdropImageTags
         };
 
-        item.SourceValue = JsonSerializer.Serialize(sourceTagInfo);
+        item.SourceImagesValue = JsonSerializer.Serialize(sourceTagInfo);
 
         // Create a hash of source image tags - this changes when source images change
         item.SourceImagesHash = ComputeImageTagsHash(sourceItem.ImageTags?.AdditionalData, sourceItem.BackdropImageTags);
@@ -464,15 +469,8 @@ public class MetadataSyncTableService
                 ["Disc"] = localItem.HasImage(MediaBrowser.Model.Entities.ImageType.Disc)
             };
 
-            item.LocalValue = JsonSerializer.Serialize(localImageInfo);
-
-            // LocalImagesHash tracks what we've synced - only update if not already set
-            // The sync task will update this after successful sync
-            // If SyncedImagesHash matches SourceImagesHash, we're in sync
+            item.LocalImagesValue = JsonSerializer.Serialize(localImageInfo);
         }
-
-        // Source wins
-        item.MergedValue = item.SourceValue;
     }
 
     /// <summary>
@@ -494,19 +492,16 @@ public class MetadataSyncTableService
                 });
             }
 
-            item.SourceValue = JsonSerializer.Serialize(sourcePeople);
+            item.SourcePeopleValue = JsonSerializer.Serialize(sourcePeople);
         }
         else
         {
-            item.SourceValue = "[]";
+            item.SourcePeopleValue = "[]";
         }
 
         // TODO: Get local people when applying
         // For now, we'll compare during the apply phase
-        item.LocalValue = null;
-
-        // Source wins
-        item.MergedValue = item.SourceValue;
+        item.LocalPeopleValue = null;
     }
 
     /// <summary>
@@ -520,24 +515,6 @@ public class MetadataSyncTableService
         }
 
         var combined = JsonSerializer.Serialize(new { imageTags, backdropTags });
-        var hashBytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(combined));
-        return Convert.ToHexString(hashBytes).ToLowerInvariant()[..32];
-    }
-
-    /// <summary>
-    /// Computes a hash for local item images.
-    /// </summary>
-    private static string? ComputeLocalImageHash(BaseItem localItem)
-    {
-        var imageInfo = new
-        {
-            HasPrimary = localItem.HasImage(MediaBrowser.Model.Entities.ImageType.Primary),
-            HasBackdrop = localItem.HasImage(MediaBrowser.Model.Entities.ImageType.Backdrop),
-            HasLogo = localItem.HasImage(MediaBrowser.Model.Entities.ImageType.Logo),
-            HasThumb = localItem.HasImage(MediaBrowser.Model.Entities.ImageType.Thumb)
-        };
-
-        var combined = JsonSerializer.Serialize(imageInfo);
         var hashBytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(combined));
         return Convert.ToHexString(hashBytes).ToLowerInvariant()[..32];
     }

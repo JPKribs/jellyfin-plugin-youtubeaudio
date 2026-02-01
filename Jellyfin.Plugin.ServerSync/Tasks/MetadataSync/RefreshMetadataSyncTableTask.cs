@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.ServerSync.Models.Configuration;
-using Jellyfin.Plugin.ServerSync.Models.MetadataSync;
 using Jellyfin.Plugin.ServerSync.Services;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Tasks;
@@ -82,24 +81,12 @@ public class RefreshMetadataSyncTableTask : IScheduledTask
             return;
         }
 
-        // Build list of enabled categories
-        var enabledCategories = new List<string>();
-        if (config.MetadataSyncMetadata)
-        {
-            enabledCategories.Add(MetadataPropertyCategory.Metadata);
-        }
+        // Get enabled category flags
+        var syncMetadata = config.MetadataSyncMetadata;
+        var syncImages = config.MetadataSyncImages;
+        var syncPeople = config.MetadataSyncPeople;
 
-        if (config.MetadataSyncImages)
-        {
-            enabledCategories.Add(MetadataPropertyCategory.Images);
-        }
-
-        if (config.MetadataSyncPeople)
-        {
-            enabledCategories.Add(MetadataPropertyCategory.People);
-        }
-
-        if (enabledCategories.Count == 0)
+        if (!syncMetadata && !syncImages && !syncPeople)
         {
             _logger.LogDebug("Metadata sync skipped: no categories enabled");
             return;
@@ -152,7 +139,9 @@ public class RefreshMetadataSyncTableTask : IScheduledTask
                 client,
                 database,
                 libraryMapping,
-                enabledCategories,
+                syncMetadata,
+                syncImages,
+                syncPeople,
                 cancellationToken,
                 onItemProcessed: () =>
                 {

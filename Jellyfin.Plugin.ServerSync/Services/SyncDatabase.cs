@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Linq;
 using Jellyfin.Plugin.ServerSync.Models.Common;
 using Jellyfin.Plugin.ServerSync.Models.ContentSync;
 using Jellyfin.Plugin.ServerSync.Models.HistorySync;
@@ -2267,6 +2268,214 @@ public class SyncDatabase : IDisposable
         }
     }
 
+    // ============================================
+    // User Sync Consolidated Methods
+    // ============================================
+
+    /// <summary>
+    /// Gets distinct user mappings with pagination for consolidated view.
+    /// Returns aggregated data grouped by (SourceUserId, LocalUserId).
+    /// </summary>
+    public (List<(string SourceUserId, string LocalUserId, string? SourceUserName, string? LocalUserName, List<UserSyncItem> Items)> Users, int TotalCount) GetUserSyncUsersPaginated(
+        string? searchTerm = null,
+        BaseSyncStatus? status = null,
+        int skip = 0,
+        int take = 50)
+    {
+        EnsureConnection();
+
+        var conditions = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            conditions.Add("(SourceUserName LIKE @searchTerm OR LocalUserName LIKE @searchTerm)");
+        }
+
+        if (status.HasValue)
+        {
+            conditions.Add("Status = @status");
+        }
+
+        var whereClause = conditions.Count > 0
+            ? $"WHERE {string.Join(" AND ", conditions)}"
+            : string.Empty;
+
+        // For status filtering, we need to get distinct user mappings that have at least one record matching the status
+        // For non-status filtering, just get distinct user mappings
+        string countQuery;
+        string dataQuery;
+
+        if (status.HasValue)
+        {
+            // Count distinct user mappings that have at least one record with this status
+            countQuery = $@"
+                SELECT COUNT(DISTINCT SourceUserId || '|' || LocalUserId)
+                FROM UserSyncItems
+                {whereClause}";
+
+            // Get paginated distinct user mappings
+            dataQuery = $@"
+                SELECT DISTINCT SourceUserId, LocalUserId
+                FROM UserSyncItems
+                {whereClause}
+                ORDER BY MIN(SourceUserName), MIN(LocalUserName)
+                LIMIT @take OFFSET @skip";
+        }
+        else
+        {
+            // Count distinct user mappings
+            countQuery = $@"
+                SELECT COUNT(DISTINCT SourceUserId || '|' || LocalUserId)
+                FROM UserSyncItems
+                {whereClause}";
+
+            // Get paginated distinct user mappings
+            dataQuery = $@"
+                SELECT SourceUserId, LocalUserId, MIN(SourceUserName) as SourceUserName, MIN(LocalUserName) as LocalUserName
+                FROM UserSyncItems
+                {whereClause}
+                GROUP BY SourceUserId, LocalUserId
+                ORDER BY MIN(SourceUserName), MIN(LocalUserName)
+                LIMIT @take OFFSET @skip";
+        }
+
+        // Get total count of distinct user mappings
+        int totalCount;
+        using (var countCommand = _connection!.CreateCommand())
+        {
+            countCommand.CommandText = countQuery;
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                countCommand.Parameters.AddWithValue("@searchTerm", $"%{searchTerm}%");
+            }
+
+            if (status.HasValue)
+            {
+                countCommand.Parameters.AddWithValue("@status", (int)status.Value);
+            }
+
+            totalCount = Convert.ToInt32(countCommand.ExecuteScalar());
+        }
+
+        // Get distinct user mappings for this page
+        var userMappings = new List<(string SourceUserId, string LocalUserId)>();
+        using (var dataCommand = _connection!.CreateCommand())
+        {
+            dataCommand.CommandText = dataQuery;
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                dataCommand.Parameters.AddWithValue("@searchTerm", $"%{searchTerm}%");
+            }
+
+            if (status.HasValue)
+            {
+                dataCommand.Parameters.AddWithValue("@status", (int)status.Value);
+            }
+
+            dataCommand.Parameters.AddWithValue("@take", take);
+            dataCommand.Parameters.AddWithValue("@skip", skip);
+
+            using var reader = dataCommand.ExecuteReader();
+            while (reader.Read())
+            {
+                userMappings.Add((
+                    reader.GetString(reader.GetOrdinal("SourceUserId")),
+                    reader.GetString(reader.GetOrdinal("LocalUserId"))));
+            }
+        }
+
+        // For each user mapping, get all their items
+        var result = new List<(string SourceUserId, string LocalUserId, string? SourceUserName, string? LocalUserName, List<UserSyncItem> Items)>();
+        foreach (var (sourceUserId, localUserId) in userMappings)
+        {
+            var items = GetUserSyncItemsByUserMapping(sourceUserId, localUserId);
+            var sourceUserName = items.FirstOrDefault()?.SourceUserName;
+            var localUserName = items.FirstOrDefault()?.LocalUserName;
+            result.Add((sourceUserId, localUserId, sourceUserName, localUserName, items));
+        }
+
+        return (result, totalCount);
+    }
+
+    /// <summary>
+    /// Gets all user sync items for a specific user mapping.
+    /// Used for the consolidated modal view.
+    /// </summary>
+    public List<UserSyncItem> GetUserSyncUserDetail(string sourceUserId, string localUserId)
+    {
+        return GetUserSyncItemsByUserMapping(sourceUserId, localUserId);
+    }
+
+    /// <summary>
+    /// Batch updates status for all categories of a user mapping.
+    /// </summary>
+    public int BatchUpdateUserSyncStatusByMapping(string sourceUserId, string localUserId, BaseSyncStatus status)
+    {
+        lock (_writeLock)
+        {
+            EnsureConnection();
+
+            using var command = _connection!.CreateCommand();
+            command.CommandText = @"
+                UPDATE UserSyncItems
+                SET Status = @status,
+                    StatusDate = @statusDate
+                WHERE SourceUserId = @sourceUserId AND LocalUserId = @localUserId";
+
+            command.Parameters.AddWithValue("@sourceUserId", sourceUserId);
+            command.Parameters.AddWithValue("@localUserId", localUserId);
+            command.Parameters.AddWithValue("@status", (int)status);
+            command.Parameters.AddWithValue("@statusDate", DateTime.UtcNow.ToString("o"));
+
+            return command.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>
+    /// Batch updates status for multiple user mappings.
+    /// </summary>
+    public int BatchUpdateUserSyncStatusByMappings(IEnumerable<(string SourceUserId, string LocalUserId)> mappings, BaseSyncStatus status)
+    {
+        lock (_writeLock)
+        {
+            EnsureConnection();
+
+            var count = 0;
+            using var transaction = _connection!.BeginTransaction();
+            try
+            {
+                foreach (var (sourceUserId, localUserId) in mappings)
+                {
+                    using var command = _connection!.CreateCommand();
+                    command.Transaction = transaction;
+                    command.CommandText = @"
+                        UPDATE UserSyncItems
+                        SET Status = @status,
+                            StatusDate = @statusDate
+                        WHERE SourceUserId = @sourceUserId AND LocalUserId = @localUserId";
+
+                    command.Parameters.AddWithValue("@sourceUserId", sourceUserId);
+                    command.Parameters.AddWithValue("@localUserId", localUserId);
+                    command.Parameters.AddWithValue("@status", (int)status);
+                    command.Parameters.AddWithValue("@statusDate", DateTime.UtcNow.ToString("o"));
+
+                    count += command.ExecuteNonQuery();
+                }
+
+                transaction.Commit();
+                return count;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Batch update user sync status by mappings failed after {Count} items, rolling back", count);
+                transaction.Rollback();
+                throw;
+            }
+        }
+    }
+
     /// <summary>
     /// Reads a UserSyncItem from the database reader.
     /// </summary>
@@ -2386,9 +2595,9 @@ public class SyncDatabase : IDisposable
     }
 
     /// <summary>
-    /// Gets a metadata sync item by source item ID and property category.
+    /// Gets a metadata sync item by source library ID and source item ID.
     /// </summary>
-    public MetadataSyncItem? GetMetadataSyncItem(string sourceLibraryId, string sourceItemId, string propertyCategory)
+    public MetadataSyncItem? GetMetadataSyncItem(string sourceLibraryId, string sourceItemId)
     {
         EnsureConnection();
 
@@ -2396,35 +2605,27 @@ public class SyncDatabase : IDisposable
         command.CommandText = @"
             SELECT * FROM MetadataSyncItems
             WHERE SourceLibraryId = @sourceLibraryId
-              AND SourceItemId = @sourceItemId
-              AND PropertyCategory = @propertyCategory";
+              AND SourceItemId = @sourceItemId";
         command.Parameters.AddWithValue("@sourceLibraryId", sourceLibraryId);
         command.Parameters.AddWithValue("@sourceItemId", sourceItemId);
-        command.Parameters.AddWithValue("@propertyCategory", propertyCategory);
 
         using var reader = command.ExecuteReader();
         return reader.Read() ? ReadMetadataSyncItem(reader) : null;
     }
 
     /// <summary>
-    /// Gets all metadata sync items for a specific source item.
+    /// Gets a metadata sync item for a specific source item (one record per item).
     /// </summary>
-    public List<MetadataSyncItem> GetMetadataSyncItemsBySourceItem(string sourceItemId)
+    public MetadataSyncItem? GetMetadataSyncItemBySourceItem(string sourceItemId)
     {
         EnsureConnection();
 
-        var items = new List<MetadataSyncItem>();
         using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT * FROM MetadataSyncItems WHERE SourceItemId = @sourceItemId ORDER BY PropertyCategory";
+        command.CommandText = "SELECT * FROM MetadataSyncItems WHERE SourceItemId = @sourceItemId";
         command.Parameters.AddWithValue("@sourceItemId", sourceItemId);
 
         using var reader = command.ExecuteReader();
-        while (reader.Read())
-        {
-            items.Add(ReadMetadataSyncItem(reader));
-        }
-
-        return items;
+        return reader.Read() ? ReadMetadataSyncItem(reader) : null;
     }
 
     /// <summary>
@@ -2476,7 +2677,6 @@ public class SyncDatabase : IDisposable
         string? searchTerm = null,
         BaseSyncStatus? status = null,
         string? sourceLibraryId = null,
-        string? propertyCategory = null,
         int skip = 0,
         int take = 50)
     {
@@ -2497,11 +2697,6 @@ public class SyncDatabase : IDisposable
         if (!string.IsNullOrWhiteSpace(sourceLibraryId))
         {
             conditions.Add("SourceLibraryId = @sourceLibraryId");
-        }
-
-        if (!string.IsNullOrWhiteSpace(propertyCategory))
-        {
-            conditions.Add("PropertyCategory = @propertyCategory");
         }
 
         var whereClause = conditions.Count > 0
@@ -2529,11 +2724,6 @@ public class SyncDatabase : IDisposable
                 countCommand.Parameters.AddWithValue("@sourceLibraryId", sourceLibraryId);
             }
 
-            if (!string.IsNullOrWhiteSpace(propertyCategory))
-            {
-                countCommand.Parameters.AddWithValue("@propertyCategory", propertyCategory);
-            }
-
             totalCount = Convert.ToInt32(countCommand.ExecuteScalar());
         }
 
@@ -2544,7 +2734,7 @@ public class SyncDatabase : IDisposable
             dataCommand.CommandText = $@"
                 SELECT * FROM MetadataSyncItems
                 {whereClause}
-                ORDER BY ItemName, PropertyCategory
+                ORDER BY ItemName
                 LIMIT @take OFFSET @skip";
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
@@ -2560,11 +2750,6 @@ public class SyncDatabase : IDisposable
             if (!string.IsNullOrWhiteSpace(sourceLibraryId))
             {
                 dataCommand.Parameters.AddWithValue("@sourceLibraryId", sourceLibraryId);
-            }
-
-            if (!string.IsNullOrWhiteSpace(propertyCategory))
-            {
-                dataCommand.Parameters.AddWithValue("@propertyCategory", propertyCategory);
             }
 
             dataCommand.Parameters.AddWithValue("@take", take);
@@ -2614,37 +2799,41 @@ public class SyncDatabase : IDisposable
             using var command = _connection!.CreateCommand();
             command.Transaction = transaction;
 
-            // Insert or update metadata sync item (one record per property category per item)
+            // Insert or update metadata sync item (one record per item with all categories)
             // Preserve Ignored status - don't overwrite if user explicitly ignored the item
             command.CommandText = @"
                 INSERT INTO MetadataSyncItems (
                     SourceLibraryId, LocalLibraryId, SourceItemId, LocalItemId,
-                    ItemName, SourcePath, LocalPath, PropertyCategory,
-                    SourceValue, LocalValue, MergedValue,
-                    SourceImagesHash, LocalImagesHash, SyncedImagesHash,
+                    ItemName, SourcePath, LocalPath,
+                    SourceMetadataValue, LocalMetadataValue,
+                    SourceImagesValue, LocalImagesValue, SourceImagesHash, SyncedImagesHash,
+                    SourcePeopleValue, LocalPeopleValue,
                     Status, StatusDate, LastSyncTime, ErrorMessage
                 ) VALUES (
                     @sourceLibraryId, @localLibraryId, @sourceItemId, @localItemId,
-                    @itemName, @sourcePath, @localPath, @propertyCategory,
-                    @sourceValue, @localValue, @mergedValue,
-                    @sourceImagesHash, @localImagesHash, @syncedImagesHash,
+                    @itemName, @sourcePath, @localPath,
+                    @sourceMetadataValue, @localMetadataValue,
+                    @sourceImagesValue, @localImagesValue, @sourceImagesHash, @syncedImagesHash,
+                    @sourcePeopleValue, @localPeopleValue,
                     @status, @statusDate, @lastSyncTime, @errorMessage
                 )
-                ON CONFLICT(SourceLibraryId, SourceItemId, PropertyCategory) DO UPDATE SET
+                ON CONFLICT(SourceLibraryId, SourceItemId) DO UPDATE SET
                     LocalLibraryId = @localLibraryId,
                     LocalItemId = @localItemId,
                     ItemName = @itemName,
                     SourcePath = @sourcePath,
                     LocalPath = @localPath,
-                    SourceValue = @sourceValue,
-                    LocalValue = @localValue,
-                    MergedValue = @mergedValue,
+                    SourceMetadataValue = @sourceMetadataValue,
+                    LocalMetadataValue = @localMetadataValue,
+                    SourceImagesValue = @sourceImagesValue,
+                    LocalImagesValue = @localImagesValue,
                     SourceImagesHash = @sourceImagesHash,
-                    LocalImagesHash = @localImagesHash,
                     SyncedImagesHash = CASE
                         WHEN @syncedImagesHash IS NOT NULL THEN @syncedImagesHash
                         ELSE MetadataSyncItems.SyncedImagesHash
                     END,
+                    SourcePeopleValue = @sourcePeopleValue,
+                    LocalPeopleValue = @localPeopleValue,
                     Status = CASE
                         WHEN MetadataSyncItems.Status = @ignoredStatus THEN @ignoredStatus
                         ELSE @status
@@ -2670,13 +2859,14 @@ public class SyncDatabase : IDisposable
             command.Parameters.AddWithValue("@itemName", item.ItemName ?? (object)DBNull.Value);
             command.Parameters.AddWithValue("@sourcePath", item.SourcePath ?? (object)DBNull.Value);
             command.Parameters.AddWithValue("@localPath", item.LocalPath ?? (object)DBNull.Value);
-            command.Parameters.AddWithValue("@propertyCategory", item.PropertyCategory);
-            command.Parameters.AddWithValue("@sourceValue", item.SourceValue ?? (object)DBNull.Value);
-            command.Parameters.AddWithValue("@localValue", item.LocalValue ?? (object)DBNull.Value);
-            command.Parameters.AddWithValue("@mergedValue", item.MergedValue ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@sourceMetadataValue", item.SourceMetadataValue ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@localMetadataValue", item.LocalMetadataValue ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@sourceImagesValue", item.SourceImagesValue ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@localImagesValue", item.LocalImagesValue ?? (object)DBNull.Value);
             command.Parameters.AddWithValue("@sourceImagesHash", item.SourceImagesHash ?? (object)DBNull.Value);
-            command.Parameters.AddWithValue("@localImagesHash", item.LocalImagesHash ?? (object)DBNull.Value);
             command.Parameters.AddWithValue("@syncedImagesHash", item.SyncedImagesHash ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@sourcePeopleValue", item.SourcePeopleValue ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@localPeopleValue", item.LocalPeopleValue ?? (object)DBNull.Value);
             command.Parameters.AddWithValue("@status", (int)item.Status);
             command.Parameters.AddWithValue("@statusDate", item.StatusDate.ToString("o"));
             command.Parameters.AddWithValue("@lastSyncTime", item.LastSyncTime?.ToString("o") ?? (object)DBNull.Value);
@@ -2821,7 +3011,6 @@ public class SyncDatabase : IDisposable
             SourceLibraryId = reader.GetString(reader.GetOrdinal("SourceLibraryId")),
             LocalLibraryId = reader.GetString(reader.GetOrdinal("LocalLibraryId")),
             SourceItemId = reader.GetString(reader.GetOrdinal("SourceItemId")),
-            PropertyCategory = reader.GetString(reader.GetOrdinal("PropertyCategory")),
             Status = (BaseSyncStatus)reader.GetInt32(reader.GetOrdinal("Status")),
             StatusDate = ParseDateTimeSafe(reader.GetString(reader.GetOrdinal("StatusDate")))
         };
@@ -2851,41 +3040,55 @@ public class SyncDatabase : IDisposable
             item.LocalPath = reader.GetString(localPathOrdinal);
         }
 
-        var sourceValueOrdinal = reader.GetOrdinal("SourceValue");
-        if (!reader.IsDBNull(sourceValueOrdinal))
+        // Metadata category fields
+        var sourceMetadataOrdinal = TryGetOrdinal(reader, "SourceMetadataValue");
+        if (sourceMetadataOrdinal >= 0 && !reader.IsDBNull(sourceMetadataOrdinal))
         {
-            item.SourceValue = reader.GetString(sourceValueOrdinal);
+            item.SourceMetadataValue = reader.GetString(sourceMetadataOrdinal);
         }
 
-        var localValueOrdinal = reader.GetOrdinal("LocalValue");
-        if (!reader.IsDBNull(localValueOrdinal))
+        var localMetadataOrdinal = TryGetOrdinal(reader, "LocalMetadataValue");
+        if (localMetadataOrdinal >= 0 && !reader.IsDBNull(localMetadataOrdinal))
         {
-            item.LocalValue = reader.GetString(localValueOrdinal);
+            item.LocalMetadataValue = reader.GetString(localMetadataOrdinal);
         }
 
-        var mergedValueOrdinal = reader.GetOrdinal("MergedValue");
-        if (!reader.IsDBNull(mergedValueOrdinal))
+        // Images category fields
+        var sourceImagesOrdinal = TryGetOrdinal(reader, "SourceImagesValue");
+        if (sourceImagesOrdinal >= 0 && !reader.IsDBNull(sourceImagesOrdinal))
         {
-            item.MergedValue = reader.GetString(mergedValueOrdinal);
+            item.SourceImagesValue = reader.GetString(sourceImagesOrdinal);
         }
 
-        // Image hash fields
+        var localImagesOrdinal = TryGetOrdinal(reader, "LocalImagesValue");
+        if (localImagesOrdinal >= 0 && !reader.IsDBNull(localImagesOrdinal))
+        {
+            item.LocalImagesValue = reader.GetString(localImagesOrdinal);
+        }
+
         var sourceImagesHashOrdinal = TryGetOrdinal(reader, "SourceImagesHash");
         if (sourceImagesHashOrdinal >= 0 && !reader.IsDBNull(sourceImagesHashOrdinal))
         {
             item.SourceImagesHash = reader.GetString(sourceImagesHashOrdinal);
         }
 
-        var localImagesHashOrdinal = TryGetOrdinal(reader, "LocalImagesHash");
-        if (localImagesHashOrdinal >= 0 && !reader.IsDBNull(localImagesHashOrdinal))
-        {
-            item.LocalImagesHash = reader.GetString(localImagesHashOrdinal);
-        }
-
         var syncedImagesHashOrdinal = TryGetOrdinal(reader, "SyncedImagesHash");
         if (syncedImagesHashOrdinal >= 0 && !reader.IsDBNull(syncedImagesHashOrdinal))
         {
             item.SyncedImagesHash = reader.GetString(syncedImagesHashOrdinal);
+        }
+
+        // People category fields
+        var sourcePeopleOrdinal = TryGetOrdinal(reader, "SourcePeopleValue");
+        if (sourcePeopleOrdinal >= 0 && !reader.IsDBNull(sourcePeopleOrdinal))
+        {
+            item.SourcePeopleValue = reader.GetString(sourcePeopleOrdinal);
+        }
+
+        var localPeopleOrdinal = TryGetOrdinal(reader, "LocalPeopleValue");
+        if (localPeopleOrdinal >= 0 && !reader.IsDBNull(localPeopleOrdinal))
+        {
+            item.LocalPeopleValue = reader.GetString(localPeopleOrdinal);
         }
 
         var lastSyncTimeOrdinal = reader.GetOrdinal("LastSyncTime");
