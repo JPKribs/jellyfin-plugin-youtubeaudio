@@ -2030,7 +2030,8 @@ public class SyncDatabase : IDisposable
     }
 
     /// <summary>
-    /// Gets user sync status counts.
+    /// Gets user sync status counts (counting unique user mappings, not individual records).
+    /// Uses the "worst" status for each user mapping: Errored > Queued > Ignored > Synced.
     /// </summary>
     public Dictionary<BaseSyncStatus, int> GetUserSyncStatusCounts()
     {
@@ -2038,7 +2039,29 @@ public class SyncDatabase : IDisposable
 
         var counts = new Dictionary<BaseSyncStatus, int>();
         using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT Status, COUNT(*) as Count FROM UserSyncItems GROUP BY Status";
+
+        // For each unique user mapping (SourceUserId, LocalUserId), determine overall status:
+        // - If ANY record is Errored -> user is Errored
+        // - Else if ANY record is Queued -> user is Queued
+        // - Else if ALL records are Ignored -> user is Ignored
+        // - Else user is Synced
+        command.CommandText = @"
+            WITH UserStatus AS (
+                SELECT
+                    SourceUserId,
+                    LocalUserId,
+                    CASE
+                        WHEN MAX(CASE WHEN Status = 3 THEN 1 ELSE 0 END) = 1 THEN 3  -- Errored
+                        WHEN MAX(CASE WHEN Status = 1 THEN 1 ELSE 0 END) = 1 THEN 1  -- Queued
+                        WHEN MIN(CASE WHEN Status = 2 THEN 1 ELSE 0 END) = 1 THEN 2  -- All Ignored
+                        ELSE 0  -- Synced
+                    END AS OverallStatus
+                FROM UserSyncItems
+                GROUP BY SourceUserId, LocalUserId
+            )
+            SELECT OverallStatus, COUNT(*) as Count
+            FROM UserStatus
+            GROUP BY OverallStatus";
 
         using var reader = command.ExecuteReader();
         while (reader.Read())

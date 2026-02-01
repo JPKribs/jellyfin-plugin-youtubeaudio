@@ -679,7 +679,7 @@
                                     <div class="inputContainer">
                                         <label class="checkboxContainer">
                                             <input is="emby-checkbox" type="checkbox" id="chkUserSyncPolicy" checked />
-                                            <span>User Policy (Permissions)</span>
+                                            <span>User Policy</span>
                                         </label>
                                         <div class="fieldDescription">Sync permission settings like admin status, parental ratings, library access.</div>
                                     </div>
@@ -687,7 +687,7 @@
                                     <div class="inputContainer">
                                         <label class="checkboxContainer">
                                             <input is="emby-checkbox" type="checkbox" id="chkUserSyncConfiguration" checked />
-                                            <span>User Configuration (Preferences)</span>
+                                            <span>User Configuration</span>
                                         </label>
                                         <div class="fieldDescription">Sync user preferences like subtitle mode, audio language, display settings.</div>
                                     </div>
@@ -2483,7 +2483,22 @@
             saveConfig: function(config) {
                 return ApiClient.updatePluginConfiguration(this.pluginId, config);
             },
-        
+
+            // Local server name (fetched from system info)
+            localServerName: null,
+
+            // Fetch local server name from system info
+            fetchLocalServerName: function() {
+                var self = this;
+                return ApiClient.getPublicSystemInfo().then(function(info) {
+                    self.localServerName = info.ServerName || 'Local';
+                    return self.localServerName;
+                }).catch(function() {
+                    self.localServerName = 'Local';
+                    return self.localServerName;
+                });
+            },
+
             // Make API request to plugin endpoint
             apiRequest: function(endpoint, method, data) {
                 var options = {
@@ -4992,7 +5007,7 @@
 
                 // Set server names in table headers (no GUIDs in table headers)
                 var sourceServerName = (self.currentConfig && self.currentConfig.SourceServerName) || 'Source';
-                var localServerName = 'Local';
+                var localServerName = ServerSyncShared.localServerName || 'Local';
                 document.getElementById('historyModalSourceHeader').textContent = sourceServerName;
                 document.getElementById('historyModalLocalHeader').textContent = localServerName;
 
@@ -5184,9 +5199,12 @@
                             render: function(item) {
                                 var sourceUserName = item.SourceUserName || 'Unknown';
                                 var localUserName = item.LocalUserName || 'Unknown';
+                                var sourceServerName = (self.currentConfig && self.currentConfig.SourceServerName) || 'Source';
+                                var localServerName = ServerSyncShared.localServerName || 'Local';
 
                                 return '<div class="syncItemInfo">' +
                                     '<div class="syncItemName">' + ServerSyncShared.escapeHtml(sourceUserName) + ' → ' + ServerSyncShared.escapeHtml(localUserName) + '</div>' +
+                                    '<div class="syncItemPath">' + ServerSyncShared.escapeHtml(sourceServerName) + ' → ' + ServerSyncShared.escapeHtml(localServerName) + '</div>' +
                                     '</div>';
                             }
                         },
@@ -5526,10 +5544,11 @@
                     document.getElementById('userSyncModalUser').textContent =
                         (detail.SourceUserName || 'Unknown') + ' → ' + (detail.LocalUserName || 'Unknown');
 
-                    // Table headers - use 4 columns now: Property | Source | Local | Changed?
+                    // Table headers - use 4 columns now: Property | Source | Local | After Sync
                     document.getElementById('userSyncModalSourceHeader').textContent =
                         (self.currentConfig && self.currentConfig.SourceServerName) || 'Source';
-                    document.getElementById('userSyncModalLocalHeader').textContent = 'Local';
+                    document.getElementById('userSyncModalLocalHeader').textContent =
+                        ServerSyncShared.localServerName || 'Local';
 
                     // Build comparison table with all categories
                     var tbody = document.getElementById('userSyncModalTableBody');
@@ -5678,12 +5697,12 @@
                 if (typeof val === 'number') return String(val);
                 if (typeof val === 'string') return val || '-';
                 if (Array.isArray(val)) {
-                    if (val.length === 0) return '(empty)';
+                    if (val.length === 0) return '-';
                     return val.length + ' items';
                 }
                 if (typeof val === 'object') {
                     var keys = Object.keys(val);
-                    if (keys.length === 0) return '(empty)';
+                    if (keys.length === 0) return '-';
                     return keys.length + ' values';
                 }
                 return String(val);
@@ -6066,7 +6085,7 @@
                     // Status badge
                     var statusBadge = document.getElementById('metadataSyncModalStatusBadge');
                     statusBadge.textContent = item.Status || 'Unknown';
-                    statusBadge.className = 'itemModal-statusBadge ' + (item.Status || 'unknown').toLowerCase();
+                    statusBadge.className = 'itemModal-statusBadge ' + (item.Status || 'Unknown');
 
                     // Last sync
                     var lastSyncSection = document.getElementById('metadataSyncModalLastSyncSection');
@@ -6093,7 +6112,8 @@
                     // Table headers
                     document.getElementById('metadataSyncModalSourceHeader').textContent =
                         (self.currentConfig && self.currentConfig.SourceServerName) || 'Source';
-                    document.getElementById('metadataSyncModalLocalHeader').textContent = 'Local';
+                    document.getElementById('metadataSyncModalLocalHeader').textContent =
+                        ServerSyncShared.localServerName || 'Local';
 
                     // Build comparison table with all categories
                     var tbody = document.getElementById('metadataSyncModalTableBody');
@@ -6124,7 +6144,13 @@
                         sortedMetaKeys.forEach(function(key) {
                             var sourceVal = sourceMetaObj[key];
                             var localVal = localMetaObj[key];
-                            var hasChange = JSON.stringify(sourceVal) !== JSON.stringify(localVal);
+
+                            // Skip rows where both values are empty
+                            if (self._isEmptyValue(sourceVal) && self._isEmptyValue(localVal)) {
+                                return;
+                            }
+
+                            var hasChange = !self._valuesEqual(sourceVal, localVal);
 
                             var row = self._createTableRow(
                                 key,
@@ -6232,18 +6258,46 @@
                 }
             },
 
+            _isEmptyValue: function(val) {
+                if (val === undefined || val === null) return true;
+                if (typeof val === 'string') return val === '';
+                if (Array.isArray(val)) return val.length === 0;
+                if (typeof val === 'object') return Object.keys(val).length === 0;
+                return false;
+            },
+
+            _valuesEqual: function(val1, val2) {
+                // Both empty = equal
+                if (this._isEmptyValue(val1) && this._isEmptyValue(val2)) return true;
+                // One empty, one not = different
+                if (this._isEmptyValue(val1) || this._isEmptyValue(val2)) return false;
+
+                // Handle date string comparison
+                if (typeof val1 === 'string' && typeof val2 === 'string') {
+                    // Try parsing as dates
+                    var d1 = Date.parse(val1);
+                    var d2 = Date.parse(val2);
+                    if (!isNaN(d1) && !isNaN(d2)) {
+                        return d1 === d2;
+                    }
+                }
+
+                // Fall back to JSON comparison
+                return JSON.stringify(val1) === JSON.stringify(val2);
+            },
+
             _formatValue: function(val) {
                 if (val === undefined || val === null) return '-';
                 if (typeof val === 'boolean') return val ? 'Yes' : 'No';
                 if (typeof val === 'number') return String(val);
                 if (typeof val === 'string') return val || '-';
                 if (Array.isArray(val)) {
-                    if (val.length === 0) return '(empty)';
+                    if (val.length === 0) return '-';
                     return val.length + ' items';
                 }
                 if (typeof val === 'object') {
                     var keys = Object.keys(val);
-                    if (keys.length === 0) return '(empty)';
+                    if (keys.length === 0) return '-';
                     return keys.length + ' values';
                 }
                 return String(val);
@@ -6339,7 +6393,8 @@
             loadCapabilities: function() {
                 return Promise.all([
                     ContentConfigModule.loadCapabilities(),
-                    SyncTableModule.loadCapabilities()
+                    SyncTableModule.loadCapabilities(),
+                    ServerSyncShared.fetchLocalServerName()
                 ]);
             },
 

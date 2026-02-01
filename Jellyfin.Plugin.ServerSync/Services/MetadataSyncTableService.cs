@@ -443,17 +443,41 @@ public class MetadataSyncTableService
     /// </summary>
     private void SetImagesValues(MetadataSyncItem item, BaseItemDto sourceItem, BaseItem? localItem)
     {
-        // Track image tags from source for sync task to use
-        var sourceTagInfo = new SortedDictionary<string, object?>
+        // Extract image tags as a simple dictionary of image type -> tag string
+        var imageTags = new Dictionary<string, string>();
+        if (sourceItem.ImageTags?.AdditionalData != null)
         {
-            ["ImageTags"] = sourceItem.ImageTags?.AdditionalData,
-            ["BackdropTags"] = sourceItem.BackdropImageTags
-        };
+            foreach (var kvp in sourceItem.ImageTags.AdditionalData)
+            {
+                if (kvp.Value != null)
+                {
+                    imageTags[kvp.Key] = kvp.Value.ToString() ?? string.Empty;
+                }
+            }
+        }
 
-        item.SourceImagesValue = JsonSerializer.Serialize(sourceTagInfo);
+        var backdropTags = sourceItem.BackdropImageTags ?? new List<string>();
 
-        // Create a hash of source image tags - this changes when source images change
-        item.SourceImagesHash = ComputeImageTagsHash(sourceItem.ImageTags?.AdditionalData, sourceItem.BackdropImageTags);
+        // Only store if there are actual images
+        if (imageTags.Count > 0 || backdropTags.Count > 0)
+        {
+            var sourceTagInfo = new SortedDictionary<string, object?>
+            {
+                ["ImageTags"] = imageTags,
+                ["BackdropTags"] = backdropTags
+            };
+
+            item.SourceImagesValue = JsonSerializer.Serialize(sourceTagInfo);
+
+            // Create a hash of source image tags - this changes when source images change
+            item.SourceImagesHash = ComputeImageTagsHash(imageTags, backdropTags);
+        }
+        else
+        {
+            // No images on source - clear values
+            item.SourceImagesValue = null;
+            item.SourceImagesHash = null;
+        }
 
         if (localItem != null)
         {
@@ -507,7 +531,7 @@ public class MetadataSyncTableService
     /// <summary>
     /// Computes a hash for image tags comparison.
     /// </summary>
-    private static string? ComputeImageTagsHash(IDictionary<string, object>? imageTags, List<string>? backdropTags)
+    private static string? ComputeImageTagsHash(Dictionary<string, string>? imageTags, List<string>? backdropTags)
     {
         if ((imageTags == null || imageTags.Count == 0) && (backdropTags == null || backdropTags.Count == 0))
         {

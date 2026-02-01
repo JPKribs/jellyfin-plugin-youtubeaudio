@@ -47,6 +47,7 @@ public static class JsonComparisonUtility
 
     /// <summary>
     /// Counts the number of differing properties between two JSON objects.
+    /// Properties where both values are "empty" (null, empty string, empty array) are not counted.
     /// </summary>
     /// <param name="json1">First JSON string.</param>
     /// <param name="json2">Second JSON string.</param>
@@ -73,27 +74,41 @@ public static class JsonComparisonUtility
 
             int diffCount = 0;
 
-            // Count properties in obj1 that differ from obj2
-            foreach (var prop in obj1.EnumerateObject())
-            {
-                if (!obj2.TryGetProperty(prop.Name, out var prop2))
-                {
-                    diffCount++;
-                    continue;
-                }
+            var props1 = obj1.EnumerateObject().ToDictionary(p => p.Name, p => p.Value);
+            var props2 = obj2.EnumerateObject().ToDictionary(p => p.Name, p => p.Value);
 
-                if (!JsonElementEquals(prop.Value, prop2))
-                {
-                    diffCount++;
-                }
-            }
+            // Get all unique property names
+            var allKeys = new HashSet<string>(props1.Keys);
+            allKeys.UnionWith(props2.Keys);
 
-            // Count properties in obj2 that don't exist in obj1
-            foreach (var prop in obj2.EnumerateObject())
+            foreach (var key in allKeys)
             {
-                if (!obj1.TryGetProperty(prop.Name, out _))
+                var has1 = props1.TryGetValue(key, out var val1);
+                var has2 = props2.TryGetValue(key, out var val2);
+
+                if (has1 && has2)
                 {
-                    diffCount++;
+                    // Both have the property - compare values
+                    if (!JsonElementEquals(val1, val2))
+                    {
+                        diffCount++;
+                    }
+                }
+                else if (has1)
+                {
+                    // Only obj1 has property - count as diff only if non-empty
+                    if (!IsEmptyValue(val1))
+                    {
+                        diffCount++;
+                    }
+                }
+                else if (has2)
+                {
+                    // Only obj2 has property - count as diff only if non-empty
+                    if (!IsEmptyValue(val2))
+                    {
+                        diffCount++;
+                    }
                 }
             }
 
@@ -106,13 +121,43 @@ public static class JsonComparisonUtility
     }
 
     /// <summary>
+    /// Checks if a JsonElement represents an "empty" value (null, empty string, empty array, empty object).
+    /// </summary>
+    private static bool IsEmptyValue(JsonElement e)
+    {
+        return e.ValueKind switch
+        {
+            JsonValueKind.Null => true,
+            JsonValueKind.Undefined => true,
+            JsonValueKind.String => string.IsNullOrEmpty(e.GetString()),
+            JsonValueKind.Array => e.GetArrayLength() == 0,
+            JsonValueKind.Object => !e.EnumerateObject().Any(),
+            _ => false
+        };
+    }
+
+    /// <summary>
     /// Recursively compares two JsonElements for equality.
+    /// Treats null, undefined, empty string, empty array, and empty object as equivalent.
     /// </summary>
     /// <param name="e1">First element.</param>
     /// <param name="e2">Second element.</param>
     /// <returns>True if equal, false otherwise.</returns>
     public static bool JsonElementEquals(JsonElement e1, JsonElement e2)
     {
+        // If both are "empty" values, consider them equal
+        if (IsEmptyValue(e1) && IsEmptyValue(e2))
+        {
+            return true;
+        }
+
+        // If only one is empty, they're different
+        if (IsEmptyValue(e1) || IsEmptyValue(e2))
+        {
+            return false;
+        }
+
+        // At this point, neither is empty - check type match
         if (e1.ValueKind != e2.ValueKind)
         {
             return false;
@@ -124,21 +169,38 @@ public static class JsonComparisonUtility
                 var props1 = e1.EnumerateObject().ToDictionary(p => p.Name, p => p.Value);
                 var props2 = e2.EnumerateObject().ToDictionary(p => p.Name, p => p.Value);
 
-                if (props1.Count != props2.Count)
-                {
-                    return false;
-                }
+                // Get all unique property names
+                var allKeys = new HashSet<string>(props1.Keys);
+                allKeys.UnionWith(props2.Keys);
 
-                foreach (var kvp in props1)
+                foreach (var key in allKeys)
                 {
-                    if (!props2.TryGetValue(kvp.Key, out var value2))
+                    var has1 = props1.TryGetValue(key, out var val1);
+                    var has2 = props2.TryGetValue(key, out var val2);
+
+                    if (has1 && has2)
                     {
-                        return false;
+                        // Both have the property - compare values
+                        if (!JsonElementEquals(val1, val2))
+                        {
+                            return false;
+                        }
                     }
-
-                    if (!JsonElementEquals(kvp.Value, value2))
+                    else if (has1)
                     {
-                        return false;
+                        // Only obj1 has property - treat as equal if value is empty
+                        if (!IsEmptyValue(val1))
+                        {
+                            return false;
+                        }
+                    }
+                    else if (has2)
+                    {
+                        // Only obj2 has property - treat as equal if value is empty
+                        if (!IsEmptyValue(val2))
+                        {
+                            return false;
+                        }
                     }
                 }
 
@@ -167,7 +229,7 @@ public static class JsonComparisonUtility
                 var s1 = e1.GetString();
                 var s2 = e2.GetString();
 
-                // Both null or empty are considered equal
+                // Both null or empty are considered equal (already handled above, but double-check)
                 if (string.IsNullOrEmpty(s1) && string.IsNullOrEmpty(s2))
                 {
                     return true;
@@ -193,6 +255,8 @@ public static class JsonComparisonUtility
 
             case JsonValueKind.True:
             case JsonValueKind.False:
+                return e1.GetBoolean() == e2.GetBoolean();
+
             case JsonValueKind.Null:
                 return true;
 
