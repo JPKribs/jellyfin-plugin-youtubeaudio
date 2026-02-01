@@ -362,6 +362,12 @@ public class HistorySyncTableService
         // Recalculate merged values
         HistorySyncMergeService.MergeHistoryData(item);
 
+        // Preserve Ignored status - don't change status for ignored items
+        if (item.Status == BaseSyncStatus.Ignored)
+        {
+            return;
+        }
+
         // Update status if it was already synced but now has new changes
         if (item.Status == BaseSyncStatus.Synced && HistorySyncMergeService.HasChangesToSync(item))
         {

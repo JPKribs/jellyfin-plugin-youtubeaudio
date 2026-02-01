@@ -13,7 +13,11 @@ public class SyncItemDto
 
     public string SourceLibraryId { get; set; } = string.Empty;
 
+    public string? SourceLibraryName { get; set; }
+
     public string LocalLibraryId { get; set; } = string.Empty;
+
+    public string? LocalLibraryName { get; set; }
 
     public string SourcePath { get; set; } = string.Empty;
 
@@ -22,6 +26,8 @@ public class SyncItemDto
     public string? LocalItemId { get; set; }
 
     public long SourceSize { get; set; }
+
+    public string? SourceSizeFormatted { get; set; }
 
     public DateTime SourceCreateDate { get; set; }
 

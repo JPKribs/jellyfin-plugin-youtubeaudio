@@ -3776,35 +3776,27 @@
                     columns: [
                         {
                             key: 'name',
-                            label: 'Name',
+                            label: 'Item',
                             type: 'custom',
                             render: function(item) {
                                 var fileName = ServerSyncShared.getFileName(item.SourcePath);
-                                var localExists = item.Status === 'Synced';
-                                var localPathClass = localExists ? '' : ' notExists';
-                                var localPathDisplay = item.LocalPath
-                                    ? ServerSyncShared.getFileName(item.LocalPath)
-                                    : 'N/A';
-        
-                                var willSync = !localExists && item.LocalPath &&
-                                    item.Status !== 'Ignored' &&
-                                    !(item.Status === 'Pending' && item.PendingType === 'Deletion');
-                                if (willSync) localPathDisplay = '(will sync to) ' + localPathDisplay;
-        
+                                var sourceLibrary = item.SourceLibraryName || 'Unknown';
+                                var localLibrary = item.LocalLibraryName || 'Unknown';
+                                var libraryDisplay = sourceLibrary + ' → ' + localLibrary;
+
                                 var errorPreview = '';
                                 if (item.Status === 'Errored' && item.ErrorMessage) {
                                     errorPreview = '<div class="syncItemError" title="' +
                                         ServerSyncShared.escapeHtml(item.ErrorMessage) + '">' +
                                         ServerSyncShared.escapeHtml(item.ErrorMessage) + '</div>';
                                 }
-        
+
                                 return '<div class="syncItemInfo">' +
                                     '<div class="syncItemName" title="' +
                                         ServerSyncShared.escapeHtml(item.SourcePath) + '">' +
                                         ServerSyncShared.escapeHtml(fileName) + '</div>' +
-                                    '<div class="syncItemPath' + localPathClass + '" title="' +
-                                        ServerSyncShared.escapeHtml(item.LocalPath || '') + '">' +
-                                        ServerSyncShared.escapeHtml(localPathDisplay) + '</div>' +
+                                    '<div class="syncItemPath">' +
+                                        ServerSyncShared.escapeHtml(libraryDisplay) + '</div>' +
                                     errorPreview +
                                 '</div>';
                             }
@@ -3812,10 +3804,13 @@
                         {
                             key: 'details',
                             label: 'Details',
-                            hidden: true,  // Hidden for content sync, available for future use
                             type: 'custom',
-                            render: function() {
-                                return '';
+                            render: function(item) {
+                                // Show "No changes" for synced items, otherwise show file size
+                                if (item.Status === 'Synced') {
+                                    return '<span style="opacity: 0.5;">No changes</span>';
+                                }
+                                return ServerSyncShared.escapeHtml(item.SourceSizeFormatted || '');
                             }
                         },
                         {

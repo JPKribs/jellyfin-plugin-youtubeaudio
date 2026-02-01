@@ -231,28 +231,41 @@ public class ConfigurationController : ControllerBase
         // Get paginated results
         var (items, totalCount) = plugin.Database.SearchPaginated(search, statusFilter, pendingTypeFilter, skip, take);
 
+        // Build lookup for library names from mappings
+        var libraryMappings = config.LibraryMappings ?? new List<Models.Configuration.LibraryMapping>();
+        var libraryNameLookup = libraryMappings.ToDictionary(
+            m => m.SourceLibraryId,
+            m => (SourceName: m.SourceLibraryName, LocalName: m.LocalLibraryName));
+
         return Ok(new PaginatedResult<SyncItemDto>
         {
-            Items = items.Select(i => new SyncItemDto
+            Items = items.Select(i =>
             {
-                Id = i.Id,
-                SourceItemId = i.SourceItemId,
-                SourceLibraryId = i.SourceLibraryId,
-                LocalLibraryId = i.LocalLibraryId,
-                SourcePath = i.SourcePath,
-                LocalPath = i.LocalPath,
-                SourceSize = i.SourceSize,
-                SourceCreateDate = i.SourceCreateDate,
-                LocalItemId = i.LocalItemId,
-                Status = i.Status.ToString(),
-                PendingType = i.PendingType?.ToString(),
-                StatusDate = i.StatusDate,
-                LastSyncTime = i.LastSyncTime,
-                ErrorMessage = i.ErrorMessage,
-                RetryCount = i.RetryCount,
-                SourceServerUrl = config.SourceServerUrl,
-                SourceServerId = config.SourceServerId,
-                CompanionFiles = i.CompanionFiles
+                libraryNameLookup.TryGetValue(i.SourceLibraryId, out var libraryNames);
+                return new SyncItemDto
+                {
+                    Id = i.Id,
+                    SourceItemId = i.SourceItemId,
+                    SourceLibraryId = i.SourceLibraryId,
+                    SourceLibraryName = libraryNames.SourceName,
+                    LocalLibraryId = i.LocalLibraryId,
+                    LocalLibraryName = libraryNames.LocalName,
+                    SourcePath = i.SourcePath,
+                    LocalPath = i.LocalPath,
+                    SourceSize = i.SourceSize,
+                    SourceSizeFormatted = FormatUtilities.FormatBytes(i.SourceSize),
+                    SourceCreateDate = i.SourceCreateDate,
+                    LocalItemId = i.LocalItemId,
+                    Status = i.Status.ToString(),
+                    PendingType = i.PendingType?.ToString(),
+                    StatusDate = i.StatusDate,
+                    LastSyncTime = i.LastSyncTime,
+                    ErrorMessage = i.ErrorMessage,
+                    RetryCount = i.RetryCount,
+                    SourceServerUrl = config.SourceServerUrl,
+                    SourceServerId = config.SourceServerId,
+                    CompanionFiles = i.CompanionFiles
+                };
             }).ToList(),
             TotalCount = totalCount,
             Skip = skip,
