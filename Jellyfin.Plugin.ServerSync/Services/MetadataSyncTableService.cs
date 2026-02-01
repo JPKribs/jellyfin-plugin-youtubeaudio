@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -384,29 +385,55 @@ public class MetadataSyncTableService
     }
 
     /// <summary>
-    /// Sets metadata field values (title, overview, genres, tags, etc.).
+    /// Sets metadata field values - simple text/number fields only.
+    /// Excludes fields that require entity creation (Studios, People, Tags).
     /// </summary>
     private void SetMetadataFieldValues(MetadataSyncItem item, BaseItemDto sourceItem, BaseItem? localItem)
     {
-        // Extract relevant metadata fields from source
+        // Extract provider IDs as a simple dictionary (external IDs like IMDB, TMDB)
+        var sourceProviderIds = sourceItem.ProviderIds?.AdditionalData?
+            .Where(kvp => kvp.Value != null)
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value?.ToString());
+
+        // Get first tagline if available
+        var sourceTagline = sourceItem.Taglines?.FirstOrDefault();
+
+        // Extract only simple metadata fields that can be directly copied
         var sourceMetadata = new Dictionary<string, object?>
         {
+            // Core info
             ["Name"] = sourceItem.Name,
             ["OriginalTitle"] = sourceItem.OriginalTitle,
             ["SortName"] = sourceItem.SortName,
             ["ForcedSortName"] = sourceItem.ForcedSortName,
             ["Overview"] = sourceItem.Overview,
+            ["Tagline"] = sourceTagline,
+
+            // Ratings
             ["OfficialRating"] = sourceItem.OfficialRating,
             ["CustomRating"] = sourceItem.CustomRating,
             ["CommunityRating"] = sourceItem.CommunityRating,
             ["CriticRating"] = sourceItem.CriticRating,
+
+            // Dates
+            ["DateCreated"] = sourceItem.DateCreated,
             ["PremiereDate"] = sourceItem.PremiereDate,
+            ["EndDate"] = sourceItem.EndDate,
             ["ProductionYear"] = sourceItem.ProductionYear,
+
+            // Genres (simple strings, no GUIDs)
             ["Genres"] = sourceItem.Genres,
-            ["Tags"] = sourceItem.Tags,
-            ["Studios"] = sourceItem.Studios,
-            ["ProductionLocations"] = sourceItem.ProductionLocations,
-            ["ProviderIds"] = sourceItem.ProviderIds
+
+            // External provider IDs
+            ["ProviderIds"] = sourceProviderIds,
+
+            // Series/Episode info
+            ["IndexNumber"] = sourceItem.IndexNumber,
+            ["ParentIndexNumber"] = sourceItem.ParentIndexNumber,
+
+            // Language preferences
+            ["PreferredMetadataCountryCode"] = sourceItem.PreferredMetadataCountryCode,
+            ["PreferredMetadataLanguage"] = sourceItem.PreferredMetadataLanguage
         };
 
         item.SourceMetadataValue = JsonSerializer.Serialize(sourceMetadata);
@@ -416,22 +443,39 @@ public class MetadataSyncTableService
         {
             var localMetadata = new Dictionary<string, object?>
             {
+                // Core info
                 ["Name"] = localItem.Name,
                 ["OriginalTitle"] = localItem.OriginalTitle,
                 ["SortName"] = localItem.SortName,
                 ["ForcedSortName"] = localItem.ForcedSortName,
                 ["Overview"] = localItem.Overview,
+                ["Tagline"] = null, // Tagline not directly accessible on local BaseItem
+
+                // Ratings
                 ["OfficialRating"] = localItem.OfficialRating,
                 ["CustomRating"] = localItem.CustomRating,
                 ["CommunityRating"] = localItem.CommunityRating,
                 ["CriticRating"] = localItem.CriticRating,
+
+                // Dates
+                ["DateCreated"] = localItem.DateCreated,
                 ["PremiereDate"] = localItem.PremiereDate,
+                ["EndDate"] = localItem.EndDate,
                 ["ProductionYear"] = localItem.ProductionYear,
+
+                // Genres
                 ["Genres"] = localItem.Genres,
-                ["Tags"] = localItem.Tags,
-                ["Studios"] = localItem.Studios,
-                ["ProductionLocations"] = localItem.ProductionLocations,
-                ["ProviderIds"] = localItem.ProviderIds
+
+                // External provider IDs
+                ["ProviderIds"] = localItem.ProviderIds,
+
+                // Series/Episode info
+                ["IndexNumber"] = localItem.IndexNumber,
+                ["ParentIndexNumber"] = localItem.ParentIndexNumber,
+
+                // Language preferences
+                ["PreferredMetadataCountryCode"] = localItem.PreferredMetadataCountryCode,
+                ["PreferredMetadataLanguage"] = localItem.PreferredMetadataLanguage
             };
 
             item.LocalMetadataValue = JsonSerializer.Serialize(localMetadata);
@@ -502,18 +546,32 @@ public class MetadataSyncTableService
     /// </summary>
     private void SetPeopleValues(MetadataSyncItem item, BaseItemDto sourceItem, BaseItem? localItem)
     {
-        // Serialize people from source
+        // Serialize people from source (using strings for proper deserialization)
         if (sourceItem.People != null && sourceItem.People.Count > 0)
         {
-            var sourcePeople = new List<Dictionary<string, object?>>();
+            var sourcePeople = new List<Dictionary<string, string>>();
             foreach (var person in sourceItem.People)
             {
-                sourcePeople.Add(new Dictionary<string, object?>
+                var personDict = new Dictionary<string, string>();
+                if (!string.IsNullOrEmpty(person.Name))
                 {
-                    ["Name"] = person.Name,
-                    ["Role"] = person.Role,
-                    ["Type"] = person.Type
-                });
+                    personDict["Name"] = person.Name;
+                }
+
+                if (!string.IsNullOrEmpty(person.Role))
+                {
+                    personDict["Role"] = person.Role;
+                }
+
+                if (person.Type != null)
+                {
+                    personDict["Type"] = person.Type.Value.ToString();
+                }
+
+                if (personDict.ContainsKey("Name"))
+                {
+                    sourcePeople.Add(personDict);
+                }
             }
 
             item.SourcePeopleValue = JsonSerializer.Serialize(sourcePeople);

@@ -574,14 +574,6 @@
                                         </label>
                                         <div class="fieldDescription">Sync primary, backdrop, and other images.</div>
                                     </div>
-
-                                    <div class="inputContainer">
-                                        <label class="checkboxContainer">
-                                            <input is="emby-checkbox" type="checkbox" id="chkMetadataSyncPeople" />
-                                            <span>People</span>
-                                        </label>
-                                        <div class="fieldDescription">Sync cast and crew information (actors, directors, etc.).</div>
-                                    </div>
                                 </div>
                             </div>
 
@@ -1533,14 +1525,15 @@
             border-left: 3px solid #f0ad4e;
         }
 
-        /* Category header rows in metadata sync modal */
-        .metadataSyncModal-categoryHeader {
-            background: rgba(82, 181, 223, 0.15);
-        }
-        .metadataSyncModal-categoryHeader td {
+        /* Section headers in metadata sync modal (matches user sync) */
+        .metadataSyncModal-sectionHeader td {
+            background: rgba(255, 255, 255, 0.08);
+            font-weight: bold;
             padding: 8px 12px;
-            font-size: 0.9em;
-            color: #52b5df;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+            text-transform: uppercase;
+            font-size: 0.85em;
+            letter-spacing: 0.5px;
         }
 
         /* Sync section separator */
@@ -5369,11 +5362,27 @@
                 var self = this;
                 ServerSyncShared.apiRequest('UserStatus').then(function(status) {
                     if (status) {
-                        document.getElementById('userHealthLastSync').textContent =
-                            status.LastSyncTime ? ServerSyncShared.formatRelativeTime(new Date(status.LastSyncTime)) : 'Never';
-                        document.getElementById('userHealthUserCount').textContent = status.UserCount || 0;
+                        // Last sync time
+                        var lastSyncEl = document.getElementById('userHealthLastSync');
+                        if (status.LastSyncTime) {
+                            lastSyncEl.textContent = ServerSyncShared.formatRelativeTime(new Date(status.LastSyncTime));
+                            lastSyncEl.className = 'healthValue success';
+                        } else {
+                            lastSyncEl.textContent = 'Never';
+                            lastSyncEl.className = 'healthValue';
+                        }
+
+                        // Users mapped (sum of all status counts = total unique users)
+                        var userCount = (status.Synced || 0) + (status.Queued || 0) + (status.Errored || 0) + (status.Ignored || 0);
+                        var userCountEl = document.getElementById('userHealthUserCount');
+                        userCountEl.textContent = userCount;
+                        userCountEl.className = userCount > 0 ? 'healthValue success' : 'healthValue warning';
+
+                        // Pending count
                         var pending = (status.Queued || 0);
-                        document.getElementById('userHealthPendingCount').textContent = pending;
+                        var pendingCountEl = document.getElementById('userHealthPendingCount');
+                        pendingCountEl.textContent = pending;
+                        pendingCountEl.className = pending > 0 ? 'healthValue warning' : 'healthValue';
                     }
                 }).catch(function() {
                     // Ignore errors
@@ -5890,12 +5899,10 @@
                 var enableMetadataSync = config.EnableMetadataSync || false;
                 var metadataSyncMetadata = config.MetadataSyncMetadata !== false;
                 var metadataSyncImages = config.MetadataSyncImages !== false;
-                var metadataSyncPeople = config.MetadataSyncPeople || false;
 
                 document.getElementById('chkEnableMetadataSync').checked = enableMetadataSync;
                 document.getElementById('chkMetadataSyncMetadata').checked = metadataSyncMetadata;
                 document.getElementById('chkMetadataSyncImages').checked = metadataSyncImages;
-                document.getElementById('chkMetadataSyncPeople').checked = metadataSyncPeople;
 
                 this.updateMetadataSyncVisibility(enableMetadataSync);
             },
@@ -5914,7 +5921,6 @@
                 config.EnableMetadataSync = document.getElementById('chkEnableMetadataSync').checked;
                 config.MetadataSyncMetadata = document.getElementById('chkMetadataSyncMetadata').checked;
                 config.MetadataSyncImages = document.getElementById('chkMetadataSyncImages').checked;
-                config.MetadataSyncPeople = document.getElementById('chkMetadataSyncPeople').checked;
 
                 ServerSyncShared.saveConfig(config).then(function() {
                     ServerSyncShared.showAlert('Metadata sync settings saved');
@@ -5946,13 +5952,35 @@
 
             loadHealthStats: function() {
                 var self = this;
-                ServerSyncShared.apiRequest('MetadataStatus').then(function(status) {
+                Promise.all([
+                    ServerSyncShared.apiRequest('MetadataStatus'),
+                    ServerSyncShared.getConfig()
+                ]).then(function(results) {
+                    var status = results[0];
+                    var config = results[1];
+
                     if (status) {
-                        document.getElementById('metadataHealthLastSync').textContent =
-                            status.LastSyncTime ? ServerSyncShared.formatRelativeTime(new Date(status.LastSyncTime)) : 'Never';
-                        document.getElementById('metadataHealthLibraryCount').textContent = status.LibraryCount || 0;
+                        // Last sync time
+                        var lastSyncEl = document.getElementById('metadataHealthLastSync');
+                        if (status.LastSyncTime) {
+                            lastSyncEl.textContent = ServerSyncShared.formatRelativeTime(new Date(status.LastSyncTime));
+                            lastSyncEl.className = 'healthValue success';
+                        } else {
+                            lastSyncEl.textContent = 'Never';
+                            lastSyncEl.className = 'healthValue';
+                        }
+
+                        // Library count from config
+                        var libraryCountEl = document.getElementById('metadataHealthLibraryCount');
+                        var libraryMappings = config.LibraryMappings || [];
+                        libraryCountEl.textContent = libraryMappings.length;
+                        libraryCountEl.className = libraryMappings.length > 0 ? 'healthValue success' : 'healthValue warning';
+
+                        // Pending count
                         var pending = (status.Queued || 0);
-                        document.getElementById('metadataHealthPendingCount').textContent = pending;
+                        var pendingCountEl = document.getElementById('metadataHealthPendingCount');
+                        pendingCountEl.textContent = pending;
+                        pendingCountEl.className = pending > 0 ? 'healthValue warning' : 'healthValue';
                     }
                 }).catch(function() {
                     // Ignore errors
@@ -6119,19 +6147,19 @@
                     var tbody = document.getElementById('metadataSyncModalTableBody');
                     tbody.innerHTML = '';
 
-                    // Add a category header row helper
-                    var addCategoryHeader = function(categoryName) {
+                    // Add a section header row helper (matches user sync style)
+                    var addSectionHeader = function(sectionName) {
                         var headerRow = document.createElement('tr');
-                        headerRow.className = 'metadataSyncModal-categoryHeader';
+                        headerRow.className = 'metadataSyncModal-sectionHeader';
                         var headerCell = document.createElement('td');
                         headerCell.colSpan = 4;
-                        headerCell.innerHTML = '<strong>' + categoryName + '</strong>';
+                        headerCell.textContent = sectionName;
                         headerRow.appendChild(headerCell);
                         tbody.appendChild(headerRow);
                     };
 
                     // Metadata section
-                    addCategoryHeader('Metadata');
+                    addSectionHeader('Metadata');
                     if (item.SourceMetadataValue) {
                         var sourceMetaObj = self._parseJson(item.SourceMetadataValue);
                         var localMetaObj = self._parseJson(item.LocalMetadataValue);
@@ -6167,49 +6195,114 @@
                     }
 
                     // Images section
-                    addCategoryHeader('Images');
+                    addSectionHeader('Images');
                     if (item.SourceImagesValue) {
                         var hasImagesChange = item.HasImagesChanges;
                         var sourceImgObj = self._parseJson(item.SourceImagesValue);
                         var localImgObj = self._parseJson(item.LocalImagesValue);
 
-                        // Show image tags summary
-                        var sourceHasImages = sourceImgObj.ImageTags || sourceImgObj.BackdropTags;
-                        var localHasImages = Object.values(localImgObj || {}).some(function(v) { return v === true; });
+                        // Get source image tags
+                        var sourceImageTags = sourceImgObj.ImageTags || {};
+                        var sourceBackdropTags = sourceImgObj.BackdropTags || [];
 
-                        var row = self._createTableRow(
-                            'Images Available',
-                            sourceHasImages ? 'Yes' : 'No',
-                            localHasImages ? 'Yes' : 'No',
-                            hasImagesChange ? 'Will sync from source' : '-',
-                            hasImagesChange
+                        // Known image types to display
+                        var imageTypes = ['Primary', 'Logo', 'Thumb', 'Banner', 'Art', 'Disc'];
+
+                        // Create placeholder rows first (will update with sizes)
+                        var imageRows = {};
+                        imageTypes.forEach(function(imgType) {
+                            var sourceHas = sourceImageTags.hasOwnProperty(imgType);
+                            var localHas = localImgObj && localImgObj[imgType] === true;
+                            var hasChange = sourceHas !== localHas;
+
+                            var row = self._createTableRow(
+                                imgType,
+                                sourceHas ? 'Loading...' : '-',
+                                localHas ? 'Yes' : '-',
+                                hasChange && hasImagesChange ? 'Sync' : '-',
+                                hasChange && hasImagesChange
+                            );
+                            tbody.appendChild(row);
+                            imageRows[imgType] = { row: row, hasImage: sourceHas };
+                        });
+
+                        // Show backdrop count
+                        var sourceBackdropCount = sourceBackdropTags.length;
+                        var localBackdropCount = 0;
+                        if (localImgObj && localImgObj.Backdrop) {
+                            localBackdropCount = typeof localImgObj.BackdropCount === 'number' ? localImgObj.BackdropCount : 1;
+                        }
+                        var backdropHasChange = sourceBackdropCount !== localBackdropCount;
+
+                        var backdropRow = self._createTableRow(
+                            'Backdrop',
+                            sourceBackdropCount > 0 ? 'Loading...' : '-',
+                            localBackdropCount > 0 ? localBackdropCount + ' images' : '-',
+                            backdropHasChange && hasImagesChange ? 'Sync' : '-',
+                            backdropHasChange && hasImagesChange
                         );
-                        tbody.appendChild(row);
+                        tbody.appendChild(backdropRow);
+                        imageRows['Backdrop'] = { row: backdropRow, hasImage: sourceBackdropCount > 0, count: sourceBackdropCount };
+
+                        // Fetch image info with sizes
+                        ServerSyncShared.apiRequest('MetadataItems/' + itemId + '/ImageInfo').then(function(imageInfoList) {
+                            if (!imageInfoList || !Array.isArray(imageInfoList)) {
+                                // Fallback to simple Yes/No if info not available
+                                imageTypes.forEach(function(imgType) {
+                                    if (imageRows[imgType].hasImage) {
+                                        imageRows[imgType].row.cells[1].textContent = 'Yes';
+                                    }
+                                });
+                                if (imageRows['Backdrop'].hasImage) {
+                                    imageRows['Backdrop'].row.cells[1].textContent = imageRows['Backdrop'].count + ' images';
+                                }
+                                return;
+                            }
+
+                            // Build lookup by image type
+                            var infoByType = {};
+                            var backdropInfos = [];
+                            imageInfoList.forEach(function(info) {
+                                if (info.ImageType === 'Backdrop') {
+                                    backdropInfos.push(info);
+                                } else {
+                                    infoByType[info.ImageType] = info;
+                                }
+                            });
+
+                            // Update rows with size info
+                            imageTypes.forEach(function(imgType) {
+                                var info = infoByType[imgType];
+                                if (info && imageRows[imgType].hasImage) {
+                                    imageRows[imgType].row.cells[1].textContent = info.FormattedSize + ' (' + info.FormattedDimensions + ')';
+                                } else if (imageRows[imgType].hasImage) {
+                                    imageRows[imgType].row.cells[1].textContent = 'Yes';
+                                }
+                            });
+
+                            // Update backdrop row with total size
+                            if (backdropInfos.length > 0) {
+                                var totalSize = backdropInfos.reduce(function(sum, info) { return sum + (info.Size || 0); }, 0);
+                                var formattedTotal = totalSize < 1024 ? totalSize + ' B' :
+                                    totalSize < 1024 * 1024 ? (totalSize / 1024).toFixed(1) + ' KB' :
+                                    (totalSize / (1024 * 1024)).toFixed(1) + ' MB';
+                                imageRows['Backdrop'].row.cells[1].textContent = backdropInfos.length + ' images (' + formattedTotal + ')';
+                            } else if (imageRows['Backdrop'].hasImage) {
+                                imageRows['Backdrop'].row.cells[1].textContent = imageRows['Backdrop'].count + ' images';
+                            }
+                        }).catch(function() {
+                            // Fallback on error
+                            imageTypes.forEach(function(imgType) {
+                                if (imageRows[imgType].hasImage) {
+                                    imageRows[imgType].row.cells[1].textContent = 'Yes';
+                                }
+                            });
+                            if (imageRows['Backdrop'].hasImage) {
+                                imageRows['Backdrop'].row.cells[1].textContent = imageRows['Backdrop'].count + ' images';
+                            }
+                        });
                     } else {
                         var noDataRow = self._createTableRow('(Images sync disabled)', '-', '-', '-', false);
-                        tbody.appendChild(noDataRow);
-                    }
-
-                    // People section
-                    addCategoryHeader('People');
-                    if (item.SourcePeopleValue) {
-                        var sourcePeopleArr = self._parseJson(item.SourcePeopleValue);
-                        var localPeopleArr = self._parseJson(item.LocalPeopleValue);
-                        var hasPeopleChange = item.HasPeopleChanges;
-
-                        var sourceCount = Array.isArray(sourcePeopleArr) ? sourcePeopleArr.length : 0;
-                        var localCount = Array.isArray(localPeopleArr) ? localPeopleArr.length : 0;
-
-                        var row = self._createTableRow(
-                            'People Count',
-                            sourceCount + ' people',
-                            localCount + ' people',
-                            hasPeopleChange ? 'Will sync from source' : '-',
-                            hasPeopleChange
-                        );
-                        tbody.appendChild(row);
-                    } else {
-                        var noDataRow = self._createTableRow('(People sync disabled)', '-', '-', '-', false);
                         tbody.appendChild(noDataRow);
                     }
 

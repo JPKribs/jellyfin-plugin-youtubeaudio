@@ -2033,6 +2033,71 @@ public class ConfigurationController : ControllerBase
     }
 
     /// <summary>
+    /// GetMetadataItemImageInfo
+    /// Gets image info (including sizes) for a metadata sync item from the source server.
+    /// </summary>
+    /// <param name="id">The database ID of the metadata sync item.</param>
+    /// <returns>List of image info with sizes.</returns>
+    [HttpGet("MetadataItems/{id}/ImageInfo")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<List<ImageInfoDto>>> GetMetadataItemImageInfo(long id)
+    {
+        var plugin = Plugin.Instance;
+        if (plugin == null)
+        {
+            return NotFound();
+        }
+
+        var item = plugin.Database.GetMetadataSyncItemById(id);
+        if (item == null || string.IsNullOrEmpty(item.SourceItemId))
+        {
+            return NotFound();
+        }
+
+        var config = plugin.Configuration;
+        if (string.IsNullOrEmpty(config.SourceServerUrl) || string.IsNullOrEmpty(config.SourceServerApiKey))
+        {
+            return NotFound("Source server not configured");
+        }
+
+        try
+        {
+            using var client = new SourceServerClient(
+                plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
+                config.SourceServerUrl,
+                config.SourceServerApiKey);
+
+            if (!Guid.TryParse(item.SourceItemId, out var sourceItemGuid))
+            {
+                return NotFound("Invalid source item ID");
+            }
+
+            var imageInfoList = await client.GetItemImageInfoAsync(sourceItemGuid).ConfigureAwait(false);
+            if (imageInfoList == null)
+            {
+                return Ok(new List<ImageInfoDto>());
+            }
+
+            var result = imageInfoList.Select(img => new ImageInfoDto
+            {
+                ImageType = img.ImageType?.ToString() ?? "Unknown",
+                ImageIndex = img.ImageIndex ?? 0,
+                Size = img.Size ?? 0,
+                Width = img.Width ?? 0,
+                Height = img.Height ?? 0
+            }).ToList();
+
+            return Ok(result);
+        }
+        catch (Exception)
+        {
+            // Return empty list on error
+            return Ok(new List<ImageInfoDto>());
+        }
+    }
+
+    /// <summary>
     /// GetMetadataSyncItems
     /// Gets paginated metadata sync items from the database with optional search and filter.
     /// One record per item containing all categories (Metadata, Images, People).

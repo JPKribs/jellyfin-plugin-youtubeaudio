@@ -180,7 +180,7 @@ public class MetadataSyncItem
     /// <summary>
     /// Gets a value indicating whether there are any changes to sync.
     /// </summary>
-    public bool HasChanges => HasMetadataChanges || HasImagesChanges || HasPeopleChanges;
+    public bool HasChanges => HasMetadataChanges || HasImagesChanges;
 
     /// <summary>
     /// Gets a display-friendly summary of the changes.
@@ -210,11 +210,6 @@ public class MetadataSyncItem
             if (HasImagesChanges)
             {
                 changes.Add("Images");
-            }
-
-            if (HasPeopleChanges)
-            {
-                changes.Add("People");
             }
 
             return string.Join(", ", changes);

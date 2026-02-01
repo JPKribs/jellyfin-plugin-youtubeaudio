@@ -235,7 +235,8 @@ public class SourceServerClient : IDisposable
                         ItemFields.ProviderIds,
                         ItemFields.OriginalTitle,
                         ItemFields.SortName,
-                        ItemFields.ProductionLocations
+                        ItemFields.ProductionLocations,
+                        ItemFields.Taglines
                     };
                     config.QueryParameters.StartIndex = startIndex;
                     config.QueryParameters.Limit = limit;
@@ -537,6 +538,26 @@ public class SourceServerClient : IDisposable
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Failed to get profile image hash for user {UserId}", userId);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Gets image info for an item, including sizes and dimensions.
+    /// </summary>
+    /// <param name="itemId">Item ID on the source server.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>List of image info or null if failed.</returns>
+    public async Task<List<ImageInfo>?> GetItemImageInfoAsync(Guid itemId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var client = GetApiClient();
+            return await client.Items[itemId].Images.GetAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to get image info for item {ItemId}", itemId);
             return null;
         }
     }

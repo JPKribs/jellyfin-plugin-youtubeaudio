@@ -381,19 +381,125 @@ public class SyncMissingMetadataTask : IScheduledTask
                 hasChanges = true;
             }
 
-            if (metadata.TryGetValue("Tags", out var tagsValue) && tagsValue.ValueKind == JsonValueKind.Array)
+            // SortName
+            if (metadata.TryGetValue("SortName", out var sortNameValue) && sortNameValue.ValueKind == JsonValueKind.String)
             {
-                var tags = new List<string>();
-                foreach (var tag in tagsValue.EnumerateArray())
+                var sortName = sortNameValue.GetString();
+                if (localItem.SortName != sortName)
                 {
-                    if (tag.ValueKind == JsonValueKind.String)
+                    localItem.SortName = sortName ?? string.Empty;
+                    hasChanges = true;
+                }
+            }
+
+            // ForcedSortName
+            if (metadata.TryGetValue("ForcedSortName", out var forcedSortNameValue) && forcedSortNameValue.ValueKind == JsonValueKind.String)
+            {
+                var forcedSortName = forcedSortNameValue.GetString();
+                if (localItem.ForcedSortName != forcedSortName)
+                {
+                    localItem.ForcedSortName = forcedSortName;
+                    hasChanges = true;
+                }
+            }
+
+            // CustomRating
+            if (metadata.TryGetValue("CustomRating", out var customRatingValue) && customRatingValue.ValueKind == JsonValueKind.String)
+            {
+                var customRating = customRatingValue.GetString();
+                if (localItem.CustomRating != customRating)
+                {
+                    localItem.CustomRating = customRating;
+                    hasChanges = true;
+                }
+            }
+
+            // PremiereDate
+            if (metadata.TryGetValue("PremiereDate", out var premiereDateValue))
+            {
+                DateTime? premiereDate = null;
+                if (premiereDateValue.ValueKind == JsonValueKind.String)
+                {
+                    var dateStr = premiereDateValue.GetString();
+                    if (!string.IsNullOrEmpty(dateStr) && DateTime.TryParse(dateStr, out var parsed))
                     {
-                        tags.Add(tag.GetString()!);
+                        premiereDate = parsed;
                     }
                 }
 
-                localItem.Tags = tags.ToArray();
-                hasChanges = true;
+                if (localItem.PremiereDate != premiereDate)
+                {
+                    localItem.PremiereDate = premiereDate;
+                    hasChanges = true;
+                }
+            }
+
+            // EndDate
+            if (metadata.TryGetValue("EndDate", out var endDateValue))
+            {
+                DateTime? endDate = null;
+                if (endDateValue.ValueKind == JsonValueKind.String)
+                {
+                    var dateStr = endDateValue.GetString();
+                    if (!string.IsNullOrEmpty(dateStr) && DateTime.TryParse(dateStr, out var parsed))
+                    {
+                        endDate = parsed;
+                    }
+                }
+
+                if (localItem.EndDate != endDate)
+                {
+                    localItem.EndDate = endDate;
+                    hasChanges = true;
+                }
+            }
+
+            // IndexNumber (episode number)
+            if (metadata.TryGetValue("IndexNumber", out var indexNumValue))
+            {
+                int? indexNum = indexNumValue.ValueKind == JsonValueKind.Number
+                    ? indexNumValue.GetInt32()
+                    : null;
+                if (localItem.IndexNumber != indexNum)
+                {
+                    localItem.IndexNumber = indexNum;
+                    hasChanges = true;
+                }
+            }
+
+            // ParentIndexNumber (season number)
+            if (metadata.TryGetValue("ParentIndexNumber", out var parentIndexNumValue))
+            {
+                int? parentIndexNum = parentIndexNumValue.ValueKind == JsonValueKind.Number
+                    ? parentIndexNumValue.GetInt32()
+                    : null;
+                if (localItem.ParentIndexNumber != parentIndexNum)
+                {
+                    localItem.ParentIndexNumber = parentIndexNum;
+                    hasChanges = true;
+                }
+            }
+
+            // PreferredMetadataCountryCode
+            if (metadata.TryGetValue("PreferredMetadataCountryCode", out var countryCodeValue) && countryCodeValue.ValueKind == JsonValueKind.String)
+            {
+                var countryCode = countryCodeValue.GetString();
+                if (localItem.PreferredMetadataCountryCode != countryCode)
+                {
+                    localItem.PreferredMetadataCountryCode = countryCode;
+                    hasChanges = true;
+                }
+            }
+
+            // PreferredMetadataLanguage
+            if (metadata.TryGetValue("PreferredMetadataLanguage", out var langValue) && langValue.ValueKind == JsonValueKind.String)
+            {
+                var lang = langValue.GetString();
+                if (localItem.PreferredMetadataLanguage != lang)
+                {
+                    localItem.PreferredMetadataLanguage = lang;
+                    hasChanges = true;
+                }
             }
 
             if (metadata.TryGetValue("ProviderIds", out var providerIdsValue) && providerIdsValue.ValueKind == JsonValueKind.Object)
