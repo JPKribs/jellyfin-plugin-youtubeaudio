@@ -1315,50 +1315,6 @@
             border-left: 3px solid #f0ad4e;
         }
 
-        /* History item row styling */
-        .historyItemInfo {
-            flex: 1;
-            min-width: 0;
-        }
-        .historyItemName {
-            font-weight: 500;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .historyItemUser {
-            font-size: 0.85em;
-            opacity: 0.7;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .historyItemDetails {
-            font-size: 0.85em;
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-        .historyItemDetail {
-            display: flex;
-            gap: 4px;
-        }
-        .historyItemDetail .label {
-            opacity: 0.6;
-        }
-        .historyItemDetail .value {
-            font-weight: 500;
-        }
-        .historyItemDetail .value.played {
-            color: var(--status-synced-color);
-        }
-        .historyItemDetail .value.notPlayed {
-            opacity: 0.5;
-        }
-        .historyItemDetail .value.favorite {
-            color: #f0ad4e;
-        }
-
         /* Sync section separator */
         .syncSectionSeparator {
             border-bottom: 1px solid #555;
@@ -4430,10 +4386,10 @@
                                 var localUserName = userMapping ? userMapping.LocalUserName : 'Unknown';
                                 var userDisplay = sourceUserName + ' → ' + localUserName;
 
-                                return '<div class="historyItemInfo">' +
-                                    '<div class="historyItemName" title="' + ServerSyncShared.escapeHtml(itemName) + '">' +
+                                return '<div class="syncItemInfo">' +
+                                    '<div class="syncItemName" title="' + ServerSyncShared.escapeHtml(itemName) + '">' +
                                     ServerSyncShared.escapeHtml(itemName) + '</div>' +
-                                    '<div class="historyItemUser">' + ServerSyncShared.escapeHtml(userDisplay) + '</div>' +
+                                    '<div class="syncItemPath">' + ServerSyncShared.escapeHtml(userDisplay) + '</div>' +
                                     '</div>';
                             }
                         },
@@ -4442,31 +4398,22 @@
                             label: 'Changes',
                             type: 'custom',
                             render: function(item) {
+                                if (!item.HasChanges) {
+                                    return '<span style="opacity: 0.5;">No changes</span>';
+                                }
+
                                 var details = [];
-
-                                // Show what will change
-                                if (item.HasChanges) {
-                                    if (item.MergedIsPlayed !== item.LocalIsPlayed) {
-                                        var playedClass = item.MergedIsPlayed ? 'played' : 'notPlayed';
-                                        details.push('<span class="historyItemDetail"><span class="label">Played:</span> <span class="value ' + playedClass + '">' +
-                                            (item.MergedIsPlayed ? 'Yes' : 'No') + '</span></span>');
-                                    }
-                                    if (item.MergedPlayCount !== item.LocalPlayCount) {
-                                        details.push('<span class="historyItemDetail"><span class="label">Count:</span> <span class="value">' +
-                                            (item.MergedPlayCount || 0) + '</span></span>');
-                                    }
-                                    if (item.MergedIsFavorite !== item.LocalIsFavorite) {
-                                        var favClass = item.MergedIsFavorite ? 'favorite' : '';
-                                        details.push('<span class="historyItemDetail"><span class="label">Favorited:</span> <span class="value ' + favClass + '">' +
-                                            (item.MergedIsFavorite ? 'Yes' : 'No') + '</span></span>');
-                                    }
+                                if (item.MergedIsPlayed !== item.LocalIsPlayed) {
+                                    details.push('Played: ' + (item.MergedIsPlayed ? 'Yes' : 'No'));
+                                }
+                                if (item.MergedPlayCount !== item.LocalPlayCount) {
+                                    details.push('Count: ' + (item.MergedPlayCount || 0));
+                                }
+                                if (item.MergedIsFavorite !== item.LocalIsFavorite) {
+                                    details.push('Favorite: ' + (item.MergedIsFavorite ? 'Yes' : 'No'));
                                 }
 
-                                if (details.length === 0) {
-                                    return '<div class="historyItemDetails"><span style="opacity: 0.5;">No changes</span></div>';
-                                }
-
-                                return '<div class="historyItemDetails">' + details.join('') + '</div>';
+                                return ServerSyncShared.escapeHtml(details.join(', ') || 'Changes pending');
                             }
                         },
                         {
