@@ -6,6 +6,7 @@ using System.IO;
 using Jellyfin.Plugin.ServerSync.Models.Common;
 using Jellyfin.Plugin.ServerSync.Models.ContentSync;
 using Jellyfin.Plugin.ServerSync.Models.HistorySync;
+using Jellyfin.Plugin.ServerSync.Models.MetadataSync;
 using Jellyfin.Plugin.ServerSync.Models.UserSync;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
@@ -2348,6 +2349,543 @@ public class SyncDatabase : IDisposable
         if (!reader.IsDBNull(syncedImageSizeOrdinal))
         {
             item.SyncedImageSize = reader.GetInt64(syncedImageSizeOrdinal);
+        }
+
+        var lastSyncTimeOrdinal = reader.GetOrdinal("LastSyncTime");
+        if (!reader.IsDBNull(lastSyncTimeOrdinal))
+        {
+            item.LastSyncTime = ParseDateTimeSafe(reader.GetString(lastSyncTimeOrdinal));
+        }
+
+        var errorMessageOrdinal = reader.GetOrdinal("ErrorMessage");
+        if (!reader.IsDBNull(errorMessageOrdinal))
+        {
+            item.ErrorMessage = reader.GetString(errorMessageOrdinal);
+        }
+
+        return item;
+    }
+
+    // ============================================
+    // Metadata Sync Methods
+    // ============================================
+
+    /// <summary>
+    /// Gets a metadata sync item by its ID.
+    /// </summary>
+    public MetadataSyncItem? GetMetadataSyncItemById(long id)
+    {
+        EnsureConnection();
+
+        using var command = _connection!.CreateCommand();
+        command.CommandText = "SELECT * FROM MetadataSyncItems WHERE Id = @id";
+        command.Parameters.AddWithValue("@id", id);
+
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadMetadataSyncItem(reader) : null;
+    }
+
+    /// <summary>
+    /// Gets a metadata sync item by source item ID and property category.
+    /// </summary>
+    public MetadataSyncItem? GetMetadataSyncItem(string sourceLibraryId, string sourceItemId, string propertyCategory)
+    {
+        EnsureConnection();
+
+        using var command = _connection!.CreateCommand();
+        command.CommandText = @"
+            SELECT * FROM MetadataSyncItems
+            WHERE SourceLibraryId = @sourceLibraryId
+              AND SourceItemId = @sourceItemId
+              AND PropertyCategory = @propertyCategory";
+        command.Parameters.AddWithValue("@sourceLibraryId", sourceLibraryId);
+        command.Parameters.AddWithValue("@sourceItemId", sourceItemId);
+        command.Parameters.AddWithValue("@propertyCategory", propertyCategory);
+
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadMetadataSyncItem(reader) : null;
+    }
+
+    /// <summary>
+    /// Gets all metadata sync items for a specific source item.
+    /// </summary>
+    public List<MetadataSyncItem> GetMetadataSyncItemsBySourceItem(string sourceItemId)
+    {
+        EnsureConnection();
+
+        var items = new List<MetadataSyncItem>();
+        using var command = _connection!.CreateCommand();
+        command.CommandText = "SELECT * FROM MetadataSyncItems WHERE SourceItemId = @sourceItemId ORDER BY PropertyCategory";
+        command.Parameters.AddWithValue("@sourceItemId", sourceItemId);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            items.Add(ReadMetadataSyncItem(reader));
+        }
+
+        return items;
+    }
+
+    /// <summary>
+    /// Gets all metadata sync items for a specific library.
+    /// </summary>
+    public List<MetadataSyncItem> GetMetadataSyncItemsByLibrary(string sourceLibraryId)
+    {
+        EnsureConnection();
+
+        var items = new List<MetadataSyncItem>();
+        using var command = _connection!.CreateCommand();
+        command.CommandText = "SELECT * FROM MetadataSyncItems WHERE SourceLibraryId = @sourceLibraryId";
+        command.Parameters.AddWithValue("@sourceLibraryId", sourceLibraryId);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            items.Add(ReadMetadataSyncItem(reader));
+        }
+
+        return items;
+    }
+
+    /// <summary>
+    /// Gets all metadata sync items with a specific status.
+    /// </summary>
+    public List<MetadataSyncItem> GetMetadataSyncItemsByStatus(BaseSyncStatus status)
+    {
+        EnsureConnection();
+
+        var items = new List<MetadataSyncItem>();
+        using var command = _connection!.CreateCommand();
+        command.CommandText = "SELECT * FROM MetadataSyncItems WHERE Status = @status";
+        command.Parameters.AddWithValue("@status", (int)status);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            items.Add(ReadMetadataSyncItem(reader));
+        }
+
+        return items;
+    }
+
+    /// <summary>
+    /// Searches metadata sync items with pagination support.
+    /// </summary>
+    public (List<MetadataSyncItem> Items, int TotalCount) SearchMetadataSyncItemsPaginated(
+        string? searchTerm = null,
+        BaseSyncStatus? status = null,
+        string? sourceLibraryId = null,
+        string? propertyCategory = null,
+        int skip = 0,
+        int take = 50)
+    {
+        EnsureConnection();
+
+        var conditions = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            conditions.Add("(ItemName LIKE @searchTerm OR SourcePath LIKE @searchTerm)");
+        }
+
+        if (status.HasValue)
+        {
+            conditions.Add("Status = @status");
+        }
+
+        if (!string.IsNullOrWhiteSpace(sourceLibraryId))
+        {
+            conditions.Add("SourceLibraryId = @sourceLibraryId");
+        }
+
+        if (!string.IsNullOrWhiteSpace(propertyCategory))
+        {
+            conditions.Add("PropertyCategory = @propertyCategory");
+        }
+
+        var whereClause = conditions.Count > 0
+            ? $"WHERE {string.Join(" AND ", conditions)}"
+            : string.Empty;
+
+        // Get total count
+        int totalCount;
+        using (var countCommand = _connection!.CreateCommand())
+        {
+            countCommand.CommandText = $"SELECT COUNT(*) FROM MetadataSyncItems {whereClause}";
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                countCommand.Parameters.AddWithValue("@searchTerm", $"%{searchTerm}%");
+            }
+
+            if (status.HasValue)
+            {
+                countCommand.Parameters.AddWithValue("@status", (int)status.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(sourceLibraryId))
+            {
+                countCommand.Parameters.AddWithValue("@sourceLibraryId", sourceLibraryId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(propertyCategory))
+            {
+                countCommand.Parameters.AddWithValue("@propertyCategory", propertyCategory);
+            }
+
+            totalCount = Convert.ToInt32(countCommand.ExecuteScalar());
+        }
+
+        // Get paginated data
+        var items = new List<MetadataSyncItem>();
+        using (var dataCommand = _connection!.CreateCommand())
+        {
+            dataCommand.CommandText = $@"
+                SELECT * FROM MetadataSyncItems
+                {whereClause}
+                ORDER BY ItemName, PropertyCategory
+                LIMIT @take OFFSET @skip";
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                dataCommand.Parameters.AddWithValue("@searchTerm", $"%{searchTerm}%");
+            }
+
+            if (status.HasValue)
+            {
+                dataCommand.Parameters.AddWithValue("@status", (int)status.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(sourceLibraryId))
+            {
+                dataCommand.Parameters.AddWithValue("@sourceLibraryId", sourceLibraryId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(propertyCategory))
+            {
+                dataCommand.Parameters.AddWithValue("@propertyCategory", propertyCategory);
+            }
+
+            dataCommand.Parameters.AddWithValue("@take", take);
+            dataCommand.Parameters.AddWithValue("@skip", skip);
+
+            using var reader = dataCommand.ExecuteReader();
+            while (reader.Read())
+            {
+                items.Add(ReadMetadataSyncItem(reader));
+            }
+        }
+
+        return (items, totalCount);
+    }
+
+    /// <summary>
+    /// Gets metadata sync status counts.
+    /// </summary>
+    public Dictionary<BaseSyncStatus, int> GetMetadataSyncStatusCounts()
+    {
+        EnsureConnection();
+
+        var counts = new Dictionary<BaseSyncStatus, int>();
+        using var command = _connection!.CreateCommand();
+        command.CommandText = "SELECT Status, COUNT(*) as Count FROM MetadataSyncItems GROUP BY Status";
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            var syncStatus = (BaseSyncStatus)reader.GetInt32(0);
+            var count = reader.GetInt32(1);
+            counts[syncStatus] = count;
+        }
+
+        return counts;
+    }
+
+    /// <summary>
+    /// Upserts a metadata sync item.
+    /// </summary>
+    public void UpsertMetadataSyncItem(MetadataSyncItem item, SqliteTransaction? transaction = null)
+    {
+        lock (_writeLock)
+        {
+            EnsureConnection();
+
+            using var command = _connection!.CreateCommand();
+            command.Transaction = transaction;
+
+            // Insert or update metadata sync item (one record per property category per item)
+            // Preserve Ignored status - don't overwrite if user explicitly ignored the item
+            command.CommandText = @"
+                INSERT INTO MetadataSyncItems (
+                    SourceLibraryId, LocalLibraryId, SourceItemId, LocalItemId,
+                    ItemName, SourcePath, LocalPath, PropertyCategory,
+                    SourceValue, LocalValue, MergedValue,
+                    SourceImagesHash, LocalImagesHash, SyncedImagesHash,
+                    Status, StatusDate, LastSyncTime, ErrorMessage
+                ) VALUES (
+                    @sourceLibraryId, @localLibraryId, @sourceItemId, @localItemId,
+                    @itemName, @sourcePath, @localPath, @propertyCategory,
+                    @sourceValue, @localValue, @mergedValue,
+                    @sourceImagesHash, @localImagesHash, @syncedImagesHash,
+                    @status, @statusDate, @lastSyncTime, @errorMessage
+                )
+                ON CONFLICT(SourceLibraryId, SourceItemId, PropertyCategory) DO UPDATE SET
+                    LocalLibraryId = @localLibraryId,
+                    LocalItemId = @localItemId,
+                    ItemName = @itemName,
+                    SourcePath = @sourcePath,
+                    LocalPath = @localPath,
+                    SourceValue = @sourceValue,
+                    LocalValue = @localValue,
+                    MergedValue = @mergedValue,
+                    SourceImagesHash = @sourceImagesHash,
+                    LocalImagesHash = @localImagesHash,
+                    SyncedImagesHash = CASE
+                        WHEN @syncedImagesHash IS NOT NULL THEN @syncedImagesHash
+                        ELSE MetadataSyncItems.SyncedImagesHash
+                    END,
+                    Status = CASE
+                        WHEN MetadataSyncItems.Status = @ignoredStatus THEN @ignoredStatus
+                        ELSE @status
+                    END,
+                    StatusDate = CASE
+                        WHEN MetadataSyncItems.Status = @ignoredStatus THEN MetadataSyncItems.StatusDate
+                        ELSE @statusDate
+                    END,
+                    LastSyncTime = CASE
+                        WHEN MetadataSyncItems.Status = @ignoredStatus THEN MetadataSyncItems.LastSyncTime
+                        ELSE @lastSyncTime
+                    END,
+                    ErrorMessage = CASE
+                        WHEN MetadataSyncItems.Status = @ignoredStatus THEN MetadataSyncItems.ErrorMessage
+                        ELSE @errorMessage
+                    END
+            ";
+
+            command.Parameters.AddWithValue("@sourceLibraryId", item.SourceLibraryId);
+            command.Parameters.AddWithValue("@localLibraryId", item.LocalLibraryId);
+            command.Parameters.AddWithValue("@sourceItemId", item.SourceItemId);
+            command.Parameters.AddWithValue("@localItemId", item.LocalItemId ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@itemName", item.ItemName ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@sourcePath", item.SourcePath ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@localPath", item.LocalPath ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@propertyCategory", item.PropertyCategory);
+            command.Parameters.AddWithValue("@sourceValue", item.SourceValue ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@localValue", item.LocalValue ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@mergedValue", item.MergedValue ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@sourceImagesHash", item.SourceImagesHash ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@localImagesHash", item.LocalImagesHash ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@syncedImagesHash", item.SyncedImagesHash ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@status", (int)item.Status);
+            command.Parameters.AddWithValue("@statusDate", item.StatusDate.ToString("o"));
+            command.Parameters.AddWithValue("@lastSyncTime", item.LastSyncTime?.ToString("o") ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@errorMessage", item.ErrorMessage ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@ignoredStatus", (int)BaseSyncStatus.Ignored);
+
+            command.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>
+    /// Updates the status of a metadata sync item by database ID.
+    /// </summary>
+    public void UpdateMetadataSyncItemStatusById(long id, BaseSyncStatus status, string? errorMessage = null)
+    {
+        lock (_writeLock)
+        {
+            EnsureConnection();
+
+            using var command = _connection!.CreateCommand();
+
+            if (status == BaseSyncStatus.Synced)
+            {
+                command.CommandText = @"
+                    UPDATE MetadataSyncItems
+                    SET Status = @status,
+                        StatusDate = @statusDate,
+                        LastSyncTime = @statusDate,
+                        ErrorMessage = NULL
+                    WHERE Id = @id";
+            }
+            else
+            {
+                command.CommandText = @"
+                    UPDATE MetadataSyncItems
+                    SET Status = @status,
+                        StatusDate = @statusDate,
+                        ErrorMessage = @errorMessage
+                    WHERE Id = @id";
+                command.Parameters.AddWithValue("@errorMessage", errorMessage ?? (object)DBNull.Value);
+            }
+
+            command.Parameters.AddWithValue("@id", id);
+            command.Parameters.AddWithValue("@status", (int)status);
+            command.Parameters.AddWithValue("@statusDate", DateTime.UtcNow.ToString("o"));
+
+            command.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>
+    /// Batch updates status for multiple metadata sync items by their database IDs.
+    /// </summary>
+    public int BatchUpdateMetadataSyncItemStatusByIds(IEnumerable<long> ids, BaseSyncStatus status)
+    {
+        lock (_writeLock)
+        {
+            EnsureConnection();
+
+            var count = 0;
+            using var transaction = _connection!.BeginTransaction();
+            try
+            {
+                foreach (var id in ids)
+                {
+                    using var command = _connection!.CreateCommand();
+                    command.Transaction = transaction;
+                    command.CommandText = @"
+                        UPDATE MetadataSyncItems
+                        SET Status = @status,
+                            StatusDate = @statusDate
+                        WHERE Id = @id";
+
+                    command.Parameters.AddWithValue("@id", id);
+                    command.Parameters.AddWithValue("@status", (int)status);
+                    command.Parameters.AddWithValue("@statusDate", DateTime.UtcNow.ToString("o"));
+
+                    count += command.ExecuteNonQuery();
+                }
+
+                transaction.Commit();
+                return count;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Batch update metadata sync status by IDs failed after {Count} items, rolling back", count);
+                transaction.Rollback();
+                throw;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Deletes all metadata sync items for a specific source item.
+    /// </summary>
+    public int DeleteMetadataSyncItemsBySourceItem(string sourceItemId)
+    {
+        lock (_writeLock)
+        {
+            EnsureConnection();
+
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "DELETE FROM MetadataSyncItems WHERE SourceItemId = @sourceItemId";
+            command.Parameters.AddWithValue("@sourceItemId", sourceItemId);
+
+            return command.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>
+    /// Resets the metadata sync database by clearing all items.
+    /// </summary>
+    public void ResetMetadataSyncDatabase()
+    {
+        lock (_writeLock)
+        {
+            _logger.LogWarning("Resetting metadata sync database - all metadata sync tracking data will be lost");
+
+            EnsureConnection();
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "DELETE FROM MetadataSyncItems WHERE 1=1";
+            try
+            {
+                var deleted = command.ExecuteNonQuery();
+                _logger.LogInformation("Metadata sync database has been reset, {Count} items removed", deleted);
+            }
+            catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.SqliteErrorCode == 1)
+            {
+                _logger.LogInformation("Metadata sync table does not exist yet, nothing to reset");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reads a MetadataSyncItem from the database reader.
+    /// </summary>
+    private static MetadataSyncItem ReadMetadataSyncItem(SqliteDataReader reader)
+    {
+        var item = new MetadataSyncItem
+        {
+            Id = reader.GetInt64(reader.GetOrdinal("Id")),
+            SourceLibraryId = reader.GetString(reader.GetOrdinal("SourceLibraryId")),
+            LocalLibraryId = reader.GetString(reader.GetOrdinal("LocalLibraryId")),
+            SourceItemId = reader.GetString(reader.GetOrdinal("SourceItemId")),
+            PropertyCategory = reader.GetString(reader.GetOrdinal("PropertyCategory")),
+            Status = (BaseSyncStatus)reader.GetInt32(reader.GetOrdinal("Status")),
+            StatusDate = ParseDateTimeSafe(reader.GetString(reader.GetOrdinal("StatusDate")))
+        };
+
+        // Optional string fields
+        var localItemIdOrdinal = reader.GetOrdinal("LocalItemId");
+        if (!reader.IsDBNull(localItemIdOrdinal))
+        {
+            item.LocalItemId = reader.GetString(localItemIdOrdinal);
+        }
+
+        var itemNameOrdinal = reader.GetOrdinal("ItemName");
+        if (!reader.IsDBNull(itemNameOrdinal))
+        {
+            item.ItemName = reader.GetString(itemNameOrdinal);
+        }
+
+        var sourcePathOrdinal = reader.GetOrdinal("SourcePath");
+        if (!reader.IsDBNull(sourcePathOrdinal))
+        {
+            item.SourcePath = reader.GetString(sourcePathOrdinal);
+        }
+
+        var localPathOrdinal = reader.GetOrdinal("LocalPath");
+        if (!reader.IsDBNull(localPathOrdinal))
+        {
+            item.LocalPath = reader.GetString(localPathOrdinal);
+        }
+
+        var sourceValueOrdinal = reader.GetOrdinal("SourceValue");
+        if (!reader.IsDBNull(sourceValueOrdinal))
+        {
+            item.SourceValue = reader.GetString(sourceValueOrdinal);
+        }
+
+        var localValueOrdinal = reader.GetOrdinal("LocalValue");
+        if (!reader.IsDBNull(localValueOrdinal))
+        {
+            item.LocalValue = reader.GetString(localValueOrdinal);
+        }
+
+        var mergedValueOrdinal = reader.GetOrdinal("MergedValue");
+        if (!reader.IsDBNull(mergedValueOrdinal))
+        {
+            item.MergedValue = reader.GetString(mergedValueOrdinal);
+        }
+
+        // Image hash fields
+        var sourceImagesHashOrdinal = TryGetOrdinal(reader, "SourceImagesHash");
+        if (sourceImagesHashOrdinal >= 0 && !reader.IsDBNull(sourceImagesHashOrdinal))
+        {
+            item.SourceImagesHash = reader.GetString(sourceImagesHashOrdinal);
+        }
+
+        var localImagesHashOrdinal = TryGetOrdinal(reader, "LocalImagesHash");
+        if (localImagesHashOrdinal >= 0 && !reader.IsDBNull(localImagesHashOrdinal))
+        {
+            item.LocalImagesHash = reader.GetString(localImagesHashOrdinal);
+        }
+
+        var syncedImagesHashOrdinal = TryGetOrdinal(reader, "SyncedImagesHash");
+        if (syncedImagesHashOrdinal >= 0 && !reader.IsDBNull(syncedImagesHashOrdinal))
+        {
+            item.SyncedImagesHash = reader.GetString(syncedImagesHashOrdinal);
         }
 
         var lastSyncTimeOrdinal = reader.GetOrdinal("LastSyncTime");

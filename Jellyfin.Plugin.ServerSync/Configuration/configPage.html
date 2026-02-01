@@ -108,6 +108,9 @@
                         <button is="emby-button" type="button" class="tabButton raised" data-tab="history">
                             <span>History</span>
                         </button>
+                        <button is="emby-button" type="button" class="tabButton raised" data-tab="metadata">
+                            <span>Metadata</span>
+                        </button>
                         <button is="emby-button" type="button" class="tabButton raised" data-tab="users">
                             <span>Users</span>
                         </button>
@@ -320,7 +323,7 @@
 
                             <!-- Library Items Section -->
                             <div class="sectionTitleContainer">
-                                <h2 class="sectionTitle">Library Items</h2>
+                                <h2 class="sectionTitle">Content</h2>
                             </div>
 
                             <div id="syncStatusSummary">
@@ -367,12 +370,12 @@
                                         <span class="healthValue" id="healthLastSync">Never</span>
                                     </div>
                                     <div class="healthCard">
-                                        <span class="healthLabel">Disk Space</span>
-                                        <span class="healthValue" id="healthDiskSpace">--</span>
+                                        <span class="healthLabel">Libraries Mapped</span>
+                                        <span class="healthValue" id="healthLibraryCount">0</span>
                                     </div>
                                     <div class="healthCard">
-                                        <span class="healthLabel">Queued Size</span>
-                                        <span class="healthValue" id="healthQueuedSize">--</span>
+                                        <span class="healthLabel">Pending</span>
+                                        <span class="healthValue" id="healthPendingCount">0</span>
                                     </div>
                                 </div>
                             </div>
@@ -469,7 +472,7 @@
 
                             <!-- History Items Section -->
                             <div class="sectionTitleContainer">
-                                <h2 class="sectionTitle">History Items</h2>
+                                <h2 class="sectionTitle">History</h2>
                             </div>
 
                             <div id="historySyncStatusSummary">
@@ -496,7 +499,7 @@
                             <div id="historyHealthDashboard" class="healthDashboard">
                                 <div class="healthRow">
                                     <div class="healthCard">
-                                        <span class="healthLabel">Last History Sync</span>
+                                        <span class="healthLabel">Last Sync</span>
                                         <span class="healthValue" id="historyHealthLastSync">Never</span>
                                     </div>
                                     <div class="healthCard">
@@ -504,7 +507,11 @@
                                         <span class="healthValue" id="historyHealthUserCount">0</span>
                                     </div>
                                     <div class="healthCard">
-                                        <span class="healthLabel">Items to Sync</span>
+                                        <span class="healthLabel">Libraries Mapped</span>
+                                        <span class="healthValue" id="historyHealthLibraryCount">0</span>
+                                    </div>
+                                    <div class="healthCard">
+                                        <span class="healthLabel">Pending</span>
                                         <span class="healthValue" id="historyHealthPendingCount">0</span>
                                     </div>
                                 </div>
@@ -529,6 +536,123 @@
 
                             <!-- Paginated Table Container for History Items -->
                             <div id="historyItemsTableContainer">
+                                <!-- PaginatedTable will generate its structure here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Metadata Tab -->
+                    <div id="tabMetadata" class="tabPanel hidden">
+                        <div class="inputContainer">
+                            <label class="checkboxContainer">
+                                <input is="emby-checkbox" type="checkbox" id="chkEnableMetadataSync" />
+                                <span>Enable Metadata Sync</span>
+                            </label>
+                            <div class="fieldDescription">Sync metadata (titles, descriptions, ratings, etc.) from source to local server for matched items.</div>
+                        </div>
+
+                        <div id="metadataSyncSettings">
+                            <!-- Settings Collapsible -->
+                            <div class="collapsibleSection">
+                                <button type="button" class="collapsibleHeader collapsed" data-target="metadataSettingsContent">
+                                    <span class="collapsibleTitle">Settings</span>
+                                    <span class="collapsibleIcon">▼</span>
+                                </button>
+                                <div id="metadataSettingsContent" class="collapsibleContent collapsed">
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkMetadataSyncMetadata" checked />
+                                            <span>Metadata Fields</span>
+                                        </label>
+                                        <div class="fieldDescription">Sync title, overview, ratings, genres, tags, and provider IDs.</div>
+                                    </div>
+
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkMetadataSyncImages" checked />
+                                            <span>Images</span>
+                                        </label>
+                                        <div class="fieldDescription">Sync primary, backdrop, and other images.</div>
+                                    </div>
+
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkMetadataSyncPeople" />
+                                            <span>People</span>
+                                        </label>
+                                        <div class="fieldDescription">Sync cast and crew information (actors, directors, etc.).</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="inputContainer mt-md">
+                                <button is="emby-button" type="button" id="btnSaveMetadataSettings" class="raised button-submit block">
+                                    <span>Save Metadata Settings</span>
+                                </button>
+                            </div>
+
+                            <!-- Metadata Sync Items Section -->
+                            <div class="sectionTitleContainer">
+                                <h2 class="sectionTitle">Metadata</h2>
+                            </div>
+
+                            <div id="metadataSyncStatusSummary">
+                                <div class="statusCards">
+                                    <div class="statusCard statusCard-synced" title="">
+                                        <span class="statusCard-count" id="metadataSyncedCount">0</span>
+                                        <span class="statusCard-label">Synced</span>
+                                    </div>
+                                    <div class="statusCard statusCard-queued" title="">
+                                        <span class="statusCard-count" id="metadataQueuedCount">0</span>
+                                        <span class="statusCard-label">Queued</span>
+                                    </div>
+                                    <div class="statusCard statusCard-errored" title="">
+                                        <span class="statusCard-count" id="metadataErroredCount">0</span>
+                                        <span class="statusCard-label">Errored</span>
+                                    </div>
+                                    <div class="statusCard statusCard-ignored" title="">
+                                        <span class="statusCard-count" id="metadataIgnoredCount">0</span>
+                                        <span class="statusCard-label">Ignored</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="metadataHealthDashboard" class="healthDashboard">
+                                <div class="healthRow">
+                                    <div class="healthCard">
+                                        <span class="healthLabel">Last Sync</span>
+                                        <span class="healthValue" id="metadataHealthLastSync">Never</span>
+                                    </div>
+                                    <div class="healthCard">
+                                        <span class="healthLabel">Libraries Mapped</span>
+                                        <span class="healthValue" id="metadataHealthLibraryCount">0</span>
+                                    </div>
+                                    <div class="healthCard">
+                                        <span class="healthLabel">Pending</span>
+                                        <span class="healthValue" id="metadataHealthPendingCount">0</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="syncActionButtonRow">
+                                <button is="emby-button" type="button" id="btnRefreshMetadataItems" class="raised syncActionButton">
+                                    <span>Refresh</span>
+                                </button>
+                                <button is="emby-button" type="button" id="btnTriggerMetadataSync" class="raised button-primary syncActionButton">
+                                    <span>Sync</span>
+                                </button>
+                                <button is="emby-button" type="button" id="btnRetryMetadataErrors" class="raised syncActionButton">
+                                    <span>Retry Errors</span>
+                                </button>
+                                <button is="emby-button" type="button" id="btnResetMetadataDatabase" class="raised button-destructive syncActionButton">
+                                    <span>Reset Database</span>
+                                </button>
+                            </div>
+
+                            <div class="syncSectionSeparator"></div>
+
+                            <!-- Paginated Table Container for Metadata Sync Items -->
+                            <div id="metadataSyncItemsTableContainer">
                                 <!-- PaginatedTable will generate its structure here -->
                             </div>
                         </div>
@@ -580,7 +704,7 @@
 
                             <div class="inputContainer mt-md">
                                 <button is="emby-button" type="button" id="btnSaveUserSettings" class="raised button-submit block">
-                                    <span>Save User Sync Settings</span>
+                                    <span>Save User Settings</span>
                                 </button>
                             </div>
 
@@ -613,7 +737,7 @@
                             <div id="userHealthDashboard" class="healthDashboard">
                                 <div class="healthRow">
                                     <div class="healthCard">
-                                        <span class="healthLabel">Last User Sync</span>
+                                        <span class="healthLabel">Last Sync</span>
                                         <span class="healthValue" id="userHealthLastSync">Never</span>
                                     </div>
                                     <div class="healthCard">
@@ -839,6 +963,59 @@
                     <span>Ignore</span>
                 </button>
                 <button is="emby-button" type="button" id="btnUserSyncModalQueue" class="raised button-primary modalButton">
+                    <span>Queue</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metadata Sync Item Detail Modal -->
+    <div id="metadataSyncItemDetailModal" class="dialog hidden">
+        <div class="dialogContent max-w-700 modal-relative">
+            <button type="button" id="btnMetadataSyncModalClose" class="dialogCloseBtn" title="Close">&times;</button>
+            <h2 id="metadataSyncModalTitle" class="modal-title"></h2>
+            <div class="modal-body">
+                <div class="modal-field">
+                    <div class="modal-field-label">Status</div>
+                    <span id="metadataSyncModalStatusBadge" class="itemModal-statusBadge"></span>
+                </div>
+                <div id="metadataSyncModalLastSyncSection" class="modal-field hidden">
+                    <div class="modal-field-label">Last Sync</div>
+                    <div id="metadataSyncModalLastSync"></div>
+                </div>
+                <div id="metadataSyncModalErrorSection" class="modal-field hidden">
+                    <div class="modal-field-label">Error</div>
+                    <div id="metadataSyncModalError" class="errorMessage"></div>
+                </div>
+
+                <!-- Item info -->
+                <div class="modal-field mb-lg">
+                    <div class="modal-field-label">Item</div>
+                    <div id="metadataSyncModalItem"></div>
+                </div>
+
+                <!-- Property Comparison Table -->
+                <div class="metadataSyncModal-tableContainer">
+                    <table class="historyCompareTable">
+                        <thead>
+                            <tr>
+                                <th class="historyCompareTable-property">Property</th>
+                                <th id="metadataSyncModalSourceHeader" class="historyCompareTable-server">Source</th>
+                                <th id="metadataSyncModalLocalHeader" class="historyCompareTable-server">Local</th>
+                                <th class="historyCompareTable-merged">After Sync</th>
+                            </tr>
+                        </thead>
+                        <tbody id="metadataSyncModalTableBody">
+                            <!-- Rows populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modalButtonRow">
+                <button is="emby-button" type="button" id="btnMetadataSyncModalIgnore" class="raised modalButton">
+                    <span>Ignore</span>
+                </button>
+                <button is="emby-button" type="button" id="btnMetadataSyncModalQueue" class="raised button-primary modalButton">
                     <span>Queue</span>
                 </button>
             </div>
@@ -1312,6 +1489,31 @@
             background: rgba(240, 173, 78, 0.1);
         }
         .userSyncModal-changedRow td:first-child {
+            border-left: 3px solid #f0ad4e;
+        }
+
+        /* Metadata Sync Modal Table Container - scrollable */
+        .metadataSyncModal-tableContainer {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 4px;
+        }
+        .metadataSyncModal-tableContainer table {
+            margin: 0;
+        }
+        .metadataSyncModal-tableContainer thead {
+            position: sticky;
+            top: 0;
+            background: #1a1a1a;
+            z-index: 1;
+        }
+
+        /* Highlight changed rows in metadata sync modal */
+        .metadataSyncModal-changedRow {
+            background: rgba(240, 173, 78, 0.1);
+        }
+        .metadataSyncModal-changedRow td:first-child {
             border-left: 3px solid #f0ad4e;
         }
 
@@ -3933,7 +4135,14 @@
             },
         
             loadHealthStats: function() {
-                return ServerSyncShared.apiRequest('Stats', 'GET').then(function(stats) {
+                var self = this;
+                return Promise.all([
+                    ServerSyncShared.apiRequest('Stats', 'GET'),
+                    ServerSyncShared.getConfig()
+                ]).then(function(results) {
+                    var stats = results[0];
+                    var config = results[1];
+
                     // Last sync time
                     var lastSyncEl = document.getElementById('healthLastSync');
                     if (stats.LastSyncEndTime) {
@@ -3944,26 +4153,17 @@
                         lastSyncEl.textContent = 'Never';
                         lastSyncEl.className = 'healthValue';
                     }
-        
-                    // Disk space
-                    var diskSpaceEl = document.getElementById('healthDiskSpace');
-                    if (stats.FreeDiskSpaceBytes > 0) {
-                        var freeSpace = ServerSyncShared.formatSize(stats.FreeDiskSpaceBytes);
-                        diskSpaceEl.textContent = freeSpace + ' free';
-                        if (stats.HasSufficientDiskSpace) {
-                            diskSpaceEl.className = 'healthValue success';
-                        } else {
-                            diskSpaceEl.className = 'healthValue error';
-                        }
-                    } else {
-                        diskSpaceEl.textContent = 'Unknown';
-                        diskSpaceEl.className = 'healthValue';
-                    }
-        
-                    // Queued size
-                    var queuedSizeEl = document.getElementById('healthQueuedSize');
-                    queuedSizeEl.textContent = ServerSyncShared.formatSize(stats.TotalQueuedBytes);
-                    queuedSizeEl.className = stats.QueuedItems > 0 ? 'healthValue warning' : 'healthValue';
+
+                    // Libraries mapped
+                    var libraryCountEl = document.getElementById('healthLibraryCount');
+                    var libraryMappings = config.LibraryMappings || [];
+                    libraryCountEl.textContent = libraryMappings.length;
+                    libraryCountEl.className = libraryMappings.length > 0 ? 'healthValue success' : 'healthValue warning';
+
+                    // Pending count
+                    var pendingCountEl = document.getElementById('healthPendingCount');
+                    pendingCountEl.textContent = stats.QueuedItems || 0;
+                    pendingCountEl.className = stats.QueuedItems > 0 ? 'healthValue warning' : 'healthValue';
                 }).catch(function() {
                     // Ignore errors
                 });
@@ -4569,7 +4769,13 @@
 
             loadHealthStats: function() {
                 var self = this;
-                return ServerSyncShared.getConfig().then(function(config) {
+                return Promise.all([
+                    ServerSyncShared.getConfig(),
+                    ServerSyncShared.apiRequest('HistoryStatus', 'GET')
+                ]).then(function(results) {
+                    var config = results[0];
+                    var status = results[1];
+
                     // Last history sync time
                     var lastSyncEl = document.getElementById('historyHealthLastSync');
                     if (config.LastHistorySyncTime) {
@@ -4587,13 +4793,17 @@
                     userCountEl.textContent = enabledUsers;
                     userCountEl.className = enabledUsers > 0 ? 'healthValue success' : 'healthValue warning';
 
+                    // Library mapping count
+                    var libraryCountEl = document.getElementById('historyHealthLibraryCount');
+                    var libraryMappings = config.LibraryMappings || [];
+                    libraryCountEl.textContent = libraryMappings.length;
+                    libraryCountEl.className = libraryMappings.length > 0 ? 'healthValue success' : 'healthValue warning';
+
                     // Pending count from status
-                    return ServerSyncShared.apiRequest('HistoryStatus', 'GET').then(function(status) {
-                        var pendingCountEl = document.getElementById('historyHealthPendingCount');
-                        var pending = (status.Pending || 0) + (status.Queued || 0);
-                        pendingCountEl.textContent = pending;
-                        pendingCountEl.className = pending > 0 ? 'healthValue warning' : 'healthValue';
-                    });
+                    var pendingCountEl = document.getElementById('historyHealthPendingCount');
+                    var pending = (status.Pending || 0) + (status.Queued || 0);
+                    pendingCountEl.textContent = pending;
+                    pendingCountEl.className = pending > 0 ? 'healthValue warning' : 'healthValue';
                 }).catch(function() {
                     // Ignore errors
                 });
@@ -5420,6 +5630,519 @@
 
     </script>
 
+    <!-- Scripts: MetadataSyncTable/metadataSyncTable.js -->
+    <script type="text/javascript">
+        // Metadata Sync Table module
+        var MetadataSyncTableModule = {
+            table: null,
+            currentModalItem: null,
+            currentConfig: null,
+
+            init: function(config) {
+                var self = this;
+                self.currentConfig = config;
+
+                // Create the paginated table instance
+                this.table = new PaginatedTable({
+                    containerId: 'metadataSyncItemsTableContainer',
+                    endpoint: 'MetadataItems',
+
+                    columns: [
+                        {
+                            key: 'item',
+                            label: 'Item',
+                            type: 'custom',
+                            render: function(item) {
+                                var category = item.PropertyCategory || 'Unknown';
+                                var itemName = item.ItemName || 'Unknown';
+                                var sourceLib = item.SourceLibraryName || 'Unknown';
+                                var localLib = item.LocalLibraryName || 'Unknown';
+                                var libraryDisplay = sourceLib + ' → ' + localLib;
+
+                                return '<div class="syncItemInfo">' +
+                                    '<div class="syncItemName" title="' + ServerSyncShared.escapeHtml(itemName + ' (' + category + ')') + '">' +
+                                    ServerSyncShared.escapeHtml(itemName) + ' <span style="opacity:0.6;">(' + ServerSyncShared.escapeHtml(category) + ')</span></div>' +
+                                    '<div class="syncItemPath">' + ServerSyncShared.escapeHtml(libraryDisplay) + '</div>' +
+                                '</div>';
+                            }
+                        },
+                        {
+                            key: 'changes',
+                            label: 'Changes',
+                            type: 'custom',
+                            render: function(item) {
+                                if (!item.HasChanges) {
+                                    return '<span style="opacity: 0.5;">No changes</span>';
+                                }
+                                if (item.PropertyCategory === 'Images') {
+                                    return 'Image update';
+                                }
+                                return item.ChangesSummary || 'Changes pending';
+                            }
+                        },
+                        {
+                            key: 'Status',
+                            label: 'Status',
+                            type: 'status'
+                        }
+                    ],
+
+                    filters: {
+                        type: 'select',
+                        label: 'Status',
+                        options: [
+                            { value: '', label: 'All Statuses' },
+                            { value: 'Synced', label: 'Synced', id: 'optMetadataSynced' },
+                            { value: 'Queued', label: 'Queued', id: 'optMetadataQueued' },
+                            { value: 'Errored', label: 'Errored', id: 'optMetadataErrored' },
+                            { value: 'Ignored', label: 'Ignored', id: 'optMetadataIgnored' }
+                        ],
+                        onChange: function(value) {
+                            self.table.setParam('status', value);
+                            self.table.reload();
+                        }
+                    },
+
+                    search: {
+                        placeholder: 'Search items...',
+                        onSearch: function(query) {
+                            self.table.setParam('search', query);
+                            self.table.reload();
+                        }
+                    },
+
+                    selection: {
+                        enabled: true,
+                        onSelectionChange: function(count) {
+                            self.updateBulkActionsVisibility(count);
+                        }
+                    },
+
+                    actions: {
+                        onRowClick: function(item) {
+                            self.showItemDetail(item.Id);
+                        },
+                        onReload: function() {
+                            self.loadMetadataStatus();
+                            self.loadHealthStats();
+                        }
+                    },
+
+                    emptyState: {
+                        message: 'No metadata items found. Run a refresh to scan for metadata.'
+                    }
+                });
+
+                // Inject bulk action buttons
+                this._injectBulkActions();
+
+                // Bind event handlers
+                this._bindEvents();
+            },
+
+            _bindEvents: function() {
+                var self = this;
+
+                var bind = function(id, event, handler) {
+                    var el = document.getElementById(id);
+                    if (el) el.addEventListener(event, handler);
+                };
+
+                bind('chkEnableMetadataSync', 'change', function() { self.updateMetadataSyncVisibility(this.checked); });
+                bind('btnSaveMetadataSettings', 'click', function() { self.saveMetadataSettings(); });
+                bind('btnRefreshMetadataItems', 'click', function() { self.triggerRefresh(); });
+                bind('btnTriggerMetadataSync', 'click', function() { self.triggerSync(); });
+                bind('btnRetryMetadataErrors', 'click', function() { self.retryErrors(); });
+                bind('btnResetMetadataDatabase', 'click', function() { self.resetMetadataDatabase(); });
+
+                // Modal buttons
+                bind('btnMetadataSyncModalIgnore', 'click', function() { self.modalIgnore(); });
+                bind('btnMetadataSyncModalQueue', 'click', function() { self.modalQueue(); });
+                bind('btnMetadataSyncModalClose', 'click', function() { self.closeModal(); });
+            },
+
+            _injectBulkActions: function() {
+                var self = this;
+                var bulkContainer = this.table.getBulkActionsContainer();
+                if (!bulkContainer) return;
+
+                bulkContainer.innerHTML =
+                    '<button is="emby-button" type="button" id="btnMetadataBulkIgnore" class="raised" disabled><span>Ignore</span></button>' +
+                    '<button is="emby-button" type="button" id="btnMetadataBulkQueue" class="raised button-primary" disabled><span>Queue</span></button>';
+
+                document.getElementById('btnMetadataBulkIgnore').addEventListener('click', function() { self.bulkIgnore(); });
+                document.getElementById('btnMetadataBulkQueue').addEventListener('click', function() { self.bulkQueue(); });
+            },
+
+            loadConfig: function(config) {
+                this.currentConfig = config;
+
+                var enableMetadataSync = config.EnableMetadataSync || false;
+                var metadataSyncMetadata = config.MetadataSyncMetadata !== false;
+                var metadataSyncImages = config.MetadataSyncImages !== false;
+                var metadataSyncPeople = config.MetadataSyncPeople || false;
+
+                document.getElementById('chkEnableMetadataSync').checked = enableMetadataSync;
+                document.getElementById('chkMetadataSyncMetadata').checked = metadataSyncMetadata;
+                document.getElementById('chkMetadataSyncImages').checked = metadataSyncImages;
+                document.getElementById('chkMetadataSyncPeople').checked = metadataSyncPeople;
+
+                this.updateMetadataSyncVisibility(enableMetadataSync);
+            },
+
+            updateMetadataSyncVisibility: function(enabled) {
+                var settings = document.getElementById('metadataSyncSettings');
+                if (settings) {
+                    settings.style.display = enabled ? 'block' : 'none';
+                }
+            },
+
+            saveMetadataSettings: function() {
+                var self = this;
+                var config = self.currentConfig || {};
+
+                config.EnableMetadataSync = document.getElementById('chkEnableMetadataSync').checked;
+                config.MetadataSyncMetadata = document.getElementById('chkMetadataSyncMetadata').checked;
+                config.MetadataSyncImages = document.getElementById('chkMetadataSyncImages').checked;
+                config.MetadataSyncPeople = document.getElementById('chkMetadataSyncPeople').checked;
+
+                ServerSyncShared.saveConfig(config).then(function() {
+                    ServerSyncShared.showAlert('Metadata sync settings saved');
+                }).catch(function(err) {
+                    console.error('Failed to save metadata settings:', err);
+                    ServerSyncShared.showAlert('Failed to save metadata settings');
+                });
+            },
+
+            loadMetadataStatus: function() {
+                ServerSyncShared.apiRequest('MetadataStatus').then(function(status) {
+                    if (status) {
+                        document.getElementById('metadataSyncedCount').textContent = status.Synced || 0;
+                        document.getElementById('metadataQueuedCount').textContent = status.Queued || 0;
+                        document.getElementById('metadataErroredCount').textContent = status.Errored || 0;
+                        document.getElementById('metadataIgnoredCount').textContent = status.Ignored || 0;
+                    }
+                }).catch(function() {
+                    // Ignore errors
+                });
+            },
+
+            loadMetadataItems: function() {
+                if (this.table) {
+                    return this.table.reload();
+                }
+                return Promise.resolve();
+            },
+
+            loadHealthStats: function() {
+                var self = this;
+                ServerSyncShared.apiRequest('MetadataStatus').then(function(status) {
+                    if (status) {
+                        document.getElementById('metadataHealthLastSync').textContent =
+                            status.LastSyncTime ? ServerSyncShared.formatRelativeTime(new Date(status.LastSyncTime)) : 'Never';
+                        document.getElementById('metadataHealthLibraryCount').textContent = status.LibraryCount || 0;
+                        var pending = (status.Queued || 0);
+                        document.getElementById('metadataHealthPendingCount').textContent = pending;
+                    }
+                }).catch(function() {
+                    // Ignore errors
+                });
+            },
+
+            triggerRefresh: function() {
+                var self = this;
+                var btn = document.getElementById('btnRefreshMetadataItems');
+                btn.disabled = true;
+                btn.querySelector('span').textContent = 'Refreshing...';
+
+                ServerSyncShared.apiRequest('TriggerMetadataRefresh', 'POST').then(function() {
+                    ServerSyncShared.showAlert('Metadata refresh started');
+                    btn.querySelector('span').textContent = 'Refresh';
+                    btn.disabled = false;
+                    self.loadMetadataStatus();
+                    self.loadMetadataItems();
+                    self.loadHealthStats();
+                }).catch(function() {
+                    ServerSyncShared.showAlert('Failed to start metadata refresh');
+                    btn.querySelector('span').textContent = 'Refresh';
+                    btn.disabled = false;
+                });
+            },
+
+            triggerSync: function() {
+                var self = this;
+                var btn = document.getElementById('btnTriggerMetadataSync');
+                btn.disabled = true;
+                btn.querySelector('span').textContent = 'Syncing...';
+
+                ServerSyncShared.apiRequest('TriggerMetadataSync', 'POST').then(function() {
+                    ServerSyncShared.showAlert('Metadata sync started');
+                    btn.querySelector('span').textContent = 'Sync';
+                    btn.disabled = false;
+                    self.loadMetadataStatus();
+                    self.loadMetadataItems();
+                    self.loadHealthStats();
+                }).catch(function() {
+                    ServerSyncShared.showAlert('Failed to start metadata sync');
+                    btn.querySelector('span').textContent = 'Sync';
+                    btn.disabled = false;
+                });
+            },
+
+            retryErrors: function() {
+                var self = this;
+
+                ServerSyncShared.apiRequest('MetadataItems/Queue', 'POST', { Ids: [], Status: 'Errored' }).then(function() {
+                    ServerSyncShared.showAlert('Errored metadata items queued for retry');
+                    self.loadMetadataStatus();
+                    self.loadMetadataItems();
+                }).catch(function() {
+                    ServerSyncShared.showAlert('Failed to retry errored items');
+                });
+            },
+
+            resetMetadataDatabase: function() {
+                var self = this;
+
+                if (!confirm('Are you sure you want to reset the metadata sync database?\n\nThis will delete ALL metadata sync tracking data. This cannot be undone.')) {
+                    return;
+                }
+
+                ServerSyncShared.apiRequest('ResetMetadataSyncDatabase', 'POST').then(function() {
+                    ServerSyncShared.showAlert('Metadata sync database has been reset');
+                    self.loadMetadataStatus();
+                    self.loadMetadataItems();
+                    self.loadHealthStats();
+                }).catch(function() {
+                    ServerSyncShared.showAlert('Failed to reset metadata sync database');
+                });
+            },
+
+            updateBulkActionsVisibility: function(count) {
+                var hasSelection = count > 0;
+                var ignoreBtn = document.getElementById('btnMetadataBulkIgnore');
+                var queueBtn = document.getElementById('btnMetadataBulkQueue');
+                if (ignoreBtn) ignoreBtn.disabled = !hasSelection;
+                if (queueBtn) queueBtn.disabled = !hasSelection;
+            },
+
+            bulkIgnore: function() {
+                var self = this;
+                var ids = this.table.getSelectedIds();
+                if (ids.length === 0) return;
+
+                ServerSyncShared.apiRequest('MetadataItems/Ignore', 'POST', { Ids: ids }).then(function() {
+                    self.table.clearSelection();
+                    self.loadMetadataStatus();
+                    self.loadMetadataItems();
+                    ServerSyncShared.showAlert(ids.length + ' item(s) ignored');
+                }).catch(function() {
+                    ServerSyncShared.showAlert('Failed to ignore items');
+                });
+            },
+
+            bulkQueue: function() {
+                var self = this;
+                var ids = this.table.getSelectedIds();
+                if (ids.length === 0) return;
+
+                ServerSyncShared.apiRequest('MetadataItems/Queue', 'POST', { Ids: ids }).then(function() {
+                    self.table.clearSelection();
+                    self.loadMetadataStatus();
+                    self.loadMetadataItems();
+                    ServerSyncShared.showAlert(ids.length + ' item(s) queued');
+                }).catch(function() {
+                    ServerSyncShared.showAlert('Failed to queue items');
+                });
+            },
+
+            showItemDetail: function(itemId) {
+                var self = this;
+
+                // Fetch full item details from API
+                ServerSyncShared.apiRequest('MetadataItems/' + itemId).then(function(item) {
+                    if (!item) {
+                        ServerSyncShared.showAlert('Item not found');
+                        return;
+                    }
+
+                    self.currentModalItem = item;
+
+                    // Title
+                    var category = item.PropertyCategory || 'Unknown';
+                    var itemName = item.ItemName || 'Unknown';
+                    document.getElementById('metadataSyncModalTitle').textContent = itemName + ' (' + category + ')';
+
+                    // Status badge
+                    var statusBadge = document.getElementById('metadataSyncModalStatusBadge');
+                    statusBadge.textContent = item.Status || 'Unknown';
+                    statusBadge.className = 'itemModal-statusBadge ' + (item.Status || 'unknown').toLowerCase();
+
+                    // Last sync
+                    var lastSyncSection = document.getElementById('metadataSyncModalLastSyncSection');
+                    if (item.LastSyncTime) {
+                        lastSyncSection.style.display = 'block';
+                        document.getElementById('metadataSyncModalLastSync').textContent =
+                            ServerSyncShared.formatRelativeTime(new Date(item.LastSyncTime));
+                    } else {
+                        lastSyncSection.style.display = 'none';
+                    }
+
+                    // Error section
+                    var errorSection = document.getElementById('metadataSyncModalErrorSection');
+                    if (item.Status === 'Errored' && item.ErrorMessage) {
+                        errorSection.style.display = 'block';
+                        document.getElementById('metadataSyncModalError').textContent = item.ErrorMessage;
+                    } else {
+                        errorSection.style.display = 'none';
+                    }
+
+                    // Item info
+                    document.getElementById('metadataSyncModalItem').textContent = itemName;
+
+                    // Table headers
+                    document.getElementById('metadataSyncModalSourceHeader').textContent =
+                        (self.currentConfig && self.currentConfig.SourceServerName) || 'Source';
+                    document.getElementById('metadataSyncModalLocalHeader').textContent = 'Local';
+
+                    // Build comparison table
+                    var tbody = document.getElementById('metadataSyncModalTableBody');
+                    tbody.innerHTML = '';
+
+                    if (item.PropertyCategory === 'Images') {
+                        var hasChange = item.HasChanges;
+                        var row = self._createTableRow(
+                            'Images',
+                            item.SourceImagesHash ? 'Has Images' : 'No Images',
+                            item.LocalImagesHash ? 'Has Images' : 'No Images',
+                            hasChange ? 'Source Images' : '-',
+                            hasChange
+                        );
+                        tbody.appendChild(row);
+                    } else {
+                        // Parse JSON and show each property
+                        var sourceObj = self._parseJson(item.SourceValue);
+                        var localObj = self._parseJson(item.LocalValue);
+                        var mergedObj = self._parseJson(item.MergedValue);
+
+                        var allKeys = new Set();
+                        Object.keys(sourceObj).forEach(function(k) { allKeys.add(k); });
+                        Object.keys(localObj).forEach(function(k) { allKeys.add(k); });
+
+                        var sortedKeys = Array.from(allKeys).sort();
+                        sortedKeys.forEach(function(key) {
+                            var sourceVal = sourceObj[key];
+                            var localVal = localObj[key];
+                            var mergedVal = mergedObj[key];
+                            var hasChange = JSON.stringify(sourceVal) !== JSON.stringify(localVal);
+
+                            var row = self._createTableRow(
+                                key,
+                                self._formatValue(sourceVal),
+                                self._formatValue(localVal),
+                                hasChange ? self._formatValue(mergedVal) : '-',
+                                hasChange
+                            );
+                            tbody.appendChild(row);
+                        });
+                    }
+
+                    document.getElementById('metadataSyncItemDetailModal').style.display = 'flex';
+                }).catch(function(err) {
+                    console.error('Failed to load item detail:', err);
+                    ServerSyncShared.showAlert('Failed to load item details');
+                });
+            },
+
+            _createTableRow: function(property, sourceVal, localVal, mergedVal, hasChange) {
+                var row = document.createElement('tr');
+                if (hasChange) {
+                    row.className = 'metadataSyncModal-changedRow';
+                }
+
+                var propCell = document.createElement('td');
+                propCell.className = 'historyCompareTable-property';
+                propCell.textContent = property;
+                row.appendChild(propCell);
+
+                var sourceCell = document.createElement('td');
+                sourceCell.className = 'historyCompareTable-value';
+                sourceCell.textContent = sourceVal;
+                row.appendChild(sourceCell);
+
+                var localCell = document.createElement('td');
+                localCell.className = 'historyCompareTable-value';
+                localCell.textContent = localVal;
+                row.appendChild(localCell);
+
+                var mergedCell = document.createElement('td');
+                mergedCell.className = 'historyCompareTable-value historyCompareTable-merged';
+                mergedCell.textContent = mergedVal;
+                row.appendChild(mergedCell);
+
+                return row;
+            },
+
+            _parseJson: function(jsonStr) {
+                if (!jsonStr) return {};
+                try {
+                    return JSON.parse(jsonStr);
+                } catch (e) {
+                    return {};
+                }
+            },
+
+            _formatValue: function(val) {
+                if (val === undefined || val === null) return '-';
+                if (typeof val === 'boolean') return val ? 'Yes' : 'No';
+                if (typeof val === 'number') return String(val);
+                if (typeof val === 'string') return val || '-';
+                if (Array.isArray(val)) {
+                    if (val.length === 0) return '(empty)';
+                    return val.length + ' items';
+                }
+                if (typeof val === 'object') {
+                    var keys = Object.keys(val);
+                    if (keys.length === 0) return '(empty)';
+                    return keys.length + ' values';
+                }
+                return String(val);
+            },
+
+            closeModal: function() {
+                document.getElementById('metadataSyncItemDetailModal').style.display = 'none';
+                this.currentModalItem = null;
+            },
+
+            modalIgnore: function() {
+                if (this.currentModalItem) {
+                    this.updateItemStatus(this.currentModalItem.Id, 'Ignored');
+                }
+            },
+
+            modalQueue: function() {
+                if (this.currentModalItem) {
+                    this.updateItemStatus(this.currentModalItem.Id, 'Queued');
+                }
+            },
+
+            updateItemStatus: function(itemId, status) {
+                var self = this;
+
+                ServerSyncShared.apiRequest('MetadataItems/UpdateStatus', 'POST', { Id: itemId, Status: status }).then(function() {
+                    self.closeModal();
+                    self.loadMetadataStatus();
+                    self.loadMetadataItems();
+                    ServerSyncShared.showAlert('Item status updated to ' + status);
+                }).catch(function(err) {
+                    console.error('Failed to update item status:', err);
+                    ServerSyncShared.showAlert('Failed to update item status');
+                });
+            }
+        };
+
+    </script>
+
     <!-- Scripts: main.js -->
     <script type="text/javascript">
         // Main orchestrator for Server Sync plugin configuration
@@ -5497,11 +6220,13 @@
                     SyncTableModule.init();
                     HistorySyncTableModule.init(config);
                     UserSyncTableModule.init(config);
+                    MetadataSyncTableModule.init(config);
 
                     // Load config into modules
                     ContentConfigModule.loadConfig(config);
                     HistorySyncTableModule.loadConfig(config);
                     UserSyncTableModule.loadConfig(config);
+                    MetadataSyncTableModule.loadConfig(config);
 
                     // Wire up cross-module communication
                     SourceServerModule.onConnectionSuccess = function() {
@@ -5560,6 +6285,11 @@
                     UserSyncTableModule.loadUserStatus();
                     UserSyncTableModule.loadUserItems();
                     UserSyncTableModule.loadHealthStats();
+
+                    // Load metadata sync data
+                    MetadataSyncTableModule.loadMetadataStatus();
+                    MetadataSyncTableModule.loadMetadataItems();
+                    MetadataSyncTableModule.loadHealthStats();
                 });
             },
 

@@ -200,6 +200,56 @@ public class SourceServerClient : IDisposable
     }
 
     /// <summary>
+    /// GetLibraryItemsWithMetadataAsync
+    /// Gets items from a library with extended metadata fields for metadata sync.
+    /// </summary>
+    /// <param name="libraryId">Library ID.</param>
+    /// <param name="startIndex">Starting index for pagination.</param>
+    /// <param name="limit">Maximum items to return.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Query result with items including metadata.</returns>
+    public async Task<BaseItemDtoQueryResult?> GetLibraryItemsWithMetadataAsync(
+        Guid libraryId,
+        int startIndex = 0,
+        int limit = 100,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var client = GetApiClient();
+            return await client.Items.GetAsync(
+                config =>
+                {
+                    config.QueryParameters.ParentId = libraryId;
+                    config.QueryParameters.Recursive = true;
+                    config.QueryParameters.IncludeItemTypes = new[] { BaseItemKind.Movie, BaseItemKind.Episode, BaseItemKind.Audio, BaseItemKind.Video };
+                    config.QueryParameters.Fields = new[]
+                    {
+                        ItemFields.Path,
+                        ItemFields.DateCreated,
+                        ItemFields.Overview,
+                        ItemFields.Genres,
+                        ItemFields.Tags,
+                        ItemFields.Studios,
+                        ItemFields.People,
+                        ItemFields.ProviderIds,
+                        ItemFields.OriginalTitle,
+                        ItemFields.SortName,
+                        ItemFields.ProductionLocations
+                    };
+                    config.QueryParameters.StartIndex = startIndex;
+                    config.QueryParameters.Limit = limit;
+                },
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get items with metadata from library {LibraryId}", libraryId);
+            return null;
+        }
+    }
+
+    /// <summary>
     /// GetLibraryItemCountAsync
     /// Gets the total count of items in a library without fetching item details.
     /// </summary>

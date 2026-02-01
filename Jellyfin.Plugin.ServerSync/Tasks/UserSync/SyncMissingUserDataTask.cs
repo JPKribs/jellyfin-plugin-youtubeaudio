@@ -3,42 +3,50 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.ServerSync.Services;
+using MediaBrowser.Controller.Configuration;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.ServerSync.Tasks;
 
 /// <summary>
-/// Scheduled task to refresh the user sync table from source and local servers.
+/// Scheduled task to apply queued user sync changes to the local server.
 /// </summary>
-public class RefreshUserSyncTableTask : IScheduledTask
+public class SyncMissingUserDataTask : IScheduledTask
 {
-    private readonly ILogger<RefreshUserSyncTableTask> _logger;
+    private readonly ILogger<SyncMissingUserDataTask> _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly IUserManager _userManager;
+    private readonly IProviderManager _providerManager;
+    private readonly IServerConfigurationManager _serverConfigurationManager;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="RefreshUserSyncTableTask"/> class.
+    /// Initializes a new instance of the <see cref="SyncMissingUserDataTask"/> class.
     /// </summary>
-    public RefreshUserSyncTableTask(
-        ILogger<RefreshUserSyncTableTask> logger,
+    public SyncMissingUserDataTask(
+        ILogger<SyncMissingUserDataTask> logger,
         ILoggerFactory loggerFactory,
-        IUserManager userManager)
+        IUserManager userManager,
+        IProviderManager providerManager,
+        IServerConfigurationManager serverConfigurationManager)
     {
         _logger = logger;
         _loggerFactory = loggerFactory;
         _userManager = userManager;
+        _providerManager = providerManager;
+        _serverConfigurationManager = serverConfigurationManager;
     }
 
     /// <inheritdoc />
-    public string Name => "Refresh User Sync Table";
+    public string Name => "Sync User Data";
 
     /// <inheritdoc />
-    public string Key => "ServerSyncRefreshUserTable";
+    public string Key => "ServerSyncMissingUserData";
 
     /// <inheritdoc />
-    public string Description => "Scans source and local servers for user setting differences and updates the user sync table.";
+    public string Description => "Applies queued user setting changes from the source server to the local server.";
 
     /// <inheritdoc />
     public string Category => "User Sync";
@@ -57,7 +65,7 @@ public class RefreshUserSyncTableTask : IScheduledTask
         // Check if user sync is enabled
         if (!config.EnableUserSync)
         {
-            _logger.LogDebug("User sync is disabled, skipping refresh");
+            _logger.LogDebug("User sync is disabled, skipping sync");
             return;
         }
 
@@ -65,25 +73,18 @@ public class RefreshUserSyncTableTask : IScheduledTask
         if (string.IsNullOrWhiteSpace(config.SourceServerUrl) ||
             string.IsNullOrWhiteSpace(config.SourceServerApiKey))
         {
-            _logger.LogWarning("Source server not configured, skipping user sync refresh");
+            _logger.LogWarning("Source server not configured, skipping user sync");
             return;
         }
 
-        var enabledMappings = config.UserMappings.FindAll(m => m.IsEnabled);
-        if (enabledMappings.Count == 0)
-        {
-            _logger.LogWarning("No enabled user mappings, skipping user sync refresh");
-            return;
-        }
-
-        _logger.LogInformation("Starting user sync table refresh");
+        _logger.LogInformation("Starting user data sync");
 
         using var sourceClient = new SourceServerClient(
             _loggerFactory.CreateLogger<SourceServerClient>(),
             config.SourceServerUrl,
             config.SourceServerApiKey);
 
-        // Test connection
+        // Test connection (needed for profile image downloads)
         var connectionResult = await sourceClient.TestConnectionAsync(cancellationToken).ConfigureAwait(false);
         if (!connectionResult.Success)
         {
@@ -91,19 +92,24 @@ public class RefreshUserSyncTableTask : IScheduledTask
             return;
         }
 
-        // Create table service and refresh
-        var tableService = new UserSyncTableService(
-            _loggerFactory.CreateLogger<UserSyncTableService>(),
+        // Create state service and apply changes
+        var stateService = new UserSyncStateService(
+            _loggerFactory.CreateLogger<UserSyncStateService>(),
             plugin.Database,
-            _userManager);
+            _userManager,
+            _providerManager,
+            _serverConfigurationManager);
 
-        var itemsProcessed = await tableService.RefreshUserSyncTableAsync(
+        var itemsSynced = await stateService.ApplyQueuedChangesAsync(
             sourceClient,
-            config,
             progress,
             cancellationToken).ConfigureAwait(false);
 
-        _logger.LogInformation("User sync table refresh complete. {Count} properties compared", itemsProcessed);
+        // Update last sync time
+        config.LastUserSyncTime = DateTime.UtcNow;
+        plugin.SaveConfiguration();
+
+        _logger.LogInformation("User data sync complete. {Count} items synced", itemsSynced);
         progress.Report(100);
     }
 

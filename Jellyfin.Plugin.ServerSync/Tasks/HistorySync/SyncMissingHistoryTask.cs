@@ -37,7 +37,7 @@ public class SyncMissingHistoryTask : IScheduledTask
     }
 
     /// <inheritdoc />
-    public string Name => "Sync Missing History";
+    public string Name => "Sync History";
 
     /// <inheritdoc />
     public string Key => "ServerSyncMissingHistory";

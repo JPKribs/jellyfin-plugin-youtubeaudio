@@ -14,7 +14,7 @@ public static class DatabaseMigrationService
     /// <summary>
     /// Current schema version. Increment this when adding new migrations.
     /// </summary>
-    public const int CurrentSchemaVersion = 11;
+    public const int CurrentSchemaVersion = 12;
 
     /// <summary>
     /// Creates the initial database schema including all tables for the current version.
@@ -124,6 +124,38 @@ public static class DatabaseMigrationService
             CREATE INDEX IF NOT EXISTS idx_user_sync_category ON UserSyncItems(PropertyCategory);
         ";
         userCmd.ExecuteNonQuery();
+
+        // Create MetadataSyncItems table (Metadata Sync) - v12 schema
+        using var metadataCmd = connection.CreateCommand();
+        metadataCmd.CommandText = @"
+            CREATE TABLE IF NOT EXISTS MetadataSyncItems (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                SourceLibraryId TEXT NOT NULL,
+                LocalLibraryId TEXT NOT NULL,
+                SourceItemId TEXT NOT NULL,
+                LocalItemId TEXT,
+                ItemName TEXT,
+                SourcePath TEXT,
+                LocalPath TEXT,
+                PropertyCategory TEXT NOT NULL,
+                SourceValue TEXT,
+                LocalValue TEXT,
+                MergedValue TEXT,
+                SourceImagesHash TEXT,
+                LocalImagesHash TEXT,
+                SyncedImagesHash TEXT,
+                Status INTEGER NOT NULL DEFAULT 1,
+                StatusDate TEXT NOT NULL,
+                LastSyncTime TEXT,
+                ErrorMessage TEXT,
+                UNIQUE(SourceLibraryId, SourceItemId, PropertyCategory)
+            );
+            CREATE INDEX IF NOT EXISTS idx_metadata_sync_item ON MetadataSyncItems(SourceItemId);
+            CREATE INDEX IF NOT EXISTS idx_metadata_sync_status ON MetadataSyncItems(Status);
+            CREATE INDEX IF NOT EXISTS idx_metadata_sync_library ON MetadataSyncItems(SourceLibraryId);
+            CREATE INDEX IF NOT EXISTS idx_metadata_sync_category ON MetadataSyncItems(PropertyCategory);
+        ";
+        metadataCmd.ExecuteNonQuery();
     }
 
     /// <summary>
@@ -213,6 +245,11 @@ public static class DatabaseMigrationService
             if (fromVersion < 11)
             {
                 MigrateToV11(connection, transaction, logger);
+            }
+
+            if (fromVersion < 12)
+            {
+                MigrateToV12(connection, transaction, logger);
             }
 
             SetSchemaVersion(connection, CurrentSchemaVersion);
@@ -555,6 +592,47 @@ public static class DatabaseMigrationService
         }
 
         logger.LogInformation("Migration v11: Added hash columns for profile image comparison");
+    }
+
+    /// <summary>
+    /// Migration to v12: Add MetadataSyncItems table for metadata synchronization.
+    /// </summary>
+    private static void MigrateToV12(SqliteConnection connection, SqliteTransaction transaction, ILogger logger)
+    {
+        // Create MetadataSyncItems table
+        using var metadataCmd = connection.CreateCommand();
+        metadataCmd.Transaction = transaction;
+        metadataCmd.CommandText = @"
+            CREATE TABLE IF NOT EXISTS MetadataSyncItems (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                SourceLibraryId TEXT NOT NULL,
+                LocalLibraryId TEXT NOT NULL,
+                SourceItemId TEXT NOT NULL,
+                LocalItemId TEXT,
+                ItemName TEXT,
+                SourcePath TEXT,
+                LocalPath TEXT,
+                PropertyCategory TEXT NOT NULL,
+                SourceValue TEXT,
+                LocalValue TEXT,
+                MergedValue TEXT,
+                SourceImagesHash TEXT,
+                LocalImagesHash TEXT,
+                SyncedImagesHash TEXT,
+                Status INTEGER NOT NULL DEFAULT 1,
+                StatusDate TEXT NOT NULL,
+                LastSyncTime TEXT,
+                ErrorMessage TEXT,
+                UNIQUE(SourceLibraryId, SourceItemId, PropertyCategory)
+            );
+            CREATE INDEX IF NOT EXISTS idx_metadata_sync_item ON MetadataSyncItems(SourceItemId);
+            CREATE INDEX IF NOT EXISTS idx_metadata_sync_status ON MetadataSyncItems(Status);
+            CREATE INDEX IF NOT EXISTS idx_metadata_sync_library ON MetadataSyncItems(SourceLibraryId);
+            CREATE INDEX IF NOT EXISTS idx_metadata_sync_category ON MetadataSyncItems(PropertyCategory);
+        ";
+        metadataCmd.ExecuteNonQuery();
+
+        logger.LogInformation("Migration v12: Added MetadataSyncItems table for metadata synchronization");
     }
 
     /// <summary>

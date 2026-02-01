@@ -265,6 +265,34 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public DateTime? LastUserSyncTime { get; set; }
 
+    // ===== Metadata Sync Configuration =====
+
+    /// <summary>
+    /// Enable metadata synchronization between servers.
+    /// </summary>
+    public bool EnableMetadataSync { get; set; }
+
+    /// <summary>
+    /// Sync item metadata (title, overview, genres, tags, ratings, etc.).
+    /// </summary>
+    public bool MetadataSyncMetadata { get; set; } = true;
+
+    /// <summary>
+    /// Sync item images (Primary, Backdrop, Logo, Thumb, etc.).
+    /// </summary>
+    public bool MetadataSyncImages { get; set; } = true;
+
+    /// <summary>
+    /// Sync people associated with items (actors, directors, writers).
+    /// Off by default as it can be resource-intensive.
+    /// </summary>
+    public bool MetadataSyncPeople { get; set; }
+
+    /// <summary>
+    /// Timestamp when the last metadata sync completed.
+    /// </summary>
+    public DateTime? LastMetadataSyncTime { get; set; }
+
     /// <summary>
     /// ValidateConfiguration
     /// Validates configuration values and returns a list of validation errors.
@@ -423,6 +451,31 @@ public class PluginConfiguration : BasePluginConfiguration
             if (!UserSyncPolicy && !UserSyncConfiguration && !UserSyncProfileImage)
             {
                 errors.Add("At least one user sync option (Policy, Configuration, or Profile Image) must be enabled");
+            }
+        }
+
+        // Validate metadata sync settings
+        if (EnableMetadataSync)
+        {
+            if (string.IsNullOrWhiteSpace(SourceServerUrl))
+            {
+                errors.Add("Source server URL is required when metadata sync is enabled");
+            }
+
+            if (string.IsNullOrWhiteSpace(SourceServerApiKey))
+            {
+                errors.Add("API key is required when metadata sync is enabled");
+            }
+
+            var enabledLibraryMappings = LibraryMappings?.Where(m => m.IsEnabled).ToList() ?? new List<LibraryMapping>();
+            if (enabledLibraryMappings.Count == 0)
+            {
+                errors.Add("At least one library mapping must be enabled for metadata sync");
+            }
+
+            if (!MetadataSyncMetadata && !MetadataSyncImages && !MetadataSyncPeople)
+            {
+                errors.Add("At least one metadata sync option (Metadata, Images, or People) must be enabled");
             }
         }
 
