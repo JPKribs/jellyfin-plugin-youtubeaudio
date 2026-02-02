@@ -1,0 +1,657 @@
+<div id="ServerSyncSettingsPage" data-role="page" class="page type-interior pluginConfigurationPage withTabs"
+     data-require="emby-input,emby-button,emby-select,emby-checkbox"
+     data-controller="__plugin/serversync_settings.js">
+    <div data-role="content">
+        <div class="content-primary">
+            <form id="ServerSyncSettingsForm">
+                <div class="verticalSection verticalSection-extrabottompadding">
+                    <div class="sectionTitleContainer flex align-items-center">
+                        <h1 class="sectionTitle">Server Sync</h1>
+                    </div>
+
+                    <!-- ==================== CONFIGURATION ==================== -->
+                    <h2 class="secondaryTitle">Configuration</h2>
+
+                    <!-- Server Subsection (collapsible) -->
+                    <div class="collapsibleSection">
+                        <button type="button" class="collapsibleHeader collapsed" data-target="serverConfigContent">
+                            <span class="collapsibleTitle">Server</span>
+                            <span class="collapsibleIcon">&#9660;</span>
+                        </button>
+                        <div id="serverConfigContent" class="collapsibleContent collapsed">
+                            <div class="inputContainer">
+                                <label for="txtSourceServerUrl">Server URL:</label>
+                                <input is="emby-input" type="text" id="txtSourceServerUrl" placeholder="http://server:8096" />
+                                <div class="fieldDescription">URL of the source Jellyfin server to sync from.</div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label for="txtSourceServerApiKey">API Key:</label>
+                                <input is="emby-input" type="password" id="txtSourceServerApiKey" />
+                                <div class="fieldDescription">Generate one in the source server's Dashboard &gt; API Keys.</div>
+                            </div>
+
+                            <div id="serverInfoContainer" class="server-info-box hidden">
+                                <div class="flex gap-lg">
+                                    <div>
+                                        <span class="text-muted">Server:</span>
+                                        <span id="txtSourceServerName"></span>
+                                        <span class="text-muted">(<span id="txtSourceServerId"></span>)</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="collapsibleActions">
+                                <button is="emby-button" type="button" id="btnSaveServer" class="raised button-submit">
+                                    <span>Save</span>
+                                </button>
+                                <button is="emby-button" type="button" id="btnTestConnection" class="raised">
+                                    <span>Test Connection</span>
+                                </button>
+                            </div>
+                            <span id="connectionStatus" class="mt-sm"></span>
+                        </div>
+                    </div>
+
+                    <!-- Libraries Subsection (collapsible) -->
+                    <div class="collapsibleSection hidden" id="librariesSection">
+                        <button type="button" class="collapsibleHeader collapsed" data-target="librariesConfigContent">
+                            <span class="collapsibleTitle">Libraries</span>
+                            <span class="collapsibleIcon">&#9660;</span>
+                        </button>
+                        <div id="librariesConfigContent" class="collapsibleContent collapsed">
+                            <div class="fieldDescription mb-md">Map source libraries to local libraries. Used for content sync and watch history sync.</div>
+
+                            <div id="libraryMappingsContainer"></div>
+
+                            <button is="emby-button" type="button" id="btnAddMapping" class="raised button-primary mt-sm">
+                                <span>Add Library Mapping</span>
+                            </button>
+
+                            <div class="collapsibleActions">
+                                <button is="emby-button" type="button" id="btnSaveLibraries" class="raised button-submit">
+                                    <span>Save Libraries</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Users Subsection (collapsible) -->
+                    <div class="collapsibleSection hidden" id="usersSection">
+                        <button type="button" class="collapsibleHeader collapsed" data-target="usersConfigContent">
+                            <span class="collapsibleTitle">Users</span>
+                            <span class="collapsibleIcon">&#9660;</span>
+                        </button>
+                        <div id="usersConfigContent" class="collapsibleContent collapsed">
+                            <div class="fieldDescription mb-md">Map source users to local users. Used for watch history sync.</div>
+
+                            <div id="userMappingsContainer"></div>
+
+                            <button is="emby-button" type="button" id="btnAddUserMapping" class="raised button-primary mt-sm">
+                                <span>Add User Mapping</span>
+                            </button>
+
+                            <div class="collapsibleActions">
+                                <button is="emby-button" type="button" id="btnSaveUsers" class="raised button-submit">
+                                    <span>Save Users</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ==================== SYNC SETTINGS ==================== -->
+                    <h2 class="secondaryTitle mt-lg">Sync Settings</h2>
+
+                    <!-- Content Sync Settings (collapsible) -->
+                    <div class="collapsibleSection">
+                        <button type="button" class="collapsibleHeader collapsed" data-target="contentSyncSettingsContent">
+                            <span class="collapsibleTitle">Content</span>
+                            <span class="collapsibleIcon">&#9660;</span>
+                        </button>
+                        <div id="contentSyncSettingsContent" class="collapsibleContent collapsed">
+                            <div class="inputContainer">
+                                <label class="checkboxContainer">
+                                    <input is="emby-checkbox" type="checkbox" id="chkEnableContentSync" />
+                                    <span>Enable Content Sync</span>
+                                </label>
+                                <div class="fieldDescription">Sync content files between source and local servers for mapped libraries.</div>
+                            </div>
+
+                            <div id="contentSyncOptions">
+                                <!-- Detection Settings -->
+                                <div class="settingsGroup">
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkDetectUpdatedFiles" />
+                                            <span>Detect Updated Files</span>
+                                        </label>
+                                        <div class="fieldDescription">Re-queue files if the source file size differs or if the source was modified after last sync.</div>
+                                    </div>
+
+                                    <div id="detectUpdatedFilesSettings" class="nested-settings hidden">
+                                        <div class="inputContainer">
+                                            <label for="selChangeDetectionPolicy">Change Detection Policy:</label>
+                                            <select is="emby-select" id="selChangeDetectionPolicy">
+                                                <option value="SizeOnly">Size Only</option>
+                                                <option value="ETagOnly">ETag Only</option>
+                                                <option value="Both">Both Size and ETag</option>
+                                            </select>
+                                            <div class="fieldDescription">How to detect if a file has changed. Size Only is most stable.</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkIncludeExtras" />
+                                            <span>Include Companion Files</span>
+                                        </label>
+                                        <div class="fieldDescription">Also download external subtitles and other companion files when available.</div>
+                                    </div>
+                                </div>
+
+                                <!-- Sync Behavior -->
+                                <div class="settingsGroup">
+                                    <div class="inputContainer">
+                                        <label for="selDownloadNewContentMode">Download New Content:</label>
+                                        <select is="emby-select" id="selDownloadNewContentMode">
+                                            <option value="Enabled">Enabled</option>
+                                            <option value="RequireApproval">Require Approval</option>
+                                            <option value="Disabled">Disabled</option>
+                                        </select>
+                                        <div class="fieldDescription">Download content from source that doesn't exist locally.</div>
+                                    </div>
+
+                                    <div class="inputContainer">
+                                        <label for="selReplaceExistingContentMode">Replace Existing Content:</label>
+                                        <select is="emby-select" id="selReplaceExistingContentMode">
+                                            <option value="Enabled">Enabled</option>
+                                            <option value="RequireApproval">Require Approval</option>
+                                            <option value="Disabled">Disabled</option>
+                                        </select>
+                                        <div class="fieldDescription">Replace local content when it differs from the source version.</div>
+                                    </div>
+
+                                    <div class="inputContainer">
+                                        <label for="selDeleteMissingContentMode">Delete Missing Content:</label>
+                                        <select is="emby-select" id="selDeleteMissingContentMode">
+                                            <option value="Enabled">Enabled</option>
+                                            <option value="RequireApproval">Require Approval</option>
+                                            <option value="Disabled" selected>Disabled</option>
+                                        </select>
+                                        <div class="fieldDescription">Delete local content that no longer exists on the source server.</div>
+                                    </div>
+
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkEnableRecyclingBin" />
+                                            <span>Enable Recycling Bin</span>
+                                        </label>
+                                        <div class="fieldDescription">Move deleted/replaced files to a recycling bin instead of permanent deletion.</div>
+                                    </div>
+
+                                    <div id="recyclingBinSettings" class="nested-settings hidden">
+                                        <div class="inputContainer">
+                                            <label for="txtRecyclingBinPath">Recycling Bin Path:</label>
+                                            <input is="emby-input" type="text" id="txtRecyclingBinPath" placeholder="/path/to/recycling-bin" />
+                                            <div class="fieldDescription">Directory where deleted files will be moved.</div>
+                                        </div>
+
+                                        <div class="inputContainer">
+                                            <label for="txtRecyclingBinRetentionDays">Retention Period (days):</label>
+                                            <input is="emby-input" type="number" id="txtRecyclingBinRetentionDays" min="1" max="365" />
+                                            <div class="fieldDescription">Files older than this will be permanently deleted (1-365 days).</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Download Settings -->
+                                <div class="settingsGroup">
+                                    <div class="inputContainer">
+                                        <label for="txtMaxConcurrentDownloads">Max Concurrent Downloads:</label>
+                                        <input is="emby-input" type="number" id="txtMaxConcurrentDownloads" min="1" max="10" />
+                                        <div class="fieldDescription">Maximum number of simultaneous downloads (1-10).</div>
+                                    </div>
+
+                                    <div class="inputContainer">
+                                        <label for="txtMaxRetryCount">Max Retry Count:</label>
+                                        <input is="emby-input" type="number" id="txtMaxRetryCount" min="1" max="10" />
+                                        <div class="fieldDescription">Maximum number of times to retry failed downloads (1-10).</div>
+                                    </div>
+
+                                    <div class="inputContainer">
+                                        <label for="txtTempDownloadPath">Temporary Download Path:</label>
+                                        <input is="emby-input" type="text" id="txtTempDownloadPath" placeholder="(Uses default cache directory)" />
+                                        <div class="fieldDescription">Directory for temporary downloads. Leave empty to use Jellyfin's cache directory.</div>
+                                    </div>
+
+                                    <div class="inputContainer">
+                                        <label for="txtMaxDownloadSpeed">Max Download Speed:</label>
+                                        <div class="inputRow">
+                                            <input is="emby-input" type="number" id="txtMaxDownloadSpeed" min="0" />
+                                            <select is="emby-select" id="selDownloadSpeedUnit" class="w-auto">
+                                                <option value="KB">KB/s</option>
+                                                <option value="MB" selected>MB/s</option>
+                                                <option value="GB">GB/s</option>
+                                            </select>
+                                        </div>
+                                        <div class="fieldDescription">Maximum download speed. Set to 0 for unlimited.</div>
+                                    </div>
+
+                                    <div class="inputContainer">
+                                        <label for="txtMinFreeDiskSpace">Minimum Free Disk Space (GB):</label>
+                                        <input is="emby-input" type="number" id="txtMinFreeDiskSpace" min="1" max="1000" />
+                                        <div class="fieldDescription">Downloads will pause when free disk space falls below this threshold.</div>
+                                    </div>
+                                </div>
+
+                                <!-- Bandwidth Scheduling -->
+                                <div class="settingsGroup">
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkEnableBandwidthScheduling" />
+                                            <span>Enable Bandwidth Scheduling</span>
+                                        </label>
+                                        <div class="fieldDescription">Use an alternate download speed during scheduled hours.</div>
+                                    </div>
+
+                                    <div id="bandwidthScheduleContainer" class="nested-settings hidden">
+                                        <div class="inputContainer inline-inputs">
+                                            <div>
+                                                <label for="txtScheduledStartHour">Start Hour:</label>
+                                                <input is="emby-input" type="number" id="txtScheduledStartHour" min="0" max="23" class="w-80" />
+                                            </div>
+                                            <div>
+                                                <label for="txtScheduledEndHour">End Hour:</label>
+                                                <input is="emby-input" type="number" id="txtScheduledEndHour" min="0" max="24" class="w-80" />
+                                            </div>
+                                        </div>
+                                        <div class="fieldDescription">24-hour format. Set 22 to 6 for overnight scheduling.</div>
+
+                                        <div class="inputContainer">
+                                            <label for="txtScheduledDownloadSpeed">Scheduled Download Speed:</label>
+                                            <div class="inputRow">
+                                                <input is="emby-input" type="number" id="txtScheduledDownloadSpeed" min="0" />
+                                                <select is="emby-select" id="selScheduledDownloadSpeedUnit" class="w-auto">
+                                                    <option value="KB">KB/s</option>
+                                                    <option value="MB" selected>MB/s</option>
+                                                    <option value="GB">GB/s</option>
+                                                </select>
+                                            </div>
+                                            <div class="fieldDescription">Download speed during scheduled hours. Set to 0 for unlimited.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="collapsibleActions">
+                                <button is="emby-button" type="button" id="btnSaveContentSettings" class="raised button-submit">
+                                    <span>Save Content Settings</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- History Sync Settings (collapsible) -->
+                    <div class="collapsibleSection">
+                        <button type="button" class="collapsibleHeader collapsed" data-target="historySyncSettingsContent">
+                            <span class="collapsibleTitle">History</span>
+                            <span class="collapsibleIcon">&#9660;</span>
+                        </button>
+                        <div id="historySyncSettingsContent" class="collapsibleContent collapsed">
+                            <div class="inputContainer">
+                                <label class="checkboxContainer">
+                                    <input is="emby-checkbox" type="checkbox" id="chkEnableHistorySync" />
+                                    <span>Enable History Sync</span>
+                                </label>
+                                <div class="fieldDescription">Sync watch history between source and local servers for mapped users.</div>
+                            </div>
+
+                            <div id="historySyncOptions">
+                                <div class="inputContainer">
+                                    <label class="checkboxContainer">
+                                        <input is="emby-checkbox" type="checkbox" id="chkHistorySyncPlayedStatus" checked />
+                                        <span>Played / Unplayed Status</span>
+                                    </label>
+                                    <div class="fieldDescription">Sync whether items are marked as played or unplayed.</div>
+                                </div>
+
+                                <div class="inputContainer">
+                                    <label class="checkboxContainer">
+                                        <input is="emby-checkbox" type="checkbox" id="chkHistorySyncPlaybackPosition" checked />
+                                        <span>Playback Position</span>
+                                    </label>
+                                    <div class="fieldDescription">Sync resume position for partially watched items.</div>
+                                </div>
+
+                                <div class="inputContainer">
+                                    <label class="checkboxContainer">
+                                        <input is="emby-checkbox" type="checkbox" id="chkHistorySyncPlayCount" checked />
+                                        <span>Play Count</span>
+                                    </label>
+                                    <div class="fieldDescription">Sync how many times an item has been played.</div>
+                                </div>
+
+                                <div class="inputContainer">
+                                    <label class="checkboxContainer">
+                                        <input is="emby-checkbox" type="checkbox" id="chkHistorySyncLastPlayedDate" checked />
+                                        <span>Last Played Date</span>
+                                    </label>
+                                    <div class="fieldDescription">Sync when an item was last watched.</div>
+                                </div>
+
+                                <div class="inputContainer">
+                                    <label class="checkboxContainer">
+                                        <input is="emby-checkbox" type="checkbox" id="chkHistorySyncFavorites" checked />
+                                        <span>Favorites</span>
+                                    </label>
+                                    <div class="fieldDescription">Sync favorite status for items.</div>
+                                </div>
+                            </div>
+
+                            <div class="collapsibleActions">
+                                <button is="emby-button" type="button" id="btnSaveHistorySettings" class="raised button-submit">
+                                    <span>Save History Settings</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Metadata Sync Settings (collapsible) -->
+                    <div class="collapsibleSection">
+                        <button type="button" class="collapsibleHeader collapsed" data-target="metadataSyncSettingsContent">
+                            <span class="collapsibleTitle">Metadata</span>
+                            <span class="collapsibleIcon">&#9660;</span>
+                        </button>
+                        <div id="metadataSyncSettingsContent" class="collapsibleContent collapsed">
+                            <div class="inputContainer">
+                                <label class="checkboxContainer">
+                                    <input is="emby-checkbox" type="checkbox" id="chkEnableMetadataSync" />
+                                    <span>Enable Metadata Sync</span>
+                                </label>
+                                <div class="fieldDescription">Sync metadata (titles, descriptions, ratings, etc.) from source to local server for matched items.</div>
+                            </div>
+
+                            <div id="metadataSyncOptions">
+                                <div class="inputContainer">
+                                    <label class="checkboxContainer">
+                                        <input is="emby-checkbox" type="checkbox" id="chkMetadataSyncMetadata" checked />
+                                        <span>Metadata Fields</span>
+                                    </label>
+                                    <div class="fieldDescription">Sync title, overview, ratings, genres, tags, and provider IDs.</div>
+                                </div>
+
+                                <div class="inputContainer">
+                                    <label class="checkboxContainer">
+                                        <input is="emby-checkbox" type="checkbox" id="chkMetadataSyncImages" checked />
+                                        <span>Images</span>
+                                    </label>
+                                    <div class="fieldDescription">Sync primary, backdrop, and other images.</div>
+                                </div>
+                            </div>
+
+                            <div class="collapsibleActions">
+                                <button is="emby-button" type="button" id="btnSaveMetadataSettings" class="raised button-submit">
+                                    <span>Save Metadata Settings</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- User Sync Settings (collapsible) -->
+                    <div class="collapsibleSection">
+                        <button type="button" class="collapsibleHeader collapsed" data-target="userSyncSettingsContent">
+                            <span class="collapsibleTitle">Users</span>
+                            <span class="collapsibleIcon">&#9660;</span>
+                        </button>
+                        <div id="userSyncSettingsContent" class="collapsibleContent collapsed">
+                            <div class="inputContainer">
+                                <label class="checkboxContainer">
+                                    <input is="emby-checkbox" type="checkbox" id="chkEnableUserSync" />
+                                    <span>Enable User Sync</span>
+                                </label>
+                                <div class="fieldDescription">Sync user settings (policy, configuration, profile images) from source to local server for mapped users.</div>
+                            </div>
+
+                            <div id="userSyncOptions">
+                                <div class="inputContainer">
+                                    <label class="checkboxContainer">
+                                        <input is="emby-checkbox" type="checkbox" id="chkUserSyncPolicy" checked />
+                                        <span>User Policy</span>
+                                    </label>
+                                    <div class="fieldDescription">Sync permission settings like admin status, parental ratings, library access.</div>
+                                </div>
+
+                                <div class="inputContainer">
+                                    <label class="checkboxContainer">
+                                        <input is="emby-checkbox" type="checkbox" id="chkUserSyncConfiguration" checked />
+                                        <span>User Configuration</span>
+                                    </label>
+                                    <div class="fieldDescription">Sync user preferences like subtitle mode, audio language, display settings.</div>
+                                </div>
+
+                                <div class="inputContainer">
+                                    <label class="checkboxContainer">
+                                        <input is="emby-checkbox" type="checkbox" id="chkUserSyncProfileImage" checked />
+                                        <span>Profile Image</span>
+                                    </label>
+                                    <div class="fieldDescription">Sync user profile pictures from source to local server.</div>
+                                </div>
+                            </div>
+
+                            <div class="collapsibleActions">
+                                <button is="emby-button" type="button" id="btnSaveUserSyncSettings" class="raised button-submit">
+                                    <span>Save User Sync Settings</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Styles -->
+    <style>
+        /* Shared styles for Server Sync plugin configuration */
+
+        /* ===== Status Color Variables ===== */
+        :root {
+            --status-synced-bg: rgba(92, 184, 92, 0.2);
+            --status-synced-color: #5cb85c;
+            --status-synced-border: rgba(92, 184, 92, 0.3);
+            --status-queued-bg: rgba(240, 173, 78, 0.2);
+            --status-queued-color: #f0ad4e;
+            --status-queued-border: rgba(240, 173, 78, 0.3);
+            --status-errored-bg: rgba(217, 83, 79, 0.2);
+            --status-errored-color: #d9534f;
+            --status-errored-border: rgba(217, 83, 79, 0.3);
+            --status-ignored-bg: rgba(153, 153, 153, 0.2);
+            --status-ignored-color: #999;
+            --status-ignored-border: rgba(153, 153, 153, 0.3);
+            --status-pending-bg: rgba(155, 89, 182, 0.2);
+            --status-pending-color: #9b59b6;
+            --status-pending-border: rgba(155, 89, 182, 0.3);
+            --status-pending-download-bg: rgba(155, 89, 182, 0.2);
+            --status-pending-download-color: #9b59b6;
+            --status-pending-download-border: rgba(155, 89, 182, 0.3);
+            --status-pending-replacement-bg: rgba(52, 152, 219, 0.2);
+            --status-pending-replacement-color: #3498db;
+            --status-pending-replacement-border: rgba(52, 152, 219, 0.3);
+            --status-pending-deletion-bg: rgba(217, 83, 79, 0.2);
+            --status-pending-deletion-color: #d9534f;
+            --status-pending-deletion-border: rgba(217, 83, 79, 0.3);
+            --status-deleting-bg: rgba(231, 76, 60, 0.2);
+            --status-deleting-color: #e74c3c;
+            --status-deleting-border: rgba(231, 76, 60, 0.3);
+        }
+
+        /* Utility Classes */
+        .text-success { color: var(--status-synced-color); }
+        .text-error { color: var(--status-errored-color); }
+        .text-warning { color: var(--status-queued-color); }
+        .text-muted { opacity: 0.7; }
+        .hidden { display: none !important; }
+        .flex { display: flex; }
+        .gap-lg { gap: 24px; }
+        .mt-sm { margin-top: 8px; }
+        .mt-md { margin-top: 16px; }
+        .mt-lg { margin-top: 24px; }
+        .mb-md { margin-bottom: 12px; }
+        .w-auto { width: auto !important; }
+        .w-80 { width: 80px; }
+
+        /* Secondary title for section headers */
+        .secondaryTitle {
+            font-size: 1.2em;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.7);
+            margin: 24px 0 12px 0;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Section title styling */
+        .sectionTitleContainer .sectionTitle {
+            width: 100%;
+            border-bottom: 1px solid #555;
+            padding-bottom: 0.5em;
+            margin-bottom: 1em;
+        }
+
+        /* Button styles */
+        .button-primary, .button-submit {
+            background-color: #00a4dc !important;
+            color: #fff !important;
+        }
+        .button-primary:hover, .button-submit:hover {
+            background-color: #0088cc !important;
+        }
+        .button-destructive {
+            background-color: var(--status-errored-color) !important;
+            color: #fff !important;
+        }
+        .button-destructive:hover {
+            background-color: #c9302c !important;
+        }
+
+        /* Collapsible sections */
+        .collapsibleSection {
+            margin-bottom: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .collapsibleHeader {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(255,255,255,0.05);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: inherit;
+            font-size: 1.1em;
+            font-weight: 500;
+            text-align: left;
+        }
+        .collapsibleHeader:hover {
+            background: rgba(255,255,255,0.08);
+        }
+        .collapsibleTitle { flex: 1; }
+        .collapsibleIcon {
+            font-size: 0.8em;
+            transition: transform 0.2s;
+        }
+        .collapsibleHeader.collapsed .collapsibleIcon {
+            transform: rotate(-90deg);
+        }
+        .collapsibleContent {
+            padding: 16px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        .collapsibleContent.collapsed { display: none; }
+        .collapsibleActions {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* Server info display */
+        .server-info-box {
+            margin-bottom: 16px;
+            padding: 12px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+        }
+        #serverInfoContainer { padding-bottom: 16px; }
+
+        /* Mapping styles */
+        .mapping {
+            margin-bottom: 2em;
+            padding-bottom: 1em;
+            border-bottom: 1px solid #555;
+        }
+        .mapping:last-child {
+            border-bottom: none;
+            margin-bottom: 1em;
+        }
+        .mappingGrid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0 24px;
+        }
+        .mappingHeader {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1em;
+        }
+        .mappingColumn {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Nested settings with left border */
+        .nested-settings {
+            margin-left: 1.5em;
+            padding-left: 1em;
+            border-left: 2px solid rgba(85, 85, 85, 0.3);
+        }
+
+        /* Settings groups for visual separation */
+        .settingsGroup {
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .settingsGroup:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        /* Input row - horizontal layout */
+        .inputRow {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .inputRow input[is="emby-input"],
+        .inputRow .emby-input-wrapper {
+            flex: 1;
+            margin: 0 !important;
+            padding-left: 0 !important;
+        }
+
+        /* Inline inputs */
+        .inline-inputs {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+    </style>
+</div>

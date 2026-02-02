@@ -395,10 +395,10 @@ public class MetadataSyncTableService
             .Where(kvp => kvp.Value != null)
             .ToDictionary(kvp => kvp.Key, kvp => kvp.Value?.ToString());
 
-        // Get first tagline if available
-        var sourceTagline = sourceItem.Taglines?.FirstOrDefault();
-
         // Extract only simple metadata fields that can be directly copied
+        // NOTE: Excluded fields that can't be synced:
+        //   - DateCreated: Read-only, set when item first added to database
+        //   - Tagline: Not directly accessible on local BaseItem
         var sourceMetadata = new Dictionary<string, object?>
         {
             // Core info
@@ -407,7 +407,6 @@ public class MetadataSyncTableService
             ["SortName"] = sourceItem.SortName,
             ["ForcedSortName"] = sourceItem.ForcedSortName,
             ["Overview"] = sourceItem.Overview,
-            ["Tagline"] = sourceTagline,
 
             // Ratings
             ["OfficialRating"] = sourceItem.OfficialRating,
@@ -416,7 +415,6 @@ public class MetadataSyncTableService
             ["CriticRating"] = sourceItem.CriticRating,
 
             // Dates
-            ["DateCreated"] = sourceItem.DateCreated,
             ["PremiereDate"] = sourceItem.PremiereDate,
             ["EndDate"] = sourceItem.EndDate,
             ["ProductionYear"] = sourceItem.ProductionYear,
@@ -449,7 +447,6 @@ public class MetadataSyncTableService
                 ["SortName"] = localItem.SortName,
                 ["ForcedSortName"] = localItem.ForcedSortName,
                 ["Overview"] = localItem.Overview,
-                ["Tagline"] = null, // Tagline not directly accessible on local BaseItem
 
                 // Ratings
                 ["OfficialRating"] = localItem.OfficialRating,
@@ -458,7 +455,6 @@ public class MetadataSyncTableService
                 ["CriticRating"] = localItem.CriticRating,
 
                 // Dates
-                ["DateCreated"] = localItem.DateCreated,
                 ["PremiereDate"] = localItem.PremiereDate,
                 ["EndDate"] = localItem.EndDate,
                 ["ProductionYear"] = localItem.ProductionYear,

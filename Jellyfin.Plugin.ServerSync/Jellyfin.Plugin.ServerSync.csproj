@@ -32,7 +32,21 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Configuration\configPage.html" />
+    <!-- Settings page (main entry) -->
+    <EmbeddedResource Include="Configuration\serversync_settings.html" />
+    <EmbeddedResource Include="Configuration\serversync_settings.js" />
+    <!-- Content sync page -->
+    <EmbeddedResource Include="Configuration\serversync_content.html" />
+    <EmbeddedResource Include="Configuration\serversync_content.js" />
+    <!-- History sync page -->
+    <EmbeddedResource Include="Configuration\serversync_history.html" />
+    <EmbeddedResource Include="Configuration\serversync_history.js" />
+    <!-- Metadata sync page -->
+    <EmbeddedResource Include="Configuration\serversync_metadata.html" />
+    <EmbeddedResource Include="Configuration\serversync_metadata.js" />
+    <!-- Users sync page -->
+    <EmbeddedResource Include="Configuration\serversync_users.html" />
+    <EmbeddedResource Include="Configuration\serversync_users.js" />
   </ItemGroup>
 
 </Project>
