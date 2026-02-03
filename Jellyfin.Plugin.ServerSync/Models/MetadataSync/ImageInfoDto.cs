@@ -31,6 +31,11 @@ public class ImageInfoDto
     public int Height { get; set; }
 
     /// <summary>
+    /// Gets or sets the image tag (for source server images, used for change detection).
+    /// </summary>
+    public string? Tag { get; set; }
+
+    /// <summary>
     /// Gets the formatted file size (e.g., "1.5 MB").
     /// </summary>
     public string FormattedSize

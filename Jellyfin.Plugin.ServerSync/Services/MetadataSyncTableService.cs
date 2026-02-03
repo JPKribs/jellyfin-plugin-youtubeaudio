@@ -156,14 +156,16 @@ public class MetadataSyncTableService
 
                 try
                 {
-                    ProcessMetadataItem(
+                    await ProcessMetadataItemAsync(
+                        client,
                         database,
                         libraryMapping,
                         sourceItem,
                         syncMetadata,
                         syncImages,
                         syncPeople,
-                        existingItems);
+                        existingItems,
+                        cancellationToken).ConfigureAwait(false);
 
                     processedItems++;
                     onItemProcessed?.Invoke();
@@ -193,14 +195,16 @@ public class MetadataSyncTableService
     /// <summary>
     /// Processes a single metadata item from the source server.
     /// </summary>
-    private void ProcessMetadataItem(
+    private async Task ProcessMetadataItemAsync(
+        SourceServerClient client,
         SyncDatabase database,
         LibraryMapping libraryMapping,
         BaseItemDto sourceItem,
         bool syncMetadata,
         bool syncImages,
         bool syncPeople,
-        Dictionary<string, MetadataSyncItem> existingItems)
+        Dictionary<string, MetadataSyncItem> existingItems,
+        CancellationToken cancellationToken)
     {
         var sourceItemId = sourceItem.Id!.Value.ToString("N", CultureInfo.InvariantCulture);
         var sourcePath = sourceItem.Path!;
@@ -215,16 +219,28 @@ public class MetadataSyncTableService
         // Get existing item for this source item
         var existingItem = existingItems.GetValueOrDefault(sourceItemId);
 
+        // Skip items without local match - only sync items that exist on both servers
+        if (localItem == null)
+        {
+            // If we had a record for this item before but local item is gone, remove it
+            if (existingItem != null)
+            {
+                database.DeleteMetadataSyncItemsBySourceItem(sourceItemId);
+            }
+
+            return;
+        }
+
         if (existingItem != null)
         {
             // Update existing item with all category values
-            UpdateMetadataItem(existingItem, sourceItem, localItem, localPath, localItemId, syncMetadata, syncImages, syncPeople);
+            await UpdateMetadataItemAsync(existingItem, sourceItem, localItem, localPath, localItemId, syncMetadata, syncImages, syncPeople, client, cancellationToken).ConfigureAwait(false);
             database.UpsertMetadataSyncItem(existingItem);
         }
         else
         {
             // Create new item with all category values
-            var newItem = CreateMetadataItem(
+            var newItem = await CreateMetadataItemAsync(
                 libraryMapping,
                 sourceItem,
                 sourceItemId,
@@ -234,7 +250,9 @@ public class MetadataSyncTableService
                 localItem,
                 syncMetadata,
                 syncImages,
-                syncPeople);
+                syncPeople,
+                client,
+                cancellationToken).ConfigureAwait(false);
 
             database.UpsertMetadataSyncItem(newItem);
         }
@@ -243,7 +261,7 @@ public class MetadataSyncTableService
     /// <summary>
     /// Creates a new metadata sync item with all category values.
     /// </summary>
-    private MetadataSyncItem CreateMetadataItem(
+    private async Task<MetadataSyncItem> CreateMetadataItemAsync(
         LibraryMapping libraryMapping,
         BaseItemDto sourceItem,
         string sourceItemId,
@@ -253,7 +271,9 @@ public class MetadataSyncTableService
         BaseItem? localItem,
         bool syncMetadata,
         bool syncImages,
-        bool syncPeople)
+        bool syncPeople,
+        SourceServerClient client,
+        CancellationToken cancellationToken)
     {
         var item = new MetadataSyncItem
         {
@@ -281,7 +301,7 @@ public class MetadataSyncTableService
 
         if (syncImages)
         {
-            SetImagesValues(item, sourceItem, localItem);
+            await SetImagesValuesAsync(item, sourceItem, localItem, client, cancellationToken).ConfigureAwait(false);
         }
 
         if (syncPeople)
@@ -313,7 +333,7 @@ public class MetadataSyncTableService
     /// <summary>
     /// Updates an existing metadata sync item with current data.
     /// </summary>
-    private void UpdateMetadataItem(
+    private async Task UpdateMetadataItemAsync(
         MetadataSyncItem item,
         BaseItemDto sourceItem,
         BaseItem? localItem,
@@ -321,7 +341,9 @@ public class MetadataSyncTableService
         string? localItemId,
         bool syncMetadata,
         bool syncImages,
-        bool syncPeople)
+        bool syncPeople,
+        SourceServerClient client,
+        CancellationToken cancellationToken)
     {
         // Update identification
         item.LocalItemId = localItemId;
@@ -342,7 +364,7 @@ public class MetadataSyncTableService
 
         if (syncImages)
         {
-            SetImagesValues(item, sourceItem, localItem);
+            await SetImagesValuesAsync(item, sourceItem, localItem, client, cancellationToken).ConfigureAwait(false);
         }
         else
         {
@@ -385,8 +407,7 @@ public class MetadataSyncTableService
     }
 
     /// <summary>
-    /// Sets metadata field values - simple text/number fields only.
-    /// Excludes fields that require entity creation (Studios, People, Tags).
+    /// Sets metadata field values - simple text/number fields and arrays.
     /// </summary>
     private void SetMetadataFieldValues(MetadataSyncItem item, BaseItemDto sourceItem, BaseItem? localItem)
     {
@@ -398,7 +419,6 @@ public class MetadataSyncTableService
         // Extract only simple metadata fields that can be directly copied
         // NOTE: Excluded fields that can't be synced:
         //   - DateCreated: Read-only, set when item first added to database
-        //   - Tagline: Not directly accessible on local BaseItem
         var sourceMetadata = new Dictionary<string, object?>
         {
             // Core info
@@ -407,6 +427,9 @@ public class MetadataSyncTableService
             ["SortName"] = sourceItem.SortName,
             ["ForcedSortName"] = sourceItem.ForcedSortName,
             ["Overview"] = sourceItem.Overview,
+
+            // Tagline - source has array but we take first one (local is singular)
+            ["Tagline"] = sourceItem.Taglines?.FirstOrDefault(),
 
             // Ratings
             ["OfficialRating"] = sourceItem.OfficialRating,
@@ -419,7 +442,7 @@ public class MetadataSyncTableService
             ["EndDate"] = sourceItem.EndDate,
             ["ProductionYear"] = sourceItem.ProductionYear,
 
-            // Genres (simple strings, no GUIDs)
+            // Genres (simple strings)
             ["Genres"] = sourceItem.Genres,
 
             // External provider IDs
@@ -431,7 +454,14 @@ public class MetadataSyncTableService
 
             // Language preferences
             ["PreferredMetadataCountryCode"] = sourceItem.PreferredMetadataCountryCode,
-            ["PreferredMetadataLanguage"] = sourceItem.PreferredMetadataLanguage
+            ["PreferredMetadataLanguage"] = sourceItem.PreferredMetadataLanguage,
+
+            // Display/format properties
+            ["AspectRatio"] = sourceItem.AspectRatio,
+            ["Video3DFormat"] = sourceItem.Video3DFormat?.ToString(),
+
+            // Locked fields (prevents metadata providers from overwriting)
+            ["LockedFields"] = sourceItem.LockedFields?.Select(f => f.ToString()).ToArray()
         };
 
         item.SourceMetadataValue = JsonSerializer.Serialize(sourceMetadata);
@@ -439,6 +469,9 @@ public class MetadataSyncTableService
         // Extract local metadata if item exists
         if (localItem != null)
         {
+            // Try to cast to Video for video-specific properties
+            var localVideo = localItem as MediaBrowser.Controller.Entities.Video;
+
             var localMetadata = new Dictionary<string, object?>
             {
                 // Core info
@@ -447,6 +480,7 @@ public class MetadataSyncTableService
                 ["SortName"] = localItem.SortName,
                 ["ForcedSortName"] = localItem.ForcedSortName,
                 ["Overview"] = localItem.Overview,
+                ["Tagline"] = localItem.Tagline,
 
                 // Ratings
                 ["OfficialRating"] = localItem.OfficialRating,
@@ -471,7 +505,14 @@ public class MetadataSyncTableService
 
                 // Language preferences
                 ["PreferredMetadataCountryCode"] = localItem.PreferredMetadataCountryCode,
-                ["PreferredMetadataLanguage"] = localItem.PreferredMetadataLanguage
+                ["PreferredMetadataLanguage"] = localItem.PreferredMetadataLanguage,
+
+                // Display/format properties (Video-specific)
+                ["AspectRatio"] = localVideo?.AspectRatio,
+                ["Video3DFormat"] = localVideo?.Video3DFormat?.ToString(),
+
+                // Locked fields (prevents metadata providers from overwriting)
+                ["LockedFields"] = localItem.LockedFields?.Select(f => f.ToString()).ToArray()
             };
 
             item.LocalMetadataValue = JsonSerializer.Serialize(localMetadata);
@@ -479,61 +520,169 @@ public class MetadataSyncTableService
     }
 
     /// <summary>
-    /// Sets images values (hash-based comparison).
+    /// Sets images values with per-type comparison, fetching actual image info from source server.
     /// </summary>
-    private void SetImagesValues(MetadataSyncItem item, BaseItemDto sourceItem, BaseItem? localItem)
+    private async Task SetImagesValuesAsync(
+        MetadataSyncItem item,
+        BaseItemDto sourceItem,
+        BaseItem? localItem,
+        SourceServerClient client,
+        CancellationToken cancellationToken)
     {
-        // Extract image tags as a simple dictionary of image type -> tag string
-        var imageTags = new Dictionary<string, string>();
+        var sourceImagesByType = new Dictionary<string, List<ImageInfoDto>>();
+
+        // Fetch actual image info from source server (includes size, width, height)
+        if (sourceItem.Id.HasValue)
+        {
+            try
+            {
+                var imageInfoList = await client.GetItemImageInfoAsync(sourceItem.Id.Value, cancellationToken).ConfigureAwait(false);
+                if (imageInfoList != null && imageInfoList.Count > 0)
+                {
+                    foreach (var img in imageInfoList)
+                    {
+                        var imageTypeName = img.ImageType?.ToString() ?? "Unknown";
+                        if (!sourceImagesByType.TryGetValue(imageTypeName, out var imageList))
+                        {
+                            imageList = new List<ImageInfoDto>();
+                            sourceImagesByType[imageTypeName] = imageList;
+                        }
+
+                        imageList.Add(new ImageInfoDto
+                        {
+                            ImageType = imageTypeName,
+                            ImageIndex = img.ImageIndex ?? 0,
+                            Size = img.Size ?? 0,
+                            Width = img.Width ?? 0,
+                            Height = img.Height ?? 0,
+                            Tag = img.ImageTag
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed to fetch image info for item {ItemId}, falling back to tags", sourceItem.Id);
+
+                // Fallback to image tags if API call fails
+                PopulateSourceImagesFromTags(sourceItem, sourceImagesByType);
+            }
+        }
+        else
+        {
+            // Fallback to image tags
+            PopulateSourceImagesFromTags(sourceItem, sourceImagesByType);
+        }
+
+        // Only store if there are actual images
+        if (sourceImagesByType.Count > 0)
+        {
+            item.SourceImagesValue = JsonSerializer.Serialize(sourceImagesByType);
+
+            // Compute hash for change detection based on size and dimensions
+            var hashInput = string.Join(";", sourceImagesByType
+                .OrderBy(k => k.Key)
+                .Select(k => $"{k.Key}:{string.Join(",", k.Value.Select(v => $"{v.Size}_{v.Width}x{v.Height}"))}"));
+            var hashBytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(hashInput));
+            item.SourceImagesHash = Convert.ToHexString(hashBytes).ToLowerInvariant()[..32];
+        }
+        else
+        {
+            item.SourceImagesValue = null;
+            item.SourceImagesHash = null;
+        }
+
+        // Local images with size/dimensions per type
+        if (localItem != null)
+        {
+            var localImagesByType = new Dictionary<string, List<ImageInfoDto>>();
+            var imageTypes = new[]
+            {
+                MediaBrowser.Model.Entities.ImageType.Primary,
+                MediaBrowser.Model.Entities.ImageType.Backdrop,
+                MediaBrowser.Model.Entities.ImageType.Logo,
+                MediaBrowser.Model.Entities.ImageType.Thumb,
+                MediaBrowser.Model.Entities.ImageType.Banner,
+                MediaBrowser.Model.Entities.ImageType.Art,
+                MediaBrowser.Model.Entities.ImageType.Disc
+            };
+
+            foreach (var imageType in imageTypes)
+            {
+                var images = localItem.GetImages(imageType).ToList();
+                if (images.Count > 0)
+                {
+                    var imageInfoList = new List<ImageInfoDto>();
+                    for (int idx = 0; idx < images.Count; idx++)
+                    {
+                        var img = images[idx];
+                        long fileSize = 0;
+
+                        // Try to get actual file size from disk
+                        if (!string.IsNullOrEmpty(img.Path) && System.IO.File.Exists(img.Path))
+                        {
+                            try
+                            {
+                                var fileInfo = new System.IO.FileInfo(img.Path);
+                                fileSize = fileInfo.Length;
+                            }
+                            catch
+                            {
+                                // Ignore file access errors
+                            }
+                        }
+
+                        imageInfoList.Add(new ImageInfoDto
+                        {
+                            ImageType = imageType.ToString(),
+                            ImageIndex = idx,
+                            Size = fileSize,
+                            Width = img.Width,
+                            Height = img.Height
+                        });
+                    }
+
+                    localImagesByType[imageType.ToString()] = imageInfoList;
+                }
+            }
+
+            item.LocalImagesValue = localImagesByType.Count > 0
+                ? JsonSerializer.Serialize(localImagesByType)
+                : null;
+        }
+    }
+
+    /// <summary>
+    /// Populates source images from image tags (fallback when API call fails).
+    /// </summary>
+    private void PopulateSourceImagesFromTags(BaseItemDto sourceItem, Dictionary<string, List<ImageInfoDto>> sourceImagesByType)
+    {
+        // Process single image types from ImageTags
         if (sourceItem.ImageTags?.AdditionalData != null)
         {
             foreach (var kvp in sourceItem.ImageTags.AdditionalData)
             {
                 if (kvp.Value != null)
                 {
-                    imageTags[kvp.Key] = kvp.Value.ToString() ?? string.Empty;
+                    sourceImagesByType[kvp.Key] = new List<ImageInfoDto>
+                    {
+                        new ImageInfoDto
+                        {
+                            ImageType = kvp.Key,
+                            ImageIndex = 0,
+                            Tag = kvp.Value.ToString()
+                        }
+                    };
                 }
             }
         }
 
-        var backdropTags = sourceItem.BackdropImageTags ?? new List<string>();
-
-        // Only store if there are actual images
-        if (imageTags.Count > 0 || backdropTags.Count > 0)
+        // Process multiple backdrops
+        if (sourceItem.BackdropImageTags?.Count > 0)
         {
-            var sourceTagInfo = new SortedDictionary<string, object?>
-            {
-                ["ImageTags"] = imageTags,
-                ["BackdropTags"] = backdropTags
-            };
-
-            item.SourceImagesValue = JsonSerializer.Serialize(sourceTagInfo);
-
-            // Create a hash of source image tags - this changes when source images change
-            item.SourceImagesHash = ComputeImageTagsHash(imageTags, backdropTags);
-        }
-        else
-        {
-            // No images on source - clear values
-            item.SourceImagesValue = null;
-            item.SourceImagesHash = null;
-        }
-
-        if (localItem != null)
-        {
-            // For local, track what image types exist
-            var localImageInfo = new SortedDictionary<string, bool>
-            {
-                ["Primary"] = localItem.HasImage(MediaBrowser.Model.Entities.ImageType.Primary),
-                ["Backdrop"] = localItem.HasImage(MediaBrowser.Model.Entities.ImageType.Backdrop),
-                ["Logo"] = localItem.HasImage(MediaBrowser.Model.Entities.ImageType.Logo),
-                ["Thumb"] = localItem.HasImage(MediaBrowser.Model.Entities.ImageType.Thumb),
-                ["Banner"] = localItem.HasImage(MediaBrowser.Model.Entities.ImageType.Banner),
-                ["Art"] = localItem.HasImage(MediaBrowser.Model.Entities.ImageType.Art),
-                ["Disc"] = localItem.HasImage(MediaBrowser.Model.Entities.ImageType.Disc)
-            };
-
-            item.LocalImagesValue = JsonSerializer.Serialize(localImageInfo);
+            sourceImagesByType["Backdrop"] = sourceItem.BackdropImageTags
+                .Select((tag, idx) => new ImageInfoDto { ImageType = "Backdrop", ImageIndex = idx, Tag = tag })
+                .ToList();
         }
     }
 
@@ -580,21 +729,6 @@ public class MetadataSyncTableService
         // TODO: Get local people when applying
         // For now, we'll compare during the apply phase
         item.LocalPeopleValue = null;
-    }
-
-    /// <summary>
-    /// Computes a hash for image tags comparison.
-    /// </summary>
-    private static string? ComputeImageTagsHash(Dictionary<string, string>? imageTags, List<string>? backdropTags)
-    {
-        if ((imageTags == null || imageTags.Count == 0) && (backdropTags == null || backdropTags.Count == 0))
-        {
-            return null;
-        }
-
-        var combined = JsonSerializer.Serialize(new { imageTags, backdropTags });
-        var hashBytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(combined));
-        return Convert.ToHexString(hashBytes).ToLowerInvariant()[..32];
     }
 
     /// <summary>

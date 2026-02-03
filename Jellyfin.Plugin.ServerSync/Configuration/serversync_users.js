@@ -1327,19 +1327,19 @@ export default function (view, params) {
             var configurationEnabled = config.SyncUserConfiguration !== false;
             var profileImageEnabled = config.SyncUserProfileImage !== false;
 
-            // Policy badge (only if enabled)
-            if (policyEnabled) {
-                var hasPolicyChanges = detail.PolicyItem && detail.PolicyItem.HasChanges === true;
-                html += '<span class="userSyncModal-changesBadge ' + (hasPolicyChanges ? 'has-changes' : 'no-changes') + '">';
-                html += 'Policy: ' + (hasPolicyChanges ? 'Changes' : 'Synced');
-                html += '</span>';
-            }
-
             // Configuration badge (only if enabled)
             if (configurationEnabled) {
                 var hasConfigChanges = detail.ConfigurationItem && detail.ConfigurationItem.HasChanges === true;
                 html += '<span class="userSyncModal-changesBadge ' + (hasConfigChanges ? 'has-changes' : 'no-changes') + '">';
                 html += 'Configuration: ' + (hasConfigChanges ? 'Changes' : 'Synced');
+                html += '</span>';
+            }
+
+            // Policy badge (only if enabled)
+            if (policyEnabled) {
+                var hasPolicyChanges = detail.PolicyItem && detail.PolicyItem.HasChanges === true;
+                html += '<span class="userSyncModal-changesBadge ' + (hasPolicyChanges ? 'has-changes' : 'no-changes') + '">';
+                html += 'Policy: ' + (hasPolicyChanges ? 'Changes' : 'Synced');
                 html += '</span>';
             }
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
@@ -381,6 +382,17 @@ public class SyncMissingMetadataTask : IScheduledTask
                 hasChanges = true;
             }
 
+            // Tagline (singular string on BaseItem)
+            if (metadata.TryGetValue("Tagline", out var taglineValue) && taglineValue.ValueKind == JsonValueKind.String)
+            {
+                var tagline = taglineValue.GetString();
+                if (localItem.Tagline != tagline)
+                {
+                    localItem.Tagline = tagline;
+                    hasChanges = true;
+                }
+            }
+
             // SortName
             if (metadata.TryGetValue("SortName", out var sortNameValue) && sortNameValue.ValueKind == JsonValueKind.String)
             {
@@ -518,6 +530,62 @@ public class SyncMissingMetadataTask : IScheduledTask
                 }
             }
 
+            // Video-specific properties - only apply if item is a Video
+            var localVideo = localItem as MediaBrowser.Controller.Entities.Video;
+
+            // Note: Taglines is not directly settable on local BaseItem/Video - will be synced as display-only
+
+            // AspectRatio (Video-specific)
+            if (localVideo != null && metadata.TryGetValue("AspectRatio", out var aspectValue))
+            {
+                var aspectRatio = aspectValue.ValueKind == JsonValueKind.String ? aspectValue.GetString() : null;
+                if (localVideo.AspectRatio != aspectRatio)
+                {
+                    localVideo.AspectRatio = aspectRatio;
+                    hasChanges = true;
+                }
+            }
+
+            // Video3DFormat (Video-specific)
+            if (localVideo != null && metadata.TryGetValue("Video3DFormat", out var video3DValue))
+            {
+                MediaBrowser.Model.Entities.Video3DFormat? format = null;
+                if (video3DValue.ValueKind == JsonValueKind.String)
+                {
+                    var formatStr = video3DValue.GetString();
+                    if (!string.IsNullOrEmpty(formatStr) && Enum.TryParse<MediaBrowser.Model.Entities.Video3DFormat>(formatStr, out var parsed))
+                    {
+                        format = parsed;
+                    }
+                }
+
+                if (localVideo.Video3DFormat != format)
+                {
+                    localVideo.Video3DFormat = format;
+                    hasChanges = true;
+                }
+            }
+
+            // LockedFields (BaseItem property)
+            if (metadata.TryGetValue("LockedFields", out var lockedValue) && lockedValue.ValueKind == JsonValueKind.Array)
+            {
+                var lockedFieldsList = new List<MediaBrowser.Model.Entities.MetadataField>();
+                foreach (var f in lockedValue.EnumerateArray())
+                {
+                    if (f.ValueKind == JsonValueKind.String)
+                    {
+                        var fieldStr = f.GetString();
+                        if (!string.IsNullOrEmpty(fieldStr) && Enum.TryParse<MediaBrowser.Model.Entities.MetadataField>(fieldStr, out var field))
+                        {
+                            lockedFieldsList.Add(field);
+                        }
+                    }
+                }
+
+                localItem.LockedFields = lockedFieldsList.ToArray();
+                hasChanges = true;
+            }
+
             if (hasChanges)
             {
                 await localItem.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
@@ -534,6 +602,7 @@ public class SyncMissingMetadataTask : IScheduledTask
 
     /// <summary>
     /// Applies images from the source server to a local item.
+    /// Deletes existing local images and replaces them with images from the source.
     /// </summary>
     private async Task<bool> ApplyImagesAsync(
         MediaBrowser.Controller.Entities.BaseItem localItem,
@@ -555,44 +624,16 @@ public class SyncMissingMetadataTask : IScheduledTask
 
         try
         {
-            // Parse source image info to determine what images exist
+            // Parse source image info - new format is Dictionary<imageType, List<ImageInfoDto>>
             if (string.IsNullOrEmpty(item.SourceImagesValue))
             {
                 return true; // No images on source
             }
 
-            var sourceImageInfo = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(item.SourceImagesValue);
-            if (sourceImageInfo == null)
+            var sourceImagesByType = JsonSerializer.Deserialize<Dictionary<string, List<ImageInfoDto>>>(item.SourceImagesValue);
+            if (sourceImagesByType == null || sourceImagesByType.Count == 0)
             {
                 return true;
-            }
-
-            // Get image tags from source
-            Dictionary<string, string>? imageTags = null;
-            List<string>? backdropTags = null;
-
-            if (sourceImageInfo.TryGetValue("ImageTags", out var imageTagsElement) && imageTagsElement.ValueKind == JsonValueKind.Object)
-            {
-                imageTags = new Dictionary<string, string>();
-                foreach (var prop in imageTagsElement.EnumerateObject())
-                {
-                    if (prop.Value.ValueKind == JsonValueKind.String)
-                    {
-                        imageTags[prop.Name] = prop.Value.GetString() ?? string.Empty;
-                    }
-                }
-            }
-
-            if (sourceImageInfo.TryGetValue("BackdropTags", out var backdropElement) && backdropElement.ValueKind == JsonValueKind.Array)
-            {
-                backdropTags = new List<string>();
-                foreach (var tag in backdropElement.EnumerateArray())
-                {
-                    if (tag.ValueKind == JsonValueKind.String)
-                    {
-                        backdropTags.Add(tag.GetString() ?? string.Empty);
-                    }
-                }
             }
 
             using var httpClient = new HttpClient();
@@ -601,27 +642,48 @@ public class SyncMissingMetadataTask : IScheduledTask
             var baseUrl = config.SourceServerUrl.TrimEnd('/');
             var sourceItemId = item.SourceItemId;
 
-            // Download and save each image type
-            var imageTypes = new[] { "Primary", "Logo", "Thumb", "Banner", "Art", "Disc" };
-
-            foreach (var imageType in imageTypes)
+            // Process each image type from source
+            foreach (var kvp in sourceImagesByType)
             {
-                if (imageTags != null && imageTags.ContainsKey(imageType))
+                var imageTypeName = kvp.Key;
+                var sourceImages = kvp.Value;
+
+                if (!Enum.TryParse<ImageType>(imageTypeName, out var imageType))
                 {
-                    var imageUrl = $"{baseUrl}/Items/{sourceItemId}/Images/{imageType}";
-                    await DownloadAndSaveImageAsync(httpClient, imageUrl, localItem, imageType, 0, cancellationToken).ConfigureAwait(false);
+                    _logger.LogWarning("Unknown image type: {ImageType}", imageTypeName);
+                    continue;
+                }
+
+                // Delete all existing local images of this type
+                var existingImages = localItem.GetImages(imageType).ToList();
+                foreach (var existingImage in existingImages)
+                {
+                    try
+                    {
+                        localItem.RemoveImage(existingImage);
+                        _logger.LogDebug("Removed existing {ImageType} image for {ItemName}", imageTypeName, localItem.Name);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to remove existing {ImageType} image for {ItemName}", imageTypeName, localItem.Name);
+                    }
+                }
+
+                // Download and save each image from source
+                for (int i = 0; i < sourceImages.Count; i++)
+                {
+                    var imageUrl = $"{baseUrl}/Items/{sourceItemId}/Images/{imageTypeName}";
+                    if (imageType == ImageType.Backdrop || sourceImages.Count > 1)
+                    {
+                        imageUrl = $"{baseUrl}/Items/{sourceItemId}/Images/{imageTypeName}/{i}";
+                    }
+
+                    await DownloadAndSaveImageAsync(httpClient, imageUrl, localItem, imageTypeName, i, cancellationToken).ConfigureAwait(false);
                 }
             }
 
-            // Download backdrops
-            if (backdropTags != null)
-            {
-                for (int i = 0; i < backdropTags.Count; i++)
-                {
-                    var imageUrl = $"{baseUrl}/Items/{sourceItemId}/Images/Backdrop/{i}";
-                    await DownloadAndSaveImageAsync(httpClient, imageUrl, localItem, "Backdrop", i, cancellationToken).ConfigureAwait(false);
-                }
-            }
+            // Save the item to persist image changes
+            await localItem.UpdateToRepositoryAsync(ItemUpdateType.ImageUpdate, cancellationToken).ConfigureAwait(false);
 
             return true;
         }

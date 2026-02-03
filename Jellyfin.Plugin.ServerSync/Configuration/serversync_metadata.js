@@ -1121,6 +1121,10 @@ export default function (view, params) {
                 // Build changes summary badges
                 self.buildChangesSummary(item);
 
+                // Populate paths
+                view.querySelector('#metadataSyncModalSourcePath').textContent = item.SourcePath || '-';
+                view.querySelector('#metadataSyncModalLocalPath').textContent = item.LocalPath || '-';
+
                 // Build property comparison table with subsections
                 self.buildPropertyTable(item);
 
@@ -1266,31 +1270,28 @@ export default function (view, params) {
                 { key: 'SortName', label: 'Sort Name' },
                 { key: 'ForcedSortName', label: 'Forced Sort Name' },
                 { key: 'Overview', label: 'Overview', truncate: true },
-                { key: 'Taglines', label: 'Taglines', isArray: true },
-                { key: 'OfficialRating', label: 'Official Rating' },
+                { key: 'Tagline', label: 'Tagline' },
+                { key: 'OfficialRating', label: 'Parental Rating' },
                 { key: 'CustomRating', label: 'Custom Rating' },
                 { key: 'CommunityRating', label: 'Community Rating' },
                 { key: 'CriticRating', label: 'Critic Rating' },
-                { key: 'PremiereDate', label: 'Premiere Date', isDate: true },
+                { key: 'PremiereDate', label: 'Release Date', isDate: true },
                 { key: 'EndDate', label: 'End Date', isDate: true },
-                { key: 'ProductionYear', label: 'Production Year' },
+                { key: 'ProductionYear', label: 'Year' },
+                { key: 'AspectRatio', label: 'Aspect Ratio' },
+                { key: 'Video3DFormat', label: '3D Format' },
                 { key: 'IndexNumber', label: 'Index Number' },
                 { key: 'ParentIndexNumber', label: 'Parent Index Number' },
-                { key: 'PreferredMetadataCountryCode', label: 'Metadata Country' },
-                { key: 'PreferredMetadataLanguage', label: 'Metadata Language' }
+                { key: 'PreferredMetadataCountryCode', label: 'Country/Region' },
+                { key: 'PreferredMetadataLanguage', label: 'Preferred Language' },
+                { key: 'LockedFields', label: 'Locked Fields', isArray: true }
             ];
-
-            var hasAnyData = false;
 
             metadataFields.forEach(function(field) {
                 var sourceVal = source[field.key];
                 var localVal = local[field.key];
 
-                // Skip if both are empty
-                if (self.isEmpty(sourceVal) && self.isEmpty(localVal)) return;
-
-                hasAnyData = true;
-
+                // Always show all fields, displaying "-" for null/empty values
                 var sourceDisplay = self.formatMetadataValue(sourceVal, field);
                 var localDisplay = self.formatMetadataValue(localVal, field);
 
@@ -1308,10 +1309,6 @@ export default function (view, params) {
                 html += '<td class="historyCompareTable-value historyCompareTable-merged">' + mergedDisplay + '</td>';
                 html += '</tr>';
             });
-
-            if (!hasAnyData) {
-                html = '<tr><td colspan="4" style="text-align: center; opacity: 0.5;">No metadata differences</td></tr>';
-            }
 
             return html;
         },
@@ -1414,70 +1411,68 @@ export default function (view, params) {
             var self = this;
             var html = '';
 
-            // Count images and calculate total size
-            var sourceCount = 0;
-            var sourceSize = 0;
-            var localCount = 0;
-            var localSize = 0;
-
+            // Collect all image types from both source and local
+            var allTypes = new Set();
             if (sourceImages && typeof sourceImages === 'object') {
-                Object.keys(sourceImages).forEach(function(imageType) {
-                    var images = sourceImages[imageType];
-                    if (Array.isArray(images)) {
-                        sourceCount += images.length;
-                        images.forEach(function(img) {
-                            if (img && img.Size) sourceSize += img.Size;
-                        });
-                    }
-                });
+                Object.keys(sourceImages).forEach(function(type) { allTypes.add(type); });
             }
-
             if (localImages && typeof localImages === 'object') {
-                Object.keys(localImages).forEach(function(imageType) {
-                    var images = localImages[imageType];
-                    if (Array.isArray(images)) {
-                        localCount += images.length;
-                        images.forEach(function(img) {
-                            if (img && img.Size) localSize += img.Size;
-                        });
-                    }
-                });
+                Object.keys(localImages).forEach(function(type) { allTypes.add(type); });
             }
 
-            // Format display: show "#MB (#)" only when count > 1, otherwise just size
-            var sourceDisplay = self.formatImageSizeDisplay(sourceSize, sourceCount);
-            var localDisplay = self.formatImageSizeDisplay(localSize, localCount);
+            // Show each image type as a row
+            var typesArray = Array.from(allTypes).sort();
+            typesArray.forEach(function(imageType) {
+                var srcImgs = sourceImages && sourceImages[imageType] ? sourceImages[imageType] : [];
+                var localImgs = localImages && localImages[imageType] ? localImages[imageType] : [];
 
-            // Single combined row for images
-            var sizeChanged = sourceSize !== localSize || sourceCount !== localCount;
-            var sizeRowClass = sizeChanged ? 'metadataSyncModal-changedRow' : '';
-            html += '<tr class="' + sizeRowClass + '">';
-            html += '<td class="historyCompareTable-property">Images</td>';
-            html += '<td class="historyCompareTable-value">' + sourceDisplay + '</td>';
-            html += '<td class="historyCompareTable-value">' + localDisplay + '</td>';
-            html += '<td class="historyCompareTable-value historyCompareTable-merged">' + sourceDisplay + '</td>';
-            html += '</tr>';
+                var srcCount = Array.isArray(srcImgs) ? srcImgs.length : 0;
+                var localCount = Array.isArray(localImgs) ? localImgs.length : 0;
 
-            // Show hash comparison if available (for when images are downloaded)
-            if (item.SourceImagesHash || item.SyncedImagesHash) {
-                var hashChanged = item.SourceImagesHash !== item.SyncedImagesHash;
-                var hashRowClass = hashChanged ? 'metadataSyncModal-changedRow' : '';
-                var sourceHashDisplay = item.SourceImagesHash ? item.SourceImagesHash.substring(0, 16) + '...' : '-';
-                var localHashDisplay = item.SyncedImagesHash ? item.SyncedImagesHash.substring(0, 16) + '...' : '-';
+                // Calculate size for source images (if available)
+                var srcSize = 0;
+                if (Array.isArray(srcImgs)) {
+                    srcImgs.forEach(function(img) {
+                        if (img && img.Size) srcSize += img.Size;
+                    });
+                }
 
-                html += '<tr class="' + hashRowClass + '">';
-                html += '<td class="historyCompareTable-property">Hash</td>';
-                html += '<td class="historyCompareTable-value" title="' + ServerSyncShared.escapeHtml(item.SourceImagesHash || '') + '">' + ServerSyncShared.escapeHtml(sourceHashDisplay) + '</td>';
-                html += '<td class="historyCompareTable-value" title="' + ServerSyncShared.escapeHtml(item.SyncedImagesHash || '') + '">' + ServerSyncShared.escapeHtml(localHashDisplay) + '</td>';
-                html += '<td class="historyCompareTable-value historyCompareTable-merged">' + ServerSyncShared.escapeHtml(sourceHashDisplay) + '</td>';
+                // Calculate size for local images
+                var localSize = 0;
+                if (Array.isArray(localImgs)) {
+                    localImgs.forEach(function(img) {
+                        if (img && img.Size) localSize += img.Size;
+                    });
+                }
+
+                // Format: size (count) - hide count if 0 or 1
+                var srcDisplay = self.formatImageDisplay(srcSize, srcCount);
+                var localDisplay = self.formatImageDisplay(localSize, localCount);
+
+                var isChanged = srcCount !== localCount;
+                var rowClass = isChanged ? 'metadataSyncModal-changedRow' : '';
+
+                html += '<tr class="' + rowClass + '">';
+                html += '<td class="historyCompareTable-property">' + ServerSyncShared.escapeHtml(imageType) + '</td>';
+                html += '<td class="historyCompareTable-value">' + srcDisplay + '</td>';
+                html += '<td class="historyCompareTable-value">' + localDisplay + '</td>';
+                html += '<td class="historyCompareTable-value historyCompareTable-merged">' + srcDisplay + '</td>';
                 html += '</tr>';
+            });
+
+            if (typesArray.length === 0) {
+                html += '<tr><td colspan="4" style="text-align: center; opacity: 0.5;">No images</td></tr>';
             }
 
             return html;
         },
 
-        formatImageSizeDisplay: function(size, count) {
+        formatImageDisplay: function(size, count) {
             if (count === 0) return '-';
+            // If size is 0 or not available, just show count
+            if (!size || size === 0) {
+                return count === 1 ? '1 image' : count + ' images';
+            }
             var sizeStr = this.formatBytes(size);
             // Only show count if more than 1 image
             if (count > 1) {
