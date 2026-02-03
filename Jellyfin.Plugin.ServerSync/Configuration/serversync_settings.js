@@ -532,15 +532,25 @@ export default function (view, params) {
 
     function loadMetadataSettings(config) {
         view.querySelector('#chkEnableMetadataSync').checked = config.EnableMetadataSync || false;
-        view.querySelector('#chkMetadataSyncMetadata').checked = config.SyncMetadata !== false;
-        view.querySelector('#chkMetadataSyncImages').checked = config.SyncImages !== false;
+        view.querySelector('#chkMetadataSyncMetadata').checked = config.MetadataSyncMetadata !== false;
+        view.querySelector('#chkMetadataSyncGenres').checked = config.MetadataSyncGenres !== false;
+        view.querySelector('#chkMetadataSyncTags').checked = config.MetadataSyncTags !== false;
+        view.querySelector('#chkMetadataSyncStudios').checked = config.MetadataSyncStudios !== false;
+        view.querySelector('#chkMetadataSyncPeople').checked = config.MetadataSyncPeople === true;
+        view.querySelector('#chkMetadataSyncSubtitles').checked = config.MetadataSyncSubtitles !== false;
+        view.querySelector('#chkMetadataSyncImages').checked = config.MetadataSyncImages !== false;
     }
 
     function saveMetadataSettings() {
         var config = currentConfig || {};
         config.EnableMetadataSync = view.querySelector('#chkEnableMetadataSync').checked;
-        config.SyncMetadata = view.querySelector('#chkMetadataSyncMetadata').checked;
-        config.SyncImages = view.querySelector('#chkMetadataSyncImages').checked;
+        config.MetadataSyncMetadata = view.querySelector('#chkMetadataSyncMetadata').checked;
+        config.MetadataSyncGenres = view.querySelector('#chkMetadataSyncGenres').checked;
+        config.MetadataSyncTags = view.querySelector('#chkMetadataSyncTags').checked;
+        config.MetadataSyncStudios = view.querySelector('#chkMetadataSyncStudios').checked;
+        config.MetadataSyncPeople = view.querySelector('#chkMetadataSyncPeople').checked;
+        config.MetadataSyncSubtitles = view.querySelector('#chkMetadataSyncSubtitles').checked;
+        config.MetadataSyncImages = view.querySelector('#chkMetadataSyncImages').checked;
 
         ApiClient.updatePluginConfiguration(pluginId, config).then(function() {
             Dashboard.alert('Metadata settings saved');

@@ -273,20 +273,41 @@ public class PluginConfiguration : BasePluginConfiguration
     public bool EnableMetadataSync { get; set; }
 
     /// <summary>
-    /// Sync item metadata (title, overview, genres, tags, ratings, etc.).
+    /// Sync core metadata fields (title, overview, ratings, dates, provider IDs).
     /// </summary>
     public bool MetadataSyncMetadata { get; set; } = true;
 
     /// <summary>
-    /// Sync item images (Primary, Backdrop, Logo, Thumb, etc.).
+    /// Sync genre assignments from source to local items.
     /// </summary>
-    public bool MetadataSyncImages { get; set; } = true;
+    public bool MetadataSyncGenres { get; set; } = true;
+
+    /// <summary>
+    /// Sync user-defined tags from source to local items.
+    /// </summary>
+    public bool MetadataSyncTags { get; set; } = true;
+
+    /// <summary>
+    /// Sync studio/production company assignments.
+    /// </summary>
+    public bool MetadataSyncStudios { get; set; } = true;
 
     /// <summary>
     /// Sync people associated with items (actors, directors, writers).
     /// Off by default as it can be resource-intensive.
     /// </summary>
     public bool MetadataSyncPeople { get; set; }
+
+    /// <summary>
+    /// Track external subtitle files by filename.
+    /// Does not sync embedded subtitles.
+    /// </summary>
+    public bool MetadataSyncSubtitles { get; set; } = true;
+
+    /// <summary>
+    /// Sync item images (Primary, Backdrop, Logo, Thumb, etc.).
+    /// </summary>
+    public bool MetadataSyncImages { get; set; } = true;
 
     /// <summary>
     /// Timestamp when the last metadata sync completed.

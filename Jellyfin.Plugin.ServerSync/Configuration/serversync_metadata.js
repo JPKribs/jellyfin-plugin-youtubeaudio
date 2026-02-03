@@ -59,10 +59,6 @@ export default function (view, params) {
             return ApiClient.getPluginConfiguration(this.pluginId);
         },
 
-        saveConfig: function(config) {
-            return ApiClient.updatePluginConfiguration(this.pluginId, config);
-        },
-
         fetchLocalServerName: function() {
             var self = this;
             return ApiClient.getPublicSystemInfo().then(function(info) {
@@ -99,17 +95,6 @@ export default function (view, params) {
         },
 
         // --- DOM Utilities ---
-
-        setVisible: function(elementOrId, visible) {
-            var el = typeof elementOrId === 'string' ? view.querySelector('#' + elementOrId) : elementOrId;
-            if (el) {
-                if (visible) {
-                    el.classList.remove('hidden');
-                } else {
-                    el.classList.add('hidden');
-                }
-            }
-        },
 
         bindEvent: function(id, event, handler, moduleName) {
             var el = view.querySelector('#' + id);
@@ -1082,6 +1067,24 @@ export default function (view, params) {
                 statusBadge.textContent = item.Status;
                 statusBadge.className = 'itemModal-statusBadge ' + item.Status;
 
+                // Server mapping display
+                var sourceServerName = (self.currentConfig && self.currentConfig.SourceServerName) || 'Source';
+                var localServerName = ServerSyncShared.localServerName || 'Local';
+                view.querySelector('#metadataSyncModalServerMapping').textContent = sourceServerName + ' → ' + localServerName;
+
+                // Last sync
+                if (item.LastSyncTime) {
+                    view.querySelector('#metadataSyncModalLastSync').textContent =
+                        ServerSyncShared.formatRelativeTime(new Date(item.LastSyncTime));
+                } else {
+                    view.querySelector('#metadataSyncModalLastSync').textContent = '-';
+                }
+
+                // Library mapping
+                var sourceLib = item.SourceLibraryName || 'Unknown';
+                var localLib = item.LocalLibraryName || 'Unknown';
+                view.querySelector('#metadataSyncModalLibrary').textContent = sourceLib + ' → ' + localLib;
+
                 // Error section
                 var errorSection = view.querySelector('#metadataSyncModalErrorSection');
                 if (item.Status === 'Errored' && item.ErrorMessage) {
@@ -1091,30 +1094,15 @@ export default function (view, params) {
                     errorSection.classList.add('hidden');
                 }
 
-                // Item info
-                var sourceLib = item.SourceLibraryName || 'Unknown';
-                var localLib = item.LocalLibraryName || 'Unknown';
-                view.querySelector('#metadataSyncModalItem').innerHTML =
-                    '<strong>Library:</strong> ' + ServerSyncShared.escapeHtml(sourceLib) + ' → ' + ServerSyncShared.escapeHtml(localLib);
-
                 // Set server names in table headers
-                var sourceServerName = (self.currentConfig && self.currentConfig.SourceServerName) || 'Source';
-                var localServerName = ServerSyncShared.localServerName || 'Local';
                 view.querySelector('#metadataSyncModalSourceHeader').textContent = sourceServerName;
                 view.querySelector('#metadataSyncModalLocalHeader').textContent = localServerName;
 
-                // Build property comparison table
-                self.buildPropertyTable(item);
+                // Build changes summary badges
+                self.buildChangesSummary(item);
 
-                // Last sync
-                var lastSyncSection = view.querySelector('#metadataSyncModalLastSyncSection');
-                if (item.LastSyncTime) {
-                    view.querySelector('#metadataSyncModalLastSync').textContent =
-                        ServerSyncShared.formatRelativeTime(new Date(item.LastSyncTime));
-                    lastSyncSection.classList.remove('hidden');
-                } else {
-                    lastSyncSection.classList.add('hidden');
-                }
+                // Build property comparison table with subsections
+                self.buildPropertyTable(item);
 
                 view.querySelector('#metadataSyncItemDetailModal').classList.remove('hidden');
             }).catch(function(err) {
@@ -1123,35 +1111,434 @@ export default function (view, params) {
             });
         },
 
-        buildPropertyTable: function(item) {
-            var tbody = view.querySelector('#metadataSyncModalTableBody');
+        buildChangesSummary: function(item) {
+            var container = view.querySelector('#metadataSyncModalChangesSummary');
+            var config = this.currentConfig || {};
             var html = '';
 
-            var properties = item.Properties || [];
+            // Get config settings - each section can be individually enabled/disabled
+            var metadataEnabled = config.MetadataSyncMetadata !== false;
+            var genresEnabled = config.MetadataSyncGenres !== false;
+            var tagsEnabled = config.MetadataSyncTags !== false;
+            var studiosEnabled = config.MetadataSyncStudios !== false;
+            var peopleEnabled = config.MetadataSyncPeople === true;
+            var subtitlesEnabled = config.MetadataSyncSubtitles !== false;
+            var imagesEnabled = config.MetadataSyncImages !== false;
 
-            if (properties.length === 0) {
-                html = '<tr><td colspan="4" style="text-align: center; opacity: 0.5;">No property data available</td></tr>';
-            } else {
-                properties.forEach(function(prop) {
-                    var isChanged = prop.SourceValue !== prop.LocalValue;
-                    var rowClass = isChanged ? 'metadataSyncModal-changedRow' : '';
+            // Metadata badge (only if enabled)
+            if (metadataEnabled) {
+                var hasMetadataChanges = item.HasMetadataChanges === true;
+                html += '<span class="metadataSyncModal-changesBadge ' + (hasMetadataChanges ? 'has-changes' : 'no-changes') + '">';
+                html += 'Metadata: ' + (hasMetadataChanges ? 'Changes' : 'Synced');
+                html += '</span>';
+            }
 
-                    html += '<tr class="' + rowClass + '">';
-                    html += '<td class="historyCompareTable-property">' + ServerSyncShared.escapeHtml(prop.Name) + '</td>';
-                    html += '<td class="historyCompareTable-value">' + ServerSyncShared.escapeHtml(prop.SourceValue || '-') + '</td>';
-                    html += '<td class="historyCompareTable-value">' + ServerSyncShared.escapeHtml(prop.LocalValue || '-') + '</td>';
-                    html += '<td class="historyCompareTable-value historyCompareTable-merged">' +
-                        ServerSyncShared.escapeHtml(prop.MergedValue || prop.SourceValue || '-') + '</td>';
-                    html += '</tr>';
-                });
+            // Images badge (only if enabled)
+            if (imagesEnabled) {
+                var hasImagesChanges = item.HasImagesChanges === true;
+                html += '<span class="metadataSyncModal-changesBadge ' + (hasImagesChanges ? 'has-changes' : 'no-changes') + '">';
+                html += 'Images: ' + (hasImagesChanges ? 'Changes' : 'Synced');
+                html += '</span>';
+            }
+
+            // People badge (only if enabled)
+            if (peopleEnabled) {
+                var hasPeopleChanges = item.HasPeopleChanges === true;
+                html += '<span class="metadataSyncModal-changesBadge ' + (hasPeopleChanges ? 'has-changes' : 'no-changes') + '">';
+                html += 'People: ' + (hasPeopleChanges ? 'Changes' : 'Synced');
+                html += '</span>';
+            }
+
+            container.innerHTML = html;
+        },
+
+        buildPropertyTable: function(item) {
+            var self = this;
+            var tbody = view.querySelector('#metadataSyncModalTableBody');
+            var config = this.currentConfig || {};
+            var html = '';
+
+            // Get config settings - each section can be individually enabled/disabled
+            var metadataEnabled = config.MetadataSyncMetadata !== false;
+            var genresEnabled = config.MetadataSyncGenres !== false;
+            var tagsEnabled = config.MetadataSyncTags !== false;
+            var studiosEnabled = config.MetadataSyncStudios !== false;
+            var peopleEnabled = config.MetadataSyncPeople === true;
+            var subtitlesEnabled = config.MetadataSyncSubtitles !== false;
+            var imagesEnabled = config.MetadataSyncImages !== false;
+
+            // Parse JSON data
+            var sourceMetadata = self.parseJsonSafe(item.SourceMetadataValue) || {};
+            var localMetadata = self.parseJsonSafe(item.LocalMetadataValue) || {};
+            var sourceImages = self.parseJsonSafe(item.SourceImagesValue);
+            var localImages = self.parseJsonSafe(item.LocalImagesValue);
+            var sourcePeople = self.parseJsonSafe(item.SourcePeopleValue);
+            var localPeople = self.parseJsonSafe(item.LocalPeopleValue);
+
+            // --- METADATA SECTION (core fields) ---
+            if (metadataEnabled) {
+                html += '<tr class="metadataSyncModal-sectionHeader"><td colspan="4">Metadata</td></tr>';
+                html += self.buildCoreMetadataRows(sourceMetadata, localMetadata);
+            }
+
+            // --- GENRES SECTION ---
+            if (genresEnabled && (sourceMetadata.Genres || localMetadata.Genres)) {
+                html += '<tr class="metadataSyncModal-sectionHeader"><td colspan="4">Genres</td></tr>';
+                html += self.buildArrayComparisonRow('Genres', sourceMetadata.Genres, localMetadata.Genres);
+            }
+
+            // --- TAGS SECTION ---
+            if (tagsEnabled && (sourceMetadata.Tags || localMetadata.Tags)) {
+                html += '<tr class="metadataSyncModal-sectionHeader"><td colspan="4">Tags</td></tr>';
+                html += self.buildArrayComparisonRow('Tags', sourceMetadata.Tags, localMetadata.Tags);
+            }
+
+            // --- STUDIOS SECTION ---
+            if (studiosEnabled && (sourceMetadata.Studios || localMetadata.Studios)) {
+                html += '<tr class="metadataSyncModal-sectionHeader"><td colspan="4">Studios</td></tr>';
+                html += self.buildArrayComparisonRow('Studios', sourceMetadata.Studios, localMetadata.Studios);
+            }
+
+            // --- PEOPLE SECTION ---
+            if (peopleEnabled) {
+                html += '<tr class="metadataSyncModal-sectionHeader"><td colspan="4">People</td></tr>';
+                html += self.buildPeopleRows(sourcePeople, localPeople);
+            }
+
+            // --- SUBTITLES SECTION ---
+            // TODO: Subtitles tracking not yet implemented in backend
+            // if (subtitlesEnabled) {
+            //     html += '<tr class="metadataSyncModal-sectionHeader"><td colspan="4">Subtitles</td></tr>';
+            //     html += self.buildSubtitlesRows(item);
+            // }
+
+            // --- IMAGES SECTION ---
+            if (imagesEnabled) {
+                html += '<tr class="metadataSyncModal-sectionHeader"><td colspan="4">Images</td></tr>';
+                html += self.buildImagesRows(sourceImages, localImages, item);
+            }
+
+            if (html === '') {
+                html = '<tr><td colspan="4" style="text-align: center; opacity: 0.5;">No sync categories are enabled</td></tr>';
             }
 
             tbody.innerHTML = html;
         },
 
+        parseJsonSafe: function(jsonString) {
+            if (!jsonString) return null;
+            try {
+                return JSON.parse(jsonString);
+            } catch (e) {
+                console.error('Failed to parse JSON:', e);
+                return null;
+            }
+        },
+
+        buildCoreMetadataRows: function(source, local) {
+            var self = this;
+            var html = '';
+
+            // Define core metadata fields (excluding arrays that get their own sections)
+            var metadataFields = [
+                { key: 'Name', label: 'Name' },
+                { key: 'OriginalTitle', label: 'Original Title' },
+                { key: 'SortName', label: 'Sort Name' },
+                { key: 'ForcedSortName', label: 'Forced Sort Name' },
+                { key: 'Overview', label: 'Overview', truncate: true },
+                { key: 'Taglines', label: 'Taglines', isArray: true },
+                { key: 'OfficialRating', label: 'Official Rating' },
+                { key: 'CustomRating', label: 'Custom Rating' },
+                { key: 'CommunityRating', label: 'Community Rating' },
+                { key: 'CriticRating', label: 'Critic Rating' },
+                { key: 'PremiereDate', label: 'Premiere Date', isDate: true },
+                { key: 'EndDate', label: 'End Date', isDate: true },
+                { key: 'ProductionYear', label: 'Production Year' },
+                { key: 'IndexNumber', label: 'Index Number' },
+                { key: 'ParentIndexNumber', label: 'Parent Index Number' },
+                { key: 'PreferredMetadataCountryCode', label: 'Metadata Country' },
+                { key: 'PreferredMetadataLanguage', label: 'Metadata Language' }
+            ];
+
+            var hasAnyData = false;
+
+            metadataFields.forEach(function(field) {
+                var sourceVal = source[field.key];
+                var localVal = local[field.key];
+
+                // Skip if both are empty
+                if (self.isEmpty(sourceVal) && self.isEmpty(localVal)) return;
+
+                hasAnyData = true;
+
+                var sourceDisplay = self.formatMetadataValue(sourceVal, field);
+                var localDisplay = self.formatMetadataValue(localVal, field);
+
+                // Determine if changed (normalize for comparison)
+                var isChanged = self.normalizeForComparison(sourceVal, field) !== self.normalizeForComparison(localVal, field);
+                var rowClass = isChanged ? 'metadataSyncModal-changedRow' : '';
+
+                // After sync shows source value (sync direction is source -> local)
+                var mergedDisplay = sourceDisplay;
+
+                html += '<tr class="' + rowClass + '">';
+                html += '<td class="historyCompareTable-property">' + ServerSyncShared.escapeHtml(field.label) + '</td>';
+                html += '<td class="historyCompareTable-value">' + sourceDisplay + '</td>';
+                html += '<td class="historyCompareTable-value">' + localDisplay + '</td>';
+                html += '<td class="historyCompareTable-value historyCompareTable-merged">' + mergedDisplay + '</td>';
+                html += '</tr>';
+            });
+
+            if (!hasAnyData) {
+                html = '<tr><td colspan="4" style="text-align: center; opacity: 0.5;">No metadata differences</td></tr>';
+            }
+
+            return html;
+        },
+
+        buildArrayComparisonRow: function(label, sourceArray, localArray) {
+            var html = '';
+            var sourceItems = Array.isArray(sourceArray) ? sourceArray : [];
+            var localItems = Array.isArray(localArray) ? localArray : [];
+
+            var sourceCount = sourceItems.length;
+            var localCount = localItems.length;
+
+            // Count row
+            var countChanged = sourceCount !== localCount;
+            var countRowClass = countChanged ? 'metadataSyncModal-changedRow' : '';
+            html += '<tr class="' + countRowClass + '">';
+            html += '<td class="historyCompareTable-property">Count</td>';
+            html += '<td class="historyCompareTable-value">' + sourceCount + '</td>';
+            html += '<td class="historyCompareTable-value">' + localCount + '</td>';
+            html += '<td class="historyCompareTable-value historyCompareTable-merged">' + sourceCount + '</td>';
+            html += '</tr>';
+
+            // Items row (show list)
+            var sourceDisplay = sourceItems.length > 0 ? ServerSyncShared.escapeHtml(sourceItems.join(', ')) : '-';
+            var localDisplay = localItems.length > 0 ? ServerSyncShared.escapeHtml(localItems.join(', ')) : '-';
+
+            var sourceSorted = sourceItems.slice().sort().join(',');
+            var localSorted = localItems.slice().sort().join(',');
+            var itemsChanged = sourceSorted !== localSorted;
+            var itemsRowClass = itemsChanged ? 'metadataSyncModal-changedRow' : '';
+
+            html += '<tr class="' + itemsRowClass + '">';
+            html += '<td class="historyCompareTable-property">Items</td>';
+            html += '<td class="historyCompareTable-value">' + sourceDisplay + '</td>';
+            html += '<td class="historyCompareTable-value">' + localDisplay + '</td>';
+            html += '<td class="historyCompareTable-value historyCompareTable-merged">' + sourceDisplay + '</td>';
+            html += '</tr>';
+
+            return html;
+        },
+
+        formatMetadataValue: function(value, field) {
+            if (this.isEmpty(value)) return '-';
+
+            if (field.isArray && Array.isArray(value)) {
+                if (value.length === 0) return '-';
+                return ServerSyncShared.escapeHtml(value.join(', '));
+            }
+
+            if (field.isDate) {
+                return this.formatDateOnly(value);
+            }
+
+            if (field.truncate && typeof value === 'string' && value.length > 100) {
+                return ServerSyncShared.escapeHtml(value.substring(0, 100) + '...');
+            }
+
+            return ServerSyncShared.escapeHtml(String(value));
+        },
+
+        formatDateOnly: function(dateStr) {
+            if (!dateStr) return '-';
+            try {
+                var date = new Date(dateStr);
+                // Return just the date portion to avoid timezone issues
+                return date.toISOString().split('T')[0];
+            } catch (e) {
+                return ServerSyncShared.escapeHtml(String(dateStr));
+            }
+        },
+
+        normalizeForComparison: function(value, field) {
+            if (this.isEmpty(value)) return '';
+
+            if (field.isArray && Array.isArray(value)) {
+                return value.sort().join(',');
+            }
+
+            if (field.isDate) {
+                // Normalize dates to just the date portion
+                try {
+                    var date = new Date(value);
+                    return date.toISOString().split('T')[0];
+                } catch (e) {
+                    return String(value);
+                }
+            }
+
+            return String(value);
+        },
+
+        isEmpty: function(value) {
+            if (value === null || value === undefined) return true;
+            if (value === '') return true;
+            if (Array.isArray(value) && value.length === 0) return true;
+            return false;
+        },
+
+        buildImagesRows: function(sourceImages, localImages, item) {
+            var self = this;
+            var html = '';
+
+            // Count images and calculate total size
+            var sourceCount = 0;
+            var sourceSize = 0;
+            var localCount = 0;
+            var localSize = 0;
+
+            if (sourceImages && typeof sourceImages === 'object') {
+                Object.keys(sourceImages).forEach(function(imageType) {
+                    var images = sourceImages[imageType];
+                    if (Array.isArray(images)) {
+                        sourceCount += images.length;
+                        images.forEach(function(img) {
+                            if (img && img.Size) sourceSize += img.Size;
+                        });
+                    }
+                });
+            }
+
+            if (localImages && typeof localImages === 'object') {
+                Object.keys(localImages).forEach(function(imageType) {
+                    var images = localImages[imageType];
+                    if (Array.isArray(images)) {
+                        localCount += images.length;
+                        images.forEach(function(img) {
+                            if (img && img.Size) localSize += img.Size;
+                        });
+                    }
+                });
+            }
+
+            // Format display: show "#MB (#)" only when count > 1, otherwise just size
+            var sourceDisplay = self.formatImageSizeDisplay(sourceSize, sourceCount);
+            var localDisplay = self.formatImageSizeDisplay(localSize, localCount);
+
+            // Single combined row for images
+            var sizeChanged = sourceSize !== localSize || sourceCount !== localCount;
+            var sizeRowClass = sizeChanged ? 'metadataSyncModal-changedRow' : '';
+            html += '<tr class="' + sizeRowClass + '">';
+            html += '<td class="historyCompareTable-property">Images</td>';
+            html += '<td class="historyCompareTable-value">' + sourceDisplay + '</td>';
+            html += '<td class="historyCompareTable-value">' + localDisplay + '</td>';
+            html += '<td class="historyCompareTable-value historyCompareTable-merged">' + sourceDisplay + '</td>';
+            html += '</tr>';
+
+            // Show hash comparison if available (for when images are downloaded)
+            if (item.SourceImagesHash || item.SyncedImagesHash) {
+                var hashChanged = item.SourceImagesHash !== item.SyncedImagesHash;
+                var hashRowClass = hashChanged ? 'metadataSyncModal-changedRow' : '';
+                var sourceHashDisplay = item.SourceImagesHash ? item.SourceImagesHash.substring(0, 16) + '...' : '-';
+                var localHashDisplay = item.SyncedImagesHash ? item.SyncedImagesHash.substring(0, 16) + '...' : '-';
+
+                html += '<tr class="' + hashRowClass + '">';
+                html += '<td class="historyCompareTable-property">Hash</td>';
+                html += '<td class="historyCompareTable-value" title="' + ServerSyncShared.escapeHtml(item.SourceImagesHash || '') + '">' + ServerSyncShared.escapeHtml(sourceHashDisplay) + '</td>';
+                html += '<td class="historyCompareTable-value" title="' + ServerSyncShared.escapeHtml(item.SyncedImagesHash || '') + '">' + ServerSyncShared.escapeHtml(localHashDisplay) + '</td>';
+                html += '<td class="historyCompareTable-value historyCompareTable-merged">' + ServerSyncShared.escapeHtml(sourceHashDisplay) + '</td>';
+                html += '</tr>';
+            }
+
+            return html;
+        },
+
+        formatImageSizeDisplay: function(size, count) {
+            if (count === 0) return '-';
+            var sizeStr = this.formatBytes(size);
+            // Only show count if more than 1 image
+            if (count > 1) {
+                return sizeStr + ' (' + count + ')';
+            }
+            return sizeStr;
+        },
+
+        formatBytes: function(bytes) {
+            if (!bytes || bytes === 0) return '0 B';
+            var units = ['B', 'KB', 'MB', 'GB'];
+            var i = 0;
+            while (bytes >= 1024 && i < units.length - 1) {
+                bytes /= 1024;
+                i++;
+            }
+            return bytes.toFixed(i > 0 ? 1 : 0) + ' ' + units[i];
+        },
+
+        buildPeopleRows: function(sourcePeople, localPeople) {
+            var html = '';
+
+            var sourceCount = Array.isArray(sourcePeople) ? sourcePeople.length : 0;
+            var localCount = Array.isArray(localPeople) ? localPeople.length : 0;
+
+            // People count row
+            var countChanged = sourceCount !== localCount;
+            var countRowClass = countChanged ? 'metadataSyncModal-changedRow' : '';
+            html += '<tr class="' + countRowClass + '">';
+            html += '<td class="historyCompareTable-property">People Count</td>';
+            html += '<td class="historyCompareTable-value">' + sourceCount + '</td>';
+            html += '<td class="historyCompareTable-value">' + localCount + '</td>';
+            html += '<td class="historyCompareTable-value historyCompareTable-merged">' + sourceCount + '</td>';
+            html += '</tr>';
+
+            // Count by type if available
+            if (sourceCount > 0 || localCount > 0) {
+                var sourceByType = this.countPeopleByType(sourcePeople);
+                var localByType = this.countPeopleByType(localPeople);
+
+                var types = ['Actor', 'Director', 'Writer', 'Producer'];
+                types.forEach(function(type) {
+                    var sourceTypeCount = sourceByType[type] || 0;
+                    var localTypeCount = localByType[type] || 0;
+
+                    if (sourceTypeCount > 0 || localTypeCount > 0) {
+                        var typeChanged = sourceTypeCount !== localTypeCount;
+                        var typeRowClass = typeChanged ? 'metadataSyncModal-changedRow' : '';
+
+                        html += '<tr class="' + typeRowClass + '">';
+                        html += '<td class="historyCompareTable-property" style="padding-left: 24px;">' + type + 's</td>';
+                        html += '<td class="historyCompareTable-value">' + sourceTypeCount + '</td>';
+                        html += '<td class="historyCompareTable-value">' + localTypeCount + '</td>';
+                        html += '<td class="historyCompareTable-value historyCompareTable-merged">' + sourceTypeCount + '</td>';
+                        html += '</tr>';
+                    }
+                });
+            }
+
+            return html;
+        },
+
+        countPeopleByType: function(people) {
+            var counts = {};
+            if (!Array.isArray(people)) return counts;
+
+            people.forEach(function(person) {
+                var type = person.Type || 'Unknown';
+                counts[type] = (counts[type] || 0) + 1;
+            });
+
+            return counts;
+        },
+
         closeModal: function() {
             view.querySelector('#metadataSyncItemDetailModal').classList.add('hidden');
             this.currentModalItem = null;
+            // Refresh table and status on modal close
+            this.table.refresh();
+            this.loadMetadataStatus();
+            this.loadHealthStats();
         },
 
         modalIgnore: function() {

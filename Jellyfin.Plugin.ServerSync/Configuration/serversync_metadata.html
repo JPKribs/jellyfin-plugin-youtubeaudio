@@ -89,40 +89,39 @@
     <!-- MODAL: Metadata Sync Item Detail -->
 
     <div id="metadataSyncItemDetailModal" class="dialog hidden">
-        <div class="dialogContent max-w-700 modal-relative">
-
-            <!-- Modal Header -->
+        <div class="dialogContent metadataSyncModal-dialog modal-relative">
             <button type="button" id="btnMetadataSyncModalClose" class="dialogCloseBtn" title="Close">&times;</button>
             <h2 id="metadataSyncModalTitle" class="modal-title"></h2>
-
-            <!-- Modal Body -->
             <div class="modal-body">
 
-                <!-- Status Display -->
-                <div class="modal-field">
-                    <div class="modal-field-label">Status</div>
+                <!-- Top row: Status badge + Server mapping -->
+                <div class="metadataSyncModal-topRow">
                     <span id="metadataSyncModalStatusBadge" class="itemModal-statusBadge"></span>
+                    <span id="metadataSyncModalServerMapping" class="metadataSyncModal-serverMapping"></span>
                 </div>
 
-                <!-- Last Sync Time -->
-                <div id="metadataSyncModalLastSyncSection" class="modal-field hidden">
-                    <div class="modal-field-label">Last Sync</div>
-                    <div id="metadataSyncModalLastSync"></div>
+                <!-- Info grid: Last Sync + Library -->
+                <div id="metadataSyncModalInfoGrid" class="metadataSyncModal-infoGrid">
+                    <div class="metadataSyncModal-infoItem">
+                        <div class="metadataSyncModal-infoLabel">Last Sync</div>
+                        <div id="metadataSyncModalLastSync" class="metadataSyncModal-infoValue">-</div>
+                    </div>
+                    <div class="metadataSyncModal-infoItem">
+                        <div class="metadataSyncModal-infoLabel">Library</div>
+                        <div id="metadataSyncModalLibrary" class="metadataSyncModal-infoValue">-</div>
+                    </div>
                 </div>
 
-                <!-- Error Message -->
+                <!-- Error Section -->
                 <div id="metadataSyncModalErrorSection" class="modal-field hidden">
                     <div class="modal-field-label">Error</div>
                     <div id="metadataSyncModalError" class="errorMessage"></div>
                 </div>
 
-                <!-- Item Info -->
-                <div class="modal-field mb-lg">
-                    <div class="modal-field-label">Item</div>
-                    <div id="metadataSyncModalItem"></div>
-                </div>
+                <!-- Changes Summary -->
+                <div id="metadataSyncModalChangesSummary" class="metadataSyncModal-changesSummary"></div>
 
-                <!-- Property Comparison Table -->
+                <!-- Property Comparison Table with Subsections -->
                 <div class="metadataSyncModal-tableContainer">
                     <table class="historyCompareTable">
                         <thead>
@@ -134,7 +133,11 @@
                             </tr>
                         </thead>
                         <tbody id="metadataSyncModalTableBody">
-                            <!-- Rows populated dynamically -->
+                            <!-- Rows populated dynamically with subsections:
+                                 - METADATA (Name, Overview, Dates, Ratings, etc.)
+                                 - IMAGES (Image count, total size)
+                                 - PEOPLE (Cast/Crew count)
+                            -->
                         </tbody>
                     </table>
                 </div>
@@ -182,47 +185,9 @@
             --status-pending-bg: rgba(155, 89, 182, 0.2);
             --status-pending-color: #9b59b6;
             --status-pending-border: rgba(155, 89, 182, 0.3);
-
-            /* Pending Download - Purple */
-            --status-pending-download-bg: rgba(155, 89, 182, 0.2);
-            --status-pending-download-color: #9b59b6;
-            --status-pending-download-border: rgba(155, 89, 182, 0.3);
-
-            /* Pending Replacement - Blue */
-            --status-pending-replacement-bg: rgba(52, 152, 219, 0.2);
-            --status-pending-replacement-color: #3498db;
-            --status-pending-replacement-border: rgba(52, 152, 219, 0.3);
-
-            /* Pending Deletion - Red (same as errored) */
-            --status-pending-deletion-bg: rgba(217, 83, 79, 0.2);
-            --status-pending-deletion-color: #d9534f;
-            --status-pending-deletion-border: rgba(217, 83, 79, 0.3);
-
-            /* Deleting - Brighter Red */
-            --status-deleting-bg: rgba(231, 76, 60, 0.2);
-            --status-deleting-color: #e74c3c;
-            --status-deleting-border: rgba(231, 76, 60, 0.3);
         }
 
         /* ===== Utility Classes ===== */
-
-        /* Text color utilities */
-        .text-success { color: var(--status-synced-color); }
-        .text-error { color: var(--status-errored-color); }
-        .text-warning { color: var(--status-queued-color); }
-        .text-muted { opacity: 0.7; }
-
-        /* Text truncation */
-        .text-truncate {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        /* Separator */
-        .separator {
-            border-bottom: 1px solid #555;
-        }
 
         /* Loading animation */
         @keyframes spin {
@@ -233,26 +198,6 @@
         /* ===== Layout Utilities ===== */
 
         .hidden { display: none !important; }
-        .flex { display: flex; }
-        .flex-center { display: flex; align-items: center; }
-        .flex-col { display: flex; flex-direction: column; }
-        .gap-sm { gap: 8px; }
-        .gap-md { gap: 16px; }
-        .gap-lg { gap: 24px; }
-
-        /* Spacing utilities */
-        .mt-sm { margin-top: 8px; }
-        .mt-md { margin-top: 16px; }
-        .mb-sm { margin-bottom: 8px; }
-        .mb-md { margin-bottom: 12px; }
-        .mb-lg { margin-bottom: 16px; }
-        .p-md { padding: 16px; }
-
-        /* Width utilities */
-        .w-auto { width: auto !important; }
-        .w-80 { width: 80px; }
-        .max-w-600 { max-width: 600px; }
-        .max-w-700 { max-width: 700px; }
 
         /* ===== Section Title Styling ===== */
 
@@ -261,40 +206,6 @@
             border-bottom: 1px solid #555;
             padding-bottom: 0.5em;
             margin-bottom: 1em;
-        }
-
-        /* Tab separator line */
-        .tabSeparator {
-            border-bottom: 1px solid #555;
-            margin-bottom: 16px;
-        }
-
-        /* ===== Tab Navigation ===== */
-
-        .tabContainer {
-            display: flex;
-            gap: 8px;
-            width: 100%;
-        }
-        .tabButton {
-            flex: 1;
-            text-align: center;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .tabButton span {
-            display: block;
-            width: 100%;
-            text-align: center;
-        }
-        .tabButton.active {
-            background-color: #00a4dc !important;
-            color: #fff !important;
-        }
-        .tabButton:disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
         }
 
         /* ===== Button Styles ===== */
@@ -314,40 +225,6 @@
         }
         .button-destructive:hover {
             background-color: #c9302c !important;
-        }
-
-        /* ===== Nested Settings ===== */
-
-        .nested-settings {
-            margin-left: 1.5em;
-            padding-left: 1em;
-            border-left: 2px solid rgba(85, 85, 85, 0.3);
-        }
-
-        /* ===== Input Row ===== */
-
-        .inputRow {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-        .inputRow input[is="emby-input"],
-        .inputRow .emby-input-wrapper {
-            flex: 1;
-            margin: 0 !important;
-            padding-left: 0 !important;
-        }
-        .inputRow .inputContainer {
-            margin: 0 !important;
-            padding: 0 !important;
-        }
-
-        /* ===== Section Separator ===== */
-
-        .contentSectionSeparator {
-            border-bottom: 1px solid #555;
-            margin-top: 24px;
-            margin-bottom: 16px;
         }
 
         /* ===== Dialog/Modal Styling ===== */
@@ -401,114 +278,92 @@
             word-break: break-all;
         }
 
-        /* ===== Generic Button Row ===== */
-
-        .buttonRow {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 8px;
-        }
-        .buttonRow button {
-            flex: 1;
-            text-align: center;
-            justify-content: center;
-        }
-
         /* ===== Modal Field Layout ===== */
 
         .modal-field { margin-bottom: 12px; }
         .modal-field-label { opacity: 0.7; margin-bottom: 4px; }
-        .modal-field-value { word-break: break-all; }
         .modal-title { margin-top: 0; padding-right: 32px; }
         .modal-body { margin: 16px 0; }
         .modal-relative { position: relative; }
-
-        /* ===== Server Info Display ===== */
-
-        .server-info-box {
-            margin-bottom: 16px;
-            padding: 12px;
-            background: rgba(0,0,0,0.3);
-            border-radius: 4px;
-        }
-
-        /* ===== Inline Form Layout ===== */
-
-        .inline-inputs {
-            display: flex;
-            gap: 16px;
-            align-items: center;
-        }
-
-        /* ===== Placeholder Text ===== */
-
-        .placeholder-text {
-            padding: 16px;
-            opacity: 0.7;
-        }
-    </style>
-
-    <!-- Styles: SourceServer/sourceServer.css -->
-    <style>
-        /* ===== Collapsible Sections ===== */
-
-        .collapsibleSection {
-            margin-bottom: 8px;
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 4px;
-            overflow: hidden;
-        }
-        .collapsibleHeader {
-            width: 100%;
-            padding: 12px 16px;
-            background: rgba(255,255,255,0.05);
-            border: none;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            color: inherit;
-            font-size: 1.1em;
-            font-weight: 500;
-            text-align: left;
-        }
-        .collapsibleHeader:hover {
-            background: rgba(255,255,255,0.08);
-        }
-        .collapsibleTitle {
-            flex: 1;
-        }
-        .collapsibleIcon {
-            font-size: 0.8em;
-            transition: transform 0.2s;
-        }
-        .collapsibleHeader.collapsed .collapsibleIcon {
-            transform: rotate(-90deg);
-        }
-        .collapsibleContent {
-            padding: 16px;
-            border-top: 1px solid rgba(255,255,255,0.1);
-        }
-        .collapsibleContent.collapsed {
-            display: none;
-        }
-        .collapsibleActions {
-            display: flex;
-            gap: 8px;
-            margin-top: 16px;
-            padding-top: 16px;
-            border-top: 1px solid rgba(255,255,255,0.1);
-        }
-
-        /* ===== Server Info Container ===== */
-
-        #serverInfoContainer {
-            padding-bottom: 16px;
-        }
     </style>
 
     <!-- Styles: MetadataSync/metadataSync.css -->
     <style>
+        /* ===== Metadata Sync Modal Dialog ===== */
+
+        .metadataSyncModal-dialog {
+            max-width: 900px;
+            width: 95vw;
+        }
+
+        /* ===== Metadata Sync Modal - Top Row ===== */
+
+        .metadataSyncModal-topRow {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .metadataSyncModal-serverMapping {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        /* ===== Metadata Sync Modal - Info Grid ===== */
+
+        .metadataSyncModal-infoGrid {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 16px;
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+        .metadataSyncModal-infoItem {
+            flex: 1;
+        }
+        .metadataSyncModal-infoLabel {
+            font-size: 0.75em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            opacity: 0.6;
+            margin-bottom: 4px;
+        }
+        .metadataSyncModal-infoValue {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 1em;
+            font-weight: 500;
+        }
+
+        /* ===== Metadata Sync Modal - Changes Summary ===== */
+
+        .metadataSyncModal-changesSummary {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .metadataSyncModal-changesBadge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+        .metadataSyncModal-changesBadge.has-changes {
+            background: rgba(240, 173, 78, 0.2);
+            color: #f0ad4e;
+        }
+        .metadataSyncModal-changesBadge.no-changes {
+            background: rgba(92, 184, 92, 0.2);
+            color: #5cb85c;
+        }
+        .metadataSyncModal-changesBadge.disabled {
+            background: rgba(153, 153, 153, 0.2);
+            color: #999;
+        }
+
         /* ===== Metadata Comparison Table ===== */
 
         .historyCompareTable {
@@ -548,6 +403,8 @@
         }
         .historyCompareTable td.historyCompareTable-value {
             font-weight: 500;
+            word-break: break-word;
+            max-width: 200px;
         }
         .historyCompareTable td.historyCompareTable-merged {
             background: rgba(0,164,220,0.08);
@@ -607,6 +464,12 @@
             text-transform: uppercase;
             font-size: 0.85em;
             letter-spacing: 0.5px;
+        }
+
+        /* Disabled section row */
+        .metadataSyncModal-disabledRow td {
+            opacity: 0.5;
+            font-style: italic;
         }
 
         /* ===== Sync Section Separator ===== */

@@ -414,9 +414,49 @@
                                     <div class="inputContainer">
                                         <label class="checkboxContainer">
                                             <input is="emby-checkbox" type="checkbox" id="chkMetadataSyncMetadata" checked />
-                                            <span>Metadata Fields</span>
+                                            <span>Metadata</span>
                                         </label>
-                                        <div class="fieldDescription">Sync title, overview, ratings, genres, tags, and provider IDs.</div>
+                                        <div class="fieldDescription">Sync core metadata: title, overview, ratings, dates, and provider IDs.</div>
+                                    </div>
+
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkMetadataSyncGenres" checked />
+                                            <span>Genres</span>
+                                        </label>
+                                        <div class="fieldDescription">Sync genre assignments from source to local items.</div>
+                                    </div>
+
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkMetadataSyncTags" checked />
+                                            <span>Tags</span>
+                                        </label>
+                                        <div class="fieldDescription">Sync user-defined tags from source to local items.</div>
+                                    </div>
+
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkMetadataSyncStudios" checked />
+                                            <span>Studios</span>
+                                        </label>
+                                        <div class="fieldDescription">Sync studio/production company assignments.</div>
+                                    </div>
+
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkMetadataSyncPeople" />
+                                            <span>People</span>
+                                        </label>
+                                        <div class="fieldDescription">Sync cast and crew information (actors, directors, writers). Can be resource-intensive.</div>
+                                    </div>
+
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkMetadataSyncSubtitles" checked />
+                                            <span>External Subtitles</span>
+                                        </label>
+                                        <div class="fieldDescription">Track external subtitle files by filename. Does not sync embedded subtitles.</div>
                                     </div>
 
                                     <div class="inputContainer">
@@ -424,7 +464,7 @@
                                             <input is="emby-checkbox" type="checkbox" id="chkMetadataSyncImages" checked />
                                             <span>Images</span>
                                         </label>
-                                        <div class="fieldDescription">Sync primary, backdrop, and other images.</div>
+                                        <div class="fieldDescription">Sync primary, backdrop, logo, and other images.</div>
                                     </div>
                                 </div>
                             </div>
