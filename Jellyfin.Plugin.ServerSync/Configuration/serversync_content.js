@@ -1195,7 +1195,7 @@ export default function (view, params) {
             var ids = this.table.getSelectedIds();
             if (ids.length === 0) return;
 
-            if (!confirm('Delete ' + ids.length + ' item(s) from the LOCAL server? This cannot be undone.\n\nNote: This only deletes from this local server, never from the source server.')) {
+            if (!confirm('Delete ' + ids.length + ' item(s) from the local server? This cannot be undone.')) {
                 return;
             }
 
@@ -1416,7 +1416,7 @@ export default function (view, params) {
             if (!this.currentModalItem) return;
 
             var fileName = ServerSyncShared.getFileName(this.currentModalItem.LocalPath || this.currentModalItem.SourcePath);
-            if (!confirm('Delete "' + fileName + '" from the LOCAL server? This cannot be undone.\n\nNote: This only deletes from this local server, never from the source server.')) {
+            if (!confirm('Delete "' + fileName + '" from the local server? This cannot be undone.')) {
                 return;
             }
 
