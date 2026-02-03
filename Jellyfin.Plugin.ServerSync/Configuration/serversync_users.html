@@ -363,11 +363,6 @@
             font-size: 0.8em;
             opacity: 0.5;
         }
-        .userSyncModal-userArrow {
-            font-size: 1.5em;
-            opacity: 0.5;
-            flex-shrink: 0;
-        }
 
         /* User Sync Modal Table Container - scrollable */
         .userSyncModal-tableContainer {
@@ -458,12 +453,6 @@
             color: var(--status-synced-color);
         }
 
-        /* Separator between stats and table */
-        .syncSectionSeparator {
-            border-bottom: 1px solid #555;
-            margin-bottom: 16px;
-        }
-
         /* Status cards */
         .statusCards {
             display: flex;
@@ -505,26 +494,6 @@
             background: var(--status-ignored-bg);
             color: var(--status-ignored-color);
         }
-        .statusCard-pending {
-            background: var(--status-pending-bg);
-            color: var(--status-pending-color);
-        }
-        .statusCard-pendingDownload {
-            background: var(--status-pending-download-bg);
-            color: var(--status-pending-download-color);
-        }
-        .statusCard-pendingReplacement {
-            background: var(--status-pending-replacement-bg);
-            color: var(--status-pending-replacement-color);
-        }
-        .statusCard-pendingDeletion {
-            background: var(--status-pending-deletion-bg);
-            color: var(--status-pending-deletion-color);
-        }
-        .statusCard-deleting {
-            background: var(--status-deleting-bg);
-            color: var(--status-deleting-color);
-        }
 
         /* Sync items list */
         .syncItem {
@@ -557,10 +526,6 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        .syncItemPath.notExists {
-            color: var(--status-pending-download-color);
-            font-style: italic;
-        }
         .syncItemError {
             font-size: 0.75em;
             color: var(--status-errored-color);
@@ -579,11 +544,6 @@
         .syncItemStatus.Queued { background: var(--status-queued-bg); color: var(--status-queued-color); }
         .syncItemStatus.Errored { background: var(--status-errored-bg); color: var(--status-errored-color); }
         .syncItemStatus.Ignored { background: var(--status-ignored-bg); color: var(--status-ignored-color); }
-        .syncItemStatus.Pending { background: var(--status-pending-bg); color: var(--status-pending-color); }
-        .syncItemStatus.Pending-Download { background: var(--status-pending-download-bg); color: var(--status-pending-download-color); }
-        .syncItemStatus.Pending-Replacement { background: var(--status-pending-replacement-bg); color: var(--status-pending-replacement-color); }
-        .syncItemStatus.Pending-Deletion { background: var(--status-pending-deletion-bg); color: var(--status-pending-deletion-color); }
-        .syncItemStatus.Deleting { background: var(--status-deleting-bg); color: var(--status-deleting-color); }
 
         /* Sync Action Button Row */
         .syncActionButtonRow {
@@ -661,114 +621,7 @@
             line-height: 1;
         }
 
-        /* ============================================
-           Item Detail Modal
-           ============================================ */
-
-        .itemModal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .itemModal-backdrop {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.75);
-            backdrop-filter: blur(4px);
-        }
-
-        .itemModal-container {
-            position: relative;
-            width: 100%;
-            max-width: 560px;
-            max-height: 90vh;
-            background: linear-gradient(145deg, #1e1e2e 0%, #181825 100%);
-            border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            animation: modalSlideIn 0.2s ease-out;
-        }
-
-        @keyframes modalSlideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-20px) scale(0.98);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-            }
-        }
-
-        /* Modal Header */
-        .itemModal-header {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            padding: 20px 24px 16px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        }
-
-        .itemModal-title {
-            margin: 0;
-            font-size: 1.25em;
-            font-weight: 600;
-            color: #fff;
-            line-height: 1.3;
-            word-break: break-word;
-            padding-right: 16px;
-        }
-
-        .itemModal-closeBtn {
-            flex-shrink: 0;
-            width: 32px;
-            height: 32px;
-            border: none;
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 8px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.15s ease;
-        }
-
-        .itemModal-closeBtn:hover {
-            background: rgba(255, 255, 255, 0.15);
-            transform: scale(1.05);
-        }
-
-        .itemModal-closeIcon {
-            font-size: 1.5em;
-            color: rgba(255, 255, 255, 0.7);
-            line-height: 1;
-        }
-
-        /* Modal Body */
-        .itemModal-body {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px 24px;
-        }
-
-        /* Status Badge */
-        .itemModal-statusRow {
-            margin-bottom: 16px;
-        }
-
+        /* Status Badge for User Sync Modal */
         .itemModal-statusBadge {
             display: inline-block;
             padding: 6px 14px;
@@ -803,218 +656,6 @@
             border: 1px solid var(--status-ignored-border);
         }
 
-        .itemModal-statusBadge.Pending {
-            background: var(--status-pending-bg);
-            color: var(--status-pending-color);
-            border: 1px solid var(--status-pending-border);
-        }
-
-        .itemModal-statusBadge.Pending-Download {
-            background: var(--status-pending-download-bg);
-            color: var(--status-pending-download-color);
-            border: 1px solid var(--status-pending-download-border);
-        }
-
-        .itemModal-statusBadge.Pending-Replacement {
-            background: var(--status-pending-replacement-bg);
-            color: var(--status-pending-replacement-color);
-            border: 1px solid var(--status-pending-replacement-border);
-        }
-
-        .itemModal-statusBadge.Pending-Deletion {
-            background: var(--status-pending-deletion-bg);
-            color: var(--status-pending-deletion-color);
-            border: 1px solid var(--status-pending-deletion-border);
-        }
-
-        .itemModal-statusBadge.Deleting {
-            background: var(--status-deleting-bg);
-            color: var(--status-deleting-color);
-            border: 1px solid var(--status-deleting-border);
-        }
-
-        /* Error Alert */
-        .itemModal-alert {
-            display: flex;
-            gap: 12px;
-            padding: 14px 16px;
-            border-radius: 10px;
-            margin-bottom: 16px;
-        }
-
-        .itemModal-alert-error {
-            background: var(--status-errored-bg);
-            border: 1px solid var(--status-errored-border);
-        }
-
-        .itemModal-alertIcon {
-            font-size: 1.2em;
-            color: var(--status-errored-color);
-            flex-shrink: 0;
-        }
-
-        .itemModal-alertContent {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .itemModal-alertTitle {
-            font-weight: 600;
-            font-size: 0.9em;
-            color: var(--status-errored-color);
-            margin-bottom: 4px;
-        }
-
-        .itemModal-alertMessage {
-            font-size: 0.85em;
-            color: rgba(255, 255, 255, 0.8);
-            word-break: break-word;
-        }
-
-        /* Info Grid */
-        .itemModal-infoGrid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 16px;
-            margin-bottom: 20px;
-            padding: 16px;
-            background: rgba(0, 0, 0, 0.25);
-            border-radius: 10px;
-        }
-
-        .itemModal-infoItem {
-            text-align: center;
-        }
-
-        .itemModal-infoLabel {
-            font-size: 0.75em;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: rgba(255, 255, 255, 0.5);
-            margin-bottom: 4px;
-        }
-
-        .itemModal-infoValue {
-            font-size: 1em;
-            font-weight: 500;
-            color: #fff;
-        }
-
-        /* Sections */
-        .itemModal-section {
-            margin-bottom: 16px;
-            padding: 16px;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        .itemModal-sectionTitle {
-            font-size: 0.75em;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: rgba(255, 255, 255, 0.5);
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        }
-
-        /* Paths */
-        .itemModal-pathItem {
-            margin-bottom: 12px;
-        }
-
-        .itemModal-pathItem:last-child {
-            margin-bottom: 0;
-        }
-
-        .itemModal-pathLabel {
-            font-size: 0.8em;
-            color: rgba(255, 255, 255, 0.6);
-            margin-bottom: 4px;
-        }
-
-        .itemModal-pathValue {
-            font-size: 0.9em;
-            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-            color: rgba(255, 255, 255, 0.9);
-            word-break: break-all;
-            background: rgba(0, 0, 0, 0.3);
-            padding: 8px 10px;
-            border-radius: 6px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        .itemModal-pathNote {
-            font-size: 0.8em;
-            color: var(--status-pending-download-color);
-            margin-top: 6px;
-            font-style: italic;
-        }
-
-        /* Companion Files */
-        .itemModal-companionList {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .itemModal-companionItem {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 12px;
-            background: rgba(0, 0, 0, 0.25);
-            border-radius: 6px;
-            font-size: 0.9em;
-        }
-
-        .itemModal-companionIcon {
-            color: rgba(255, 255, 255, 0.5);
-        }
-
-        .itemModal-companionName {
-            color: rgba(255, 255, 255, 0.85);
-            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-            font-size: 0.9em;
-        }
-
-        /* Modal Footer */
-        .itemModal-footer {
-            padding: 16px 24px 20px;
-            border-top: 1px solid rgba(255, 255, 255, 0.08);
-            background: rgba(0, 0, 0, 0.15);
-        }
-
-        .itemModal-actions {
-            display: flex;
-            gap: 10px;
-        }
-
-        .itemModal-btn {
-            flex: 1;
-            text-align: center;
-            justify-content: center;
-            padding: 10px 16px !important;
-            border-radius: 8px !important;
-            font-weight: 500;
-        }
-
-        .itemModal-deleteRow {
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid rgba(255, 255, 255, 0.08);
-        }
-
-        .itemModal-deleteBtn {
-            width: 100%;
-            text-align: center;
-            justify-content: center;
-            padding: 10px 16px !important;
-            border-radius: 8px !important;
-            font-weight: 500;
-        }
-
         /* Modal button layout */
         .modalButtonRow {
             display: flex;
@@ -1023,16 +664,6 @@
         }
         .modalButton {
             flex: 1;
-            text-align: center;
-            justify-content: center;
-        }
-        .modalDeleteRow {
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid rgba(255,255,255,0.1);
-        }
-        .modalDeleteButton {
-            width: 100%;
             text-align: center;
             justify-content: center;
         }
@@ -1215,11 +846,6 @@
         .pt-status-badge.Queued { background: var(--status-queued-bg); color: var(--status-queued-color); }
         .pt-status-badge.Errored { background: var(--status-errored-bg); color: var(--status-errored-color); }
         .pt-status-badge.Ignored { background: var(--status-ignored-bg); color: var(--status-ignored-color); }
-        .pt-status-badge.Pending { background: var(--status-pending-bg); color: var(--status-pending-color); }
-        .pt-status-badge.Pending-Download { background: var(--status-pending-download-bg); color: var(--status-pending-download-color); }
-        .pt-status-badge.Pending-Replacement { background: var(--status-pending-replacement-bg); color: var(--status-pending-replacement-color); }
-        .pt-status-badge.Pending-Deletion { background: var(--status-pending-deletion-bg); color: var(--status-pending-deletion-color); }
-        .pt-status-badge.Deleting { background: var(--status-deleting-bg); color: var(--status-deleting-color); }
 
         /* Empty state */
         .pt-empty {
@@ -1273,20 +899,6 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-        }
-
-        .pt-cell .syncItemPath.notExists {
-            color: var(--status-pending-download-color);
-            font-style: italic;
-        }
-
-        .pt-cell .syncItemError {
-            font-size: 0.75em;
-            color: var(--status-errored-color);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 200px;
         }
 
     </style>
