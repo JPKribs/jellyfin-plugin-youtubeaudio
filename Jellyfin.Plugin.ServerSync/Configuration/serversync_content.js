@@ -89,6 +89,21 @@ export default function (view, params) {
             return ApiClient.getPluginConfiguration(this.pluginId);
         },
 
+        // Local server name (fetched once)
+        localServerName: null,
+
+        // Fetch local server name from system info
+        fetchLocalServerName: function() {
+            var self = this;
+            return ApiClient.getPublicSystemInfo().then(function(info) {
+                self.localServerName = info.ServerName || 'Local';
+                return self.localServerName;
+            }).catch(function() {
+                self.localServerName = 'Local';
+                return self.localServerName;
+            });
+        },
+
         // Make API request to plugin endpoint
         apiRequest: function(endpoint, method, data) {
             var options = {
@@ -768,6 +783,7 @@ export default function (view, params) {
         table: null,
         currentModalItem: null,
         capabilities: null,
+        currentConfig: null,
         _initialized: false,
 
         // --------------------------------------------
@@ -1488,7 +1504,11 @@ export default function (view, params) {
             SyncTableModule.init();
             SyncTableModule.loadCapabilities();
 
+            // Fetch local server name
+            ServerSyncShared.fetchLocalServerName();
+
             ServerSyncShared.getConfig().then(function(config) {
+                SyncTableModule.currentConfig = config;
                 SyncTableModule.updatePendingFilterVisibility(config);
             });
 

@@ -110,6 +110,9 @@
                     <div id="userSyncModalError" class="errorMessage"></div>
                 </div>
 
+                <!-- Changes Summary Badges -->
+                <div id="userSyncModalChangesSummary" class="userSyncModal-changesSummary"></div>
+
                 <!-- User Mapping Section -->
                 <div class="userSyncModal-userSection">
                     <div class="userSyncModal-userBlock">
@@ -353,6 +356,34 @@
             font-size: 0.95em;
         }
 
+        /* ===== User Sync Modal - Changes Summary ===== */
+        .userSyncModal-changesSummary {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .userSyncModal-changesBadge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+        .userSyncModal-changesBadge.has-changes {
+            background: rgba(240, 173, 78, 0.2);
+            color: #f0ad4e;
+        }
+        .userSyncModal-changesBadge.no-changes {
+            background: rgba(92, 184, 92, 0.2);
+            color: #5cb85c;
+        }
+        .userSyncModal-changesBadge.disabled {
+            background: rgba(153, 153, 153, 0.2);
+            color: #999;
+        }
+
         /* ===== User Sync Modal - User Section ===== */
         .userSyncModal-userSection {
             display: flex;
@@ -466,9 +497,6 @@
         }
         .healthValue.warning {
             color: var(--status-queued-color);
-        }
-        .healthValue.error {
-            color: var(--status-errored-color);
         }
         .healthValue.success {
             color: var(--status-synced-color);

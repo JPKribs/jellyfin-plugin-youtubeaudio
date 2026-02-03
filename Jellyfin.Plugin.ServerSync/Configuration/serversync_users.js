@@ -1129,6 +1129,9 @@ export default function (view, params) {
                 view.querySelector('#userSyncModalSourceHeader').textContent = sourceServerName;
                 view.querySelector('#userSyncModalLocalHeader').textContent = localServerName;
 
+                // Build changes summary badges
+                self.buildChangesSummary(detail);
+
                 // Build comparison table
                 var tbody = view.querySelector('#userSyncModalTableBody');
                 tbody.innerHTML = '';
@@ -1312,6 +1315,43 @@ export default function (view, params) {
             row.appendChild(mergedCell);
 
             tbody.appendChild(row);
+        },
+
+        buildChangesSummary: function(detail) {
+            var container = view.querySelector('#userSyncModalChangesSummary');
+            var config = this.currentConfig || {};
+            var html = '';
+
+            // Get config settings for each section
+            var policyEnabled = config.SyncUserPolicy !== false;
+            var configurationEnabled = config.SyncUserConfiguration !== false;
+            var profileImageEnabled = config.SyncUserProfileImage !== false;
+
+            // Policy badge (only if enabled)
+            if (policyEnabled) {
+                var hasPolicyChanges = detail.PolicyItem && detail.PolicyItem.HasChanges === true;
+                html += '<span class="userSyncModal-changesBadge ' + (hasPolicyChanges ? 'has-changes' : 'no-changes') + '">';
+                html += 'Policy: ' + (hasPolicyChanges ? 'Changes' : 'Synced');
+                html += '</span>';
+            }
+
+            // Configuration badge (only if enabled)
+            if (configurationEnabled) {
+                var hasConfigChanges = detail.ConfigurationItem && detail.ConfigurationItem.HasChanges === true;
+                html += '<span class="userSyncModal-changesBadge ' + (hasConfigChanges ? 'has-changes' : 'no-changes') + '">';
+                html += 'Configuration: ' + (hasConfigChanges ? 'Changes' : 'Synced');
+                html += '</span>';
+            }
+
+            // Profile Image badge (only if enabled)
+            if (profileImageEnabled) {
+                var hasImageChanges = detail.ProfileImageItem && detail.ProfileImageItem.HasChanges === true;
+                html += '<span class="userSyncModal-changesBadge ' + (hasImageChanges ? 'has-changes' : 'no-changes') + '">';
+                html += 'Image: ' + (hasImageChanges ? 'Changes' : 'Synced');
+                html += '</span>';
+            }
+
+            container.innerHTML = html;
         },
 
         _formatValue: function(value) {
