@@ -171,7 +171,7 @@ public class HistorySyncTableService
 
                 try
                 {
-                    ProcessHistoryItem(
+                    var wasProcessed = ProcessHistoryItem(
                         database,
                         userMapping,
                         libraryMapping,
@@ -179,7 +179,11 @@ public class HistorySyncTableService
                         localUser,
                         existingItems);
 
-                    processedItems++;
+                    if (wasProcessed)
+                    {
+                        processedItems++;
+                    }
+
                     onItemProcessed?.Invoke();
                 }
                 catch (Exception ex)
@@ -207,7 +211,8 @@ public class HistorySyncTableService
     /// <summary>
     /// Processes a single history item from the source server.
     /// </summary>
-    private void ProcessHistoryItem(
+    /// <returns>True if the item was processed, false if skipped (no local equivalent).</returns>
+    private bool ProcessHistoryItem(
         SyncDatabase database,
         UserMapping userMapping,
         LibraryMapping libraryMapping,
@@ -223,23 +228,33 @@ public class HistorySyncTableService
 
         // Try to find the local item
         var localItem = _libraryManager.FindByPath(localPath, isFolder: false);
-        string? localItemId = localItem?.Id.ToString("N", CultureInfo.InvariantCulture);
 
-        // Get local user data if item exists
-        UserItemData? localUserData = null;
-        if (localItem != null)
+        // Skip items that don't have a local equivalent - only sync history for items that exist locally
+        if (localItem == null)
         {
-            localUserData = _userDataManager.GetUserData(localUser, localItem);
+            // If there was an existing history item for this source item, remove it since the local file no longer exists
+            var existingItem = existingItems.GetValueOrDefault(sourceItemId);
+            if (existingItem != null)
+            {
+                database.DeleteHistoryItem(existingItem.Id);
+            }
+
+            return false;
         }
 
-        // Check if we have an existing history item
-        var existingItem = existingItems.GetValueOrDefault(sourceItemId);
+        string localItemId = localItem.Id.ToString("N", CultureInfo.InvariantCulture);
 
-        if (existingItem != null)
+        // Get local user data
+        var localUserData = _userDataManager.GetUserData(localUser, localItem);
+
+        // Check if we have an existing history item
+        var existing = existingItems.GetValueOrDefault(sourceItemId);
+
+        if (existing != null)
         {
             // Update existing item
-            UpdateHistoryItem(existingItem, sourceItem, localItem, localUserData, localPath, localItemId);
-            database.UpsertHistoryItem(existingItem);
+            UpdateHistoryItem(existing, sourceItem, localItem, localUserData, localPath, localItemId);
+            database.UpsertHistoryItem(existing);
         }
         else
         {
@@ -256,6 +271,8 @@ public class HistorySyncTableService
 
             database.UpsertHistoryItem(newItem);
         }
+
+        return true;
     }
 
     /// <summary>
@@ -268,7 +285,7 @@ public class HistorySyncTableService
         string sourceItemId,
         string sourcePath,
         string localPath,
-        string? localItemId,
+        string localItemId,
         UserItemData? localUserData)
     {
         var item = new HistorySyncItem
@@ -293,7 +310,7 @@ public class HistorySyncTableService
             SourceLastPlayedDate = sourceItem.UserData?.LastPlayedDate?.UtcDateTime,
             SourceIsFavorite = sourceItem.UserData?.IsFavorite,
 
-            // Local history state
+            // Local history state (may be null if user never interacted with item)
             LocalIsPlayed = localUserData?.Played,
             LocalPlayCount = localUserData?.PlayCount,
             LocalPlaybackPositionTicks = localUserData?.PlaybackPositionTicks,
@@ -309,12 +326,7 @@ public class HistorySyncTableService
         HistorySyncMergeService.MergeHistoryData(item);
 
         // Determine initial status based on whether there are changes
-        if (string.IsNullOrEmpty(localItemId))
-        {
-            // Local item not found - can't sync yet, keep queued until content syncs
-            item.Status = BaseSyncStatus.Queued;
-        }
-        else if (HistorySyncMergeService.HasChangesToSync(item))
+        if (HistorySyncMergeService.HasChangesToSync(item))
         {
             // Has changes - queue for sync (no approval needed for history)
             item.Status = BaseSyncStatus.Queued;
@@ -335,10 +347,10 @@ public class HistorySyncTableService
     private void UpdateHistoryItem(
         HistorySyncItem item,
         BaseItemDto sourceItem,
-        BaseItem? localItem,
+        BaseItem localItem,
         UserItemData? localUserData,
         string localPath,
-        string? localItemId)
+        string localItemId)
     {
         // Update identification
         item.LocalItemId = localItemId;
@@ -352,7 +364,7 @@ public class HistorySyncTableService
         item.SourceLastPlayedDate = sourceItem.UserData?.LastPlayedDate?.UtcDateTime;
         item.SourceIsFavorite = sourceItem.UserData?.IsFavorite;
 
-        // Update local state
+        // Update local state (may be null if user never interacted with item)
         item.LocalIsPlayed = localUserData?.Played;
         item.LocalPlayCount = localUserData?.PlayCount;
         item.LocalPlaybackPositionTicks = localUserData?.PlaybackPositionTicks;
@@ -374,7 +386,7 @@ public class HistorySyncTableService
             item.Status = BaseSyncStatus.Queued;
             item.StatusDate = DateTime.UtcNow;
         }
-        else if (item.Status == BaseSyncStatus.Queued && !HistorySyncMergeService.HasChangesToSync(item) && !string.IsNullOrEmpty(localItemId))
+        else if (item.Status == BaseSyncStatus.Queued && !HistorySyncMergeService.HasChangesToSync(item))
         {
             // Previously queued but now in sync
             item.Status = BaseSyncStatus.Synced;

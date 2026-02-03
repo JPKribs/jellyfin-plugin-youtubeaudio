@@ -1665,6 +1665,25 @@ public class SyncDatabase : IDisposable
     }
 
     /// <summary>
+    /// Deletes a history sync item by its database ID.
+    /// </summary>
+    /// <param name="id">Database ID of the item to delete.</param>
+    /// <returns>True if an item was deleted, false otherwise.</returns>
+    public bool DeleteHistoryItem(long id)
+    {
+        lock (_writeLock)
+        {
+            EnsureConnection();
+
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "DELETE FROM HistorySyncItems WHERE Id = @id";
+            command.Parameters.AddWithValue("@id", id);
+
+            return command.ExecuteNonQuery() > 0;
+        }
+    }
+
+    /// <summary>
     /// Batch updates status for multiple history sync items by their database IDs.
     /// </summary>
     /// <param name="ids">List of database IDs.</param>

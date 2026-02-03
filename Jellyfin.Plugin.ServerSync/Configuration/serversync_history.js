@@ -101,18 +101,6 @@ export default function (view, params) {
             });
         },
 
-        // Set element visibility
-        setVisible: function(elementOrId, visible) {
-            var el = typeof elementOrId === 'string' ? view.querySelector('#' + elementOrId) : elementOrId;
-            if (el) {
-                if (visible) {
-                    el.classList.remove('hidden');
-                } else {
-                    el.classList.add('hidden');
-                }
-            }
-        },
-
         // Safe event binding - binds event only if element exists (uses view.querySelector)
         bindEvent: function(id, event, handler, moduleName) {
             var el = view.querySelector('#' + id);
@@ -876,11 +864,11 @@ export default function (view, params) {
                             if (item.MergedIsPlayed !== item.LocalIsPlayed) {
                                 details.push('Played: ' + (item.MergedIsPlayed ? 'Yes' : 'No'));
                             }
-                            if (item.MergedPlayCount !== item.LocalPlayCount) {
-                                details.push('Count: ' + (item.MergedPlayCount || 0));
-                            }
                             if (item.MergedIsFavorite !== item.LocalIsFavorite) {
                                 details.push('Favorite: ' + (item.MergedIsFavorite ? 'Yes' : 'No'));
+                            }
+                            if (item.MergedPlayCount !== item.LocalPlayCount) {
+                                details.push('Count: ' + (item.MergedPlayCount || 0));
                             }
 
                             return ServerSyncShared.escapeHtml(details.join(', ') || 'Changes pending');
@@ -986,14 +974,7 @@ export default function (view, params) {
         },
 
         loadHealthStats: function() {
-            var self = this;
-            return Promise.all([
-                ServerSyncShared.getConfig(),
-                ServerSyncShared.apiRequest('HistoryStatus', 'GET')
-            ]).then(function(results) {
-                var config = results[0];
-                var status = results[1];
-
+            return ServerSyncShared.getConfig().then(function(config) {
                 // Last history sync time
                 var lastSyncEl = view.querySelector('#historyHealthLastSync');
                 if (config.LastHistorySyncTime) {
@@ -1016,12 +997,6 @@ export default function (view, params) {
                 var libraryMappings = config.LibraryMappings || [];
                 libraryCountEl.textContent = libraryMappings.length;
                 libraryCountEl.className = libraryMappings.length > 0 ? 'healthValue success' : 'healthValue warning';
-
-                // Pending count from status
-                var pendingCountEl = view.querySelector('#historyHealthPendingCount');
-                var pending = (status.Pending || 0) + (status.Queued || 0);
-                pendingCountEl.textContent = pending;
-                pendingCountEl.className = pending > 0 ? 'healthValue warning' : 'healthValue';
             }).catch(function() {
                 // Ignore errors
             });
@@ -1153,6 +1128,19 @@ export default function (view, params) {
             statusBadge.textContent = item.Status;
             statusBadge.className = 'itemModal-statusBadge ' + item.Status;
 
+            // Server mapping on same line as status
+            var sourceServerName = (self.currentConfig && self.currentConfig.SourceServerName) || 'Source';
+            var localServerName = ServerSyncShared.localServerName || 'Local';
+            view.querySelector('#historyModalServerMapping').textContent = sourceServerName + ' → ' + localServerName;
+
+            // Last sync in info grid
+            if (item.LastSyncTime) {
+                view.querySelector('#historyModalLastSync').textContent =
+                    ServerSyncShared.formatRelativeTime(new Date(item.LastSyncTime));
+            } else {
+                view.querySelector('#historyModalLastSync').textContent = '-';
+            }
+
             // Error section
             var errorSection = view.querySelector('#historyModalErrorSection');
             if (item.Status === 'Errored' && item.ErrorMessage) {
@@ -1162,21 +1150,17 @@ export default function (view, params) {
                 errorSection.classList.add('hidden');
             }
 
-            // User info - look up names from user mappings
+            // User info - separate display for name and GUID
             var userMapping = self.findUserMapping(item.SourceUserId, item.LocalUserId);
-            var sourceUserDisplay = self.formatUserDisplay(
-                userMapping ? userMapping.SourceUserName : null,
-                item.SourceUserId
-            );
-            var localUserDisplay = self.formatUserDisplay(
-                userMapping ? userMapping.LocalUserName : null,
-                item.LocalUserId
-            );
-            view.querySelector('#historyModalUser').innerHTML = sourceUserDisplay + ' -> ' + localUserDisplay;
+            var sourceUserName = userMapping ? userMapping.SourceUserName : 'Unknown';
+            var localUserName = userMapping ? userMapping.LocalUserName : 'Unknown';
 
-            // Set server names in table headers (no GUIDs in table headers)
-            var sourceServerName = (self.currentConfig && self.currentConfig.SourceServerName) || 'Source';
-            var localServerName = ServerSyncShared.localServerName || 'Local';
+            view.querySelector('#historyModalSourceUserName').textContent = sourceUserName;
+            view.querySelector('#historyModalSourceUserId').textContent = item.SourceUserId || '';
+            view.querySelector('#historyModalLocalUserName').textContent = localUserName;
+            view.querySelector('#historyModalLocalUserId').textContent = item.LocalUserId || '';
+
+            // Set server names in table headers
             view.querySelector('#historyModalSourceHeader').textContent = sourceServerName;
             view.querySelector('#historyModalLocalHeader').textContent = localServerName;
 
@@ -1201,16 +1185,6 @@ export default function (view, params) {
             self.setTableValue('historyModalMergedLastPlayed', item.MergedLastPlayedDate, 'date');
             self.setTableValue('historyModalMergedFavorite', item.MergedIsFavorite, 'favorite');
 
-            // Last sync
-            var lastSyncSection = view.querySelector('#historyModalLastSyncSection');
-            if (item.LastSyncTime) {
-                view.querySelector('#historyModalLastSync').textContent =
-                    ServerSyncShared.formatRelativeTime(new Date(item.LastSyncTime));
-                lastSyncSection.classList.remove('hidden');
-            } else {
-                lastSyncSection.classList.add('hidden');
-            }
-
             view.querySelector('#historyItemDetailModal').classList.remove('hidden');
         },
 
@@ -1219,25 +1193,14 @@ export default function (view, params) {
             if (!el) return;
 
             var text = '-';
-            var cssClass = '';
 
             switch (type) {
                 case 'bool':
-                    if (value === true) {
-                        text = 'Yes';
-                        cssClass = 'value-yes';
-                    } else if (value === false) {
-                        text = 'No';
-                        cssClass = 'value-no';
-                    }
-                    break;
                 case 'favorite':
                     if (value === true) {
                         text = 'Yes';
-                        cssClass = 'value-favorite';
                     } else if (value === false) {
                         text = 'No';
-                        cssClass = 'value-no';
                     }
                     break;
                 case 'number':
@@ -1252,11 +1215,6 @@ export default function (view, params) {
             }
 
             el.textContent = text;
-            // Keep the base classes and add value-specific class
-            var baseClasses = el.className.split(' ').filter(function(c) {
-                return c.indexOf('value-') !== 0;
-            }).join(' ');
-            el.className = baseClasses + (cssClass ? ' ' + cssClass : '');
         },
 
         formatPosition: function(ticks) {
@@ -1290,22 +1248,12 @@ export default function (view, params) {
             });
         },
 
-        formatUserDisplay: function(userName, userId) {
-            // Modal shows: username (GUID)
-            if (userName && userId) {
-                return ServerSyncShared.escapeHtml(userName) +
-                    ' <span class="historyModalUserGuid">(' + ServerSyncShared.escapeHtml(userId) + ')</span>';
-            }
-            if (userName) {
-                return ServerSyncShared.escapeHtml(userName);
-            }
-            // Fallback to GUID only if no username available
-            return '<span class="historyModalUserGuid">' + ServerSyncShared.escapeHtml(userId || 'Unknown') + '</span>';
-        },
-
         closeModal: function() {
             view.querySelector('#historyItemDetailModal').classList.add('hidden');
             this.currentModalItem = null;
+            // Refresh table data and status when modal closes
+            this.table.refresh();
+            this.loadHistoryStatus();
         },
 
         modalIgnore: function() {
@@ -1341,22 +1289,8 @@ export default function (view, params) {
         currentConfig: null,
 
         init: function() {
-            var self = this;
-
-            // Collapsible sections
-            view.querySelectorAll('.collapsibleHeader').forEach(function(header) {
-                header.addEventListener('click', function() {
-                    var targetId = this.dataset.target;
-                    var content = view.querySelector('#' + targetId);
-                    if (content) {
-                        this.classList.toggle('collapsed');
-                        content.classList.toggle('collapsed');
-                    }
-                });
-            });
-
             // Load config and initialize modules
-            self.loadConfig();
+            this.loadConfig();
         },
 
         loadConfig: function() {
