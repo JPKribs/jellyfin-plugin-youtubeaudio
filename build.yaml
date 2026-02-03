@@ -32,7 +32,9 @@ changelog:
   - Semantic JSON comparison for detecting policy and configuration changes
   - User mappings configuration to link source users to local users
   - Individual toggles for syncing Policy, Configuration, and Profile Image
+  - Metadata syncing
   improvements:
+  - Complete web rework to utilize exisitng tabs and split out the configPage into multiple files
   - Web cleanup & centralization of shared components
   - Reorganize web files
   - Consolidated duplicate FormatBytes and ComputeHash utilities
