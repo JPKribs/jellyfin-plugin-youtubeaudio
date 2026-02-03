@@ -1,6 +1,10 @@
-// Server Sync Plugin - Settings Page Controller
-// This file uses the Jellyfin multi-page plugin pattern
+// ============================================
+// SETTINGS - PAGE CONTROLLER
+// ============================================
 
+// ============================================
+// TAB NAVIGATION
+// ============================================
 function getTabs() {
     return [
         { href: 'configurationpage?name=serversync_settings', name: 'Settings' },
@@ -14,10 +18,22 @@ function getTabs() {
 export default function (view, params) {
     'use strict';
 
+    // ============================================
+    // CONSTANTS & STATE
+    // ============================================
     var pluginId = 'ebd650b5-6f4c-4ccb-b10d-23dffb3a7286';
     var _initialized = false;
 
-    // Shared utilities
+    var currentConfig = null;
+    var sourceLibraries = [];
+    var localLibraries = [];
+    var sourceUsers = [];
+    var localUsers = [];
+
+    // ============================================
+    // UTILITY FUNCTIONS
+    // ============================================
+
     function escapeHtml(str) {
         if (!str) return '';
         return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -58,14 +74,9 @@ export default function (view, params) {
         return el;
     }
 
-    // Current config state
-    var currentConfig = null;
-    var sourceLibraries = [];
-    var localLibraries = [];
-    var sourceUsers = [];
-    var localUsers = [];
-
-    // ==================== SERVER MODULE ====================
+    // ============================================
+    // SERVER MODULE
+    // ============================================
 
     function loadServerConfig(config) {
         var urlEl = view.querySelector('#txtSourceServerUrl');
@@ -110,7 +121,6 @@ export default function (view, params) {
                     currentConfig.SourceServerId = response.ServerId;
                 }
 
-                // Fetch libraries and users
                 fetchSourceLibraries(url, apiKey);
                 fetchSourceUsers(url, apiKey);
                 showMappingSections();
@@ -136,7 +146,9 @@ export default function (view, params) {
         });
     }
 
-    // ==================== LIBRARY MAPPINGS ====================
+    // ============================================
+    // LIBRARY MAPPINGS MODULE
+    // ============================================
 
     function fetchSourceLibraries(serverUrl, apiKey) {
         return apiRequest('GetSourceLibraries', 'POST', { ServerUrl: serverUrl, ApiKey: apiKey }).then(function(libraries) {
@@ -294,7 +306,9 @@ export default function (view, params) {
         });
     }
 
-    // ==================== USER MAPPINGS ====================
+    // ============================================
+    // USER MAPPINGS MODULE
+    // ============================================
 
     function fetchSourceUsers(serverUrl, apiKey) {
         return apiRequest('GetSourceUsers', 'POST', { ServerUrl: serverUrl, ApiKey: apiKey }).then(function(users) {
@@ -424,7 +438,11 @@ export default function (view, params) {
         });
     }
 
-    // ==================== SYNC SETTINGS ====================
+    // ============================================
+    // SYNC SETTINGS MODULE
+    // ============================================
+
+    // --- Content Settings ---
 
     function loadContentSettings(config) {
         view.querySelector('#chkEnableContentSync').checked = config.EnableContentSync || false;
@@ -450,34 +468,6 @@ export default function (view, params) {
         view.querySelector('#selScheduledDownloadSpeedUnit').value = config.ScheduledDownloadSpeedUnit || 'MB';
 
         updateNestedVisibility();
-    }
-
-    function loadHistorySettings(config) {
-        view.querySelector('#chkEnableHistorySync').checked = config.EnableHistorySync || false;
-        view.querySelector('#chkHistorySyncPlayedStatus').checked = config.SyncPlayedStatus !== false;
-        view.querySelector('#chkHistorySyncPlaybackPosition').checked = config.SyncPlaybackPosition !== false;
-        view.querySelector('#chkHistorySyncPlayCount').checked = config.SyncPlayCount !== false;
-        view.querySelector('#chkHistorySyncLastPlayedDate').checked = config.SyncLastPlayedDate !== false;
-        view.querySelector('#chkHistorySyncFavorites').checked = config.SyncFavorites !== false;
-    }
-
-    function loadMetadataSettings(config) {
-        view.querySelector('#chkEnableMetadataSync').checked = config.EnableMetadataSync || false;
-        view.querySelector('#chkMetadataSyncMetadata').checked = config.SyncMetadata !== false;
-        view.querySelector('#chkMetadataSyncImages').checked = config.SyncImages !== false;
-    }
-
-    function loadUserSyncSettings(config) {
-        view.querySelector('#chkEnableUserSync').checked = config.EnableUserSync || false;
-        view.querySelector('#chkUserSyncPolicy').checked = config.SyncUserPolicy !== false;
-        view.querySelector('#chkUserSyncConfiguration').checked = config.SyncUserConfiguration !== false;
-        view.querySelector('#chkUserSyncProfileImage').checked = config.SyncUserProfileImage !== false;
-    }
-
-    function updateNestedVisibility() {
-        setVisible('detectUpdatedFilesSettings', view.querySelector('#chkDetectUpdatedFiles').checked);
-        setVisible('recyclingBinSettings', view.querySelector('#chkEnableRecyclingBin').checked);
-        setVisible('bandwidthScheduleContainer', view.querySelector('#chkEnableBandwidthScheduling').checked);
     }
 
     function saveContentSettings() {
@@ -511,6 +501,17 @@ export default function (view, params) {
         });
     }
 
+    // --- History Settings ---
+
+    function loadHistorySettings(config) {
+        view.querySelector('#chkEnableHistorySync').checked = config.EnableHistorySync || false;
+        view.querySelector('#chkHistorySyncPlayedStatus').checked = config.SyncPlayedStatus !== false;
+        view.querySelector('#chkHistorySyncPlaybackPosition').checked = config.SyncPlaybackPosition !== false;
+        view.querySelector('#chkHistorySyncPlayCount').checked = config.SyncPlayCount !== false;
+        view.querySelector('#chkHistorySyncLastPlayedDate').checked = config.SyncLastPlayedDate !== false;
+        view.querySelector('#chkHistorySyncFavorites').checked = config.SyncFavorites !== false;
+    }
+
     function saveHistorySettings() {
         var config = currentConfig || {};
         config.EnableHistorySync = view.querySelector('#chkEnableHistorySync').checked;
@@ -527,6 +528,14 @@ export default function (view, params) {
         });
     }
 
+    // --- Metadata Settings ---
+
+    function loadMetadataSettings(config) {
+        view.querySelector('#chkEnableMetadataSync').checked = config.EnableMetadataSync || false;
+        view.querySelector('#chkMetadataSyncMetadata').checked = config.SyncMetadata !== false;
+        view.querySelector('#chkMetadataSyncImages').checked = config.SyncImages !== false;
+    }
+
     function saveMetadataSettings() {
         var config = currentConfig || {};
         config.EnableMetadataSync = view.querySelector('#chkEnableMetadataSync').checked;
@@ -538,6 +547,15 @@ export default function (view, params) {
         }).catch(function() {
             Dashboard.alert('Failed to save metadata settings');
         });
+    }
+
+    // --- User Sync Settings ---
+
+    function loadUserSyncSettings(config) {
+        view.querySelector('#chkEnableUserSync').checked = config.EnableUserSync || false;
+        view.querySelector('#chkUserSyncPolicy').checked = config.SyncUserPolicy !== false;
+        view.querySelector('#chkUserSyncConfiguration').checked = config.SyncUserConfiguration !== false;
+        view.querySelector('#chkUserSyncProfileImage').checked = config.SyncUserProfileImage !== false;
     }
 
     function saveUserSyncSettings() {
@@ -554,7 +572,17 @@ export default function (view, params) {
         });
     }
 
-    // ==================== PAGE INITIALIZATION ====================
+    // --- Nested Visibility ---
+
+    function updateNestedVisibility() {
+        setVisible('detectUpdatedFilesSettings', view.querySelector('#chkDetectUpdatedFiles').checked);
+        setVisible('recyclingBinSettings', view.querySelector('#chkEnableRecyclingBin').checked);
+        setVisible('bandwidthScheduleContainer', view.querySelector('#chkEnableBandwidthScheduling').checked);
+    }
+
+    // ============================================
+    // PAGE INITIALIZATION
+    // ============================================
 
     function showMappingSections() {
         setVisible('librariesSection', true);
@@ -587,21 +615,16 @@ export default function (view, params) {
         ApiClient.getPluginConfiguration(pluginId).then(function(config) {
             currentConfig = config;
 
-            // Load server config
             loadServerConfig(config);
-
-            // Load sync settings
             loadContentSettings(config);
             loadHistorySettings(config);
             loadMetadataSettings(config);
             loadUserSyncSettings(config);
 
-            // Show mapping sections if server is configured
             if (config.SourceServerUrl && config.SourceServerApiKey) {
                 showMappingSections();
             }
 
-            // Fetch libraries and users
             var promises = [fetchLocalLibraries(), fetchLocalUsers()];
             if (config.SourceServerUrl && config.SourceServerApiKey) {
                 promises.push(fetchSourceLibraries(config.SourceServerUrl, config.SourceServerApiKey));
@@ -615,35 +638,39 @@ export default function (view, params) {
         });
     }
 
-    // Initialize on viewshow
+    // ============================================
+    // EVENT LISTENERS
+    // ============================================
+
     view.addEventListener('viewshow', function () {
         console.log('ServerSync Settings: viewshow');
         LibraryMenu.setTabs('serversync', 0, getTabs);
 
-        // Only bind event handlers once to prevent double-firing
         if (!_initialized) {
             _initialized = true;
 
-            // Collapsibles
             initCollapsibles();
-
-            // Nested visibility handlers
             initNestedVisibilityHandlers();
 
-            // Button handlers
+            // Server actions
             bindClick('btnTestConnection', testConnection);
             bindClick('btnSaveServer', saveServerConfig);
+
+            // Library mapping actions
             bindClick('btnAddMapping', function() { addLibraryMappingRow(); });
             bindClick('btnSaveLibraries', saveLibraries);
+
+            // User mapping actions
             bindClick('btnAddUserMapping', function() { addUserMappingRow(); });
             bindClick('btnSaveUsers', saveUsers);
+
+            // Sync settings actions
             bindClick('btnSaveContentSettings', saveContentSettings);
             bindClick('btnSaveHistorySettings', saveHistorySettings);
             bindClick('btnSaveMetadataSettings', saveMetadataSettings);
             bindClick('btnSaveUserSyncSettings', saveUserSyncSettings);
         }
 
-        // Load config (always reload on viewshow to get fresh data)
         loadConfig();
     });
 }

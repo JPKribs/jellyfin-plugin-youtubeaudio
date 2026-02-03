@@ -1,3 +1,5 @@
+<!-- SETTINGS - PAGE -->
+
 <div id="ServerSyncSettingsPage" data-role="page" class="page type-interior pluginConfigurationPage withTabs"
      data-require="emby-input,emby-button,emby-select,emby-checkbox"
      data-controller="__plugin/serversync_settings.js">
@@ -6,29 +8,36 @@
             <form id="ServerSyncSettingsForm">
                 <div class="verticalSection verticalSection-extrabottompadding">
 
+                    <!-- SECTION: Configuration Header -->
+
                     <div class="sectionTitleContainer flex align-items-center">
                         <h1 class="sectionTitle">Configuration</h1>
                     </div>
 
-                    <!-- Server Subsection (collapsible) -->
+                    <!-- COLLAPSIBLE SECTION: Server Configuration -->
+
                     <div class="collapsibleSection">
                         <button type="button" class="collapsibleHeader collapsed" data-target="serverConfigContent">
                             <span class="collapsibleTitle">Server</span>
                             <span class="collapsibleIcon">&#9660;</span>
                         </button>
                         <div id="serverConfigContent" class="collapsibleContent collapsed">
+
+                            <!-- Server URL Input -->
                             <div class="inputContainer">
                                 <label for="txtSourceServerUrl">Server URL:</label>
                                 <input is="emby-input" type="text" id="txtSourceServerUrl" placeholder="http://server:8096" />
                                 <div class="fieldDescription">URL of the source Jellyfin server to sync from.</div>
                             </div>
 
+                            <!-- API Key Input -->
                             <div class="inputContainer">
                                 <label for="txtSourceServerApiKey">API Key:</label>
                                 <input is="emby-input" type="password" id="txtSourceServerApiKey" />
                                 <div class="fieldDescription">Generate one in the source server's Dashboard &gt; API Keys.</div>
                             </div>
 
+                            <!-- Server Info Display -->
                             <div id="serverInfoContainer" class="server-info-box hidden">
                                 <div class="flex gap-lg">
                                     <div>
@@ -39,6 +48,7 @@
                                 </div>
                             </div>
 
+                            <!-- Server Actions -->
                             <div class="collapsibleActions">
                                 <button is="emby-button" type="button" id="btnSaveServer" class="raised button-submit">
                                     <span>Save</span>
@@ -51,7 +61,8 @@
                         </div>
                     </div>
 
-                    <!-- Libraries Subsection (collapsible) -->
+                    <!-- COLLAPSIBLE SECTION: Library Mappings -->
+
                     <div class="collapsibleSection hidden" id="librariesSection">
                         <button type="button" class="collapsibleHeader collapsed" data-target="librariesConfigContent">
                             <span class="collapsibleTitle">Libraries</span>
@@ -60,6 +71,7 @@
                         <div id="librariesConfigContent" class="collapsibleContent collapsed">
                             <div class="fieldDescription mb-md">Map source libraries to local libraries. Used for content sync and watch history sync.</div>
 
+                            <!-- Library Mappings Container (dynamically populated) -->
                             <div id="libraryMappingsContainer"></div>
 
                             <button is="emby-button" type="button" id="btnAddMapping" class="raised button-secondary mt-sm">
@@ -74,7 +86,8 @@
                         </div>
                     </div>
 
-                    <!-- Users Subsection (collapsible) -->
+                    <!-- COLLAPSIBLE SECTION: User Mappings -->
+
                     <div class="collapsibleSection hidden" id="usersSection">
                         <button type="button" class="collapsibleHeader collapsed" data-target="usersConfigContent">
                             <span class="collapsibleTitle">Users</span>
@@ -83,6 +96,7 @@
                         <div id="usersConfigContent" class="collapsibleContent collapsed">
                             <div class="fieldDescription mb-md">Map source users to local users. Used for watch history sync.</div>
 
+                            <!-- User Mappings Container (dynamically populated) -->
                             <div id="userMappingsContainer"></div>
 
                             <button is="emby-button" type="button" id="btnAddUserMapping" class="raised button-secondary mt-sm">
@@ -97,17 +111,22 @@
                         </div>
                     </div>
 
+                    <!-- SECTION: Sync Settings Header -->
+
                     <div class="sectionTitleContainer flex align-items-center">
                         <h1 class="sectionTitle">Sync Settings</h1>
                     </div>
 
-                    <!-- Content Sync Settings (collapsible) -->
+                    <!-- COLLAPSIBLE SECTION: Content Sync Settings -->
+
                     <div class="collapsibleSection">
                         <button type="button" class="collapsibleHeader collapsed" data-target="contentSyncSettingsContent">
                             <span class="collapsibleTitle">Content</span>
                             <span class="collapsibleIcon">&#9660;</span>
                         </button>
                         <div id="contentSyncSettingsContent" class="collapsibleContent collapsed">
+
+                            <!-- Enable Content Sync -->
                             <div class="settingsGroup">
                                 <div class="inputContainer">
                                     <label class="checkboxContainer">
@@ -119,7 +138,8 @@
                             </div>
 
                             <div id="contentSyncOptions">
-                                <!-- Sync Parameters -->
+
+                                <!-- Sync Parameters Subsection -->
                                 <h3 class="subsectionHeader">Sync Parameters</h3>
                                 <div class="settingsGroup">
                                     <div class="inputContainer">
@@ -151,7 +171,7 @@
                                     </div>
                                 </div>
 
-                                <!-- Approval Preferences -->
+                                <!-- Approval Preferences Subsection -->
                                 <h3 class="subsectionHeader">Approval Preferences</h3>
                                 <div class="settingsGroup">
                                     <div class="inputContainer">
@@ -207,7 +227,7 @@
                                     </div>
                                 </div>
 
-                                <!-- Download Preferences -->
+                                <!-- Download Preferences Subsection -->
                                 <h3 class="subsectionHeader">Download Preferences</h3>
                                 <div class="settingsGroup">
                                     <div class="inputContainer">
@@ -292,13 +312,16 @@
                         </div>
                     </div>
 
-                    <!-- History Sync Settings (collapsible) -->
+                    <!-- COLLAPSIBLE SECTION: History Sync Settings -->
+
                     <div class="collapsibleSection">
                         <button type="button" class="collapsibleHeader collapsed" data-target="historySyncSettingsContent">
                             <span class="collapsibleTitle">History</span>
                             <span class="collapsibleIcon">&#9660;</span>
                         </button>
                         <div id="historySyncSettingsContent" class="collapsibleContent collapsed">
+
+                            <!-- Enable History Sync -->
                             <div class="settingsGroup">
                                 <div class="inputContainer">
                                     <label class="checkboxContainer">
@@ -310,6 +333,8 @@
                             </div>
 
                             <div id="historySyncOptions">
+
+                                <!-- Sync Parameters Subsection -->
                                 <h3 class="subsectionHeader">Sync Parameters</h3>
                                 <div class="settingsGroup">
                                     <div class="inputContainer">
@@ -362,13 +387,15 @@
                         </div>
                     </div>
 
-                    <!-- Metadata Sync Settings (collapsible) -->
+                    <!-- COLLAPSIBLE SECTION: Metadata Sync Settings -->
+
                     <div class="collapsibleSection">
                         <button type="button" class="collapsibleHeader collapsed" data-target="metadataSyncSettingsContent">
                             <span class="collapsibleTitle">Metadata</span>
                             <span class="collapsibleIcon">&#9660;</span>
                         </button>
                         <div id="metadataSyncSettingsContent" class="collapsibleContent collapsed">
+                            <!-- Enable Metadata Sync -->
                             <div class="settingsGroup">
                                 <div class="inputContainer">
                                     <label class="checkboxContainer">
@@ -380,6 +407,8 @@
                             </div>
 
                             <div id="metadataSyncOptions">
+
+                                <!-- Sync Parameters Subsection -->
                                 <h3 class="subsectionHeader">Sync Parameters</h3>
                                 <div class="settingsGroup">
                                     <div class="inputContainer">
@@ -408,13 +437,15 @@
                         </div>
                     </div>
 
-                    <!-- User Sync Settings (collapsible) -->
+                    <!-- COLLAPSIBLE SECTION: User Sync Settings -->
                     <div class="collapsibleSection">
                         <button type="button" class="collapsibleHeader collapsed" data-target="userSyncSettingsContent">
                             <span class="collapsibleTitle">Users</span>
                             <span class="collapsibleIcon">&#9660;</span>
                         </button>
                         <div id="userSyncSettingsContent" class="collapsibleContent collapsed">
+
+                            <!-- Enable User Sync -->
                             <div class="settingsGroup">
                                 <div class="inputContainer">
                                     <label class="checkboxContainer">
@@ -426,6 +457,8 @@
                             </div>
 
                             <div id="userSyncOptions">
+
+                                <!-- Sync Parameters Subsection -->
                                 <h3 class="subsectionHeader">Sync Parameters</h3>
                                 <div class="settingsGroup">
                                     <div class="inputContainer">
@@ -467,9 +500,10 @@
         </div>
     </div>
 
-    <!-- Styles -->
+    <!-- STYLES -->
+
     <style>
-        /* Utility Classes */
+        /* ===== Utility Classes ===== */
         .text-success { color: #5cb85c; }
         .text-error { color: #d9534f; }
         .text-muted { opacity: 0.7; }
@@ -481,7 +515,7 @@
         .w-auto { width: auto !important; }
         .w-80 { width: 80px; }
 
-        /* Section title styling */
+        /* ===== Section Title Styling ===== */
         .sectionTitleContainer {
             margin-top: 1.5em;
         }
@@ -495,7 +529,7 @@
             margin-bottom: 1em;
         }
 
-        /* Button styles */
+        /* ===== Button Styles ===== */
         .button-submit {
             background-color: #00a4dc !important;
             color: #fff !important;
@@ -511,7 +545,7 @@
             background-color: #c9302c !important;
         }
 
-        /* Collapsible sections */
+        /* ===== Collapsible Sections ===== */
         .collapsibleSection {
             margin-bottom: 8px;
             border: 1px solid rgba(255,255,255,0.1);
@@ -556,7 +590,7 @@
             border-top: 1px solid rgba(255,255,255,0.1);
         }
 
-        /* Server info display */
+        /* ===== Server Info Display ===== */
         .server-info-box {
             margin-bottom: 16px;
             padding: 12px;
@@ -565,7 +599,7 @@
         }
         #serverInfoContainer { padding-bottom: 16px; }
 
-        /* Mapping styles */
+        /* ===== Mapping Styles ===== */
         .mapping {
             margin-bottom: 2em;
             padding-bottom: 1em;
@@ -591,14 +625,14 @@
             flex-direction: column;
         }
 
-        /* Nested settings with left border */
+        /* ===== Nested Settings ===== */
         .nested-settings {
             margin-left: 1.5em;
             padding-left: 1em;
             border-left: 2px solid rgba(85, 85, 85, 0.3);
         }
 
-        /* Subsection headers within collapsible sections */
+        /* ===== Subsection Headers ===== */
         .subsectionHeader {
             font-size: 0.95em;
             font-weight: 600;
@@ -613,7 +647,7 @@
             margin-top: 0;
         }
 
-        /* Settings groups for visual separation */
+        /* ===== Settings Groups ===== */
         .settingsGroup {
             margin-bottom: 16px;
             padding-bottom: 16px;
@@ -625,7 +659,7 @@
             padding-bottom: 0;
         }
 
-        /* Input row - horizontal layout */
+        /* ===== Input Row (Horizontal Layout) ===== */
         .inputRow {
             display: flex;
             gap: 8px;
@@ -635,7 +669,7 @@
             flex: 1;
         }
 
-        /* Inline inputs */
+        /* ===== Inline Inputs ===== */
         .inline-inputs {
             display: flex;
             gap: 16px;

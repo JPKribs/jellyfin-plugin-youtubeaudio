@@ -1,5 +1,10 @@
-// Server Sync Plugin - Content Page Controller
-// This file uses the Jellyfin multi-page plugin pattern
+// ============================================
+// SERVER SYNC PLUGIN - CONTENT PAGE CONTROLLER
+// ============================================
+
+// ============================================
+// TAB NAVIGATION
+// ============================================
 
 function getTabs() {
     return [
@@ -29,7 +34,10 @@ function getTabs() {
 export default function (view, params) {
     'use strict';
 
-    // Shared utilities for Server Sync plugin configuration
+    // ============================================
+    // SHARED UTILITIES
+    // ============================================
+
     var ServerSyncShared = {
         pluginId: 'ebd650b5-6f4c-4ccb-b10d-23dffb3a7286',
 
@@ -116,7 +124,7 @@ export default function (view, params) {
             }
         },
 
-        // Safe event binding - binds event only if element exists (uses view.querySelector)
+        // Safe event binding
         bindEvent: function(id, event, handler, moduleName) {
             var el = view.querySelector('#' + id);
             if (el) {
@@ -133,9 +141,10 @@ export default function (view, params) {
         }
     };
 
+    // ============================================
+    // PAGINATED TABLE COMPONENT
+    // ============================================
 
-    // PaginatedTable Component
-    // Generic table component with infinite scroll, search, filter, and bulk actions
     var PaginatedTable = function(options) {
         this.options = {
             containerId: null,
@@ -170,8 +179,10 @@ export default function (view, params) {
 
     PaginatedTable.prototype = {
 
-        // _getItemId
-        // Gets the ID for an item. Supports idKey as string (property name) or function.
+        // --------------------------------------------
+        // Private Methods
+        // --------------------------------------------
+
         _getItemId: function(item) {
             var idKey = this.options.selection && this.options.selection.idKey || 'id';
             if (typeof idKey === 'function') {
@@ -180,8 +191,6 @@ export default function (view, params) {
             return item[idKey];
         },
 
-        // _mergeOptions
-        // Deep merges user-provided options with defaults.
         _mergeOptions: function(options) {
             var self = this;
             Object.keys(options).forEach(function(key) {
@@ -193,15 +202,11 @@ export default function (view, params) {
             });
         },
 
-        // _init
-        // Initializes the component by creating DOM structure and binding events.
         _init: function() {
             this._createStructure();
             this._bindEvents();
         },
 
-        // _createStructure
-        // Builds and injects the table HTML into the container element.
         _createStructure: function() {
             var container = view.querySelector('#' + this.options.containerId);
             if (!container) {
@@ -212,8 +217,6 @@ export default function (view, params) {
             this._cacheElements(container);
         },
 
-        // _cacheElements
-        // Stores references to frequently accessed DOM elements.
         _cacheElements: function(container) {
             this.elements = {
                 container: container,
@@ -229,8 +232,6 @@ export default function (view, params) {
             };
         },
 
-        // _buildHTML
-        // Generates the complete HTML structure for the table component.
         _buildHTML: function() {
             var opts = this.options;
             var html = '<div class="pt-wrapper">';
@@ -285,8 +286,6 @@ export default function (view, params) {
             return html;
         },
 
-        // _bindEvents
-        // Attaches event listeners to interactive elements.
         _bindEvents: function() {
             var self = this;
 
@@ -321,8 +320,6 @@ export default function (view, params) {
             }
         },
 
-        // _handleSearchInput
-        // Debounces search input to avoid excessive API calls.
         _handleSearchInput: function(value) {
             var self = this;
             if (this.searchTimeout) {
@@ -334,8 +331,6 @@ export default function (view, params) {
             }, debounceMs);
         },
 
-        // _handleScroll
-        // Triggers loading more items when scrolled near the bottom.
         _handleScroll: function() {
             var body = this.elements.body;
             if (!body || this.state.isLoading || !this.state.hasMore) return;
@@ -344,14 +339,11 @@ export default function (view, params) {
             var scrollHeight = body.scrollHeight;
             var clientHeight = body.clientHeight;
 
-            // Load more when within 100px of bottom
             if (scrollTop + clientHeight >= scrollHeight - 100) {
                 this._loadMore();
             }
         },
 
-        // _handleReload
-        // Resets state and reloads all data from the first page.
         _handleReload: function() {
             var self = this;
             var btn = this.elements.reloadBtn;
@@ -382,80 +374,6 @@ export default function (view, params) {
             });
         },
 
-        // reload
-        // Public method to reset state and reload from page 1.
-        reload: function() {
-            console.log('PaginatedTable reload called, clearing state');
-            this.state.items = [];
-            this.state.currentPage = 1;
-            this.state.hasMore = true;
-            this.state.selectedIds.clear();
-            return this.load();
-        },
-
-        // load
-        // Fetches items from the API for the current page.
-        load: function() {
-            var self = this;
-            var state = this.state;
-            var opts = this.options;
-
-            if (state.isLoading) return Promise.resolve();
-            state.isLoading = true;
-            this._setLoading(true);
-
-            // Build query params
-            var params = [];
-            params.push('skip=' + ((state.currentPage - 1) * state.pageSize));
-            params.push('take=' + state.pageSize);
-
-            if (state.searchQuery) {
-                params.push('search=' + encodeURIComponent(state.searchQuery));
-            }
-
-            if (state.filterValue) {
-                if (opts.filters && opts.filters.buildParams) {
-                    // Custom filter param builder
-                    var filterParams = opts.filters.buildParams(state.filterValue);
-                    Object.keys(filterParams).forEach(function(key) {
-                        if (filterParams[key] !== null && filterParams[key] !== undefined) {
-                            params.push(key + '=' + encodeURIComponent(filterParams[key]));
-                        }
-                    });
-                } else {
-                    params.push('filter=' + encodeURIComponent(state.filterValue));
-                }
-            }
-
-            var endpoint = opts.endpoint + (params.length ? '?' + params.join('&') : '');
-
-            return ServerSyncShared.apiRequest(endpoint, 'GET').then(function(result) {
-                var newItems = result.Items || [];
-                state.totalCount = result.TotalCount || 0;
-
-                // First page replaces, subsequent pages append
-                if (state.currentPage === 1) {
-                    state.items = newItems;
-                } else {
-                    state.items = state.items.concat(newItems);
-                }
-
-                state.hasMore = state.items.length < state.totalCount;
-
-                self._render();
-                state.isLoading = false;
-                self._setLoading(false);
-                return result;
-            }).catch(function(err) {
-                console.error('PaginatedTable load error:', err);
-                state.isLoading = false;
-                self._setLoading(false);
-                throw err;
-            });
-        },
-
-        // _loadMore
-        // Increments page and loads the next batch of items.
         _loadMore: function() {
             if (!this.state.hasMore || this.state.isLoading) return;
 
@@ -473,11 +391,8 @@ export default function (view, params) {
             });
         },
 
-        // _setLoading
-        // Toggles the loading state visual indicator.
         _setLoading: function(loading) {
             if (this.elements.container) {
-                // Only show loading overlay on first page load
                 if (loading && this.state.currentPage === 1) {
                     this.elements.container.classList.add('pt-loading');
                 } else {
@@ -486,16 +401,12 @@ export default function (view, params) {
             }
         },
 
-        // _render
-        // Updates all rendered portions of the table.
         _render: function() {
             this._renderBody();
             this._updateItemCount();
             this._updateSelectionUI();
         },
 
-        // _renderBody
-        // Renders all table rows or empty state message.
         _renderBody: function() {
             var self = this;
             var state = this.state;
@@ -517,8 +428,6 @@ export default function (view, params) {
             this._bindRowEvents();
         },
 
-        // _renderRow
-        // Generates HTML for a single table row.
         _renderRow: function(item) {
             var self = this;
             var opts = this.options;
@@ -563,8 +472,6 @@ export default function (view, params) {
             return html;
         },
 
-        // _getDisplayStatus
-        // Returns the display text for a status value.
         _getDisplayStatus: function(item, value) {
             if (this.options.getDisplayStatus) {
                 return this.options.getDisplayStatus(item, value);
@@ -572,8 +479,6 @@ export default function (view, params) {
             return value || '';
         },
 
-        // _getStatusClass
-        // Returns the CSS class for a status value.
         _getStatusClass: function(item, value) {
             if (this.options.getStatusClass) {
                 return this.options.getStatusClass(item, value);
@@ -581,8 +486,6 @@ export default function (view, params) {
             return value || '';
         },
 
-        // _bindRowEvents
-        // Attaches click and change handlers to row elements.
         _bindRowEvents: function() {
             var self = this;
             var body = this.elements.body;
@@ -590,7 +493,6 @@ export default function (view, params) {
 
             body.querySelectorAll('.pt-row').forEach(function(row) {
                 var handleRowAction = function(e) {
-                    // Skip if clicking checkbox or status button (handled separately)
                     if (e.target.type === 'checkbox' || e.target.classList.contains('pt-row-checkbox') ||
                         e.target.classList.contains('pt-status-btn')) {
                         return;
@@ -608,7 +510,7 @@ export default function (view, params) {
                 row.addEventListener('click', handleRowAction);
             });
 
-            // Status badge buttons - explicit tap target for mobile
+            // Status badge buttons
             body.querySelectorAll('.pt-status-btn').forEach(function(btn) {
                 btn.addEventListener('click', function(e) {
                     e.preventDefault();
@@ -634,15 +536,12 @@ export default function (view, params) {
                     self._notifySelectionChange();
                 });
 
-                // Prevent row click when clicking checkbox
                 checkbox.addEventListener('click', function(e) {
                     e.stopPropagation();
                 });
             });
         },
 
-        // _getItemById
-        // Finds an item in the current items array by its ID.
         _getItemById: function(id) {
             var self = this;
             return this.state.items.find(function(item) {
@@ -650,8 +549,6 @@ export default function (view, params) {
             });
         },
 
-        // _updateItemCount
-        // Updates the footer text showing loaded vs total item counts.
         _updateItemCount: function() {
             if (this.elements.itemCount) {
                 var loaded = this.state.items.length;
@@ -667,8 +564,6 @@ export default function (view, params) {
             }
         },
 
-        // _updateSelectionUI
-        // Syncs the selection count display and select-all checkbox state.
         _updateSelectionUI: function() {
             var count = this.state.selectedIds.size;
 
@@ -684,8 +579,6 @@ export default function (view, params) {
             }
         },
 
-        // _toggleSelectAll
-        // Selects or deselects all currently loaded items.
         _toggleSelectAll: function(checked) {
             var self = this;
 
@@ -707,26 +600,85 @@ export default function (view, params) {
             this._notifySelectionChange();
         },
 
-        // _notifySelectionChange
-        // Invokes the selection change callback if configured.
         _notifySelectionChange: function() {
             if (this.options.selection && this.options.selection.onSelectionChange) {
                 this.options.selection.onSelectionChange(this.getSelectedIds());
             }
         },
 
-        // ========================================
+        // --------------------------------------------
         // Public API
-        // ========================================
+        // --------------------------------------------
 
-        // getSelectedIds
-        // Returns an array of selected item IDs.
+        reload: function() {
+            console.log('PaginatedTable reload called, clearing state');
+            this.state.items = [];
+            this.state.currentPage = 1;
+            this.state.hasMore = true;
+            this.state.selectedIds.clear();
+            return this.load();
+        },
+
+        load: function() {
+            var self = this;
+            var state = this.state;
+            var opts = this.options;
+
+            if (state.isLoading) return Promise.resolve();
+            state.isLoading = true;
+            this._setLoading(true);
+
+            var params = [];
+            params.push('skip=' + ((state.currentPage - 1) * state.pageSize));
+            params.push('take=' + state.pageSize);
+
+            if (state.searchQuery) {
+                params.push('search=' + encodeURIComponent(state.searchQuery));
+            }
+
+            if (state.filterValue) {
+                if (opts.filters && opts.filters.buildParams) {
+                    var filterParams = opts.filters.buildParams(state.filterValue);
+                    Object.keys(filterParams).forEach(function(key) {
+                        if (filterParams[key] !== null && filterParams[key] !== undefined) {
+                            params.push(key + '=' + encodeURIComponent(filterParams[key]));
+                        }
+                    });
+                } else {
+                    params.push('filter=' + encodeURIComponent(state.filterValue));
+                }
+            }
+
+            var endpoint = opts.endpoint + (params.length ? '?' + params.join('&') : '');
+
+            return ServerSyncShared.apiRequest(endpoint, 'GET').then(function(result) {
+                var newItems = result.Items || [];
+                state.totalCount = result.TotalCount || 0;
+
+                if (state.currentPage === 1) {
+                    state.items = newItems;
+                } else {
+                    state.items = state.items.concat(newItems);
+                }
+
+                state.hasMore = state.items.length < state.totalCount;
+
+                self._render();
+                state.isLoading = false;
+                self._setLoading(false);
+                return result;
+            }).catch(function(err) {
+                console.error('PaginatedTable load error:', err);
+                state.isLoading = false;
+                self._setLoading(false);
+                throw err;
+            });
+        },
+
         getSelectedIds: function() {
             return Array.from(this.state.selectedIds);
         },
 
-        // getSelectedItems
-        // Returns an array of selected item objects.
         getSelectedItems: function() {
             var self = this;
             return this.state.items.filter(function(item) {
@@ -734,8 +686,6 @@ export default function (view, params) {
             });
         },
 
-        // clearSelection
-        // Clears all selected items and updates UI.
         clearSelection: function() {
             this.state.selectedIds.clear();
             this._updateSelectionUI();
@@ -752,8 +702,6 @@ export default function (view, params) {
             }
         },
 
-        // refresh
-        // Resets pagination and reloads data from the beginning.
         refresh: function() {
             this.state.items = [];
             this.state.currentPage = 1;
@@ -761,8 +709,6 @@ export default function (view, params) {
             return this.load();
         },
 
-        // setFilter
-        // Applies a filter value and reloads data.
         setFilter: function(value) {
             this.state.filterValue = value;
             this.state.items = [];
@@ -772,8 +718,6 @@ export default function (view, params) {
             return this.load();
         },
 
-        // setSearch
-        // Applies a search query and reloads data.
         setSearch: function(query) {
             this.state.searchQuery = query;
             this.state.items = [];
@@ -783,26 +727,18 @@ export default function (view, params) {
             return this.load();
         },
 
-        // getItems
-        // Returns all currently loaded items.
         getItems: function() {
             return this.state.items;
         },
 
-        // getTotalCount
-        // Returns the total number of items available on the server.
         getTotalCount: function() {
             return this.state.totalCount;
         },
 
-        // getBulkActionsContainer
-        // Returns the DOM element for injecting bulk action buttons.
         getBulkActionsContainer: function() {
             return this.elements.bulkActions;
         },
 
-        // setFilterOptionVisible
-        // Shows or hides a specific filter dropdown option.
         setFilterOptionVisible: function(optionId, visible) {
             if (this.elements.filter) {
                 var option = this.elements.filter.querySelector('#' + optionId);
@@ -812,8 +748,6 @@ export default function (view, params) {
             }
         },
 
-        // setFilterValue
-        // Sets the filter value without triggering a reload.
         setFilterValue: function(value) {
             this.state.filterValue = value;
             if (this.elements.filter) {
@@ -822,17 +756,21 @@ export default function (view, params) {
         }
     };
 
+    // ============================================
+    // SYNC TABLE MODULE
+    // ============================================
 
-    // Sync Table Module
-    // Uses the generic PaginatedTable component for content sync items
     var SyncTableModule = {
         table: null,
         currentModalItem: null,
         capabilities: null,
         _initialized: false,
 
+        // --------------------------------------------
+        // Initialization
+        // --------------------------------------------
+
         init: function() {
-            // Prevent double initialization (viewshow can fire multiple times)
             if (this._initialized) {
                 return;
             }
@@ -840,7 +778,6 @@ export default function (view, params) {
 
             var self = this;
 
-            // Create the paginated table instance
             this.table = new PaginatedTable({
                 containerId: 'syncItemsTableContainer',
                 endpoint: 'Items',
@@ -878,7 +815,6 @@ export default function (view, params) {
                         label: 'Details',
                         type: 'custom',
                         render: function(item) {
-                            // Show "No changes" for synced items, otherwise show file size
                             if (item.Status === 'Synced') {
                                 return '<span style="opacity: 0.5;">No changes</span>';
                             }
@@ -954,10 +890,7 @@ export default function (view, params) {
                 }
             });
 
-            // Bind module-specific events (buttons outside the table)
             this._bindModuleEvents();
-
-            // Inject bulk action buttons into the table's bulk actions container
             this._injectBulkActions();
         },
 
@@ -983,19 +916,17 @@ export default function (view, params) {
             var bulkContainer = this.table.getBulkActionsContainer();
             if (!bulkContainer) return;
 
-            // Create bulk action buttons
             bulkContainer.innerHTML =
                 '<button is="emby-button" type="button" id="btnBulkIgnore" class="raised" disabled><span>Ignore</span></button>' +
                 '<button is="emby-button" type="button" id="btnBulkQueue" class="raised button-primary" disabled><span>Queue</span></button>' +
                 '<button is="emby-button" type="button" id="btnBulkDelete" class="raised button-destructive" title="Delete from local server only" disabled><span>Delete</span></button>';
 
-            // Bind events
             bulkContainer.querySelector('#btnBulkIgnore').addEventListener('click', function() { self.bulkIgnore(); });
             bulkContainer.querySelector('#btnBulkQueue').addEventListener('click', function() { self.bulkQueue(); });
             bulkContainer.querySelector('#btnBulkDelete').addEventListener('click', function() { self.bulkDelete(); });
         },
 
-        // Backward compatibility - expose items through table
+        // Backward compatibility properties
         get syncItems() {
             return this.table ? this.table.getItems() : [];
         },
@@ -1007,6 +938,10 @@ export default function (view, params) {
         get selectedItems() {
             return this.table ? new Set(this.table.getSelectedIds()) : new Set();
         },
+
+        // --------------------------------------------
+        // Capabilities
+        // --------------------------------------------
 
         loadCapabilities: function() {
             var self = this;
@@ -1031,6 +966,10 @@ export default function (view, params) {
             }
         },
 
+        // --------------------------------------------
+        // Data Loading
+        // --------------------------------------------
+
         loadHealthStats: function() {
             return Promise.all([
                 ServerSyncShared.apiRequest('Stats', 'GET'),
@@ -1041,7 +980,6 @@ export default function (view, params) {
                 var config = results[1];
                 var pendingSizeData = results[2];
 
-                // Last sync time
                 var lastSyncEl = view.querySelector('#healthLastSync');
                 if (stats.LastSyncEndTime) {
                     var lastSync = new Date(stats.LastSyncEndTime);
@@ -1052,13 +990,11 @@ export default function (view, params) {
                     lastSyncEl.className = 'healthValue';
                 }
 
-                // Libraries mapped
                 var libraryCountEl = view.querySelector('#healthLibraryCount');
                 var libraryMappings = config.LibraryMappings || [];
                 libraryCountEl.textContent = libraryMappings.length;
                 libraryCountEl.className = libraryMappings.length > 0 ? 'healthValue success' : 'healthValue warning';
 
-                // Pending size (pending download + pending replacement + queued - pending deletion)
                 var pendingCountEl = view.querySelector('#healthPendingCount');
                 if (pendingSizeData && typeof pendingSizeData.TotalPendingBytes === 'number') {
                     pendingCountEl.textContent = ServerSyncShared.formatSize(pendingSizeData.TotalPendingBytes);
@@ -1071,6 +1007,56 @@ export default function (view, params) {
                 // Ignore errors
             });
         },
+
+        loadSyncStatus: function() {
+            return ServerSyncShared.apiRequest('Status', 'GET').then(function(status) {
+                var syncedCount = status.Synced || 0;
+                var queuedCount = status.Queued || 0;
+                var erroredCount = status.Errored || 0;
+                var ignoredCount = status.Ignored || 0;
+                var pendingDownloadCount = status.PendingDownload || 0;
+                var pendingReplacementCount = status.PendingReplacement || 0;
+                var pendingDeletionCount = status.PendingDeletion || 0;
+                var deletingCount = status.Deleting || 0;
+
+                var totalPendingCount = pendingDownloadCount + pendingReplacementCount + pendingDeletionCount;
+
+                view.querySelector('#syncedCount').textContent = syncedCount;
+                view.querySelector('#statusGroupSynced').setAttribute('title', 'Synced: ' + syncedCount);
+
+                view.querySelector('#pendingCount').textContent = totalPendingCount;
+                view.querySelector('#statusGroupPending').setAttribute('title', 'Pending: ' + totalPendingCount + ' (Download: ' + pendingDownloadCount + ', Replace: ' + pendingReplacementCount + ', Delete: ' + pendingDeletionCount + ')');
+
+                view.querySelector('#queuedCount').textContent = queuedCount;
+                view.querySelector('#statusGroupQueued').setAttribute('title', 'Queued: ' + queuedCount);
+
+                view.querySelector('#erroredCount').textContent = erroredCount;
+                view.querySelector('#statusGroupErrored').setAttribute('title', 'Errored: ' + erroredCount);
+
+                view.querySelector('#ignoredCount').textContent = ignoredCount;
+                view.querySelector('#statusGroupIgnored').setAttribute('title', 'Ignored: ' + ignoredCount);
+
+                view.querySelector('#pendingDownloadCount').textContent = pendingDownloadCount;
+                view.querySelector('#statusGroupPendingDownload').setAttribute('title', 'Pending Download: ' + pendingDownloadCount);
+
+                view.querySelector('#pendingReplacementCount').textContent = pendingReplacementCount;
+                view.querySelector('#statusGroupPendingReplacement').setAttribute('title', 'Pending Replacement: ' + pendingReplacementCount);
+
+                view.querySelector('#pendingDeletionCount').textContent = pendingDeletionCount;
+                view.querySelector('#statusGroupPendingDeletion').setAttribute('title', 'Pending Deletion: ' + pendingDeletionCount);
+
+                view.querySelector('#deletingCount').textContent = deletingCount;
+                view.querySelector('#statusGroupDeleting').setAttribute('title', 'Deleting: ' + deletingCount);
+            });
+        },
+
+        loadSyncItems: function() {
+            return this.table.reload();
+        },
+
+        // --------------------------------------------
+        // Action Handlers
+        // --------------------------------------------
 
         triggerSync: function() {
             var btn = view.querySelector('#btnTriggerSync');
@@ -1098,7 +1084,6 @@ export default function (view, params) {
                 ServerSyncShared.showAlert('Refresh task started');
                 btn.querySelector('span').textContent = 'Refresh';
                 btn.disabled = false;
-                // Also reload the items display
                 self.loadSyncStatus();
                 self.loadSyncItems();
                 self.loadHealthStats();
@@ -1144,52 +1129,9 @@ export default function (view, params) {
             });
         },
 
-        loadSyncStatus: function() {
-            return ServerSyncShared.apiRequest('Status', 'GET').then(function(status) {
-                var syncedCount = status.Synced || 0;
-                var queuedCount = status.Queued || 0;
-                var erroredCount = status.Errored || 0;
-                var ignoredCount = status.Ignored || 0;
-                var pendingDownloadCount = status.PendingDownload || 0;
-                var pendingReplacementCount = status.PendingReplacement || 0;
-                var pendingDeletionCount = status.PendingDeletion || 0;
-                var deletingCount = status.Deleting || 0;
-
-                // Calculate total pending (all pending types combined)
-                var totalPendingCount = pendingDownloadCount + pendingReplacementCount + pendingDeletionCount;
-
-                view.querySelector('#syncedCount').textContent = syncedCount;
-                view.querySelector('#statusGroupSynced').setAttribute('title', 'Synced: ' + syncedCount);
-
-                view.querySelector('#pendingCount').textContent = totalPendingCount;
-                view.querySelector('#statusGroupPending').setAttribute('title', 'Pending: ' + totalPendingCount + ' (Download: ' + pendingDownloadCount + ', Replace: ' + pendingReplacementCount + ', Delete: ' + pendingDeletionCount + ')');
-
-                view.querySelector('#queuedCount').textContent = queuedCount;
-                view.querySelector('#statusGroupQueued').setAttribute('title', 'Queued: ' + queuedCount);
-
-                view.querySelector('#erroredCount').textContent = erroredCount;
-                view.querySelector('#statusGroupErrored').setAttribute('title', 'Errored: ' + erroredCount);
-
-                view.querySelector('#ignoredCount').textContent = ignoredCount;
-                view.querySelector('#statusGroupIgnored').setAttribute('title', 'Ignored: ' + ignoredCount);
-
-                view.querySelector('#pendingDownloadCount').textContent = pendingDownloadCount;
-                view.querySelector('#statusGroupPendingDownload').setAttribute('title', 'Pending Download: ' + pendingDownloadCount);
-
-                view.querySelector('#pendingReplacementCount').textContent = pendingReplacementCount;
-                view.querySelector('#statusGroupPendingReplacement').setAttribute('title', 'Pending Replacement: ' + pendingReplacementCount);
-
-                view.querySelector('#pendingDeletionCount').textContent = pendingDeletionCount;
-                view.querySelector('#statusGroupPendingDeletion').setAttribute('title', 'Pending Deletion: ' + pendingDeletionCount);
-
-                view.querySelector('#deletingCount').textContent = deletingCount;
-                view.querySelector('#statusGroupDeleting').setAttribute('title', 'Deleting: ' + deletingCount);
-            });
-        },
-
-        loadSyncItems: function() {
-            return this.table.reload();
-        },
+        // --------------------------------------------
+        // Bulk Actions
+        // --------------------------------------------
 
         updateBulkActionsVisibility: function(count) {
             var hasSelection = count > 0;
@@ -1211,7 +1153,6 @@ export default function (view, params) {
             var ids = this.table.getSelectedIds();
             if (ids.length === 0) return;
 
-            // Filter out pending deletion items - queuing them is a no-op
             var items = this.table.getItems();
             var filteredIds = ids.filter(function(id) {
                 var item = items.find(function(i) { return i.SourceItemId === id; });
@@ -1274,6 +1215,10 @@ export default function (view, params) {
             });
         },
 
+        // --------------------------------------------
+        // Status Helpers
+        // --------------------------------------------
+
         getDisplayStatus: function(item) {
             if (item.Status === 'Pending' && item.PendingType) {
                 return 'Pending ' + item.PendingType;
@@ -1287,6 +1232,10 @@ export default function (view, params) {
             }
             return item.Status;
         },
+
+        // --------------------------------------------
+        // Modal: Item Detail
+        // --------------------------------------------
 
         showItemDetail: function(sourceItemId) {
             var self = this;
@@ -1306,7 +1255,7 @@ export default function (view, params) {
             statusBadge.textContent = displayStatus;
             statusBadge.className = 'itemModal-statusBadge ' + statusClass;
 
-            // Library mapping display
+            // Library mapping
             var sourceLibrary = item.SourceLibraryName || 'Source';
             var localLibrary = item.LocalLibraryName || 'Local';
             view.querySelector('#modalLibraryMapping').textContent = sourceLibrary + ' → ' + localLibrary;
@@ -1386,7 +1335,7 @@ export default function (view, params) {
                 localPathNoteEl.style.display = 'none';
             }
 
-            // Show/hide modal buttons based on status and pending type
+            // Show/hide buttons based on status
             var btnQueue = view.querySelector('#btnModalQueue');
             var btnIgnore = view.querySelector('#btnModalIgnore');
             var modalDeleteRow = view.querySelector('#modalDeleteRow');
@@ -1394,7 +1343,6 @@ export default function (view, params) {
             var isPendingDownloadOrReplacement = item.Status === 'Pending' && (item.PendingType === 'Download' || item.PendingType === 'Replacement');
             var isSynced = item.Status === 'Synced';
 
-            // Update Queue button text based on status
             var queueBtnSpan = btnQueue.querySelector('span');
             if (isSynced) {
                 queueBtnSpan.textContent = 'Re-sync';
@@ -1423,7 +1371,6 @@ export default function (view, params) {
         closeModal: function() {
             view.querySelector('#itemDetailModal').classList.add('hidden');
             this.currentModalItem = null;
-            // Refresh table data and health stats when modal closes
             this.table.refresh();
             this.loadHealthStats();
         },
@@ -1436,7 +1383,6 @@ export default function (view, params) {
 
         modalQueue: function() {
             if (this.currentModalItem) {
-                // Queuing a pending deletion item is a no-op
                 if (this.currentModalItem.Status === 'Pending' && this.currentModalItem.PendingType === 'Deletion') {
                     return;
                 }
@@ -1477,8 +1423,11 @@ export default function (view, params) {
             });
         },
 
+        // --------------------------------------------
+        // Filter Visibility
+        // --------------------------------------------
+
         updatePendingFilterVisibility: function(config) {
-            // Show pending cards only if approval is required
             var downloadMode = config.DownloadNewContentMode || 'Enabled';
             var replaceMode = config.ReplaceExistingContentMode || 'Enabled';
             var deleteMode = config.DeleteMissingContentMode || 'Disabled';
@@ -1487,7 +1436,6 @@ export default function (view, params) {
             var showPendingReplace = replaceMode === 'RequireApproval';
             var showPendingDelete = deleteMode === 'RequireApproval';
 
-            // Update filter options visibility
             if (this.table) {
                 this.table.setFilterOptionVisible('optPendingDownload', showPendingDownload);
                 this.table.setFilterOptionVisible('optPendingReplacement', showPendingReplace);
@@ -1495,13 +1443,11 @@ export default function (view, params) {
                 this.table.setFilterOptionVisible('optDeleting', showPendingDelete);
             }
 
-            // Update status cards visibility
             ServerSyncShared.setVisible('statusGroupPendingDownload', showPendingDownload);
             ServerSyncShared.setVisible('statusGroupPendingReplacement', showPendingReplace);
             ServerSyncShared.setVisible('statusGroupPendingDeletion', showPendingDelete);
             ServerSyncShared.setVisible('statusGroupDeleting', showPendingDelete);
 
-            // Show/hide the pending row container
             var showAnyPending = showPendingDownload || showPendingReplace || showPendingDelete;
             var pendingRow = view.querySelector('#pendingStatusRow');
             if (pendingRow) {
@@ -1510,37 +1456,34 @@ export default function (view, params) {
         }
     };
 
+    // ============================================
+    // PAGE CONTROLLER
+    // ============================================
 
-    // Content Page Controller
     var ContentPageController = {
         init: function() {
             var self = this;
 
-            // Initialize sync table module
             SyncTableModule.init();
             SyncTableModule.loadCapabilities();
 
-            // Load config to determine pending filter visibility
             ServerSyncShared.getConfig().then(function(config) {
                 SyncTableModule.updatePendingFilterVisibility(config);
             });
 
-            // Load initial data
             SyncTableModule.loadSyncStatus();
             SyncTableModule.loadSyncItems();
             SyncTableModule.loadHealthStats();
         }
     };
 
+    // ============================================
+    // EVENT LISTENERS
+    // ============================================
 
-    // Initialize on viewshow
     view.addEventListener('viewshow', function () {
         console.log('ServerSync Content: viewshow event fired');
-
-        // Set up Jellyfin tabs - index 1 for Content tab
         LibraryMenu.setTabs('serversync', 1, getTabs);
-
-        // Initialize the page
         ContentPageController.init();
     });
 

@@ -1,3 +1,5 @@
+<!-- CONTENTSYNC - PAGE -->
+
 <div id="ServerSyncContentPage" data-role="page" class="page type-interior pluginConfigurationPage withTabs"
      data-require="emby-input,emby-button,emby-select,emby-checkbox"
      data-controller="__plugin/serversync_content.js">
@@ -5,88 +7,100 @@
         <div class="content-primary">
             <form id="ServerSyncContentForm">
                 <div class="verticalSection verticalSection-extrabottompadding">
+
+                    <!-- SECTION: Page Header -->
+
                     <div class="sectionTitleContainer flex align-items-center">
                         <h1 class="sectionTitle">Content</h1>
                     </div>
 
-                        <div id="syncStatusSummary">
-                            <div class="statusCards" id="mainStatusRow">
-                                <div class="statusCard statusCard-synced" id="statusGroupSynced" title="">
-                                    <span class="statusCard-count" id="syncedCount">0</span>
-                                    <span class="statusCard-label">Synced</span>
-                                </div>
-                                <div class="statusCard statusCard-pending" id="statusGroupPending" title="">
-                                    <span class="statusCard-count" id="pendingCount">0</span>
-                                    <span class="statusCard-label">Pending</span>
-                                </div>
-                                <div class="statusCard statusCard-queued" id="statusGroupQueued" title="">
-                                    <span class="statusCard-count" id="queuedCount">0</span>
-                                    <span class="statusCard-label">Queued</span>
-                                </div>
-                                <div class="statusCard statusCard-errored" id="statusGroupErrored" title="">
-                                    <span class="statusCard-count" id="erroredCount">0</span>
-                                    <span class="statusCard-label">Errored</span>
-                                </div>
-                                <div class="statusCard statusCard-ignored" id="statusGroupIgnored" title="">
-                                    <span class="statusCard-count" id="ignoredCount">0</span>
-                                    <span class="statusCard-label">Ignored</span>
-                                </div>
-                            </div>
-                            <div class="statusCards hidden" id="pendingStatusRow">
-                                <div class="statusCard statusCard-pendingDownload hidden" id="statusGroupPendingDownload" title="">
-                                    <span class="statusCard-count" id="pendingDownloadCount">0</span>
-                                    <span class="statusCard-label">Pending Download</span>
-                                </div>
-                                <div class="statusCard statusCard-pendingReplacement hidden" id="statusGroupPendingReplacement" title="">
-                                    <span class="statusCard-count" id="pendingReplacementCount">0</span>
-                                    <span class="statusCard-label">Pending Replace</span>
-                                </div>
-                                <div class="statusCard statusCard-pendingDeletion hidden" id="statusGroupPendingDeletion" title="">
-                                    <span class="statusCard-count" id="pendingDeletionCount">0</span>
-                                    <span class="statusCard-label">Pending Delete</span>
-                                </div>
-                                <div class="statusCard statusCard-deleting hidden" id="statusGroupDeleting" title="">
-                                    <span class="statusCard-count" id="deletingCount">0</span>
-                                    <span class="statusCard-label">Deleting</span>
-                                </div>
-                            </div>
-                        </div>
+                    <!-- SECTION: Status Summary Cards -->
 
-                        <div id="healthDashboard" class="healthDashboard">
-                            <div class="healthRow">
-                                <div class="healthCard">
-                                    <span class="healthLabel">Last Sync</span>
-                                    <span class="healthValue" id="healthLastSync">Never</span>
-                                </div>
-                                <div class="healthCard">
-                                    <span class="healthLabel">Libraries Mapped</span>
-                                    <span class="healthValue" id="healthLibraryCount">0</span>
-                                </div>
-                                <div class="healthCard">
-                                    <span class="healthLabel">Pending</span>
-                                    <span class="healthValue" id="healthPendingCount">0</span>
-                                </div>
+                    <div id="syncStatusSummary">
+                        <!-- Main Status Row -->
+                        <div class="statusCards" id="mainStatusRow">
+                            <div class="statusCard statusCard-synced" id="statusGroupSynced" title="">
+                                <span class="statusCard-count" id="syncedCount">0</span>
+                                <span class="statusCard-label">Synced</span>
+                            </div>
+                            <div class="statusCard statusCard-pending" id="statusGroupPending" title="">
+                                <span class="statusCard-count" id="pendingCount">0</span>
+                                <span class="statusCard-label">Pending</span>
+                            </div>
+                            <div class="statusCard statusCard-queued" id="statusGroupQueued" title="">
+                                <span class="statusCard-count" id="queuedCount">0</span>
+                                <span class="statusCard-label">Queued</span>
+                            </div>
+                            <div class="statusCard statusCard-errored" id="statusGroupErrored" title="">
+                                <span class="statusCard-count" id="erroredCount">0</span>
+                                <span class="statusCard-label">Errored</span>
+                            </div>
+                            <div class="statusCard statusCard-ignored" id="statusGroupIgnored" title="">
+                                <span class="statusCard-count" id="ignoredCount">0</span>
+                                <span class="statusCard-label">Ignored</span>
                             </div>
                         </div>
-
-                        <div class="syncActionButtonRow">
-                            <button is="emby-button" type="button" id="btnRefreshItems" class="raised syncActionButton">
-                                <span>Refresh</span>
-                            </button>
-                            <button is="emby-button" type="button" id="btnTriggerSync" class="raised button-primary syncActionButton">
-                                <span>Sync</span>
-                            </button>
-                            <button is="emby-button" type="button" id="btnRetryErrors" class="raised syncActionButton">
-                                <span>Retry Errors</span>
-                            </button>
-                            <button is="emby-button" type="button" id="btnResetDatabase" class="raised button-destructive syncActionButton">
-                                <span>Reset Database</span>
-                            </button>
+                        <!-- Pending Status Row (conditional) -->
+                        <div class="statusCards hidden" id="pendingStatusRow">
+                            <div class="statusCard statusCard-pendingDownload hidden" id="statusGroupPendingDownload" title="">
+                                <span class="statusCard-count" id="pendingDownloadCount">0</span>
+                                <span class="statusCard-label">Pending Download</span>
+                            </div>
+                            <div class="statusCard statusCard-pendingReplacement hidden" id="statusGroupPendingReplacement" title="">
+                                <span class="statusCard-count" id="pendingReplacementCount">0</span>
+                                <span class="statusCard-label">Pending Replace</span>
+                            </div>
+                            <div class="statusCard statusCard-pendingDeletion hidden" id="statusGroupPendingDeletion" title="">
+                                <span class="statusCard-count" id="pendingDeletionCount">0</span>
+                                <span class="statusCard-label">Pending Delete</span>
+                            </div>
+                            <div class="statusCard statusCard-deleting hidden" id="statusGroupDeleting" title="">
+                                <span class="statusCard-count" id="deletingCount">0</span>
+                                <span class="statusCard-label">Deleting</span>
+                            </div>
                         </div>
+                    </div>
+
+                    <!-- SECTION: Health Dashboard -->
+
+                    <div id="healthDashboard" class="healthDashboard">
+                        <div class="healthRow">
+                            <div class="healthCard">
+                                <span class="healthLabel">Last Sync</span>
+                                <span class="healthValue" id="healthLastSync">Never</span>
+                            </div>
+                            <div class="healthCard">
+                                <span class="healthLabel">Libraries Mapped</span>
+                                <span class="healthValue" id="healthLibraryCount">0</span>
+                            </div>
+                            <div class="healthCard">
+                                <span class="healthLabel">Pending</span>
+                                <span class="healthValue" id="healthPendingCount">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SECTION: Action Buttons -->
+
+                    <div class="syncActionButtonRow">
+                        <button is="emby-button" type="button" id="btnRefreshItems" class="raised syncActionButton">
+                            <span>Refresh</span>
+                        </button>
+                        <button is="emby-button" type="button" id="btnTriggerSync" class="raised button-primary syncActionButton">
+                            <span>Sync</span>
+                        </button>
+                        <button is="emby-button" type="button" id="btnRetryErrors" class="raised syncActionButton">
+                            <span>Retry Errors</span>
+                        </button>
+                        <button is="emby-button" type="button" id="btnResetDatabase" class="raised button-destructive syncActionButton">
+                            <span>Reset Database</span>
+                        </button>
+                    </div>
 
                     <div class="syncSectionSeparator"></div>
 
-                    <!-- Paginated Table Container - populated by PaginatedTable component -->
+                    <!-- SECTION: Content Items Table -->
+
                     <div id="syncItemsTableContainer">
                         <!-- PaginatedTable will generate its structure here -->
                     </div>
@@ -96,28 +110,33 @@
         </div>
     </div>
 
-    <!-- Item Detail Modal (Content Sync) -->
+    <!-- SECTION: Item Detail Modal -->
+
     <div id="itemDetailModal" class="dialog hidden">
         <div class="dialogContent contentModal-dialog modal-relative">
             <button type="button" id="btnModalClose" class="dialogCloseBtn" title="Close">&times;</button>
             <h2 id="modalTitle" class="modal-title"></h2>
             <div id="modalContent" class="modal-body">
+
                 <!-- Status and Library row -->
                 <div class="contentModal-topRow">
                     <span id="modalStatusBadge" class="itemModal-statusBadge"></span>
                     <span id="modalLibraryMapping" class="contentModal-libraryMapping"></span>
                 </div>
 
+                <!-- Error Section -->
                 <div id="modalErrorSection" class="modal-field hidden">
                     <div class="modal-field-label">Error</div>
                     <div id="modalError" class="errorMessage"></div>
                 </div>
+
+                <!-- Retry Section -->
                 <div id="modalRetrySection" class="modal-field hidden">
                     <div class="modal-field-label">Retry Count</div>
                     <div id="modalRetryCount"></div>
                 </div>
 
-                <!-- Info grid: Size and Last Sync side by side -->
+                <!-- Info grid: Size and Last Sync -->
                 <div class="contentModal-infoGrid">
                     <div class="contentModal-infoItem">
                         <div class="contentModal-infoLabel">Size</div>
@@ -129,7 +148,7 @@
                     </div>
                 </div>
 
-                <!-- Paths section -->
+                <!-- Paths Section -->
                 <div class="contentModal-pathsSection">
                     <div class="contentModal-pathItem">
                         <div class="contentModal-pathLabel">Source Path</div>
@@ -142,11 +161,14 @@
                     </div>
                 </div>
 
+                <!-- Companion Files Section -->
                 <div id="modalCompanionFilesSection" class="modal-field hidden">
                     <div class="modal-field-label">Companion Files</div>
                     <div id="modalCompanionFiles" class="modal-field-value"></div>
                 </div>
             </div>
+
+            <!-- Modal Action Buttons -->
             <div class="modalButtonRow">
                 <button is="emby-button" type="button" id="btnModalIgnore" class="raised modalButton">
                     <span>Ignore</span>
@@ -163,7 +185,8 @@
         </div>
     </div>
 
-    <!-- Styles: Content Page -->
+    <!-- STYLES: Content Page Base -->
+
     <style>
         /* ===== Status Color Variables ===== */
         :root {
@@ -202,7 +225,7 @@
             --status-pending-replacement-color: #3498db;
             --status-pending-replacement-border: rgba(52, 152, 219, 0.3);
 
-            /* Pending Deletion - Red (same as errored) */
+            /* Pending Deletion - Red */
             --status-pending-deletion-bg: rgba(217, 83, 79, 0.2);
             --status-pending-deletion-color: #d9534f;
             --status-pending-deletion-border: rgba(217, 83, 79, 0.3);
@@ -213,12 +236,13 @@
             --status-deleting-border: rgba(231, 76, 60, 0.3);
         }
 
-        /* ===== Utility Classes ===== */
+        /* ===== Animations ===== */
         @keyframes spin {
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
         }
 
+        /* ===== Section Title Styling ===== */
         .sectionTitleContainer .sectionTitle {
             width: 100%;
             border-bottom: 1px solid #555;
@@ -226,7 +250,7 @@
             margin-bottom: 1em;
         }
 
-        /* Button styles */
+        /* ===== Button Styles ===== */
         .button-primary {
             background-color: #00a4dc !important;
             color: #fff !important;
@@ -242,7 +266,7 @@
             background-color: #c9302c !important;
         }
 
-        /* Dialog/Modal styling */
+        /* ===== Dialog/Modal Base Styling ===== */
         .dialog {
             position: fixed;
             top: 0;
@@ -280,7 +304,7 @@
             opacity: 1;
         }
 
-        /* Error message styling */
+        /* ===== Error Message Styling ===== */
         .errorMessage {
             background: var(--status-errored-bg);
             color: var(--status-errored-color);
@@ -291,21 +315,21 @@
             word-break: break-all;
         }
 
-        /* Layout utility classes */
+        /* ===== Layout Utility Classes ===== */
         .hidden { display: none !important; }
 
-        /* Modal field layout */
+        /* ===== Modal Field Layout ===== */
         .modal-field { margin-bottom: 12px; }
         .modal-field-label { opacity: 0.7; margin-bottom: 4px; }
         .modal-title { margin-top: 0; padding-right: 32px; }
         .modal-body { margin: 16px 0; }
         .modal-relative { position: relative; }
-
     </style>
 
-    <!-- Styles: Status Cards, Health Dashboard, and Modal -->
+    <!-- STYLES: Status Cards, Health Dashboard, and Modal -->
+
     <style>
-        /* Health Dashboard */
+        /* ===== Health Dashboard ===== */
         .healthDashboard {
             padding: 16px;
             background: rgba(0,0,0,0.3);
@@ -333,13 +357,13 @@
         .healthValue.warning { color: var(--status-queued-color); }
         .healthValue.success { color: var(--status-synced-color); }
 
-        /* Separator between stats and table */
+        /* ===== Section Separator ===== */
         .syncSectionSeparator {
             border-bottom: 1px solid #555;
             margin-bottom: 16px;
         }
 
-        /* Status cards */
+        /* ===== Status Cards ===== */
         .statusCards {
             display: flex;
             gap: 12px;
@@ -374,7 +398,7 @@
         .statusCard-pendingDeletion { background: var(--status-pending-deletion-bg); color: var(--status-pending-deletion-color); }
         .statusCard-deleting { background: var(--status-deleting-bg); color: var(--status-deleting-color); }
 
-        /* Sync Action Button Row */
+        /* ===== Sync Action Button Row ===== */
         .syncActionButtonRow {
             display: flex;
             gap: 8px;
@@ -386,7 +410,7 @@
             justify-content: center;
         }
 
-        /* Item Modal Status Badge */
+        /* ===== Status Badge (Modal) ===== */
         .itemModal-statusBadge {
             display: inline-block;
             padding: 6px 14px;
@@ -406,7 +430,7 @@
         .itemModal-statusBadge.Pending-Deletion { background: var(--status-pending-deletion-bg); color: var(--status-pending-deletion-color); border: 1px solid var(--status-pending-deletion-border); }
         .itemModal-statusBadge.Deleting { background: var(--status-deleting-bg); color: var(--status-deleting-color); border: 1px solid var(--status-deleting-border); }
 
-        /* Companion Files */
+        /* ===== Companion Files ===== */
         .itemModal-companionItem {
             display: flex;
             align-items: center;
@@ -423,8 +447,8 @@
             font-size: 0.9em;
         }
 
-        /* Content Modal specific styles */
-        .contentModal-dialog { max-width: 700px; width: 90vw; }
+        /* ===== Content Modal Specific Styles ===== */
+        .contentModal-dialog { max-width: 900px; width: 95vw; }
         .contentModal-topRow { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
         .contentModal-libraryMapping { font-size: 0.9em; opacity: 0.8; }
         .contentModal-infoGrid {
@@ -468,51 +492,43 @@
             font-style: italic;
         }
 
-        /* Modal button layout */
+        /* ===== Modal Button Layout ===== */
         .modalButtonRow { display: flex; gap: 8px; margin-top: 8px; }
         .modalButton { flex: 1; text-align: center; justify-content: center; }
         .modalDeleteRow { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.1); }
         .modalDeleteButton { width: 100%; text-align: center; justify-content: center; }
-
     </style>
 
-    <!-- Styles: PaginatedTable/paginatedTable.css -->
-    <style>
-        /* ============================================
-           PaginatedTable Component Styles
-           Prefix: pt- (paginated-table)
-           Generic, reusable table component with infinite scroll
-           ============================================ */
+    <!-- STYLES: PaginatedTable Component -->
 
+    <style>
+        /* ===== PaginatedTable Wrapper ===== */
         .pt-wrapper {
             display: flex;
             flex-direction: column;
         }
-
         .pt-wrapper.pt-loading {
             opacity: 0.6;
             pointer-events: none;
         }
 
-        /* Top row: Search + Filter */
+        /* ===== PaginatedTable Controls ===== */
         .pt-controls {
             display: flex;
             gap: 8px;
             align-items: center;
             margin-bottom: 12px;
         }
-
         .pt-search {
             flex: 1;
             min-width: 150px;
         }
-
         .pt-filter {
             width: auto !important;
             min-width: 140px;
         }
 
-        /* Bottom row: Selection + Bulk actions + Reload */
+        /* ===== PaginatedTable Selection Header ===== */
         .pt-selection-header {
             display: flex;
             gap: 8px;
@@ -522,31 +538,27 @@
             background: rgba(0, 0, 0, 0.2);
             border-radius: 4px;
         }
-
         .pt-select-all-container {
             display: flex;
             align-items: center;
             gap: 4px;
             cursor: pointer;
         }
-
         .pt-selected-count {
             margin-left: 8px;
             opacity: 0.7;
             min-width: 80px;
         }
-
         .pt-bulk-actions {
             display: flex;
             gap: 8px;
             margin-left: auto;
         }
-
         .pt-header-spacer {
             flex: 1;
         }
 
-        /* Reload button - material icon style */
+        /* ===== PaginatedTable Reload Button ===== */
         .pt-reload-btn {
             background: transparent !important;
             border: none !important;
@@ -560,20 +572,17 @@
             align-items: center !important;
             justify-content: center !important;
         }
-
         .pt-reload-btn:hover {
             opacity: 1;
         }
-
         .pt-reload-btn.spinning .pt-reload-icon {
             animation: spin 0.8s linear infinite;
         }
-
         .pt-reload-icon {
             font-size: 24px !important;
         }
 
-        /* Table body - scrollable with infinite scroll */
+        /* ===== PaginatedTable Body ===== */
         .pt-body {
             max-height: 400px;
             overflow-y: auto;
@@ -581,7 +590,7 @@
             border-radius: 4px;
         }
 
-        /* Table rows */
+        /* ===== PaginatedTable Rows ===== */
         .pt-row {
             display: flex;
             align-items: center;
@@ -591,43 +600,37 @@
             transition: background-color 0.15s;
             -webkit-tap-highlight-color: transparent;
         }
-
         .pt-row:hover {
             background: rgba(255, 255, 255, 0.05);
         }
-
         .pt-row:active {
             background: rgba(255, 255, 255, 0.1);
         }
-
         .pt-row:last-child {
             border-bottom: none;
         }
 
-        /* Table cells */
+        /* ===== PaginatedTable Cells ===== */
         .pt-cell {
             flex: 1;
             padding: 4px 8px;
             min-width: 0;
         }
-
         .pt-cell.pt-cell-checkbox {
             flex: 0 0 40px;
             padding: 4px;
         }
-
         .pt-cell.pt-cell-status {
             flex: 0 0 130px;
             text-align: right;
         }
-
         .pt-row-checkbox {
             cursor: pointer;
             width: 18px;
             height: 18px;
         }
 
-        /* Status badges - clickable button for mobile */
+        /* ===== PaginatedTable Status Badges ===== */
         .pt-status-badge {
             display: inline-block;
             padding: 4px 12px;
@@ -639,15 +642,12 @@
             -webkit-tap-highlight-color: transparent;
             transition: opacity 0.15s, transform 0.1s;
         }
-
         .pt-status-badge:hover {
             opacity: 0.85;
         }
-
         .pt-status-badge:active {
             transform: scale(0.97);
         }
-
         .pt-status-badge.Synced { background: var(--status-synced-bg); color: var(--status-synced-color); }
         .pt-status-badge.Queued { background: var(--status-queued-bg); color: var(--status-queued-color); }
         .pt-status-badge.Errored { background: var(--status-errored-bg); color: var(--status-errored-color); }
@@ -658,14 +658,14 @@
         .pt-status-badge.Pending-Deletion { background: var(--status-pending-deletion-bg); color: var(--status-pending-deletion-color); }
         .pt-status-badge.Deleting { background: var(--status-deleting-bg); color: var(--status-deleting-color); }
 
-        /* Empty state */
+        /* ===== PaginatedTable Empty State ===== */
         .pt-empty {
             padding: 32px 16px;
             text-align: center;
             opacity: 0.7;
         }
 
-        /* Loading more indicator */
+        /* ===== PaginatedTable Loading Indicator ===== */
         .pt-loading-more {
             padding: 12px;
             text-align: center;
@@ -673,37 +673,34 @@
             font-size: 0.9em;
         }
 
-        /* Footer with item count */
+        /* ===== PaginatedTable Footer ===== */
         .pt-footer {
             padding: 8px 12px;
             font-size: 0.9em;
             opacity: 0.7;
         }
 
-        /* Bulk action buttons */
+        /* ===== PaginatedTable Bulk Actions ===== */
         .pt-bulk-actions button {
             padding: 4px 12px !important;
             min-width: auto !important;
         }
-
         .pt-bulk-actions button:disabled {
             opacity: 0.4;
             cursor: not-allowed;
         }
 
-        /* Content-specific styles for syncTable use */
+        /* ===== PaginatedTable Content Styles ===== */
         .pt-cell .syncItemInfo {
             flex: 1;
             min-width: 0;
         }
-
         .pt-cell .syncItemName {
             font-weight: 500;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
-
         .pt-cell .syncItemPath {
             font-size: 0.85em;
             opacity: 0.7;
@@ -711,12 +708,10 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
-
         .pt-cell .syncItemPath.notExists {
             color: var(--status-pending-download-color);
             font-style: italic;
         }
-
         .pt-cell .syncItemError {
             font-size: 0.75em;
             color: var(--status-errored-color);
@@ -725,6 +720,5 @@
             text-overflow: ellipsis;
             max-width: 200px;
         }
-
     </style>
 </div>

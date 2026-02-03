@@ -1,42 +1,34 @@
-// Server Sync Plugin - Metadata Page Controller
-// This file uses the Jellyfin multi-page plugin pattern
+// ============================================
+// METADATASYNC - PAGE CONTROLLER
+// ============================================
+
+// ============================================
+// TAB NAVIGATION
+// ============================================
 
 function getTabs() {
     return [
-        {
-            href: 'configurationpage?name=serversync_settings',
-            name: 'Settings'
-        },
-        {
-            href: 'configurationpage?name=serversync_content',
-            name: 'Content'
-        },
-        {
-            href: 'configurationpage?name=serversync_history',
-            name: 'History'
-        },
-        {
-            href: 'configurationpage?name=serversync_metadata',
-            name: 'Metadata'
-        },
-        {
-            href: 'configurationpage?name=serversync_users',
-            name: 'Users'
-        }
+        { href: 'configurationpage?name=serversync_settings', name: 'Settings' },
+        { href: 'configurationpage?name=serversync_content', name: 'Content' },
+        { href: 'configurationpage?name=serversync_history', name: 'History' },
+        { href: 'configurationpage?name=serversync_metadata', name: 'Metadata' },
+        { href: 'configurationpage?name=serversync_users', name: 'Users' }
     ];
 }
 
 export default function (view, params) {
     'use strict';
 
-    // Shared utilities for Server Sync plugin configuration
+    // ============================================
+    // SHARED UTILITIES
+    // ============================================
+
     var ServerSyncShared = {
         pluginId: 'ebd650b5-6f4c-4ccb-b10d-23dffb3a7286',
-
-        // Local server name (fetched from system info)
         localServerName: null,
 
-        // Format relative time (e.g., "5 minutes ago")
+        // --- Formatting ---
+
         formatRelativeTime: function(date) {
             var now = new Date();
             var diff = now - date;
@@ -50,28 +42,27 @@ export default function (view, params) {
             return 'Just now';
         },
 
-        // Escape HTML special characters
         escapeHtml: function(str) {
             if (!str) return '';
             return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         },
 
-        // Show alert using Dashboard
+        // --- Alerts ---
+
         showAlert: function(message) {
             Dashboard.alert(message);
         },
 
-        // Get plugin configuration
+        // --- Configuration ---
+
         getConfig: function() {
             return ApiClient.getPluginConfiguration(this.pluginId);
         },
 
-        // Save plugin configuration
         saveConfig: function(config) {
             return ApiClient.updatePluginConfiguration(this.pluginId, config);
         },
 
-        // Fetch local server name from system info
         fetchLocalServerName: function() {
             var self = this;
             return ApiClient.getPublicSystemInfo().then(function(info) {
@@ -83,7 +74,8 @@ export default function (view, params) {
             });
         },
 
-        // Make API request to plugin endpoint
+        // --- API Requests ---
+
         apiRequest: function(endpoint, method, data) {
             var options = {
                 url: ApiClient.getUrl('ServerSync/' + endpoint),
@@ -106,7 +98,8 @@ export default function (view, params) {
             });
         },
 
-        // Set element visibility
+        // --- DOM Utilities ---
+
         setVisible: function(elementOrId, visible) {
             var el = typeof elementOrId === 'string' ? view.querySelector('#' + elementOrId) : elementOrId;
             if (el) {
@@ -118,7 +111,6 @@ export default function (view, params) {
             }
         },
 
-        // Safe event binding - binds event only if element exists (uses view.querySelector)
         bindEvent: function(id, event, handler, moduleName) {
             var el = view.querySelector('#' + id);
             if (el) {
@@ -129,15 +121,16 @@ export default function (view, params) {
             return el;
         },
 
-        // Safe click binding shorthand
         bindClick: function(id, handler, moduleName) {
             return this.bindEvent(id, 'click', handler, moduleName);
         }
     };
 
 
-    // PaginatedTable Component
-    // Generic table component with infinite scroll, search, filter, and bulk actions
+    // ============================================
+    // PAGINATED TABLE COMPONENT
+    // ============================================
+
     var PaginatedTable = function(options) {
         this.options = {
             containerId: null,
@@ -172,18 +165,13 @@ export default function (view, params) {
 
     PaginatedTable.prototype = {
 
-        // _getItemId
-        // Gets the ID for an item. Supports idKey as string (property name) or function.
-        _getItemId: function(item) {
-            var idKey = this.options.selection && this.options.selection.idKey || 'id';
-            if (typeof idKey === 'function') {
-                return idKey(item);
-            }
-            return item[idKey];
+        // --- Initialization ---
+
+        _init: function() {
+            this._createStructure();
+            this._bindEvents();
         },
 
-        // _mergeOptions
-        // Deep merges user-provided options with defaults.
         _mergeOptions: function(options) {
             var self = this;
             Object.keys(options).forEach(function(key) {
@@ -195,15 +183,6 @@ export default function (view, params) {
             });
         },
 
-        // _init
-        // Initializes the component by creating DOM structure and binding events.
-        _init: function() {
-            this._createStructure();
-            this._bindEvents();
-        },
-
-        // _createStructure
-        // Builds and injects the table HTML into the container element.
         _createStructure: function() {
             var container = view.querySelector('#' + this.options.containerId);
             if (!container) {
@@ -214,8 +193,6 @@ export default function (view, params) {
             this._cacheElements(container);
         },
 
-        // _cacheElements
-        // Stores references to frequently accessed DOM elements.
         _cacheElements: function(container) {
             this.elements = {
                 container: container,
@@ -231,8 +208,8 @@ export default function (view, params) {
             };
         },
 
-        // _buildHTML
-        // Generates the complete HTML structure for the table component.
+        // --- HTML Building ---
+
         _buildHTML: function() {
             var opts = this.options;
             var html = '<div class="pt-wrapper">';
@@ -287,8 +264,8 @@ export default function (view, params) {
             return html;
         },
 
-        // _bindEvents
-        // Attaches event listeners to interactive elements.
+        // --- Event Binding ---
+
         _bindEvents: function() {
             var self = this;
 
@@ -323,8 +300,8 @@ export default function (view, params) {
             }
         },
 
-        // _handleSearchInput
-        // Debounces search input to avoid excessive API calls.
+        // --- Event Handlers ---
+
         _handleSearchInput: function(value) {
             var self = this;
             if (this.searchTimeout) {
@@ -336,8 +313,6 @@ export default function (view, params) {
             }, debounceMs);
         },
 
-        // _handleScroll
-        // Triggers loading more items when scrolled near the bottom.
         _handleScroll: function() {
             var body = this.elements.body;
             if (!body || this.state.isLoading || !this.state.hasMore) return;
@@ -352,8 +327,6 @@ export default function (view, params) {
             }
         },
 
-        // _handleReload
-        // Resets state and reloads all data from the first page.
         _handleReload: function() {
             var self = this;
             var btn = this.elements.reloadBtn;
@@ -384,8 +357,8 @@ export default function (view, params) {
             });
         },
 
-        // reload
-        // Public method to reset state and reload from page 1.
+        // --- Data Loading ---
+
         reload: function() {
             console.log('PaginatedTable reload called, clearing state');
             this.state.items = [];
@@ -395,8 +368,6 @@ export default function (view, params) {
             return this.load();
         },
 
-        // load
-        // Fetches items from the API for the current page.
         load: function() {
             var self = this;
             var state = this.state;
@@ -417,7 +388,6 @@ export default function (view, params) {
 
             if (state.filterValue) {
                 if (opts.filters && opts.filters.buildParams) {
-                    // Custom filter param builder
                     var filterParams = opts.filters.buildParams(state.filterValue);
                     Object.keys(filterParams).forEach(function(key) {
                         if (filterParams[key] !== null && filterParams[key] !== undefined) {
@@ -456,8 +426,6 @@ export default function (view, params) {
             });
         },
 
-        // _loadMore
-        // Increments page and loads the next batch of items.
         _loadMore: function() {
             if (!this.state.hasMore || this.state.isLoading) return;
 
@@ -475,11 +443,8 @@ export default function (view, params) {
             });
         },
 
-        // _setLoading
-        // Toggles the loading state visual indicator.
         _setLoading: function(loading) {
             if (this.elements.container) {
-                // Only show loading overlay on first page load
                 if (loading && this.state.currentPage === 1) {
                     this.elements.container.classList.add('pt-loading');
                 } else {
@@ -488,16 +453,14 @@ export default function (view, params) {
             }
         },
 
-        // _render
-        // Updates all rendered portions of the table.
+        // --- Rendering ---
+
         _render: function() {
             this._renderBody();
             this._updateItemCount();
             this._updateSelectionUI();
         },
 
-        // _renderBody
-        // Renders all table rows or empty state message.
         _renderBody: function() {
             var self = this;
             var state = this.state;
@@ -519,8 +482,6 @@ export default function (view, params) {
             this._bindRowEvents();
         },
 
-        // _renderRow
-        // Generates HTML for a single table row.
         _renderRow: function(item) {
             var self = this;
             var opts = this.options;
@@ -565,8 +526,6 @@ export default function (view, params) {
             return html;
         },
 
-        // _getDisplayStatus
-        // Returns the display text for a status value.
         _getDisplayStatus: function(item, value) {
             if (this.options.getDisplayStatus) {
                 return this.options.getDisplayStatus(item, value);
@@ -574,8 +533,6 @@ export default function (view, params) {
             return value || '';
         },
 
-        // _getStatusClass
-        // Returns the CSS class for a status value.
         _getStatusClass: function(item, value) {
             if (this.options.getStatusClass) {
                 return this.options.getStatusClass(item, value);
@@ -583,8 +540,8 @@ export default function (view, params) {
             return value || '';
         },
 
-        // _bindRowEvents
-        // Attaches click and change handlers to row elements.
+        // --- Row Events ---
+
         _bindRowEvents: function() {
             var self = this;
             var body = this.elements.body;
@@ -592,7 +549,6 @@ export default function (view, params) {
 
             body.querySelectorAll('.pt-row').forEach(function(row) {
                 var handleRowAction = function(e) {
-                    // Skip if clicking checkbox or status button (handled separately)
                     if (e.target.type === 'checkbox' || e.target.classList.contains('pt-row-checkbox') ||
                         e.target.classList.contains('pt-status-btn')) {
                         return;
@@ -610,7 +566,7 @@ export default function (view, params) {
                 row.addEventListener('click', handleRowAction);
             });
 
-            // Status badge buttons - explicit tap target for mobile
+            // Status badge buttons
             body.querySelectorAll('.pt-status-btn').forEach(function(btn) {
                 btn.addEventListener('click', function(e) {
                     e.preventDefault();
@@ -623,6 +579,7 @@ export default function (view, params) {
                 });
             });
 
+            // Row checkboxes
             body.querySelectorAll('.pt-row-checkbox').forEach(function(checkbox) {
                 checkbox.addEventListener('change', function(e) {
                     e.stopPropagation();
@@ -636,15 +593,22 @@ export default function (view, params) {
                     self._notifySelectionChange();
                 });
 
-                // Prevent row click when clicking checkbox
                 checkbox.addEventListener('click', function(e) {
                     e.stopPropagation();
                 });
             });
         },
 
-        // _getItemById
-        // Finds an item in the current items array by its ID.
+        // --- Selection Management ---
+
+        _getItemId: function(item) {
+            var idKey = this.options.selection && this.options.selection.idKey || 'id';
+            if (typeof idKey === 'function') {
+                return idKey(item);
+            }
+            return item[idKey];
+        },
+
         _getItemById: function(id) {
             var self = this;
             return this.state.items.find(function(item) {
@@ -652,8 +616,6 @@ export default function (view, params) {
             });
         },
 
-        // _updateItemCount
-        // Updates the footer text showing loaded vs total item counts.
         _updateItemCount: function() {
             if (this.elements.itemCount) {
                 var loaded = this.state.items.length;
@@ -669,8 +631,6 @@ export default function (view, params) {
             }
         },
 
-        // _updateSelectionUI
-        // Syncs the selection count display and select-all checkbox state.
         _updateSelectionUI: function() {
             var count = this.state.selectedIds.size;
 
@@ -686,8 +646,6 @@ export default function (view, params) {
             }
         },
 
-        // _toggleSelectAll
-        // Selects or deselects all currently loaded items.
         _toggleSelectAll: function(checked) {
             var self = this;
 
@@ -709,26 +667,18 @@ export default function (view, params) {
             this._notifySelectionChange();
         },
 
-        // _notifySelectionChange
-        // Invokes the selection change callback if configured.
         _notifySelectionChange: function() {
             if (this.options.selection && this.options.selection.onSelectionChange) {
                 this.options.selection.onSelectionChange(this.getSelectedIds());
             }
         },
 
-        // ========================================
-        // Public API
-        // ========================================
+        // --- Public API ---
 
-        // getSelectedIds
-        // Returns an array of selected item IDs.
         getSelectedIds: function() {
             return Array.from(this.state.selectedIds);
         },
 
-        // getSelectedItems
-        // Returns an array of selected item objects.
         getSelectedItems: function() {
             var self = this;
             return this.state.items.filter(function(item) {
@@ -736,8 +686,6 @@ export default function (view, params) {
             });
         },
 
-        // clearSelection
-        // Clears all selected items and updates UI.
         clearSelection: function() {
             this.state.selectedIds.clear();
             this._updateSelectionUI();
@@ -754,8 +702,6 @@ export default function (view, params) {
             }
         },
 
-        // refresh
-        // Resets pagination and reloads data from the beginning.
         refresh: function() {
             this.state.items = [];
             this.state.currentPage = 1;
@@ -763,8 +709,6 @@ export default function (view, params) {
             return this.load();
         },
 
-        // setFilter
-        // Applies a filter value and reloads data.
         setFilter: function(value) {
             this.state.filterValue = value;
             this.state.items = [];
@@ -774,8 +718,6 @@ export default function (view, params) {
             return this.load();
         },
 
-        // setSearch
-        // Applies a search query and reloads data.
         setSearch: function(query) {
             this.state.searchQuery = query;
             this.state.items = [];
@@ -785,26 +727,18 @@ export default function (view, params) {
             return this.load();
         },
 
-        // getItems
-        // Returns all currently loaded items.
         getItems: function() {
             return this.state.items;
         },
 
-        // getTotalCount
-        // Returns the total number of items available on the server.
         getTotalCount: function() {
             return this.state.totalCount;
         },
 
-        // getBulkActionsContainer
-        // Returns the DOM element for injecting bulk action buttons.
         getBulkActionsContainer: function() {
             return this.elements.bulkActions;
         },
 
-        // setFilterOptionVisible
-        // Shows or hides a specific filter dropdown option.
         setFilterOptionVisible: function(optionId, visible) {
             if (this.elements.filter) {
                 var option = this.elements.filter.querySelector('#' + optionId);
@@ -814,8 +748,6 @@ export default function (view, params) {
             }
         },
 
-        // setFilterValue
-        // Sets the filter value without triggering a reload.
         setFilterValue: function(value) {
             this.state.filterValue = value;
             if (this.elements.filter) {
@@ -825,16 +757,19 @@ export default function (view, params) {
     };
 
 
-    // Metadata Sync Table Module
-    // Uses the generic PaginatedTable component for metadata sync items
+    // ============================================
+    // METADATA SYNC TABLE MODULE
+    // ============================================
+
     var MetadataSyncTableModule = {
         table: null,
         currentModalItem: null,
         currentConfig: null,
         _initialized: false,
 
+        // --- Initialization ---
+
         init: function(config) {
-            // Prevent double initialization (viewshow can fire multiple times)
             if (this._initialized) {
                 return;
             }
@@ -843,7 +778,6 @@ export default function (view, params) {
             var self = this;
             self.currentConfig = config;
 
-            // Create the paginated table instance for metadata items
             this.table = new PaginatedTable({
                 containerId: 'metadataSyncItemsTableContainer',
                 endpoint: 'MetadataItems',
@@ -927,10 +861,7 @@ export default function (view, params) {
                 }
             });
 
-            // Bind module-specific events
             this._bindModuleEvents();
-
-            // Inject bulk action buttons
             this._injectBulkActions();
         },
 
@@ -962,6 +893,8 @@ export default function (view, params) {
             view.querySelector('#btnMetadataBulkIgnore').addEventListener('click', function() { self.bulkIgnore(); });
             view.querySelector('#btnMetadataBulkQueue').addEventListener('click', function() { self.bulkQueue(); });
         },
+
+        // --- Status & Health Loading ---
 
         loadMetadataStatus: function() {
             return ServerSyncShared.apiRequest('MetadataStatus', 'GET').then(function(status) {
@@ -1018,6 +951,8 @@ export default function (view, params) {
         loadMetadataItems: function() {
             return this.table.reload();
         },
+
+        // --- Action Handlers ---
 
         refreshMetadataTable: function() {
             var self = this;
@@ -1085,6 +1020,8 @@ export default function (view, params) {
             });
         },
 
+        // --- Bulk Actions ---
+
         updateBulkActionsVisibility: function(count) {
             var hasSelection = count > 0;
             var ignoreBtn = view.querySelector('#btnMetadataBulkIgnore');
@@ -1124,10 +1061,11 @@ export default function (view, params) {
             });
         },
 
+        // --- Modal Management ---
+
         showItemDetail: function(itemId) {
             var self = this;
 
-            // Fetch full item details from API
             ServerSyncShared.apiRequest('MetadataItems/' + itemId).then(function(item) {
                 if (!item) {
                     ServerSyncShared.showAlert('Item not found');
@@ -1189,7 +1127,6 @@ export default function (view, params) {
             var tbody = view.querySelector('#metadataSyncModalTableBody');
             var html = '';
 
-            // Define properties to compare
             var properties = item.Properties || [];
 
             if (properties.length === 0) {
@@ -1245,21 +1182,21 @@ export default function (view, params) {
     };
 
 
-    // Metadata Page Controller
+    // ============================================
+    // PAGE CONTROLLER
+    // ============================================
+
     var MetadataPageController = {
         currentConfig: null,
 
         init: function() {
             var self = this;
-
-            // Load config and initialize modules
             self.loadConfig();
         },
 
         loadConfig: function() {
             var self = this;
 
-            // Fetch local server name first
             ServerSyncShared.fetchLocalServerName().then(function() {
                 return ServerSyncShared.getConfig();
             }).then(function(config) {
@@ -1278,7 +1215,10 @@ export default function (view, params) {
     };
 
 
-    // Initialize on viewshow
+    // ============================================
+    // EVENT LISTENERS
+    // ============================================
+
     view.addEventListener('viewshow', function () {
         console.log('ServerSync Metadata: viewshow event fired');
 

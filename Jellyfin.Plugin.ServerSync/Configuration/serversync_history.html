@@ -1,3 +1,5 @@
+<!-- HISTORYSYNC - PAGE -->
+
 <div id="ServerSyncHistoryPage" data-role="page" class="page type-interior pluginConfigurationPage withTabs"
      data-require="emby-input,emby-button,emby-select,emby-checkbox"
      data-controller="__plugin/serversync_history.js">
@@ -5,66 +7,76 @@
         <div class="content-primary">
             <form id="ServerSyncHistoryForm">
                 <div class="verticalSection verticalSection-extrabottompadding">
+
+                    <!-- SECTION: Page Header -->
+
                     <div class="sectionTitleContainer flex align-items-center">
                         <h1 class="sectionTitle">History</h1>
                     </div>
 
-                        <div id="historySyncStatusSummary">
-                            <div class="statusCards" id="historyStatusRow">
-                                <div class="statusCard statusCard-synced" id="historyStatusGroupSynced" title="">
-                                    <span class="statusCard-count" id="historySyncedCount">0</span>
-                                    <span class="statusCard-label">Synced</span>
-                                </div>
-                                <div class="statusCard statusCard-queued" id="historyStatusGroupQueued" title="">
-                                    <span class="statusCard-count" id="historyQueuedCount">0</span>
-                                    <span class="statusCard-label">Queued</span>
-                                </div>
-                                <div class="statusCard statusCard-errored" id="historyStatusGroupErrored" title="">
-                                    <span class="statusCard-count" id="historyErroredCount">0</span>
-                                    <span class="statusCard-label">Errored</span>
-                                </div>
-                                <div class="statusCard statusCard-ignored" id="historyStatusGroupIgnored" title="">
-                                    <span class="statusCard-count" id="historyIgnoredCount">0</span>
-                                    <span class="statusCard-label">Ignored</span>
-                                </div>
+                    <!-- SECTION: Status Summary Cards -->
+
+                    <div id="historySyncStatusSummary">
+                        <div class="statusCards" id="historyStatusRow">
+                            <div class="statusCard statusCard-synced" id="historyStatusGroupSynced" title="">
+                                <span class="statusCard-count" id="historySyncedCount">0</span>
+                                <span class="statusCard-label">Synced</span>
+                            </div>
+                            <div class="statusCard statusCard-queued" id="historyStatusGroupQueued" title="">
+                                <span class="statusCard-count" id="historyQueuedCount">0</span>
+                                <span class="statusCard-label">Queued</span>
+                            </div>
+                            <div class="statusCard statusCard-errored" id="historyStatusGroupErrored" title="">
+                                <span class="statusCard-count" id="historyErroredCount">0</span>
+                                <span class="statusCard-label">Errored</span>
+                            </div>
+                            <div class="statusCard statusCard-ignored" id="historyStatusGroupIgnored" title="">
+                                <span class="statusCard-count" id="historyIgnoredCount">0</span>
+                                <span class="statusCard-label">Ignored</span>
                             </div>
                         </div>
+                    </div>
 
-                        <div id="historyHealthDashboard" class="healthDashboard">
-                            <div class="healthRow">
-                                <div class="healthCard">
-                                    <span class="healthLabel">Last Sync</span>
-                                    <span class="healthValue" id="historyHealthLastSync">Never</span>
-                                </div>
-                                <div class="healthCard">
-                                    <span class="healthLabel">Users Mapped</span>
-                                    <span class="healthValue" id="historyHealthUserCount">0</span>
-                                </div>
-                                <div class="healthCard">
-                                    <span class="healthLabel">Libraries Mapped</span>
-                                    <span class="healthValue" id="historyHealthLibraryCount">0</span>
-                                </div>
+                    <!-- SECTION: Health Dashboard -->
+
+                    <div id="historyHealthDashboard" class="healthDashboard">
+                        <div class="healthRow">
+                            <div class="healthCard">
+                                <span class="healthLabel">Last Sync</span>
+                                <span class="healthValue" id="historyHealthLastSync">Never</span>
+                            </div>
+                            <div class="healthCard">
+                                <span class="healthLabel">Users Mapped</span>
+                                <span class="healthValue" id="historyHealthUserCount">0</span>
+                            </div>
+                            <div class="healthCard">
+                                <span class="healthLabel">Libraries Mapped</span>
+                                <span class="healthValue" id="historyHealthLibraryCount">0</span>
                             </div>
                         </div>
+                    </div>
 
-                        <div class="syncActionButtonRow">
-                            <button is="emby-button" type="button" id="btnRefreshHistoryItems" class="raised syncActionButton">
-                                <span>Refresh</span>
-                            </button>
-                            <button is="emby-button" type="button" id="btnTriggerHistorySync" class="raised button-primary syncActionButton">
-                                <span>Sync</span>
-                            </button>
-                            <button is="emby-button" type="button" id="btnRetryHistoryErrors" class="raised syncActionButton">
-                                <span>Retry Errors</span>
-                            </button>
-                            <button is="emby-button" type="button" id="btnResetHistoryDatabase" class="raised button-destructive syncActionButton">
-                                <span>Reset Database</span>
-                            </button>
-                        </div>
+                    <!-- SECTION: Action Buttons -->
+
+                    <div class="syncActionButtonRow">
+                        <button is="emby-button" type="button" id="btnRefreshHistoryItems" class="raised syncActionButton">
+                            <span>Refresh</span>
+                        </button>
+                        <button is="emby-button" type="button" id="btnTriggerHistorySync" class="raised button-primary syncActionButton">
+                            <span>Sync</span>
+                        </button>
+                        <button is="emby-button" type="button" id="btnRetryHistoryErrors" class="raised syncActionButton">
+                            <span>Retry Errors</span>
+                        </button>
+                        <button is="emby-button" type="button" id="btnResetHistoryDatabase" class="raised button-destructive syncActionButton">
+                            <span>Reset Database</span>
+                        </button>
+                    </div>
 
                     <div class="syncSectionSeparator"></div>
 
-                    <!-- Paginated Table Container for History Items -->
+                    <!-- SECTION: History Items Table -->
+
                     <div id="historyItemsTableContainer">
                         <!-- PaginatedTable will generate its structure here -->
                     </div>
@@ -74,12 +86,14 @@
         </div>
     </div>
 
-    <!-- History Item Detail Modal -->
+    <!-- SECTION: History Item Detail Modal -->
+
     <div id="historyItemDetailModal" class="dialog hidden">
         <div class="dialogContent historyModal-dialog modal-relative">
             <button type="button" id="btnHistoryModalClose" class="dialogCloseBtn" title="Close">&times;</button>
             <h2 id="historyModalTitle" class="modal-title"></h2>
             <div id="historyModalContent" class="modal-body">
+
                 <!-- Top row: Status badge + Server mapping -->
                 <div class="historyModal-topRow">
                     <span id="historyModalStatusBadge" class="itemModal-statusBadge"></span>
@@ -94,12 +108,13 @@
                     </div>
                 </div>
 
+                <!-- Error Section -->
                 <div id="historyModalErrorSection" class="modal-field hidden">
                     <div class="modal-field-label">Error</div>
                     <div id="historyModalError" class="errorMessage"></div>
                 </div>
 
-                <!-- User Mapping - separate lines for name and GUID -->
+                <!-- User Mapping Section -->
                 <div class="historyModal-userSection">
                     <div class="historyModal-userRow">
                         <div class="historyModal-userBlock">
@@ -159,6 +174,8 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- Modal Action Buttons -->
             <div class="modalButtonRow">
                 <button is="emby-button" type="button" id="btnHistoryModalIgnore" class="raised modalButton">
                     <span>Ignore</span>
@@ -170,7 +187,8 @@
         </div>
     </div>
 
-    <!-- Styles: History Page -->
+    <!-- STYLES: History Page Base -->
+
     <style>
         /* ===== Status Color Variables ===== */
         :root {
@@ -191,12 +209,13 @@
             --status-pending-border: rgba(155, 89, 182, 0.3);
         }
 
-        /* ===== Utility Classes ===== */
+        /* ===== Animations ===== */
         @keyframes spin {
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
         }
 
+        /* ===== Section Title Styling ===== */
         .sectionTitleContainer .sectionTitle {
             width: 100%;
             border-bottom: 1px solid #555;
@@ -204,7 +223,7 @@
             margin-bottom: 1em;
         }
 
-        /* Button styles */
+        /* ===== Button Styles ===== */
         .button-primary {
             background-color: #00a4dc !important;
             color: #fff !important;
@@ -220,7 +239,7 @@
             background-color: #c9302c !important;
         }
 
-        /* Dialog/Modal styling */
+        /* ===== Dialog/Modal Base Styling ===== */
         .dialog {
             position: fixed;
             top: 0;
@@ -258,7 +277,7 @@
             opacity: 1;
         }
 
-        /* Error message styling */
+        /* ===== Error Message Styling ===== */
         .errorMessage {
             background: var(--status-errored-bg);
             color: var(--status-errored-color);
@@ -269,27 +288,27 @@
             word-break: break-all;
         }
 
-        /* Layout utility classes */
+        /* ===== Layout Utility Classes ===== */
         .hidden { display: none !important; }
 
-        /* Modal field layout */
+        /* ===== Modal Field Layout ===== */
         .modal-field { margin-bottom: 12px; }
         .modal-field-label { opacity: 0.7; margin-bottom: 4px; }
         .modal-title { margin-top: 0; padding-right: 32px; }
         .modal-body { margin: 16px 0; }
         .modal-relative { position: relative; }
-
     </style>
 
-    <!-- Styles: History Modal and Compare Table -->
+    <!-- STYLES: History Modal and Compare Table -->
+
     <style>
-        /* History Modal specific styles */
+        /* ===== History Modal Dialog ===== */
         .historyModal-dialog {
             max-width: 900px;
             width: 95vw;
         }
 
-        /* Top row: Status + Server mapping on same line */
+        /* ===== History Modal - Top Row ===== */
         .historyModal-topRow {
             display: flex;
             align-items: center;
@@ -301,7 +320,7 @@
             opacity: 0.8;
         }
 
-        /* Info grid for Last Sync */
+        /* ===== History Modal - Info Grid ===== */
         .historyModal-infoGrid {
             display: flex;
             gap: 24px;
@@ -326,7 +345,7 @@
             font-weight: 500;
         }
 
-        /* User section - split display */
+        /* ===== History Modal - User Section ===== */
         .historyModal-userSection {
             margin-bottom: 16px;
         }
@@ -364,7 +383,7 @@
             padding-top: 20px;
         }
 
-        /* History comparison table for modal */
+        /* ===== History Comparison Table ===== */
         .historyCompareTable {
             width: 100%;
             border-collapse: collapse;
@@ -412,18 +431,18 @@
             border-bottom: none;
         }
 
-        /* Sync section separator */
+        /* ===== Section Separator ===== */
         .syncSectionSeparator {
             border-bottom: 1px solid #555;
             margin-top: 16px;
             margin-bottom: 16px;
         }
-
     </style>
 
-    <!-- Styles: Status Cards and Health Dashboard -->
+    <!-- STYLES: Status Cards and Health Dashboard -->
+
     <style>
-        /* Health Dashboard */
+        /* ===== Health Dashboard ===== */
         .healthDashboard {
             padding: 16px;
             background: rgba(0,0,0,0.3);
@@ -451,7 +470,7 @@
         .healthValue.warning { color: var(--status-queued-color); }
         .healthValue.success { color: var(--status-synced-color); }
 
-        /* Status cards */
+        /* ===== Status Cards ===== */
         .statusCards {
             display: flex;
             gap: 12px;
@@ -481,7 +500,7 @@
         .statusCard-errored { background: var(--status-errored-bg); color: var(--status-errored-color); }
         .statusCard-ignored { background: var(--status-ignored-bg); color: var(--status-ignored-color); }
 
-        /* Sync Action Button Row */
+        /* ===== Sync Action Button Row ===== */
         .syncActionButtonRow {
             display: flex;
             gap: 8px;
@@ -493,11 +512,11 @@
             justify-content: center;
         }
 
-        /* Modal button layout */
+        /* ===== Modal Button Layout ===== */
         .modalButtonRow { display: flex; gap: 8px; margin-top: 8px; }
         .modalButton { flex: 1; text-align: center; justify-content: center; }
 
-        /* Status Badge */
+        /* ===== Status Badge (Modal) ===== */
         .itemModal-statusBadge {
             display: inline-block;
             padding: 6px 14px;
@@ -512,46 +531,38 @@
         .itemModal-statusBadge.Errored { background: var(--status-errored-bg); color: var(--status-errored-color); border: 1px solid var(--status-errored-border); }
         .itemModal-statusBadge.Ignored { background: var(--status-ignored-bg); color: var(--status-ignored-color); border: 1px solid var(--status-ignored-border); }
         .itemModal-statusBadge.Pending { background: var(--status-pending-bg); color: var(--status-pending-color); border: 1px solid var(--status-pending-border); }
-
     </style>
 
-    <!-- Styles: PaginatedTable/paginatedTable.css -->
-    <style>
-        /* ============================================
-           PaginatedTable Component Styles
-           Prefix: pt- (paginated-table)
-           Generic, reusable table component with infinite scroll
-           ============================================ */
+    <!-- STYLES: PaginatedTable Component -->
 
+    <style>
+        /* ===== PaginatedTable Wrapper ===== */
         .pt-wrapper {
             display: flex;
             flex-direction: column;
         }
-
         .pt-wrapper.pt-loading {
             opacity: 0.6;
             pointer-events: none;
         }
 
-        /* Top row: Search + Filter */
+        /* ===== PaginatedTable Controls ===== */
         .pt-controls {
             display: flex;
             gap: 8px;
             align-items: center;
             margin-bottom: 12px;
         }
-
         .pt-search {
             flex: 1;
             min-width: 150px;
         }
-
         .pt-filter {
             width: auto !important;
             min-width: 140px;
         }
 
-        /* Bottom row: Selection + Bulk actions + Reload */
+        /* ===== PaginatedTable Selection Header ===== */
         .pt-selection-header {
             display: flex;
             gap: 8px;
@@ -561,31 +572,27 @@
             background: rgba(0, 0, 0, 0.2);
             border-radius: 4px;
         }
-
         .pt-select-all-container {
             display: flex;
             align-items: center;
             gap: 4px;
             cursor: pointer;
         }
-
         .pt-selected-count {
             margin-left: 8px;
             opacity: 0.7;
             min-width: 80px;
         }
-
         .pt-bulk-actions {
             display: flex;
             gap: 8px;
             margin-left: auto;
         }
-
         .pt-header-spacer {
             flex: 1;
         }
 
-        /* Reload button - material icon style */
+        /* ===== PaginatedTable Reload Button ===== */
         .pt-reload-btn {
             background: transparent !important;
             border: none !important;
@@ -599,20 +606,17 @@
             align-items: center !important;
             justify-content: center !important;
         }
-
         .pt-reload-btn:hover {
             opacity: 1;
         }
-
         .pt-reload-btn.spinning .pt-reload-icon {
             animation: spin 0.8s linear infinite;
         }
-
         .pt-reload-icon {
             font-size: 24px !important;
         }
 
-        /* Table body - scrollable with infinite scroll */
+        /* ===== PaginatedTable Body ===== */
         .pt-body {
             max-height: 400px;
             overflow-y: auto;
@@ -620,7 +624,7 @@
             border-radius: 4px;
         }
 
-        /* Table rows */
+        /* ===== PaginatedTable Rows ===== */
         .pt-row {
             display: flex;
             align-items: center;
@@ -630,43 +634,37 @@
             transition: background-color 0.15s;
             -webkit-tap-highlight-color: transparent;
         }
-
         .pt-row:hover {
             background: rgba(255, 255, 255, 0.05);
         }
-
         .pt-row:active {
             background: rgba(255, 255, 255, 0.1);
         }
-
         .pt-row:last-child {
             border-bottom: none;
         }
 
-        /* Table cells */
+        /* ===== PaginatedTable Cells ===== */
         .pt-cell {
             flex: 1;
             padding: 4px 8px;
             min-width: 0;
         }
-
         .pt-cell.pt-cell-checkbox {
             flex: 0 0 40px;
             padding: 4px;
         }
-
         .pt-cell.pt-cell-status {
             flex: 0 0 130px;
             text-align: right;
         }
-
         .pt-row-checkbox {
             cursor: pointer;
             width: 18px;
             height: 18px;
         }
 
-        /* Status badges - clickable button for mobile */
+        /* ===== PaginatedTable Status Badges ===== */
         .pt-status-badge {
             display: inline-block;
             padding: 4px 12px;
@@ -678,29 +676,26 @@
             -webkit-tap-highlight-color: transparent;
             transition: opacity 0.15s, transform 0.1s;
         }
-
         .pt-status-badge:hover {
             opacity: 0.85;
         }
-
         .pt-status-badge:active {
             transform: scale(0.97);
         }
-
         .pt-status-badge.Synced { background: var(--status-synced-bg); color: var(--status-synced-color); }
         .pt-status-badge.Queued { background: var(--status-queued-bg); color: var(--status-queued-color); }
         .pt-status-badge.Errored { background: var(--status-errored-bg); color: var(--status-errored-color); }
         .pt-status-badge.Ignored { background: var(--status-ignored-bg); color: var(--status-ignored-color); }
         .pt-status-badge.Pending { background: var(--status-pending-bg); color: var(--status-pending-color); }
 
-        /* Empty state */
+        /* ===== PaginatedTable Empty State ===== */
         .pt-empty {
             padding: 32px 16px;
             text-align: center;
             opacity: 0.7;
         }
 
-        /* Loading more indicator */
+        /* ===== PaginatedTable Loading Indicator ===== */
         .pt-loading-more {
             padding: 12px;
             text-align: center;
@@ -708,37 +703,34 @@
             font-size: 0.9em;
         }
 
-        /* Footer with item count */
+        /* ===== PaginatedTable Footer ===== */
         .pt-footer {
             padding: 8px 12px;
             font-size: 0.9em;
             opacity: 0.7;
         }
 
-        /* Bulk action buttons */
+        /* ===== PaginatedTable Bulk Actions ===== */
         .pt-bulk-actions button {
             padding: 4px 12px !important;
             min-width: auto !important;
         }
-
         .pt-bulk-actions button:disabled {
             opacity: 0.4;
             cursor: not-allowed;
         }
 
-        /* Content-specific styles for syncTable use */
+        /* ===== PaginatedTable Content Styles ===== */
         .pt-cell .syncItemInfo {
             flex: 1;
             min-width: 0;
         }
-
         .pt-cell .syncItemName {
             font-weight: 500;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
-
         .pt-cell .syncItemPath {
             font-size: 0.85em;
             opacity: 0.7;
@@ -746,7 +738,6 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
-
         .pt-cell .syncItemError {
             font-size: 0.75em;
             color: var(--status-errored-color);
@@ -755,6 +746,5 @@
             text-overflow: ellipsis;
             max-width: 200px;
         }
-
     </style>
 </div>
