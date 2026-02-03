@@ -460,8 +460,9 @@ public class MetadataSyncTableService
             ["AspectRatio"] = sourceItem.AspectRatio,
             ["Video3DFormat"] = sourceItem.Video3DFormat?.ToString(),
 
-            // Locked fields (prevents metadata providers from overwriting)
-            ["LockedFields"] = sourceItem.LockedFields?.Select(f => f.ToString()).ToArray()
+            // Lock settings (prevents metadata providers from overwriting)
+            ["LockedFields"] = sourceItem.LockedFields?.Select(f => f.ToString()).ToArray(),
+            ["LockData"] = sourceItem.LockData  // IsLocked - lock this item to prevent future changes
         };
 
         item.SourceMetadataValue = JsonSerializer.Serialize(sourceMetadata);
@@ -511,8 +512,9 @@ public class MetadataSyncTableService
                 ["AspectRatio"] = localVideo?.AspectRatio,
                 ["Video3DFormat"] = localVideo?.Video3DFormat?.ToString(),
 
-                // Locked fields (prevents metadata providers from overwriting)
-                ["LockedFields"] = localItem.LockedFields?.Select(f => f.ToString()).ToArray()
+                // Lock settings (prevents metadata providers from overwriting)
+                ["LockedFields"] = localItem.LockedFields?.Select(f => f.ToString()).ToArray(),
+                ["LockData"] = localItem.IsLocked  // Lock this item to prevent future changes
             };
 
             item.LocalMetadataValue = JsonSerializer.Serialize(localMetadata);

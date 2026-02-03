@@ -942,12 +942,6 @@ export default function (view, params) {
                 var libraryMappings = config.LibraryMappings || [];
                 libraryCountEl.textContent = libraryMappings.length;
                 libraryCountEl.className = libraryMappings.length > 0 ? 'healthValue success' : 'healthValue warning';
-
-                // Pending count from status
-                var pendingCountEl = view.querySelector('#metadataHealthPendingCount');
-                var pending = (status.Queued || 0);
-                pendingCountEl.textContent = pending;
-                pendingCountEl.className = pending > 0 ? 'healthValue warning' : 'healthValue';
             }).catch(function() {
                 // Ignore errors
             });
@@ -1284,6 +1278,7 @@ export default function (view, params) {
                 { key: 'ParentIndexNumber', label: 'Parent Index Number' },
                 { key: 'PreferredMetadataCountryCode', label: 'Country/Region' },
                 { key: 'PreferredMetadataLanguage', label: 'Preferred Language' },
+                { key: 'LockData', label: 'Lock Item', isBoolean: true },
                 { key: 'LockedFields', label: 'Locked Fields', isArray: true }
             ];
 
@@ -1351,6 +1346,13 @@ export default function (view, params) {
         },
 
         formatMetadataValue: function(value, field) {
+            // Handle booleans first (before isEmpty check, since false is a valid value)
+            if (field.isBoolean) {
+                if (value === true) return 'Yes';
+                if (value === false) return 'No';
+                return '-';
+            }
+
             if (this.isEmpty(value)) return '-';
 
             if (field.isArray && Array.isArray(value)) {
@@ -1381,6 +1383,13 @@ export default function (view, params) {
         },
 
         normalizeForComparison: function(value, field) {
+            // Handle booleans first (false is a valid value, not empty)
+            if (field.isBoolean) {
+                if (value === true) return 'true';
+                if (value === false) return 'false';
+                return '';
+            }
+
             if (this.isEmpty(value)) return '';
 
             if (field.isArray && Array.isArray(value)) {

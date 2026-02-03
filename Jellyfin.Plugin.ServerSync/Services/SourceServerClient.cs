@@ -236,7 +236,9 @@ public class SourceServerClient : IDisposable
                         ItemFields.OriginalTitle,
                         ItemFields.SortName,
                         ItemFields.ProductionLocations,
-                        ItemFields.Taglines
+                        ItemFields.Taglines,
+                        ItemFields.Settings,     // For LockedFields, PreferredMetadataLanguage, PreferredMetadataCountryCode
+                        ItemFields.CustomRating  // For CustomRating field
                     };
                     config.QueryParameters.StartIndex = startIndex;
                     config.QueryParameters.Limit = limit;

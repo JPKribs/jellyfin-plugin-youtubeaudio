@@ -586,6 +586,26 @@ public class SyncMissingMetadataTask : IScheduledTask
                 hasChanges = true;
             }
 
+            // LockData (IsLocked - lock item to prevent future metadata changes)
+            if (metadata.TryGetValue("LockData", out var lockDataValue))
+            {
+                bool? lockData = null;
+                if (lockDataValue.ValueKind == JsonValueKind.True)
+                {
+                    lockData = true;
+                }
+                else if (lockDataValue.ValueKind == JsonValueKind.False)
+                {
+                    lockData = false;
+                }
+
+                if (lockData.HasValue && localItem.IsLocked != lockData.Value)
+                {
+                    localItem.IsLocked = lockData.Value;
+                    hasChanges = true;
+                }
+            }
+
             if (hasChanges)
             {
                 await localItem.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
