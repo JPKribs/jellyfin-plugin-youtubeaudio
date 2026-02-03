@@ -202,11 +202,12 @@ export default function (view, params) {
             // Top row: Search + Filter
             html += '<div class="pt-controls">';
             if (opts.search && opts.search.enabled !== false) {
-                html += '<input is="emby-input" type="text" class="pt-search" placeholder="' +
+                html += '<input type="text" class="pt-search" placeholder="' +
                     ServerSyncShared.escapeHtml(opts.search.placeholder || 'Search...') + '" />';
             }
             if (opts.filters && opts.filters.options && opts.filters.options.length > 0) {
-                html += '<select is="emby-select" class="pt-filter">';
+                html += '<div class="pt-filter-wrapper">';
+                html += '<select class="pt-filter">';
                 html += '<option value="">All</option>';
                 opts.filters.options.forEach(function(opt) {
                     var style = opt.hidden ? ' style="display:none"' : '';
@@ -215,21 +216,24 @@ export default function (view, params) {
                         ServerSyncShared.escapeHtml(opt.label) + '</option>';
                 });
                 html += '</select>';
+                html += '<span class="pt-filter-arrow">&#9662;</span>';
+                html += '</div>';
             }
             html += '</div>';
 
             // Bottom row: Selection controls + Bulk actions + Reload button
             if (opts.selection && opts.selection.enabled) {
                 html += '<div class="pt-selection-header">';
-                html += '<label class="pt-select-all-container">';
+                html += '<label class="pt-select-all-label">';
                 html += '<input type="checkbox" class="pt-select-all" />';
-                html += '<span>Select All</span>';
+                html += '<span class="pt-checkbox-custom"></span>';
+                html += '<span class="pt-select-all-text">Select All</span>';
                 html += '</label>';
                 html += '<span class="pt-selected-count">0 selected</span>';
                 html += '<div class="pt-bulk-actions"></div>';
                 html += '<span class="pt-header-spacer"></span>';
-                html += '<button is="emby-button" type="button" class="pt-reload-btn" title="Reload table data">';
-                html += '<span class="material-icons pt-reload-icon">refresh</span>';
+                html += '<button type="button" class="pt-reload-btn" title="Reload">';
+                html += '<span class="pt-reload-icon">&#8635;</span>';
                 html += '</button>';
                 html += '</div>';
             }
@@ -778,10 +782,18 @@ export default function (view, params) {
                             var localLib = item.LocalLibraryName || 'Unknown';
                             var libraryDisplay = sourceLib + ' → ' + localLib;
 
+                            var errorPreview = '';
+                            if (item.Status === 'Errored' && item.ErrorMessage) {
+                                errorPreview = '<div class="syncItemError" title="' +
+                                    ServerSyncShared.escapeHtml(item.ErrorMessage) + '">' +
+                                    ServerSyncShared.escapeHtml(item.ErrorMessage) + '</div>';
+                            }
+
                             return '<div class="syncItemInfo">' +
                                 '<div class="syncItemName" title="' + ServerSyncShared.escapeHtml(itemName) + '">' +
                                 ServerSyncShared.escapeHtml(itemName) + '</div>' +
                                 '<div class="syncItemPath">' + ServerSyncShared.escapeHtml(libraryDisplay) + '</div>' +
+                                errorPreview +
                                 '</div>';
                         }
                     },
@@ -892,6 +904,14 @@ export default function (view, params) {
                 view.querySelector('#metadataStatusGroupQueued').setAttribute('title', 'Queued: ' + (status.Queued || 0));
                 view.querySelector('#metadataStatusGroupErrored').setAttribute('title', 'Errored: ' + (status.Errored || 0));
                 view.querySelector('#metadataStatusGroupIgnored').setAttribute('title', 'Ignored: ' + (status.Ignored || 0));
+
+                // Show/hide Retry Errors button based on error count
+                var retryBtn = view.querySelector('#btnRetryMetadataErrors');
+                if ((status.Errored || 0) > 0) {
+                    retryBtn.classList.remove('hidden');
+                } else {
+                    retryBtn.classList.add('hidden');
+                }
             }).catch(function(err) {
                 console.log('Metadata status not available:', err);
             });
@@ -1060,7 +1080,7 @@ export default function (view, params) {
                 self.currentModalItem = item;
 
                 // Set title
-                view.querySelector('#metadataSyncModalTitle').textContent = item.ItemName || 'Unknown Item';
+                view.querySelector('#metadataSyncModalTitle').textContent = item.ItemName || 'Unknown';
 
                 // Status badge
                 var statusBadge = view.querySelector('#metadataSyncModalStatusBadge');

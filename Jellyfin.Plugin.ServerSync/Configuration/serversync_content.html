@@ -89,7 +89,7 @@
                         <button is="emby-button" type="button" id="btnTriggerSync" class="raised button-primary syncActionButton">
                             <span>Sync</span>
                         </button>
-                        <button is="emby-button" type="button" id="btnRetryErrors" class="raised syncActionButton">
+                        <button is="emby-button" type="button" id="btnRetryErrors" class="raised button-primary syncActionButton hidden">
                             <span>Retry Errors</span>
                         </button>
                         <button is="emby-button" type="button" id="btnResetDatabase" class="raised button-destructive syncActionButton">
@@ -118,10 +118,22 @@
             <h2 id="modalTitle" class="modal-title"></h2>
             <div id="modalContent" class="modal-body">
 
-                <!-- Status and Library row -->
+                <!-- Top row: Status badge + Server mapping -->
                 <div class="contentModal-topRow">
                     <span id="modalStatusBadge" class="itemModal-statusBadge"></span>
-                    <span id="modalLibraryMapping" class="contentModal-libraryMapping"></span>
+                    <span id="modalServerMapping" class="contentModal-serverMapping"></span>
+                </div>
+
+                <!-- Info grid: Last Sync + Library -->
+                <div class="contentModal-infoGrid">
+                    <div class="contentModal-infoItem">
+                        <div class="contentModal-infoLabel">Last Sync</div>
+                        <div id="modalLastSync" class="contentModal-infoValue">-</div>
+                    </div>
+                    <div class="contentModal-infoItem">
+                        <div class="contentModal-infoLabel">Library</div>
+                        <div id="modalLibraryMapping" class="contentModal-infoValue">-</div>
+                    </div>
                 </div>
 
                 <!-- Error Section -->
@@ -136,28 +148,26 @@
                     <div id="modalRetryCount"></div>
                 </div>
 
-                <!-- Info grid: Size and Last Sync -->
-                <div class="contentModal-infoGrid">
-                    <div class="contentModal-infoItem">
-                        <div class="contentModal-infoLabel">Size</div>
-                        <div id="modalSize" class="contentModal-infoValue"></div>
-                    </div>
-                    <div id="modalLastSyncSection" class="contentModal-infoItem hidden">
-                        <div class="contentModal-infoLabel">Last Sync</div>
-                        <div id="modalLastSync" class="contentModal-infoValue"></div>
-                    </div>
-                </div>
-
-                <!-- Paths Section -->
+                <!-- Paths Section (Source vs Local side by side) -->
                 <div class="contentModal-pathsSection">
-                    <div class="contentModal-pathItem">
-                        <div class="contentModal-pathLabel">Source Path</div>
-                        <div id="modalSourcePath" class="contentModal-pathValue"></div>
-                    </div>
-                    <div class="contentModal-pathItem">
-                        <div class="contentModal-pathLabel">Local Path</div>
-                        <div id="modalLocalPath" class="contentModal-pathValue"></div>
-                        <div id="modalLocalPathNote" class="contentModal-pathNote"></div>
+                    <div class="contentModal-pathRow">
+                        <div class="contentModal-pathBlock">
+                            <div class="contentModal-pathLabel">Source Path</div>
+                            <div id="modalSourcePath" class="contentModal-pathValue"></div>
+                            <div class="contentModal-pathMeta">
+                                <span class="contentModal-pathMetaLabel">Size:</span>
+                                <span id="modalSourceSize" class="contentModal-pathMetaValue"></span>
+                            </div>
+                        </div>
+                        <div class="contentModal-pathBlock">
+                            <div class="contentModal-pathLabel">Local Path</div>
+                            <div id="modalLocalPath" class="contentModal-pathValue"></div>
+                            <div id="modalLocalPathNote" class="contentModal-pathNote"></div>
+                            <div id="modalLocalSizeRow" class="contentModal-pathMeta">
+                                <span class="contentModal-pathMetaLabel">Size:</span>
+                                <span id="modalLocalSize" class="contentModal-pathMetaValue"></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -450,7 +460,7 @@
         /* ===== Content Modal Specific Styles ===== */
         .contentModal-dialog { max-width: 900px; width: 95vw; }
         .contentModal-topRow { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
-        .contentModal-libraryMapping { font-size: 0.9em; opacity: 0.8; }
+        .contentModal-serverMapping { font-size: 0.9em; opacity: 0.8; }
         .contentModal-infoGrid {
             display: flex;
             gap: 24px;
@@ -468,7 +478,18 @@
             margin-bottom: 4px;
         }
         .contentModal-infoValue { font-size: 1em; font-weight: 500; }
-        .contentModal-pathsSection { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+        .contentModal-pathsSection { margin-bottom: 16px; }
+        .contentModal-pathRow {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+        .contentModal-pathBlock {
+            flex: 1;
+        }
         .contentModal-pathLabel {
             font-size: 0.75em;
             text-transform: uppercase;
@@ -479,17 +500,24 @@
         .contentModal-pathValue {
             font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
             font-size: 0.85em;
-            background: rgba(0, 0, 0, 0.3);
-            padding: 8px 12px;
-            border-radius: 6px;
             word-break: break-all;
-            border: 1px solid rgba(255, 255, 255, 0.05);
         }
         .contentModal-pathNote {
             font-size: 0.8em;
             color: var(--status-pending-download-color);
             margin-top: 6px;
             font-style: italic;
+        }
+        .contentModal-pathMeta {
+            margin-top: 8px;
+            font-size: 0.85em;
+        }
+        .contentModal-pathMetaLabel {
+            opacity: 0.6;
+            margin-right: 4px;
+        }
+        .contentModal-pathMetaValue {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
         }
 
         /* ===== Modal Button Layout ===== */
@@ -515,44 +543,115 @@
         /* ===== PaginatedTable Controls ===== */
         .pt-controls {
             display: flex;
-            gap: 8px;
+            gap: 12px;
             align-items: center;
             margin-bottom: 12px;
         }
         .pt-search {
             flex: 1;
-            min-width: 150px;
+            min-width: 200px;
+            padding: 10px 14px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            color: inherit;
+            font-size: 1em;
+            outline: none;
+        }
+        .pt-search:focus {
+            border-color: rgba(255, 255, 255, 0.3);
+            background: rgba(0, 0, 0, 0.4);
+        }
+        .pt-search::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+        .pt-filter-wrapper {
+            position: relative;
+            flex-shrink: 0;
+            min-width: 140px;
         }
         .pt-filter {
-            width: auto !important;
-            min-width: 140px;
+            width: 100%;
+            padding: 10px 36px 10px 14px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            color: inherit;
+            font-size: 1em;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            outline: none;
+        }
+        .pt-filter:focus {
+            border-color: rgba(255, 255, 255, 0.3);
+            background: rgba(0, 0, 0, 0.4);
+        }
+        .pt-filter option {
+            background: #1c1c1c;
+            color: #fff;
+        }
+        .pt-filter-arrow {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+            opacity: 0.7;
+            font-size: 0.9em;
         }
 
         /* ===== PaginatedTable Selection Header ===== */
         .pt-selection-header {
             display: flex;
-            gap: 8px;
+            gap: 12px;
             align-items: center;
             margin-bottom: 12px;
-            padding: 8px 12px;
+            padding: 10px 12px;
             background: rgba(0, 0, 0, 0.2);
             border-radius: 4px;
         }
-        .pt-select-all-container {
+        .pt-select-all-label {
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 8px;
             cursor: pointer;
+            user-select: none;
+        }
+        .pt-select-all-label input[type="checkbox"] {
+            display: none;
+        }
+        .pt-checkbox-custom {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+        }
+        .pt-select-all-label input[type="checkbox"]:checked + .pt-checkbox-custom {
+            background: #00a4dc;
+            border-color: #00a4dc;
+        }
+        .pt-select-all-label input[type="checkbox"]:checked + .pt-checkbox-custom::after {
+            content: '✓';
+            color: #fff;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .pt-select-all-text {
+            font-size: 0.95em;
         }
         .pt-selected-count {
-            margin-left: 8px;
             opacity: 0.7;
             min-width: 80px;
         }
         .pt-bulk-actions {
             display: flex;
             gap: 8px;
-            margin-left: auto;
         }
         .pt-header-spacer {
             flex: 1;
@@ -560,26 +659,27 @@
 
         /* ===== PaginatedTable Reload Button ===== */
         .pt-reload-btn {
-            background: transparent !important;
-            border: none !important;
-            padding: 8px !important;
-            min-width: 40px !important;
-            height: 40px !important;
+            background: transparent;
+            border: none;
+            padding: 6px 10px;
             cursor: pointer;
             opacity: 0.7;
             transition: opacity 0.2s;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
         }
         .pt-reload-btn:hover {
             opacity: 1;
+            background: rgba(255, 255, 255, 0.1);
         }
         .pt-reload-btn.spinning .pt-reload-icon {
             animation: spin 0.8s linear infinite;
         }
         .pt-reload-icon {
-            font-size: 24px !important;
+            font-size: 20px;
+            color: #fff;
         }
 
         /* ===== PaginatedTable Body ===== */

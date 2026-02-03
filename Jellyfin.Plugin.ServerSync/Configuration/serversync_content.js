@@ -153,7 +153,7 @@ export default function (view, params) {
             selection: { enabled: false, idKey: 'id' },
             pagination: { pageSize: 50 },
             filters: { options: [] },
-            search: { enabled: true, placeholder: 'Search...', debounceMs: 300 },
+            search: { enabled: true, placeholder: 'Search items...', debounceMs: 300 },
             actions: {},
             emptyState: { message: 'No items found' }
         };
@@ -239,11 +239,12 @@ export default function (view, params) {
             // Top row: Search + Filter
             html += '<div class="pt-controls">';
             if (opts.search && opts.search.enabled !== false) {
-                html += '<input is="emby-input" type="text" class="pt-search" placeholder="' +
-                    ServerSyncShared.escapeHtml(opts.search.placeholder || 'Search...') + '" />';
+                html += '<input type="text" class="pt-search" placeholder="' +
+                    ServerSyncShared.escapeHtml(opts.search.placeholder || 'Search items...') + '" />';
             }
             if (opts.filters && opts.filters.options && opts.filters.options.length > 0) {
-                html += '<select is="emby-select" class="pt-filter">';
+                html += '<div class="pt-filter-wrapper">';
+                html += '<select class="pt-filter">';
                 html += '<option value="">All</option>';
                 opts.filters.options.forEach(function(opt) {
                     var style = opt.hidden ? ' style="display:none"' : '';
@@ -252,21 +253,24 @@ export default function (view, params) {
                         ServerSyncShared.escapeHtml(opt.label) + '</option>';
                 });
                 html += '</select>';
+                html += '<span class="pt-filter-arrow">&#9662;</span>';
+                html += '</div>';
             }
             html += '</div>';
 
             // Bottom row: Selection controls + Bulk actions + Reload button
             if (opts.selection && opts.selection.enabled) {
                 html += '<div class="pt-selection-header">';
-                html += '<label class="pt-select-all-container">';
+                html += '<label class="pt-select-all-label">';
                 html += '<input type="checkbox" class="pt-select-all" />';
-                html += '<span>Select All</span>';
+                html += '<span class="pt-checkbox-custom"></span>';
+                html += '<span class="pt-select-all-text">Select All</span>';
                 html += '</label>';
                 html += '<span class="pt-selected-count">0 selected</span>';
                 html += '<div class="pt-bulk-actions"></div>';
                 html += '<span class="pt-header-spacer"></span>';
-                html += '<button is="emby-button" type="button" class="pt-reload-btn" title="Reload table data">';
-                html += '<span class="material-icons pt-reload-icon">refresh</span>';
+                html += '<button type="button" class="pt-reload-btn" title="Reload">';
+                html += '<span class="pt-reload-icon">&#8635;</span>';
                 html += '</button>';
                 html += '</div>';
             }
@@ -788,9 +792,9 @@ export default function (view, params) {
                         label: 'Item',
                         type: 'custom',
                         render: function(item) {
-                            var fileName = ServerSyncShared.getFileName(item.SourcePath);
-                            var sourceLibrary = item.SourceLibraryName || 'Source';
-                            var localLibrary = item.LocalLibraryName || 'Local';
+                            var sourcePath = item.SourcePath || '';
+                            var sourceLibrary = item.SourceLibraryName || 'Unknown';
+                            var localLibrary = item.LocalLibraryName || 'Unknown';
                             var libraryDisplay = sourceLibrary + ' → ' + localLibrary;
 
                             var errorPreview = '';
@@ -802,8 +806,8 @@ export default function (view, params) {
 
                             return '<div class="syncItemInfo">' +
                                 '<div class="syncItemName" title="' +
-                                    ServerSyncShared.escapeHtml(item.SourcePath) + '">' +
-                                    ServerSyncShared.escapeHtml(fileName) + '</div>' +
+                                    ServerSyncShared.escapeHtml(sourcePath) + '">' +
+                                    ServerSyncShared.escapeHtml(ServerSyncShared.getFileName(sourcePath)) + '</div>' +
                                 '<div class="syncItemPath">' +
                                     ServerSyncShared.escapeHtml(libraryDisplay) + '</div>' +
                                 errorPreview +
@@ -1047,6 +1051,14 @@ export default function (view, params) {
 
                 view.querySelector('#deletingCount').textContent = deletingCount;
                 view.querySelector('#statusGroupDeleting').setAttribute('title', 'Deleting: ' + deletingCount);
+
+                // Show/hide Retry Errors button based on error count
+                var retryBtn = view.querySelector('#btnRetryErrors');
+                if (erroredCount > 0) {
+                    retryBtn.classList.remove('hidden');
+                } else {
+                    retryBtn.classList.add('hidden');
+                }
             });
         },
 
@@ -1245,8 +1257,8 @@ export default function (view, params) {
 
             self.currentModalItem = item;
 
-            // Title
-            view.querySelector('#modalTitle').textContent = ServerSyncShared.getFileName(item.SourcePath);
+            // Title - show filename only
+            view.querySelector('#modalTitle').textContent = ServerSyncShared.getFileName(item.SourcePath) || item.ItemName || 'Unknown';
 
             // Status badge
             var statusBadge = view.querySelector('#modalStatusBadge');
@@ -1255,16 +1267,23 @@ export default function (view, params) {
             statusBadge.textContent = displayStatus;
             statusBadge.className = 'itemModal-statusBadge ' + statusClass;
 
+            // Server mapping
+            var sourceServerName = (self.currentConfig && self.currentConfig.SourceServerName) || 'Source';
+            var localServerName = ServerSyncShared.localServerName || 'Local';
+            view.querySelector('#modalServerMapping').textContent = sourceServerName + ' → ' + localServerName;
+
+            // Last sync time (always show)
+            if (item.LastSyncTime) {
+                var lastSync = new Date(item.LastSyncTime);
+                view.querySelector('#modalLastSync').textContent = ServerSyncShared.formatRelativeTime(lastSync);
+            } else {
+                view.querySelector('#modalLastSync').textContent = '-';
+            }
+
             // Library mapping
-            var sourceLibrary = item.SourceLibraryName || 'Source';
-            var localLibrary = item.LocalLibraryName || 'Local';
+            var sourceLibrary = item.SourceLibraryName || 'Unknown';
+            var localLibrary = item.LocalLibraryName || 'Unknown';
             view.querySelector('#modalLibraryMapping').textContent = sourceLibrary + ' → ' + localLibrary;
-
-            // Size
-            view.querySelector('#modalSize').textContent = ServerSyncShared.formatSize(item.SourceSize);
-
-            // Paths
-            view.querySelector('#modalSourcePath').textContent = item.SourcePath;
 
             // Error message
             var errorSection = view.querySelector('#modalErrorSection');
@@ -1282,16 +1301,6 @@ export default function (view, params) {
                 retrySection.classList.remove('hidden');
             } else {
                 retrySection.classList.add('hidden');
-            }
-
-            // Last sync time
-            var lastSyncSection = view.querySelector('#modalLastSyncSection');
-            if (item.LastSyncTime) {
-                var lastSync = new Date(item.LastSyncTime);
-                view.querySelector('#modalLastSync').textContent = ServerSyncShared.formatRelativeTime(lastSync);
-                lastSyncSection.classList.remove('hidden');
-            } else {
-                lastSyncSection.classList.add('hidden');
             }
 
             // Companion files
@@ -1317,22 +1326,34 @@ export default function (view, params) {
                 companionSection.classList.add('hidden');
             }
 
-            // Local path
+            // Source path and size
+            view.querySelector('#modalSourcePath').textContent = item.SourcePath || 'N/A';
+            view.querySelector('#modalSourceSize').textContent = ServerSyncShared.formatSize(item.SourceSize);
+
+            // Local path and size
             var localPathEl = view.querySelector('#modalLocalPath');
             var localPathNoteEl = view.querySelector('#modalLocalPathNote');
+            var localSizeRowEl = view.querySelector('#modalLocalSizeRow');
+            var localSizeEl = view.querySelector('#modalLocalSize');
             var localExists = item.Status === 'Synced';
+
             if (item.LocalPath) {
                 localPathEl.textContent = item.LocalPath;
                 if (localExists) {
                     localPathNoteEl.textContent = '';
                     localPathNoteEl.style.display = 'none';
+                    // Show local size if synced
+                    localSizeEl.textContent = ServerSyncShared.formatSize(item.LocalSize || item.SourceSize);
+                    localSizeRowEl.style.display = 'block';
                 } else {
                     localPathNoteEl.textContent = 'File will be synced to this location';
                     localPathNoteEl.style.display = 'block';
+                    localSizeRowEl.style.display = 'none';
                 }
             } else {
                 localPathEl.textContent = 'N/A';
                 localPathNoteEl.style.display = 'none';
+                localSizeRowEl.style.display = 'none';
             }
 
             // Show/hide buttons based on status
