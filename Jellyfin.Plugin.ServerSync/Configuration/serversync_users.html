@@ -40,10 +40,6 @@
                                     <span class="healthLabel">Users Mapped</span>
                                     <span class="healthValue" id="userHealthUserCount">0</span>
                                 </div>
-                                <div class="healthCard">
-                                    <span class="healthLabel">Pending</span>
-                                    <span class="healthValue" id="userHealthPendingCount">0</span>
-                                </div>
                             </div>
                         </div>
 
@@ -76,27 +72,42 @@
 
     <!-- User Sync Item Detail Modal -->
     <div id="userSyncItemDetailModal" class="dialog hidden">
-        <div class="dialogContent max-w-700 modal-relative">
+        <div class="dialogContent max-w-900 modal-relative">
             <button type="button" id="btnUserSyncModalClose" class="dialogCloseBtn" title="Close">&times;</button>
             <h2 id="userSyncModalTitle" class="modal-title"></h2>
             <div class="modal-body">
-                <div class="modal-field">
-                    <div class="modal-field-label">Status</div>
+                <!-- Top row: Status badge and server mapping -->
+                <div class="userSyncModal-topRow">
                     <span id="userSyncModalStatusBadge" class="itemModal-statusBadge"></span>
+                    <span id="userSyncModalServerMapping" class="userSyncModal-serverMapping"></span>
                 </div>
-                <div id="userSyncModalLastSyncSection" class="modal-field hidden">
-                    <div class="modal-field-label">Last Sync</div>
-                    <div id="userSyncModalLastSync"></div>
+
+                <!-- Info grid: Last sync -->
+                <div id="userSyncModalInfoGrid" class="userSyncModal-infoGrid hidden">
+                    <div class="userSyncModal-infoItem">
+                        <div class="userSyncModal-infoLabel">Last Sync</div>
+                        <div id="userSyncModalLastSync" class="userSyncModal-infoValue"></div>
+                    </div>
                 </div>
+
+                <!-- Error section -->
                 <div id="userSyncModalErrorSection" class="modal-field hidden">
                     <div class="modal-field-label">Error</div>
                     <div id="userSyncModalError" class="errorMessage"></div>
                 </div>
 
-                <!-- User Mapping -->
-                <div class="modal-field mb-lg">
-                    <div class="modal-field-label">User</div>
-                    <div id="userSyncModalUser"></div>
+                <!-- User Mapping Section -->
+                <div class="userSyncModal-userSection">
+                    <div class="userSyncModal-userBlock">
+                        <div class="userSyncModal-userLabel">Source User</div>
+                        <div id="userSyncModalSourceUser" class="userSyncModal-userName"></div>
+                        <div id="userSyncModalSourceUserId" class="userSyncModal-userId"></div>
+                    </div>
+                    <div class="userSyncModal-userBlock">
+                        <div class="userSyncModal-userLabel">Local User</div>
+                        <div id="userSyncModalLocalUser" class="userSyncModal-userName"></div>
+                        <div id="userSyncModalLocalUserId" class="userSyncModal-userId"></div>
+                    </div>
                 </div>
 
                 <!-- Property Comparison Table -->
@@ -127,76 +138,22 @@
         </div>
     </div>
 
-    <!-- Styles: shared.css -->
+    <!-- Styles -->
     <style>
-        /* Shared styles for Server Sync plugin configuration */
-
         /* ===== Status Color Variables ===== */
         :root {
-            /* Synced - Green */
             --status-synced-bg: rgba(92, 184, 92, 0.2);
             --status-synced-color: #5cb85c;
             --status-synced-border: rgba(92, 184, 92, 0.3);
-
-            /* Queued - Orange/Yellow */
             --status-queued-bg: rgba(240, 173, 78, 0.2);
             --status-queued-color: #f0ad4e;
             --status-queued-border: rgba(240, 173, 78, 0.3);
-
-            /* Errored - Red */
             --status-errored-bg: rgba(217, 83, 79, 0.2);
             --status-errored-color: #d9534f;
             --status-errored-border: rgba(217, 83, 79, 0.3);
-
-            /* Ignored - Gray */
             --status-ignored-bg: rgba(153, 153, 153, 0.2);
             --status-ignored-color: #999;
             --status-ignored-border: rgba(153, 153, 153, 0.3);
-
-            /* Pending - Purple (generic) */
-            --status-pending-bg: rgba(155, 89, 182, 0.2);
-            --status-pending-color: #9b59b6;
-            --status-pending-border: rgba(155, 89, 182, 0.3);
-
-            /* Pending Download - Purple */
-            --status-pending-download-bg: rgba(155, 89, 182, 0.2);
-            --status-pending-download-color: #9b59b6;
-            --status-pending-download-border: rgba(155, 89, 182, 0.3);
-
-            /* Pending Replacement - Blue */
-            --status-pending-replacement-bg: rgba(52, 152, 219, 0.2);
-            --status-pending-replacement-color: #3498db;
-            --status-pending-replacement-border: rgba(52, 152, 219, 0.3);
-
-            /* Pending Deletion - Red (same as errored) */
-            --status-pending-deletion-bg: rgba(217, 83, 79, 0.2);
-            --status-pending-deletion-color: #d9534f;
-            --status-pending-deletion-border: rgba(217, 83, 79, 0.3);
-
-            /* Deleting - Brighter Red */
-            --status-deleting-bg: rgba(231, 76, 60, 0.2);
-            --status-deleting-color: #e74c3c;
-            --status-deleting-border: rgba(231, 76, 60, 0.3);
-        }
-
-        /* ===== Utility Classes ===== */
-
-        /* Text color utilities for status feedback */
-        .text-success { color: var(--status-synced-color); }
-        .text-error { color: var(--status-errored-color); }
-        .text-warning { color: var(--status-queued-color); }
-        .text-muted { opacity: 0.7; }
-
-        /* Text truncation */
-        .text-truncate {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        /* Separator */
-        .separator {
-            border-bottom: 1px solid #555;
         }
 
         /* Shared animation for loading spinners */
@@ -205,7 +162,7 @@
             to { transform: rotate(360deg); }
         }
 
-        /* Section titles with bottom border */
+        /* Section titles */
         .sectionTitleContainer .sectionTitle {
             width: 100%;
             border-bottom: 1px solid #555;
@@ -213,47 +170,12 @@
             margin-bottom: 1em;
         }
 
-        /* Tab separator line */
-        .tabSeparator {
-            border-bottom: 1px solid #555;
-            margin-bottom: 16px;
-        }
-
-        /* Tab navigation - fill width equally */
-        .tabContainer {
-            display: flex;
-            gap: 8px;
-            width: 100%;
-        }
-        .tabButton {
-            flex: 1;
-            text-align: center;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .tabButton span {
-            display: block;
-            width: 100%;
-            text-align: center;
-        }
-        .tabButton.active {
+        /* Button styles */
+        .button-primary {
             background-color: #00a4dc !important;
             color: #fff !important;
         }
-        .tabButton:disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-        }
-
-        /* Button styles - primary (blue), secondary (gray), destructive (red) */
-        .button-primary,
-        .button-submit {
-            background-color: #00a4dc !important;
-            color: #fff !important;
-        }
-        .button-primary:hover,
-        .button-submit:hover {
+        .button-primary:hover {
             background-color: #0088cc !important;
         }
         .button-destructive {
@@ -262,37 +184,6 @@
         }
         .button-destructive:hover {
             background-color: #c9302c !important;
-        }
-
-        /* Nested settings with left border */
-        .nested-settings {
-            margin-left: 1.5em;
-            padding-left: 1em;
-            border-left: 2px solid rgba(85, 85, 85, 0.3);
-        }
-
-        /* Input row - horizontal layout for input + select combinations */
-        .inputRow {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-        .inputRow input[is="emby-input"],
-        .inputRow .emby-input-wrapper {
-            flex: 1;
-            margin: 0 !important;
-            padding-left: 0 !important;
-        }
-        .inputRow .inputContainer {
-            margin: 0 !important;
-            padding: 0 !important;
-        }
-
-        /* Content section separator line */
-        .contentSectionSeparator {
-            border-bottom: 1px solid #555;
-            margin-top: 24px;
-            margin-bottom: 16px;
         }
 
         /* Dialog/Modal styling */
@@ -344,167 +235,16 @@
             word-break: break-all;
         }
 
-        /* Generic button row layout */
-        .buttonRow {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 8px;
-        }
-        .buttonRow button {
-            flex: 1;
-            text-align: center;
-            justify-content: center;
-        }
-
         /* Layout utility classes */
         .hidden { display: none !important; }
-        .flex { display: flex; }
-        .flex-center { display: flex; align-items: center; }
-        .flex-col { display: flex; flex-direction: column; }
-        .gap-sm { gap: 8px; }
-        .gap-md { gap: 16px; }
-        .gap-lg { gap: 24px; }
-
-        /* Spacing utility classes */
-        .mt-sm { margin-top: 8px; }
-        .mt-md { margin-top: 16px; }
-        .mb-sm { margin-bottom: 8px; }
-        .mb-md { margin-bottom: 12px; }
-        .mb-lg { margin-bottom: 16px; }
-        .p-md { padding: 16px; }
-
-        /* Width utility classes */
-        .w-auto { width: auto !important; }
-        .w-80 { width: 80px; }
-        .max-w-600 { max-width: 600px; }
-        .max-w-700 { max-width: 700px; }
+        .max-w-900 { max-width: 900px; }
 
         /* Modal field layout */
         .modal-field { margin-bottom: 12px; }
         .modal-field-label { opacity: 0.7; margin-bottom: 4px; }
-        .modal-field-value { word-break: break-all; }
         .modal-title { margin-top: 0; padding-right: 32px; }
         .modal-body { margin: 16px 0; }
         .modal-relative { position: relative; }
-
-        /* Server info display */
-        .server-info-box {
-            margin-bottom: 16px;
-            padding: 12px;
-            background: rgba(0,0,0,0.3);
-            border-radius: 4px;
-        }
-
-        /* Inline form layout */
-        .inline-inputs {
-            display: flex;
-            gap: 16px;
-            align-items: center;
-        }
-
-        /* Placeholder text */
-        .placeholder-text {
-            padding: 16px;
-            opacity: 0.7;
-        }
-
-    </style>
-
-    <!-- Styles: SourceServer/sourceServer.css -->
-    <style>
-        /* Source Server Configuration styles */
-
-        /* Collapsible sections */
-        .collapsibleSection {
-            margin-bottom: 8px;
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 4px;
-            overflow: hidden;
-        }
-        .collapsibleHeader {
-            width: 100%;
-            padding: 12px 16px;
-            background: rgba(255,255,255,0.05);
-            border: none;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            color: inherit;
-            font-size: 1.1em;
-            font-weight: 500;
-            text-align: left;
-        }
-        .collapsibleHeader:hover {
-            background: rgba(255,255,255,0.08);
-        }
-        .collapsibleTitle {
-            flex: 1;
-        }
-        .collapsibleIcon {
-            font-size: 0.8em;
-            transition: transform 0.2s;
-        }
-        .collapsibleHeader.collapsed .collapsibleIcon {
-            transform: rotate(-90deg);
-        }
-        .collapsibleContent {
-            padding: 16px;
-            border-top: 1px solid rgba(255,255,255,0.1);
-        }
-        .collapsibleContent.collapsed {
-            display: none;
-        }
-        .collapsibleActions {
-            display: flex;
-            gap: 8px;
-            margin-top: 16px;
-            padding-top: 16px;
-            border-top: 1px solid rgba(255,255,255,0.1);
-        }
-
-        /* Server info container */
-        #serverInfoContainer {
-            padding-bottom: 16px;
-        }
-
-    </style>
-
-    <!-- Styles: ContentConfig/contentConfig.css -->
-    <style>
-        /* Content Sync Configuration styles */
-
-        /* Shared mapping styles - used by library and user mappings */
-        .mapping {
-            margin-bottom: 2em;
-            padding-bottom: 1em;
-            border-bottom: 1px solid #555;
-        }
-        .mapping:last-child {
-            border-bottom: none;
-            margin-bottom: 1em;
-        }
-        .mappingGrid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0 24px;
-        }
-        .mappingHeader {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1em;
-        }
-        .mappingColumn {
-            display: flex;
-            flex-direction: column;
-        }
-
-    </style>
-
-    <!-- Styles: HistorySync/historySync.css -->
-    <style>
-        /* History Sync Configuration styles */
 
         /* History comparison table for modal */
         .historyCompareTable {
@@ -553,23 +293,80 @@
         .historyCompareTable tr:last-child td {
             border-bottom: none;
         }
-        .historyCompareTable .value-yes {
-            color: var(--status-synced-color);
+
+        /* User Sync Modal - Top Row (status + server mapping) */
+        .userSyncModal-topRow {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
         }
-        .historyCompareTable .value-no {
-            color: var(--status-errored-color);
-        }
-        .historyCompareTable .value-favorite {
-            color: #f0ad4e;
-        }
-        .historyCompareTable .value-changed {
-            color: #00a4dc;
+        .userSyncModal-serverMapping {
+            opacity: 0.7;
+            font-size: 0.95em;
         }
 
-        /* History modal user display */
-        .historyModalUserGuid {
+        /* User Sync Modal - Info Grid */
+        .userSyncModal-infoGrid {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 16px;
+            padding: 12px 16px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 6px;
+        }
+        .userSyncModal-infoItem {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .userSyncModal-infoLabel {
+            font-size: 0.8em;
+            opacity: 0.6;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .userSyncModal-infoValue {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.95em;
+        }
+
+        /* User Sync Modal - User Section */
+        .userSyncModal-userSection {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+            padding: 16px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 6px;
+        }
+        .userSyncModal-userBlock {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .userSyncModal-userLabel {
+            font-size: 0.8em;
+            opacity: 0.6;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .userSyncModal-userName {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 1em;
+            font-weight: 500;
+        }
+        .userSyncModal-userId {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.8em;
             opacity: 0.5;
-            font-size: 0.85em;
+        }
+        .userSyncModal-userArrow {
+            font-size: 1.5em;
+            opacity: 0.5;
+            flex-shrink: 0;
         }
 
         /* User Sync Modal Table Container - scrollable */
@@ -611,42 +408,6 @@
         /* Disabled category row */
         .userSyncModal-disabledRow td {
             padding: 8px 12px;
-        }
-
-        /* Metadata Sync Modal Table Container - scrollable */
-        .metadataSyncModal-tableContainer {
-            max-height: 400px;
-            overflow-y: auto;
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 4px;
-        }
-        .metadataSyncModal-tableContainer table {
-            margin: 0;
-        }
-        .metadataSyncModal-tableContainer thead {
-            position: sticky;
-            top: 0;
-            background: #1a1a1a;
-            z-index: 1;
-        }
-
-        /* Highlight changed rows in metadata sync modal */
-        .metadataSyncModal-changedRow {
-            background: rgba(240, 173, 78, 0.1);
-        }
-        .metadataSyncModal-changedRow td:first-child {
-            border-left: 3px solid #f0ad4e;
-        }
-
-        /* Section headers in metadata sync modal (matches user sync) */
-        .metadataSyncModal-sectionHeader td {
-            background: rgba(255, 255, 255, 0.08);
-            font-weight: bold;
-            padding: 8px 12px;
-            border-bottom: 2px solid rgba(255, 255, 255, 0.2);
-            text-transform: uppercase;
-            font-size: 0.85em;
-            letter-spacing: 0.5px;
         }
 
         /* Sync section separator */

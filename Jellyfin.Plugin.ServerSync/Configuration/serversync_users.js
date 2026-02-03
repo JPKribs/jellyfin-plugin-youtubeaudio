@@ -106,18 +106,6 @@ export default function (view, params) {
             });
         },
 
-        // Set element visibility
-        setVisible: function(elementOrId, visible) {
-            var el = typeof elementOrId === 'string' ? view.querySelector('#' + elementOrId) : elementOrId;
-            if (el) {
-                if (visible) {
-                    el.classList.remove('hidden');
-                } else {
-                    el.classList.add('hidden');
-                }
-            }
-        },
-
         // Safe event binding - binds event only if element exists (uses view.querySelector)
         bindEvent: function(id, event, handler, moduleName) {
             var el = view.querySelector('#' + id);
@@ -976,7 +964,6 @@ export default function (view, params) {
         },
 
         loadHealthStats: function() {
-            var self = this;
             return ServerSyncShared.apiRequest('UserStatus', 'GET').then(function(status) {
                 if (status) {
                     // Last sync time
@@ -994,12 +981,6 @@ export default function (view, params) {
                     var userCountEl = view.querySelector('#userHealthUserCount');
                     userCountEl.textContent = userCount;
                     userCountEl.className = userCount > 0 ? 'healthValue success' : 'healthValue warning';
-
-                    // Pending count
-                    var pending = (status.Queued || 0);
-                    var pendingCountEl = view.querySelector('#userHealthPendingCount');
-                    pendingCountEl.textContent = pending;
-                    pendingCountEl.className = pending > 0 ? 'healthValue warning' : 'healthValue';
                 }
             }).catch(function() {
                 // Ignore errors
@@ -1139,7 +1120,7 @@ export default function (view, params) {
 
                 self.currentModalDetail = detail;
 
-                // Title
+                // Title - just user names
                 view.querySelector('#userSyncModalTitle').textContent =
                     (detail.SourceUserName || 'Unknown') + ' → ' + (detail.LocalUserName || 'Unknown');
 
@@ -1148,14 +1129,20 @@ export default function (view, params) {
                 statusBadge.textContent = detail.OverallStatus || 'Unknown';
                 statusBadge.className = 'itemModal-statusBadge ' + (detail.OverallStatus || 'unknown');
 
-                // Last sync
-                var lastSyncSection = view.querySelector('#userSyncModalLastSyncSection');
+                // Server mapping on same line as status
+                var sourceServerName = (self.currentConfig && self.currentConfig.SourceServerName) || 'Source';
+                var localServerName = ServerSyncShared.localServerName || 'Local';
+                view.querySelector('#userSyncModalServerMapping').textContent =
+                    sourceServerName + ' → ' + localServerName;
+
+                // Last sync (info grid)
+                var infoGrid = view.querySelector('#userSyncModalInfoGrid');
                 if (detail.LastSyncTime) {
-                    lastSyncSection.classList.remove('hidden');
+                    infoGrid.classList.remove('hidden');
                     view.querySelector('#userSyncModalLastSync').textContent =
                         ServerSyncShared.formatRelativeTime(new Date(detail.LastSyncTime));
                 } else {
-                    lastSyncSection.classList.add('hidden');
+                    infoGrid.classList.add('hidden');
                 }
 
                 // Error section
@@ -1167,15 +1154,17 @@ export default function (view, params) {
                     errorSection.classList.add('hidden');
                 }
 
-                // User info
-                view.querySelector('#userSyncModalUser').textContent =
-                    (detail.SourceUserName || 'Unknown') + ' → ' + (detail.LocalUserName || 'Unknown');
+                // User section - source user
+                view.querySelector('#userSyncModalSourceUser').textContent = detail.SourceUserName || 'Unknown';
+                view.querySelector('#userSyncModalSourceUserId').textContent = detail.SourceUserId || '';
 
-                // Table headers - use 4 columns: Property | Source | Local | After Sync
-                view.querySelector('#userSyncModalSourceHeader').textContent =
-                    (self.currentConfig && self.currentConfig.SourceServerName) || 'Source';
-                view.querySelector('#userSyncModalLocalHeader').textContent =
-                    ServerSyncShared.localServerName || 'Local';
+                // User section - local user
+                view.querySelector('#userSyncModalLocalUser').textContent = detail.LocalUserName || 'Unknown';
+                view.querySelector('#userSyncModalLocalUserId').textContent = detail.LocalUserId || '';
+
+                // Table headers
+                view.querySelector('#userSyncModalSourceHeader').textContent = sourceServerName;
+                view.querySelector('#userSyncModalLocalHeader').textContent = localServerName;
 
                 // Build comparison table with all categories
                 var tbody = view.querySelector('#userSyncModalTableBody');
@@ -1240,11 +1229,58 @@ export default function (view, params) {
 
         _addPropertyRows: function(tbody, item) {
             var self = this;
-            var properties = item.Properties || [];
 
-            properties.forEach(function(prop) {
+            // Parse JSON values from SourceValue, LocalValue, MergedValue
+            var sourceObj = self._parseJson(item.SourceValue);
+            var localObj = self._parseJson(item.LocalValue);
+            var mergedObj = self._parseJson(item.MergedValue);
+
+            // If we couldn't parse as JSON, show raw values
+            if (!sourceObj && !localObj && !mergedObj) {
+                // Show single row with raw values
                 var row = document.createElement('tr');
-                var isChanged = prop.SourceValue !== prop.LocalValue;
+                if (item.HasChanges) {
+                    row.className = 'userSyncModal-changedRow';
+                }
+
+                var propCell = document.createElement('td');
+                propCell.className = 'historyCompareTable-property';
+                propCell.textContent = item.PropertyCategory || 'Value';
+
+                var sourceCell = document.createElement('td');
+                sourceCell.className = 'historyCompareTable-value';
+                sourceCell.textContent = self._formatValue(item.SourceValue);
+
+                var localCell = document.createElement('td');
+                localCell.className = 'historyCompareTable-value';
+                localCell.textContent = self._formatValue(item.LocalValue);
+
+                var mergedCell = document.createElement('td');
+                mergedCell.className = 'historyCompareTable-value historyCompareTable-merged';
+                mergedCell.textContent = self._formatValue(item.MergedValue);
+
+                row.appendChild(propCell);
+                row.appendChild(sourceCell);
+                row.appendChild(localCell);
+                row.appendChild(mergedCell);
+                tbody.appendChild(row);
+                return;
+            }
+
+            // Get all unique property names across source, local, and merged
+            var allKeys = new Set();
+            if (sourceObj) Object.keys(sourceObj).forEach(function(k) { allKeys.add(k); });
+            if (localObj) Object.keys(localObj).forEach(function(k) { allKeys.add(k); });
+            if (mergedObj) Object.keys(mergedObj).forEach(function(k) { allKeys.add(k); });
+
+            // Add a row for each property
+            allKeys.forEach(function(key) {
+                var sourceVal = sourceObj ? sourceObj[key] : undefined;
+                var localVal = localObj ? localObj[key] : undefined;
+                var mergedVal = mergedObj ? mergedObj[key] : sourceVal;
+
+                var row = document.createElement('tr');
+                var isChanged = JSON.stringify(sourceVal) !== JSON.stringify(localVal);
 
                 if (isChanged) {
                     row.className = 'userSyncModal-changedRow';
@@ -1252,19 +1288,19 @@ export default function (view, params) {
 
                 var propCell = document.createElement('td');
                 propCell.className = 'historyCompareTable-property';
-                propCell.textContent = prop.Name || '';
+                propCell.textContent = key;
 
                 var sourceCell = document.createElement('td');
                 sourceCell.className = 'historyCompareTable-value';
-                sourceCell.textContent = self._formatValue(prop.SourceValue);
+                sourceCell.textContent = self._formatValue(sourceVal);
 
                 var localCell = document.createElement('td');
                 localCell.className = 'historyCompareTable-value';
-                localCell.textContent = self._formatValue(prop.LocalValue);
+                localCell.textContent = self._formatValue(localVal);
 
                 var mergedCell = document.createElement('td');
                 mergedCell.className = 'historyCompareTable-value historyCompareTable-merged';
-                mergedCell.textContent = self._formatValue(prop.MergedValue !== undefined ? prop.MergedValue : prop.SourceValue);
+                mergedCell.textContent = self._formatValue(mergedVal);
 
                 row.appendChild(propCell);
                 row.appendChild(sourceCell);
@@ -1273,6 +1309,15 @@ export default function (view, params) {
 
                 tbody.appendChild(row);
             });
+        },
+
+        _parseJson: function(str) {
+            if (!str || typeof str !== 'string') return null;
+            try {
+                return JSON.parse(str);
+            } catch (e) {
+                return null;
+            }
         },
 
         _addProfileImageRow: function(tbody, item) {
@@ -1287,17 +1332,22 @@ export default function (view, params) {
             propCell.className = 'historyCompareTable-property';
             propCell.textContent = 'Profile Image';
 
+            // Use formatted size if available, otherwise show "None"
+            var sourceDisplay = item.SourceImageSizeFormatted || (item.SourceImageSize > 0 ? item.SourceImageSize + ' bytes' : 'None');
+            var localDisplay = item.LocalImageSizeFormatted || (item.LocalImageSize > 0 ? item.LocalImageSize + ' bytes' : 'None');
+            var mergedDisplay = sourceDisplay; // After sync, will have source image
+
             var sourceCell = document.createElement('td');
             sourceCell.className = 'historyCompareTable-value';
-            sourceCell.textContent = item.SourceHasImage ? 'Yes' : 'No';
+            sourceCell.textContent = sourceDisplay;
 
             var localCell = document.createElement('td');
             localCell.className = 'historyCompareTable-value';
-            localCell.textContent = item.LocalHasImage ? 'Yes' : 'No';
+            localCell.textContent = localDisplay;
 
             var mergedCell = document.createElement('td');
             mergedCell.className = 'historyCompareTable-value historyCompareTable-merged';
-            mergedCell.textContent = item.SourceHasImage ? 'Yes' : 'No';
+            mergedCell.textContent = mergedDisplay;
 
             row.appendChild(propCell);
             row.appendChild(sourceCell);
@@ -1323,6 +1373,9 @@ export default function (view, params) {
         closeModal: function() {
             view.querySelector('#userSyncItemDetailModal').classList.add('hidden');
             this.currentModalDetail = null;
+            // Refresh table and status on close
+            this.table.reload();
+            this.loadUserStatus();
         },
 
         modalIgnore: function() {
