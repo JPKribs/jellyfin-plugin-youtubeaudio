@@ -9,78 +9,76 @@
                         <h1 class="sectionTitle">Content</h1>
                     </div>
 
-                    <div id="syncStatusSummary">
-                        <!-- Row 1: Main statuses -->
-                        <div class="statusCards" id="mainStatusRow">
-                            <div class="statusCard statusCard-synced" id="statusGroupSynced" title="">
-                                <span class="statusCard-count" id="syncedCount">0</span>
-                                <span class="statusCard-label">Synced</span>
+                        <div id="syncStatusSummary">
+                            <div class="statusCards" id="mainStatusRow">
+                                <div class="statusCard statusCard-synced" id="statusGroupSynced" title="">
+                                    <span class="statusCard-count" id="syncedCount">0</span>
+                                    <span class="statusCard-label">Synced</span>
+                                </div>
+                                <div class="statusCard statusCard-queued" id="statusGroupQueued" title="">
+                                    <span class="statusCard-count" id="queuedCount">0</span>
+                                    <span class="statusCard-label">Queued</span>
+                                </div>
+                                <div class="statusCard statusCard-errored" id="statusGroupErrored" title="">
+                                    <span class="statusCard-count" id="erroredCount">0</span>
+                                    <span class="statusCard-label">Errored</span>
+                                </div>
+                                <div class="statusCard statusCard-ignored" id="statusGroupIgnored" title="">
+                                    <span class="statusCard-count" id="ignoredCount">0</span>
+                                    <span class="statusCard-label">Ignored</span>
+                                </div>
                             </div>
-                            <div class="statusCard statusCard-queued" id="statusGroupQueued" title="">
-                                <span class="statusCard-count" id="queuedCount">0</span>
-                                <span class="statusCard-label">Queued</span>
-                            </div>
-                            <div class="statusCard statusCard-errored" id="statusGroupErrored" title="">
-                                <span class="statusCard-count" id="erroredCount">0</span>
-                                <span class="statusCard-label">Errored</span>
-                            </div>
-                            <div class="statusCard statusCard-ignored" id="statusGroupIgnored" title="">
-                                <span class="statusCard-count" id="ignoredCount">0</span>
-                                <span class="statusCard-label">Ignored</span>
+                            <div class="statusCards hidden" id="pendingStatusRow">
+                                <div class="statusCard statusCard-pendingDownload hidden" id="statusGroupPendingDownload" title="">
+                                    <span class="statusCard-count" id="pendingDownloadCount">0</span>
+                                    <span class="statusCard-label">Pending Download</span>
+                                </div>
+                                <div class="statusCard statusCard-pendingReplacement hidden" id="statusGroupPendingReplacement" title="">
+                                    <span class="statusCard-count" id="pendingReplacementCount">0</span>
+                                    <span class="statusCard-label">Pending Replace</span>
+                                </div>
+                                <div class="statusCard statusCard-pendingDeletion hidden" id="statusGroupPendingDeletion" title="">
+                                    <span class="statusCard-count" id="pendingDeletionCount">0</span>
+                                    <span class="statusCard-label">Pending Delete</span>
+                                </div>
+                                <div class="statusCard statusCard-deleting hidden" id="statusGroupDeleting" title="">
+                                    <span class="statusCard-count" id="deletingCount">0</span>
+                                    <span class="statusCard-label">Deleting</span>
+                                </div>
                             </div>
                         </div>
-                        <!-- Row 2: Pending statuses (only shown when approval required) -->
-                        <div class="statusCards hidden" id="pendingStatusRow">
-                            <div class="statusCard statusCard-pendingDownload hidden" id="statusGroupPendingDownload" title="">
-                                <span class="statusCard-count" id="pendingDownloadCount">0</span>
-                                <span class="statusCard-label">Pending Download</span>
-                            </div>
-                            <div class="statusCard statusCard-pendingReplacement hidden" id="statusGroupPendingReplacement" title="">
-                                <span class="statusCard-count" id="pendingReplacementCount">0</span>
-                                <span class="statusCard-label">Pending Replace</span>
-                            </div>
-                            <div class="statusCard statusCard-pendingDeletion hidden" id="statusGroupPendingDeletion" title="">
-                                <span class="statusCard-count" id="pendingDeletionCount">0</span>
-                                <span class="statusCard-label">Pending Delete</span>
-                            </div>
-                            <div class="statusCard statusCard-deleting hidden" id="statusGroupDeleting" title="">
-                                <span class="statusCard-count" id="deletingCount">0</span>
-                                <span class="statusCard-label">Deleting</span>
-                            </div>
-                        </div>
-                    </div>
 
-                    <div id="healthDashboard" class="healthDashboard">
-                        <div class="healthRow">
-                            <div class="healthCard">
-                                <span class="healthLabel">Last Sync</span>
-                                <span class="healthValue" id="healthLastSync">Never</span>
-                            </div>
-                            <div class="healthCard">
-                                <span class="healthLabel">Libraries Mapped</span>
-                                <span class="healthValue" id="healthLibraryCount">0</span>
-                            </div>
-                            <div class="healthCard">
-                                <span class="healthLabel">Pending</span>
-                                <span class="healthValue" id="healthPendingCount">0</span>
+                        <div id="healthDashboard" class="healthDashboard">
+                            <div class="healthRow">
+                                <div class="healthCard">
+                                    <span class="healthLabel">Last Sync</span>
+                                    <span class="healthValue" id="healthLastSync">Never</span>
+                                </div>
+                                <div class="healthCard">
+                                    <span class="healthLabel">Libraries Mapped</span>
+                                    <span class="healthValue" id="healthLibraryCount">0</span>
+                                </div>
+                                <div class="healthCard">
+                                    <span class="healthLabel">Pending</span>
+                                    <span class="healthValue" id="healthPendingCount">0</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div class="syncActionButtonRow">
-                        <button is="emby-button" type="button" id="btnRefreshItems" class="raised syncActionButton">
-                            <span>Refresh</span>
-                        </button>
-                        <button is="emby-button" type="button" id="btnTriggerSync" class="raised button-primary syncActionButton">
-                            <span>Sync</span>
-                        </button>
-                        <button is="emby-button" type="button" id="btnRetryErrors" class="raised syncActionButton">
-                            <span>Retry Errors</span>
-                        </button>
-                        <button is="emby-button" type="button" id="btnResetDatabase" class="raised button-destructive syncActionButton">
-                            <span>Reset Database</span>
-                        </button>
-                    </div>
+                        <div class="syncActionButtonRow">
+                            <button is="emby-button" type="button" id="btnRefreshItems" class="raised syncActionButton">
+                                <span>Refresh</span>
+                            </button>
+                            <button is="emby-button" type="button" id="btnTriggerSync" class="raised button-primary syncActionButton">
+                                <span>Sync</span>
+                            </button>
+                            <button is="emby-button" type="button" id="btnRetryErrors" class="raised syncActionButton">
+                                <span>Retry Errors</span>
+                            </button>
+                            <button is="emby-button" type="button" id="btnResetDatabase" class="raised button-destructive syncActionButton">
+                                <span>Reset Database</span>
+                            </button>
+                        </div>
 
                     <div class="syncSectionSeparator"></div>
 

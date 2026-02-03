@@ -469,82 +469,42 @@
 
     <!-- Styles -->
     <style>
-        /* Shared styles for Server Sync plugin configuration */
-
-        /* ===== Status Color Variables ===== */
-        :root {
-            --status-synced-bg: rgba(92, 184, 92, 0.2);
-            --status-synced-color: #5cb85c;
-            --status-synced-border: rgba(92, 184, 92, 0.3);
-            --status-queued-bg: rgba(240, 173, 78, 0.2);
-            --status-queued-color: #f0ad4e;
-            --status-queued-border: rgba(240, 173, 78, 0.3);
-            --status-errored-bg: rgba(217, 83, 79, 0.2);
-            --status-errored-color: #d9534f;
-            --status-errored-border: rgba(217, 83, 79, 0.3);
-            --status-ignored-bg: rgba(153, 153, 153, 0.2);
-            --status-ignored-color: #999;
-            --status-ignored-border: rgba(153, 153, 153, 0.3);
-            --status-pending-bg: rgba(155, 89, 182, 0.2);
-            --status-pending-color: #9b59b6;
-            --status-pending-border: rgba(155, 89, 182, 0.3);
-            --status-pending-download-bg: rgba(155, 89, 182, 0.2);
-            --status-pending-download-color: #9b59b6;
-            --status-pending-download-border: rgba(155, 89, 182, 0.3);
-            --status-pending-replacement-bg: rgba(52, 152, 219, 0.2);
-            --status-pending-replacement-color: #3498db;
-            --status-pending-replacement-border: rgba(52, 152, 219, 0.3);
-            --status-pending-deletion-bg: rgba(217, 83, 79, 0.2);
-            --status-pending-deletion-color: #d9534f;
-            --status-pending-deletion-border: rgba(217, 83, 79, 0.3);
-            --status-deleting-bg: rgba(231, 76, 60, 0.2);
-            --status-deleting-color: #e74c3c;
-            --status-deleting-border: rgba(231, 76, 60, 0.3);
-        }
-
         /* Utility Classes */
-        .text-success { color: var(--status-synced-color); }
-        .text-error { color: var(--status-errored-color); }
-        .text-warning { color: var(--status-queued-color); }
+        .text-success { color: #5cb85c; }
+        .text-error { color: #d9534f; }
         .text-muted { opacity: 0.7; }
         .hidden { display: none !important; }
         .flex { display: flex; }
         .gap-lg { gap: 24px; }
         .mt-sm { margin-top: 8px; }
-        .mt-md { margin-top: 16px; }
-        .mt-lg { margin-top: 24px; }
         .mb-md { margin-bottom: 12px; }
         .w-auto { width: auto !important; }
         .w-80 { width: 80px; }
 
-        /* Secondary title for section headers */
-        .secondaryTitle {
-            font-size: 1.2em;
-            font-weight: 500;
-            color: rgba(255, 255, 255, 0.7);
-            margin: 24px 0 12px 0;
-            padding-bottom: 8px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
         /* Section title styling */
+        .sectionTitleContainer {
+            margin-top: 1.5em;
+        }
+        .sectionTitleContainer:first-child {
+            margin-top: 0;
+        }
         .sectionTitleContainer .sectionTitle {
-            width: 100%;
+            flex: 1;
             border-bottom: 1px solid #555;
             padding-bottom: 0.5em;
             margin-bottom: 1em;
         }
 
         /* Button styles */
-        .button-primary, .button-submit {
+        .button-submit {
             background-color: #00a4dc !important;
             color: #fff !important;
         }
-        .button-primary:hover, .button-submit:hover {
+        .button-submit:hover {
             background-color: #0088cc !important;
         }
         .button-destructive {
-            background-color: var(--status-errored-color) !important;
+            background-color: #d9534f !important;
             color: #fff !important;
         }
         .button-destructive:hover {
@@ -671,13 +631,8 @@
             gap: 8px;
             align-items: center;
         }
-        .inputRow input[is="emby-input"],
-        .inputRow .emby-input-wrapper {
+        .inputRow input[type="number"] {
             flex: 1;
-            margin: 0 !important;
-        }
-        .inputRow input[is="emby-input"] {
-            padding-left: 1em !important;
         }
 
         /* Inline inputs */
