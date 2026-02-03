@@ -5,12 +5,9 @@
         <div class="content-primary">
             <form id="ServerSyncSettingsForm">
                 <div class="verticalSection verticalSection-extrabottompadding">
-                    <div class="sectionTitleContainer flex align-items-center">
-                        <h1 class="sectionTitle">Server Sync</h1>
-                    </div>
 
                     <!-- ==================== CONFIGURATION ==================== -->
-                    <h2 class="secondaryTitle">Configuration</h2>
+                    <h1 class="sectionTitle">Configuration</h1>
 
                     <!-- Server Subsection (collapsible) -->
                     <div class="collapsibleSection">
@@ -64,7 +61,7 @@
 
                             <div id="libraryMappingsContainer"></div>
 
-                            <button is="emby-button" type="button" id="btnAddMapping" class="raised button-primary mt-sm">
+                            <button is="emby-button" type="button" id="btnAddMapping" class="raised button-secondary mt-sm">
                                 <span>Add Library Mapping</span>
                             </button>
 
@@ -87,7 +84,7 @@
 
                             <div id="userMappingsContainer"></div>
 
-                            <button is="emby-button" type="button" id="btnAddUserMapping" class="raised button-primary mt-sm">
+                            <button is="emby-button" type="button" id="btnAddUserMapping" class="raised button-secondary mt-sm">
                                 <span>Add User Mapping</span>
                             </button>
 
@@ -100,7 +97,7 @@
                     </div>
 
                     <!-- ==================== SYNC SETTINGS ==================== -->
-                    <h2 class="secondaryTitle mt-lg">Sync Settings</h2>
+                    <h1 class="sectionTitle">Sync Settings</h1>
 
                     <!-- Content Sync Settings (collapsible) -->
                     <div class="collapsibleSection">
@@ -109,16 +106,19 @@
                             <span class="collapsibleIcon">&#9660;</span>
                         </button>
                         <div id="contentSyncSettingsContent" class="collapsibleContent collapsed">
-                            <div class="inputContainer">
-                                <label class="checkboxContainer">
-                                    <input is="emby-checkbox" type="checkbox" id="chkEnableContentSync" />
-                                    <span>Enable Content Sync</span>
-                                </label>
-                                <div class="fieldDescription">Sync content files between source and local servers for mapped libraries.</div>
+                            <div class="settingsGroup">
+                                <div class="inputContainer">
+                                    <label class="checkboxContainer">
+                                        <input is="emby-checkbox" type="checkbox" id="chkEnableContentSync" />
+                                        <span>Enable Content Sync</span>
+                                    </label>
+                                    <div class="fieldDescription">Sync content files between source and local servers for mapped libraries.</div>
+                                </div>
                             </div>
 
                             <div id="contentSyncOptions">
-                                <!-- Detection Settings -->
+                                <!-- Sync Parameters -->
+                                <h3 class="subsectionHeader">Sync Parameters</h3>
                                 <div class="settingsGroup">
                                     <div class="inputContainer">
                                         <label class="checkboxContainer">
@@ -149,7 +149,8 @@
                                     </div>
                                 </div>
 
-                                <!-- Sync Behavior -->
+                                <!-- Approval Preferences -->
+                                <h3 class="subsectionHeader">Approval Preferences</h3>
                                 <div class="settingsGroup">
                                     <div class="inputContainer">
                                         <label for="selDownloadNewContentMode">Download New Content:</label>
@@ -204,7 +205,8 @@
                                     </div>
                                 </div>
 
-                                <!-- Download Settings -->
+                                <!-- Download Preferences -->
+                                <h3 class="subsectionHeader">Download Preferences</h3>
                                 <div class="settingsGroup">
                                     <div class="inputContainer">
                                         <label for="txtMaxConcurrentDownloads">Max Concurrent Downloads:</label>
@@ -242,10 +244,7 @@
                                         <input is="emby-input" type="number" id="txtMinFreeDiskSpace" min="1" max="1000" />
                                         <div class="fieldDescription">Downloads will pause when free disk space falls below this threshold.</div>
                                     </div>
-                                </div>
 
-                                <!-- Bandwidth Scheduling -->
-                                <div class="settingsGroup">
                                     <div class="inputContainer">
                                         <label class="checkboxContainer">
                                             <input is="emby-checkbox" type="checkbox" id="chkEnableBandwidthScheduling" />
@@ -298,53 +297,58 @@
                             <span class="collapsibleIcon">&#9660;</span>
                         </button>
                         <div id="historySyncSettingsContent" class="collapsibleContent collapsed">
-                            <div class="inputContainer">
-                                <label class="checkboxContainer">
-                                    <input is="emby-checkbox" type="checkbox" id="chkEnableHistorySync" />
-                                    <span>Enable History Sync</span>
-                                </label>
-                                <div class="fieldDescription">Sync watch history between source and local servers for mapped users.</div>
+                            <div class="settingsGroup">
+                                <div class="inputContainer">
+                                    <label class="checkboxContainer">
+                                        <input is="emby-checkbox" type="checkbox" id="chkEnableHistorySync" />
+                                        <span>Enable History Sync</span>
+                                    </label>
+                                    <div class="fieldDescription">Sync watch history between source and local servers for mapped users.</div>
+                                </div>
                             </div>
 
                             <div id="historySyncOptions">
-                                <div class="inputContainer">
-                                    <label class="checkboxContainer">
-                                        <input is="emby-checkbox" type="checkbox" id="chkHistorySyncPlayedStatus" checked />
-                                        <span>Played / Unplayed Status</span>
-                                    </label>
-                                    <div class="fieldDescription">Sync whether items are marked as played or unplayed.</div>
-                                </div>
+                                <h3 class="subsectionHeader">Sync Parameters</h3>
+                                <div class="settingsGroup">
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkHistorySyncPlayedStatus" checked />
+                                            <span>Played / Unplayed Status</span>
+                                        </label>
+                                        <div class="fieldDescription">Sync whether items are marked as played or unplayed.</div>
+                                    </div>
 
-                                <div class="inputContainer">
-                                    <label class="checkboxContainer">
-                                        <input is="emby-checkbox" type="checkbox" id="chkHistorySyncPlaybackPosition" checked />
-                                        <span>Playback Position</span>
-                                    </label>
-                                    <div class="fieldDescription">Sync resume position for partially watched items.</div>
-                                </div>
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkHistorySyncPlaybackPosition" checked />
+                                            <span>Playback Position</span>
+                                        </label>
+                                        <div class="fieldDescription">Sync resume position for partially watched items.</div>
+                                    </div>
 
-                                <div class="inputContainer">
-                                    <label class="checkboxContainer">
-                                        <input is="emby-checkbox" type="checkbox" id="chkHistorySyncPlayCount" checked />
-                                        <span>Play Count</span>
-                                    </label>
-                                    <div class="fieldDescription">Sync how many times an item has been played.</div>
-                                </div>
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkHistorySyncPlayCount" checked />
+                                            <span>Play Count</span>
+                                        </label>
+                                        <div class="fieldDescription">Sync how many times an item has been played.</div>
+                                    </div>
 
-                                <div class="inputContainer">
-                                    <label class="checkboxContainer">
-                                        <input is="emby-checkbox" type="checkbox" id="chkHistorySyncLastPlayedDate" checked />
-                                        <span>Last Played Date</span>
-                                    </label>
-                                    <div class="fieldDescription">Sync when an item was last watched.</div>
-                                </div>
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkHistorySyncLastPlayedDate" checked />
+                                            <span>Last Played Date</span>
+                                        </label>
+                                        <div class="fieldDescription">Sync when an item was last watched.</div>
+                                    </div>
 
-                                <div class="inputContainer">
-                                    <label class="checkboxContainer">
-                                        <input is="emby-checkbox" type="checkbox" id="chkHistorySyncFavorites" checked />
-                                        <span>Favorites</span>
-                                    </label>
-                                    <div class="fieldDescription">Sync favorite status for items.</div>
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkHistorySyncFavorites" checked />
+                                            <span>Favorites</span>
+                                        </label>
+                                        <div class="fieldDescription">Sync favorite status for items.</div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -363,29 +367,34 @@
                             <span class="collapsibleIcon">&#9660;</span>
                         </button>
                         <div id="metadataSyncSettingsContent" class="collapsibleContent collapsed">
-                            <div class="inputContainer">
-                                <label class="checkboxContainer">
-                                    <input is="emby-checkbox" type="checkbox" id="chkEnableMetadataSync" />
-                                    <span>Enable Metadata Sync</span>
-                                </label>
-                                <div class="fieldDescription">Sync metadata (titles, descriptions, ratings, etc.) from source to local server for matched items.</div>
+                            <div class="settingsGroup">
+                                <div class="inputContainer">
+                                    <label class="checkboxContainer">
+                                        <input is="emby-checkbox" type="checkbox" id="chkEnableMetadataSync" />
+                                        <span>Enable Metadata Sync</span>
+                                    </label>
+                                    <div class="fieldDescription">Sync metadata (titles, descriptions, ratings, etc.) from source to local server for matched items.</div>
+                                </div>
                             </div>
 
                             <div id="metadataSyncOptions">
-                                <div class="inputContainer">
-                                    <label class="checkboxContainer">
-                                        <input is="emby-checkbox" type="checkbox" id="chkMetadataSyncMetadata" checked />
-                                        <span>Metadata Fields</span>
-                                    </label>
-                                    <div class="fieldDescription">Sync title, overview, ratings, genres, tags, and provider IDs.</div>
-                                </div>
+                                <h3 class="subsectionHeader">Sync Parameters</h3>
+                                <div class="settingsGroup">
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkMetadataSyncMetadata" checked />
+                                            <span>Metadata Fields</span>
+                                        </label>
+                                        <div class="fieldDescription">Sync title, overview, ratings, genres, tags, and provider IDs.</div>
+                                    </div>
 
-                                <div class="inputContainer">
-                                    <label class="checkboxContainer">
-                                        <input is="emby-checkbox" type="checkbox" id="chkMetadataSyncImages" checked />
-                                        <span>Images</span>
-                                    </label>
-                                    <div class="fieldDescription">Sync primary, backdrop, and other images.</div>
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkMetadataSyncImages" checked />
+                                            <span>Images</span>
+                                        </label>
+                                        <div class="fieldDescription">Sync primary, backdrop, and other images.</div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -404,37 +413,42 @@
                             <span class="collapsibleIcon">&#9660;</span>
                         </button>
                         <div id="userSyncSettingsContent" class="collapsibleContent collapsed">
-                            <div class="inputContainer">
-                                <label class="checkboxContainer">
-                                    <input is="emby-checkbox" type="checkbox" id="chkEnableUserSync" />
-                                    <span>Enable User Sync</span>
-                                </label>
-                                <div class="fieldDescription">Sync user settings (policy, configuration, profile images) from source to local server for mapped users.</div>
+                            <div class="settingsGroup">
+                                <div class="inputContainer">
+                                    <label class="checkboxContainer">
+                                        <input is="emby-checkbox" type="checkbox" id="chkEnableUserSync" />
+                                        <span>Enable User Sync</span>
+                                    </label>
+                                    <div class="fieldDescription">Sync user settings (policy, configuration, profile images) from source to local server for mapped users.</div>
+                                </div>
                             </div>
 
                             <div id="userSyncOptions">
-                                <div class="inputContainer">
-                                    <label class="checkboxContainer">
-                                        <input is="emby-checkbox" type="checkbox" id="chkUserSyncPolicy" checked />
-                                        <span>User Policy</span>
-                                    </label>
-                                    <div class="fieldDescription">Sync permission settings like admin status, parental ratings, library access.</div>
-                                </div>
+                                <h3 class="subsectionHeader">Sync Parameters</h3>
+                                <div class="settingsGroup">
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkUserSyncPolicy" checked />
+                                            <span>User Policy</span>
+                                        </label>
+                                        <div class="fieldDescription">Sync permission settings like admin status, parental ratings, library access.</div>
+                                    </div>
 
-                                <div class="inputContainer">
-                                    <label class="checkboxContainer">
-                                        <input is="emby-checkbox" type="checkbox" id="chkUserSyncConfiguration" checked />
-                                        <span>User Configuration</span>
-                                    </label>
-                                    <div class="fieldDescription">Sync user preferences like subtitle mode, audio language, display settings.</div>
-                                </div>
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkUserSyncConfiguration" checked />
+                                            <span>User Configuration</span>
+                                        </label>
+                                        <div class="fieldDescription">Sync user preferences like subtitle mode, audio language, display settings.</div>
+                                    </div>
 
-                                <div class="inputContainer">
-                                    <label class="checkboxContainer">
-                                        <input is="emby-checkbox" type="checkbox" id="chkUserSyncProfileImage" checked />
-                                        <span>Profile Image</span>
-                                    </label>
-                                    <div class="fieldDescription">Sync user profile pictures from source to local server.</div>
+                                    <div class="inputContainer">
+                                        <label class="checkboxContainer">
+                                            <input is="emby-checkbox" type="checkbox" id="chkUserSyncProfileImage" checked />
+                                            <span>Profile Image</span>
+                                        </label>
+                                        <div class="fieldDescription">Sync user profile pictures from source to local server.</div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -622,6 +636,21 @@
             border-left: 2px solid rgba(85, 85, 85, 0.3);
         }
 
+        /* Subsection headers within collapsible sections */
+        .subsectionHeader {
+            font-size: 0.95em;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.6);
+            margin: 16px 0 12px 0;
+            padding-bottom: 6px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .subsectionHeader:first-child {
+            margin-top: 0;
+        }
+
         /* Settings groups for visual separation */
         .settingsGroup {
             margin-bottom: 16px;
@@ -644,7 +673,9 @@
         .inputRow .emby-input-wrapper {
             flex: 1;
             margin: 0 !important;
-            padding-left: 0 !important;
+        }
+        .inputRow input[is="emby-input"] {
+            padding-left: 1em !important;
         }
 
         /* Inline inputs */
