@@ -852,8 +852,15 @@ export default function (view, params) {
         table: null,
         currentModalItem: null,
         capabilities: null,
+        _initialized: false,
 
         init: function() {
+            // Prevent double initialization (viewshow can fire multiple times)
+            if (this._initialized) {
+                return;
+            }
+            this._initialized = true;
+
             var self = this;
 
             // Create the paginated table instance

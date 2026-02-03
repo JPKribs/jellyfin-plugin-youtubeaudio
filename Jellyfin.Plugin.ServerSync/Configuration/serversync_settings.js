@@ -15,6 +15,7 @@ export default function (view, params) {
     'use strict';
 
     var pluginId = 'ebd650b5-6f4c-4ccb-b10d-23dffb3a7286';
+    var _initialized = false;
 
     // Shared utilities
     function escapeHtml(str) {
@@ -619,25 +620,30 @@ export default function (view, params) {
         console.log('ServerSync Settings: viewshow');
         LibraryMenu.setTabs('serversync', 0, getTabs);
 
-        // Collapsibles
-        initCollapsibles();
+        // Only bind event handlers once to prevent double-firing
+        if (!_initialized) {
+            _initialized = true;
 
-        // Nested visibility handlers
-        initNestedVisibilityHandlers();
+            // Collapsibles
+            initCollapsibles();
 
-        // Button handlers
-        bindClick('btnTestConnection', testConnection);
-        bindClick('btnSaveServer', saveServerConfig);
-        bindClick('btnAddMapping', function() { addLibraryMappingRow(); });
-        bindClick('btnSaveLibraries', saveLibraries);
-        bindClick('btnAddUserMapping', function() { addUserMappingRow(); });
-        bindClick('btnSaveUsers', saveUsers);
-        bindClick('btnSaveContentSettings', saveContentSettings);
-        bindClick('btnSaveHistorySettings', saveHistorySettings);
-        bindClick('btnSaveMetadataSettings', saveMetadataSettings);
-        bindClick('btnSaveUserSyncSettings', saveUserSyncSettings);
+            // Nested visibility handlers
+            initNestedVisibilityHandlers();
 
-        // Load config
+            // Button handlers
+            bindClick('btnTestConnection', testConnection);
+            bindClick('btnSaveServer', saveServerConfig);
+            bindClick('btnAddMapping', function() { addLibraryMappingRow(); });
+            bindClick('btnSaveLibraries', saveLibraries);
+            bindClick('btnAddUserMapping', function() { addUserMappingRow(); });
+            bindClick('btnSaveUsers', saveUsers);
+            bindClick('btnSaveContentSettings', saveContentSettings);
+            bindClick('btnSaveHistorySettings', saveHistorySettings);
+            bindClick('btnSaveMetadataSettings', saveMetadataSettings);
+            bindClick('btnSaveUserSyncSettings', saveUserSyncSettings);
+        }
+
+        // Load config (always reload on viewshow to get fresh data)
         loadConfig();
     });
 }

@@ -831,8 +831,15 @@ export default function (view, params) {
         table: null,
         currentModalDetail: null,
         currentConfig: null,
+        _initialized: false,
 
         init: function(config) {
+            // Prevent double initialization (viewshow can fire multiple times)
+            if (this._initialized) {
+                return;
+            }
+            this._initialized = true;
+
             var self = this;
             self.currentConfig = config;
 
