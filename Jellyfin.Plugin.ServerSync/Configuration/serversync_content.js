@@ -875,9 +875,9 @@ export default function (view, params) {
                         type: 'custom',
                         render: function(item) {
                             var fileName = ServerSyncShared.getFileName(item.SourcePath);
-                            var sourceLibrary = item.SourceLibraryName || 'Unknown';
-                            var localLibrary = item.LocalLibraryName || 'Unknown';
-                            var libraryDisplay = sourceLibrary + ' -> ' + localLibrary;
+                            var sourceLibrary = item.SourceLibraryName || 'Source';
+                            var localLibrary = item.LocalLibraryName || 'Local';
+                            var libraryDisplay = sourceLibrary + ' → ' + localLibrary;
 
                             var errorPreview = '';
                             if (item.Status === 'Errored' && item.ErrorMessage) {
@@ -1171,8 +1171,14 @@ export default function (view, params) {
                 var pendingDeletionCount = status.PendingDeletion || 0;
                 var deletingCount = status.Deleting || 0;
 
+                // Calculate total pending (all pending types combined)
+                var totalPendingCount = pendingDownloadCount + pendingReplacementCount + pendingDeletionCount;
+
                 view.querySelector('#syncedCount').textContent = syncedCount;
                 view.querySelector('#statusGroupSynced').setAttribute('title', 'Synced: ' + syncedCount);
+
+                view.querySelector('#pendingCount').textContent = totalPendingCount;
+                view.querySelector('#statusGroupPending').setAttribute('title', 'Pending: ' + totalPendingCount + ' (Download: ' + pendingDownloadCount + ', Replace: ' + pendingReplacementCount + ', Delete: ' + pendingDeletionCount + ')');
 
                 view.querySelector('#queuedCount').textContent = queuedCount;
                 view.querySelector('#statusGroupQueued').setAttribute('title', 'Queued: ' + queuedCount);
