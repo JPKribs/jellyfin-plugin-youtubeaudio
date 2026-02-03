@@ -857,7 +857,7 @@ export default function (view, params) {
                             var itemName = item.ItemName || 'Unknown';
                             var sourceLib = item.SourceLibraryName || 'Unknown';
                             var localLib = item.LocalLibraryName || 'Unknown';
-                            var libraryDisplay = sourceLib + ' -> ' + localLib;
+                            var libraryDisplay = sourceLib + ' → ' + localLib;
 
                             return '<div class="syncItemInfo">' +
                                 '<div class="syncItemName" title="' + ServerSyncShared.escapeHtml(itemName) + '">' +
@@ -1157,7 +1157,7 @@ export default function (view, params) {
                 var sourceLib = item.SourceLibraryName || 'Unknown';
                 var localLib = item.LocalLibraryName || 'Unknown';
                 view.querySelector('#metadataSyncModalItem').innerHTML =
-                    '<strong>Library:</strong> ' + ServerSyncShared.escapeHtml(sourceLib) + ' -> ' + ServerSyncShared.escapeHtml(localLib);
+                    '<strong>Library:</strong> ' + ServerSyncShared.escapeHtml(sourceLib) + ' → ' + ServerSyncShared.escapeHtml(localLib);
 
                 // Set server names in table headers
                 var sourceServerName = (self.currentConfig && self.currentConfig.SourceServerName) || 'Source';

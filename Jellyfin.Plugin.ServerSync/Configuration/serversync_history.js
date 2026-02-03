@@ -854,7 +854,7 @@ export default function (view, params) {
                             var userMapping = self.findUserMapping(item.SourceUserId, item.LocalUserId);
                             var sourceUserName = userMapping ? userMapping.SourceUserName : 'Unknown';
                             var localUserName = userMapping ? userMapping.LocalUserName : 'Unknown';
-                            var userDisplay = sourceUserName + ' -> ' + localUserName;
+                            var userDisplay = sourceUserName + ' → ' + localUserName;
 
                             return '<div class="syncItemInfo">' +
                                 '<div class="syncItemName" title="' + ServerSyncShared.escapeHtml(itemName) + '">' +

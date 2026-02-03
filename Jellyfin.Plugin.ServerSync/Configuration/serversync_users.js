@@ -860,8 +860,8 @@ export default function (view, params) {
                             var localServerName = ServerSyncShared.localServerName || 'Local';
 
                             return '<div class="syncItemInfo">' +
-                                '<div class="syncItemName">' + ServerSyncShared.escapeHtml(sourceUserName) + ' -> ' + ServerSyncShared.escapeHtml(localUserName) + '</div>' +
-                                '<div class="syncItemPath">' + ServerSyncShared.escapeHtml(sourceServerName) + ' -> ' + ServerSyncShared.escapeHtml(localServerName) + '</div>' +
+                                '<div class="syncItemName">' + ServerSyncShared.escapeHtml(sourceUserName) + ' → ' + ServerSyncShared.escapeHtml(localUserName) + '</div>' +
+                                '<div class="syncItemPath">' + ServerSyncShared.escapeHtml(sourceServerName) + ' → ' + ServerSyncShared.escapeHtml(localServerName) + '</div>' +
                                 '</div>';
                         }
                     },
@@ -1141,7 +1141,7 @@ export default function (view, params) {
 
                 // Title
                 view.querySelector('#userSyncModalTitle').textContent =
-                    (detail.SourceUserName || 'Unknown') + ' -> ' + (detail.LocalUserName || 'Unknown');
+                    (detail.SourceUserName || 'Unknown') + ' → ' + (detail.LocalUserName || 'Unknown');
 
                 // Status badge
                 var statusBadge = view.querySelector('#userSyncModalStatusBadge');
@@ -1169,7 +1169,7 @@ export default function (view, params) {
 
                 // User info
                 view.querySelector('#userSyncModalUser').textContent =
-                    (detail.SourceUserName || 'Unknown') + ' -> ' + (detail.LocalUserName || 'Unknown');
+                    (detail.SourceUserName || 'Unknown') + ' → ' + (detail.LocalUserName || 'Unknown');
 
                 // Table headers - use 4 columns: Property | Source | Local | After Sync
                 view.querySelector('#userSyncModalSourceHeader').textContent =
