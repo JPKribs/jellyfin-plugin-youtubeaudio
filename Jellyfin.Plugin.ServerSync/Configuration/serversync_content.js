@@ -116,29 +116,6 @@ export default function (view, params) {
             }
         },
 
-        // Get status display text and CSS class
-        getStatusInfo: function(status, pendingType) {
-            var statusMap = {
-                'Synced': { text: 'Synced', cssClass: 'Synced' },
-                'Queued': { text: 'Queued', cssClass: 'Queued' },
-                'Errored': { text: 'Errored', cssClass: 'Errored' },
-                'Ignored': { text: 'Ignored', cssClass: 'Ignored' },
-                'Downloading': { text: 'Downloading', cssClass: 'Queued' },
-                'Deleting': { text: 'Deleting', cssClass: 'Deleting' }
-            };
-
-            if (status === 'Pending' && pendingType) {
-                var pendingMap = {
-                    'Download': { text: 'Pending Download', cssClass: 'Pending-Download' },
-                    'Replacement': { text: 'Pending Replacement', cssClass: 'Pending-Replacement' },
-                    'Deletion': { text: 'Pending Deletion', cssClass: 'Pending-Deletion' }
-                };
-                return pendingMap[pendingType] || { text: 'Pending', cssClass: 'Queued' };
-            }
-
-            return statusMap[status] || { text: status || 'Unknown', cssClass: 'Ignored' };
-        },
-
         // Safe event binding - binds event only if element exists (uses view.querySelector)
         bindEvent: function(id, event, handler, moduleName) {
             var el = view.querySelector('#' + id);
@@ -1057,10 +1034,12 @@ export default function (view, params) {
         loadHealthStats: function() {
             return Promise.all([
                 ServerSyncShared.apiRequest('Stats', 'GET'),
-                ServerSyncShared.getConfig()
+                ServerSyncShared.getConfig(),
+                ServerSyncShared.apiRequest('PendingSize', 'GET')
             ]).then(function(results) {
                 var stats = results[0];
                 var config = results[1];
+                var pendingSizeData = results[2];
 
                 // Last sync time
                 var lastSyncEl = view.querySelector('#healthLastSync');
@@ -1079,10 +1058,15 @@ export default function (view, params) {
                 libraryCountEl.textContent = libraryMappings.length;
                 libraryCountEl.className = libraryMappings.length > 0 ? 'healthValue success' : 'healthValue warning';
 
-                // Pending count
+                // Pending size (pending download + pending replacement + queued - pending deletion)
                 var pendingCountEl = view.querySelector('#healthPendingCount');
-                pendingCountEl.textContent = stats.QueuedItems || 0;
-                pendingCountEl.className = stats.QueuedItems > 0 ? 'healthValue warning' : 'healthValue';
+                if (pendingSizeData && typeof pendingSizeData.TotalPendingBytes === 'number') {
+                    pendingCountEl.textContent = ServerSyncShared.formatSize(pendingSizeData.TotalPendingBytes);
+                    pendingCountEl.className = pendingSizeData.TotalPendingBytes > 0 ? 'healthValue warning' : 'healthValue';
+                } else {
+                    pendingCountEl.textContent = '0 B';
+                    pendingCountEl.className = 'healthValue';
+                }
             }).catch(function() {
                 // Ignore errors
             });
@@ -1322,6 +1306,11 @@ export default function (view, params) {
             statusBadge.textContent = displayStatus;
             statusBadge.className = 'itemModal-statusBadge ' + statusClass;
 
+            // Library mapping display
+            var sourceLibrary = item.SourceLibraryName || 'Source';
+            var localLibrary = item.LocalLibraryName || 'Local';
+            view.querySelector('#modalLibraryMapping').textContent = sourceLibrary + ' → ' + localLibrary;
+
             // Size
             view.querySelector('#modalSize').textContent = ServerSyncShared.formatSize(item.SourceSize);
 
@@ -1350,7 +1339,7 @@ export default function (view, params) {
             var lastSyncSection = view.querySelector('#modalLastSyncSection');
             if (item.LastSyncTime) {
                 var lastSync = new Date(item.LastSyncTime);
-                view.querySelector('#modalLastSync').textContent = lastSync.toLocaleString();
+                view.querySelector('#modalLastSync').textContent = ServerSyncShared.formatRelativeTime(lastSync);
                 lastSyncSection.classList.remove('hidden');
             } else {
                 lastSyncSection.classList.add('hidden');
@@ -1397,11 +1386,21 @@ export default function (view, params) {
                 localPathNoteEl.style.display = 'none';
             }
 
-            // Show/hide modal buttons based on pending type
+            // Show/hide modal buttons based on status and pending type
             var btnQueue = view.querySelector('#btnModalQueue');
+            var btnIgnore = view.querySelector('#btnModalIgnore');
             var modalDeleteRow = view.querySelector('#modalDeleteRow');
             var isPendingDeletion = item.Status === 'Pending' && item.PendingType === 'Deletion';
             var isPendingDownloadOrReplacement = item.Status === 'Pending' && (item.PendingType === 'Download' || item.PendingType === 'Replacement');
+            var isSynced = item.Status === 'Synced';
+
+            // Update Queue button text based on status
+            var queueBtnSpan = btnQueue.querySelector('span');
+            if (isSynced) {
+                queueBtnSpan.textContent = 'Re-sync';
+            } else {
+                queueBtnSpan.textContent = 'Queue';
+            }
 
             if (isPendingDeletion) {
                 btnQueue.style.display = 'none';
@@ -1424,6 +1423,9 @@ export default function (view, params) {
         closeModal: function() {
             view.querySelector('#itemDetailModal').classList.add('hidden');
             this.currentModalItem = null;
+            // Refresh table data and health stats when modal closes
+            this.table.refresh();
+            this.loadHealthStats();
         },
 
         modalIgnore: function() {

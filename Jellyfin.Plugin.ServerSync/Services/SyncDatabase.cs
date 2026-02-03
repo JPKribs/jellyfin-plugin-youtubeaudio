@@ -535,6 +535,51 @@ public class SyncDatabase : IDisposable
     }
 
     /// <summary>
+    /// GetPendingSizes
+    /// Returns the total size in bytes for items that need to be synced.
+    /// Calculates: PendingDownload + PendingReplacement + Queued - PendingDeletion
+    /// </summary>
+    /// <returns>Dictionary with size breakdown and total.</returns>
+    public Dictionary<string, long> GetPendingSizes()
+    {
+        EnsureConnection();
+
+        var sizes = new Dictionary<string, long>();
+
+        // Get pending download size
+        using var pendingDownloadCmd = _connection!.CreateCommand();
+        pendingDownloadCmd.CommandText = "SELECT COALESCE(SUM(SourceSize), 0) FROM SyncItems WHERE Status = @status AND PendingType = @pendingType";
+        pendingDownloadCmd.Parameters.AddWithValue("@status", (int)SyncStatus.Pending);
+        pendingDownloadCmd.Parameters.AddWithValue("@pendingType", (int)PendingType.Download);
+        sizes["PendingDownload"] = Convert.ToInt64(pendingDownloadCmd.ExecuteScalar());
+
+        // Get pending replacement size
+        using var pendingReplacementCmd = _connection.CreateCommand();
+        pendingReplacementCmd.CommandText = "SELECT COALESCE(SUM(SourceSize), 0) FROM SyncItems WHERE Status = @status AND PendingType = @pendingType";
+        pendingReplacementCmd.Parameters.AddWithValue("@status", (int)SyncStatus.Pending);
+        pendingReplacementCmd.Parameters.AddWithValue("@pendingType", (int)PendingType.Replacement);
+        sizes["PendingReplacement"] = Convert.ToInt64(pendingReplacementCmd.ExecuteScalar());
+
+        // Get pending deletion size
+        using var pendingDeletionCmd = _connection.CreateCommand();
+        pendingDeletionCmd.CommandText = "SELECT COALESCE(SUM(SourceSize), 0) FROM SyncItems WHERE Status = @status AND PendingType = @pendingType";
+        pendingDeletionCmd.Parameters.AddWithValue("@status", (int)SyncStatus.Pending);
+        pendingDeletionCmd.Parameters.AddWithValue("@pendingType", (int)PendingType.Deletion);
+        sizes["PendingDeletion"] = Convert.ToInt64(pendingDeletionCmd.ExecuteScalar());
+
+        // Get queued size
+        using var queuedCmd = _connection.CreateCommand();
+        queuedCmd.CommandText = "SELECT COALESCE(SUM(SourceSize), 0) FROM SyncItems WHERE Status = @status";
+        queuedCmd.Parameters.AddWithValue("@status", (int)SyncStatus.Queued);
+        sizes["Queued"] = Convert.ToInt64(queuedCmd.ExecuteScalar());
+
+        // Calculate total: PendingDownload + PendingReplacement + Queued - PendingDeletion
+        sizes["Total"] = sizes["PendingDownload"] + sizes["PendingReplacement"] + sizes["Queued"] - sizes["PendingDeletion"];
+
+        return sizes;
+    }
+
+    /// <summary>
     /// GetErroredItemsForRetry
     /// Gets errored items that haven't exceeded max retries.
     /// </summary>

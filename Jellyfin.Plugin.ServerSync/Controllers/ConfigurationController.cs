@@ -349,6 +349,34 @@ public class ConfigurationController : ControllerBase
     }
 
     /// <summary>
+    /// GetPendingSize
+    /// Gets the total size of pending items to be synced.
+    /// Calculates: PendingDownload + PendingReplacement + Queued - PendingDeletion
+    /// </summary>
+    /// <returns>Pending size response with breakdown.</returns>
+    [HttpGet("PendingSize")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<PendingSizeResponse> GetPendingSize()
+    {
+        var plugin = Plugin.Instance;
+        if (plugin == null)
+        {
+            return NotFound();
+        }
+
+        var sizes = plugin.Database.GetPendingSizes();
+
+        return Ok(new PendingSizeResponse
+        {
+            PendingDownloadBytes = sizes.GetValueOrDefault("PendingDownload", 0),
+            PendingReplacementBytes = sizes.GetValueOrDefault("PendingReplacement", 0),
+            PendingDeletionBytes = sizes.GetValueOrDefault("PendingDeletion", 0),
+            QueuedBytes = sizes.GetValueOrDefault("Queued", 0),
+            TotalPendingBytes = sizes.GetValueOrDefault("Total", 0)
+        });
+    }
+
+    /// <summary>
     /// GetDiskSpace
     /// Gets disk space information for configured library paths.
     /// </summary>
