@@ -205,6 +205,8 @@ public class UserSyncStateService
                 await _userManager.UpdatePolicyAsync(localUser.Id, localPolicy).ConfigureAwait(false);
             }
 
+            // Update LocalValue to match MergedValue so HasChanges becomes false
+            UpdateLocalValueAfterSync(item.Id, item.MergedValue);
             _database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Synced);
             return true;
         }
@@ -282,6 +284,8 @@ public class UserSyncStateService
                 await _userManager.UpdateConfigurationAsync(localUser.Id, localConfig).ConfigureAwait(false);
             }
 
+            // Update LocalValue to match MergedValue so HasChanges becomes false
+            UpdateLocalValueAfterSync(item.Id, item.MergedValue);
             _database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Synced);
             return true;
         }
@@ -335,8 +339,8 @@ public class UserSyncStateService
                     _logger.LogInformation("{Context}: Removed profile image", syncContext);
                 }
 
-                // Update synced hash/size to indicate no image
-                UpdateSyncedImageData(item.Id, null, 0);
+                // Update synced hash/size to indicate no image, and clear local hash so HasChanges becomes false
+                UpdateSyncedImageData(item.Id, null, 0, updateLocalHash: true);
                 _database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Synced);
                 return true;
             }
@@ -414,8 +418,9 @@ public class UserSyncStateService
                 await _userManager.UpdateUserAsync(localUser).ConfigureAwait(false);
 
                 // Update the synced image hash/size to track what we've synced
+                // Also update LocalImageHash to match so HasChanges becomes false
                 var downloadedSize = new FileInfo(tempPath).Length;
-                UpdateSyncedImageData(item.Id, downloadedHash, downloadedSize);
+                UpdateSyncedImageData(item.Id, downloadedHash, downloadedSize, updateLocalHash: true);
 
                 _logger.LogInformation("{Context}: Updated profile image (hash: {Hash}, size: {Size} bytes)",
                     syncContext, downloadedHash, downloadedSize);
@@ -450,7 +455,11 @@ public class UserSyncStateService
     /// <summary>
     /// Updates the synced image hash and size after successfully syncing an image.
     /// </summary>
-    private void UpdateSyncedImageData(long itemId, string? imageHash, long? imageSize)
+    /// <param name="itemId">The item ID to update.</param>
+    /// <param name="imageHash">The synced image hash.</param>
+    /// <param name="imageSize">The synced image size.</param>
+    /// <param name="updateLocalHash">If true, also updates LocalImageHash to match SourceImageHash so HasChanges becomes false.</param>
+    private void UpdateSyncedImageData(long itemId, string? imageHash, long? imageSize, bool updateLocalHash = false)
     {
         try
         {
@@ -460,12 +469,44 @@ public class UserSyncStateService
                 item.SyncedImageHash = imageHash;
                 item.SyncedImageSize = imageSize;
                 item.LastSyncTime = DateTime.UtcNow;
+
+                // Update LocalImageHash/Size to match Source so HasChanges becomes false
+                if (updateLocalHash)
+                {
+                    item.LocalImageHash = item.SourceImageHash;
+                    item.LocalImageSize = item.SourceImageSize;
+                    // Also update LocalValue display to match source
+                    item.LocalValue = item.SourceValue;
+                }
+
                 _database.UpsertUserSyncItem(item);
             }
         }
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Error updating synced image data");
+        }
+    }
+
+    /// <summary>
+    /// Updates the LocalValue to match MergedValue after a successful sync.
+    /// This ensures HasChanges becomes false without requiring a full table refresh.
+    /// </summary>
+    private void UpdateLocalValueAfterSync(long itemId, string? mergedValue)
+    {
+        try
+        {
+            var item = _database.GetUserSyncItemById(itemId);
+            if (item != null)
+            {
+                item.LocalValue = mergedValue;
+                item.LastSyncTime = DateTime.UtcNow;
+                _database.UpsertUserSyncItem(item);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Error updating LocalValue after sync");
         }
     }
 }
