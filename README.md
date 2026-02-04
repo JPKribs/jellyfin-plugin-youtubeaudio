@@ -144,7 +144,21 @@ Using the file history found in the Sync Table, all Queued records populate cont
 
 ## Metadata Syncing
 
-Metadata syncing enables one-way synchronization of media metadata from the source server to your local server. The plugin syncs three property categories independently: item metadata (titles, descriptions, ratings, genres, tags, provider IDs), images (posters, backdrops, logos), and people/artist associations. Each category uses intelligent comparison—semantic JSON diffing for metadata properties and SHA256 hash comparison for images. Items are matched by file path using your existing library mappings, the same matching logic used by History Sync. This allows you to curate metadata on a primary server and have secondary servers automatically reflect those changes.
+Metadata Syncing copies media metadata from the Source Server and mirrors them on your Local Server. This is performed in two steps: **Refresh Sync Table** & **Sync Metadata**.
+
+| Metadata Sync Table |
+| :--- |
+| ![Metadata Sync Table](Documentation/Screenshots/MetadataSync/Table.png) |
+
+### Refresh Sync Table
+
+...
+
+Setting a file to Ignored will skip any future actions.
+
+### Sync Metadata
+
+Using the file metadata found in the Sync Table, all Queued records populate content metadata using Jellyfin's API.
 
 
 
@@ -154,7 +168,21 @@ Metadata syncing enables one-way synchronization of media metadata from the sour
 
 ## User Syncing
 
-User syncing enables one-way synchronization of user settings from the source server to your local server. The plugin syncs three property categories independently: user policies (permissions and restrictions), user configuration (preferences), and profile images. Each category can be individually enabled and uses intelligent comparison—semantic JSON diffing for policies/configuration and SHA256 hash comparison for profile images. Library-specific permissions are automatically translated using your library mappings, ensuring access controls work correctly even when library IDs differ between servers.
+User Syncing copies user images, settings, and configuraiton from the Source Server and mirrors them on your Local Server. This is performed in two steps: **Refresh Sync Table** & **Sync Users**.
+
+| User Sync Table |
+| :--- |
+| ![User Sync Table](Documentation/Screenshots/UserSync/Table.png) |
+
+### Refresh Sync Table
+
+...
+
+Setting a user to Ignored will skip any future actions.
+
+### Sync Users
+
+Using the user configurations found in the Sync Table, all Queued records replace the user configuration using Jellyfin's API.
 
 
 
