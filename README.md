@@ -122,10 +122,9 @@ History Syncing copies media history from the Source Server and mirrors them on 
 
 ### Refresh Sync Table
 
-The Plugin builds a table of all content that exists on both the Source Server and the Local Server. Source Server content history is compared, **by file path**, against the Local Server. History that varies from the Source Server is Queued for import. The Favorite status is always taken from the value on the Source Server. Other history is negotiated, where the Server whose content was more recently played it taken. This applies to:
+The Plugin builds a table of all content that exists on both the Source Server and the Local Server. Source Server content history is compared, **by file path**, against the Local Server. History that varies from the Source Server is Queued for import. The Favorite status is always taken from the value on the Source Server. Play count becomes the greater value of the Source and Local Server. Other history is negotiated, where the Server whose content was more recently played it taken. This applies to:
 
 * Played
-* Play Count
 * Position
 * Last Played Date
 
