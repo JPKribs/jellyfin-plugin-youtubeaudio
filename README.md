@@ -62,7 +62,7 @@ The Source Server is the Jellyfin Server you want to sync content **from**. This
 
    - **Root Path**: This is the base folder path that the library uses for content
       - *This will take the Source Library file `/media/Track Testing/My Movie (2025)/movie.mp4` and save it to the Local Library at `/media/My Movie (2025)/movie.mp4`*
-         - **Only single folder libraries are supported by this plugin.**
+      - **Only single folder libraries are supported by this plugin.**
 
 #### Once all of the Libraries that you want to map are mapped, save your settings.
 
