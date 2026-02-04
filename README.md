@@ -102,27 +102,39 @@ Files in this table can be manually approved/ignored for Download, Replacement, 
 
 Using the files found in the Sync Table, all Queued files *(and companion files such as subtitles & NFOs)* are downloaded using Jellyfin's API into the Temporary Directory. Once downloaded, these files are moved in the mirroring location on the Local Server and any required folders are created. Files with the Pending & Ignored statuses are not processed by this step. Files that are set to Delete are deleted during this step but, to prevent issues, any nested folders left empty by a deletion are not touched.
 
----
 
-#### For complete information, pleaes see our **[Content Syncing Documentation](Documentation/Content.md)**!
+
+#### For complete information, please see our **[Content Syncing Documentation](Documentation/Content.md)**!
 
 ---
 
 ## History Syncing
 
-History syncing enables bidirectional watch history synchronization between servers. The plugin tracks played/unplayed status, play counts, playback positions (resume points), and favorites for each user's items. Using intelligent two-way merge logic, it combines data from both servers: maximum play count, most recent playback position, and preserves played/favorite status if either server has them. History sync requires user mappings and library mappings but operates independently from content sync. For complete documentation, see **[Documentation/History.md](Documentation/History.md)**.
+History syncing enables bidirectional watch history synchronization between servers. The plugin tracks played/unplayed status, play counts, playback positions (resume points), and favorites for each user's items. Using intelligent two-way merge logic, it combines data from both servers: maximum play count, most recent playback position, and preserves played/favorite status if either server has them. History sync requires user mappings and library mappings but operates independently from content sync. 
+
+
+
+#### For complete information, please see our **[History Syncing Documentation](Documentation/History.md)**!
 
 ---
 
 ## Metadata Syncing
 
-Metadata syncing enables one-way synchronization of media metadata from the source server to your local server. The plugin syncs three property categories independently: item metadata (titles, descriptions, ratings, genres, tags, provider IDs), images (posters, backdrops, logos), and people/artist associations. Each category uses intelligent comparison—semantic JSON diffing for metadata properties and SHA256 hash comparison for images. Items are matched by file path using your existing library mappings, the same matching logic used by History Sync. This allows you to curate metadata on a primary server and have secondary servers automatically reflect those changes. For complete documentation, see **[Documentation/Metadata.md](Documentation/Metadata.md)**.
+Metadata syncing enables one-way synchronization of media metadata from the source server to your local server. The plugin syncs three property categories independently: item metadata (titles, descriptions, ratings, genres, tags, provider IDs), images (posters, backdrops, logos), and people/artist associations. Each category uses intelligent comparison—semantic JSON diffing for metadata properties and SHA256 hash comparison for images. Items are matched by file path using your existing library mappings, the same matching logic used by History Sync. This allows you to curate metadata on a primary server and have secondary servers automatically reflect those changes.
+
+
+
+#### For complete information, please see our **[Metadata Syncing Documentation](Documentation/History.md)**!
 
 ---
 
 ## User Syncing
 
-User syncing enables one-way synchronization of user settings from the source server to your local server. The plugin syncs three property categories independently: user policies (permissions and restrictions), user configuration (preferences), and profile images. Each category can be individually enabled and uses intelligent comparison—semantic JSON diffing for policies/configuration and SHA256 hash comparison for profile images. Library-specific permissions are automatically translated using your library mappings, ensuring access controls work correctly even when library IDs differ between servers. For complete documentation, see **[Documentation/Users.md](Documentation/Users.md)**.
+User syncing enables one-way synchronization of user settings from the source server to your local server. The plugin syncs three property categories independently: user policies (permissions and restrictions), user configuration (preferences), and profile images. Each category can be individually enabled and uses intelligent comparison—semantic JSON diffing for policies/configuration and SHA256 hash comparison for profile images. Library-specific permissions are automatically translated using your library mappings, ensuring access controls work correctly even when library IDs differ between servers.
+
+
+
+#### For complete information, please see our **[User Syncing Documentation](Documentation/Users.md)**!
 
 ---
 
