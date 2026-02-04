@@ -114,7 +114,24 @@ Using the files found in the Sync Table, all Queued files *(and companion files 
 
 ## History Syncing
 
-History syncing enables bidirectional watch history synchronization between servers. The plugin tracks played/unplayed status, play counts, playback positions (resume points), and favorites for each user's items. Using intelligent two-way merge logic, it combines data from both servers: maximum play count, most recent playback position, and preserves played/favorite status if either server has them. History sync requires user mappings and library mappings but operates independently from content sync. 
+History Syncing copies media history from the Source Server and mirrors them on your Local Server. This is performed in two steps: **Refresh Sync Table** & **Sync History**.
+
+| Content Sync Table |
+| :--- |
+| ![Content Sync Table](Documentation/Screenshots/HistorySync/Table.png) |
+
+### Refresh Sync Table
+
+The Plugin builds a table of all content that exists on both the Source Server and the Local Server. Source Server content history is compared, **by file path**, against the Local Server. History that varies from the Source Server is Queued for import. The Favorite status is always taken from the value on the Source Server. Other history is negotiated, where the Server whose content was more recently played it taken. This applies to:
+
+* Played
+* Play Count
+* Position
+* Last Played Date
+
+### Sync Missing Content
+
+Using the file history found in the Sync Table, all Queued records populate content history using Jellyfin's API.
 
 
 
