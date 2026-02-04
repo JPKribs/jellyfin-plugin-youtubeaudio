@@ -86,11 +86,11 @@ The Source Server is the Jellyfin Server you want to sync content **from**. This
 
 ## Content Syncing
 
+Content Syncing copies media files from the Source Server and mirrors them on your Local Server. This is performed in two steps:
+
 | Content Sync Table |
 | :--- |
 | ![Content Sync Table](Documentation/Screenshots/ContentSync/Table.png) |
-
-Content Syncing copies media files from the Source Server and mirrors them on your Local Server. This is performed in two steps:
 
 ### Refresh Sync Table
 
