@@ -102,6 +102,8 @@ The Plugin builds a table of all content that exists in the mapped Source Librar
 
 Files in this table can be manually approved/ignored for Download, Replacement, or Deletion using the Approval Process. Files can also *manually* be deleted from the local server using the Delete functionality.
 
+Setting a file to Ignored will skip any future Download, Replacement, or Deletion actions.
+
 ### Sync Missing Content
 
 Using the files found in the Sync Table, all Queued files *(and companion files such as subtitles & NFOs)* are downloaded using Jellyfin's API into the Temporary Directory. Once downloaded, these files are moved in the mirroring location on the Local Server and any required folders are created. Files with the Pending & Ignored statuses are not processed by this step. Files that are set to Delete are deleted during this step but, to prevent issues, any nested folders left empty by a deletion are not touched.
@@ -127,6 +129,8 @@ The Plugin builds a table of all content that exists on both the Source Server a
 * Played
 * Position
 * Last Played Date
+
+Setting a file to Ignored will skip any future actions.
 
 ### Sync History
 
