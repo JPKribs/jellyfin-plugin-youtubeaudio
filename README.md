@@ -1,27 +1,14 @@
 # Server Sync
 
-#### A Jellyfin plugin that enables one-way synchronization from a Source Jellyfin Server to a Local Jellyfin Server. This enables you to not only keep **Content Files** synchronized on multiple servers, but also share **Watch History**, **Metadata**, and **User Settings** as well. The plugin is only required on the Local (destination) Server as all sync tasks are performed using standard Jellyfin APIs.
+A Jellyfin plugin for one-way synchronization between Jellyfin servers. Keep your **Content**, **Watch History**, **Metadata**, and **User Settings** in sync across multiple Jellyfin installations.
 
-*This plugin edits live data in your Jellyfin Server. I created this project for my own personal use case which may not align with your own. While this project is tested extensively, I cannot foresee every possibility or server variation. Please ensure that you take backups of your data and Jellyfin Server to protect against issues.*
+## How It Works
 
-**You are responsible for your own data security and preservation.**
+Server Sync runs on your Local (destination) server and pulls data from a Source server using standard Jellyfin APIs. You configure library and user mappings, then scheduled tasks handle the synchronization. Content is matched by file path, allowing the plugin to track what needs to be downloaded, updated, or removed. No modifications are required on the Source server—just an API key.
 
----
+## Use At Your Own Risk
 
-# WORK IN PROGRESS
-
-**THIS IS NOT CURRENTLY READY FOR PRODUCTION USAGE! FEEL FREE TO TEST THIS OUT BUT DO NOT USE THIS FOR ANYTHING CRITICAL!**
-
-**AT THIS TIME THE FOLLOWING IS COMPLETE:**
-
-- **Content Syncing**
-- **Histoy Syncing**
-- **User Syncing**
-
-**THE FOLLOWING IS INCOMPLETE:**
-
-- **Metadata Syncing**
-   - *Images and Metadata sync but array data (Genres, People, Studios, & Tags) does not sync at this time.*
+This plugin modifies live data on your Jellyfin server. While extensively tested, I cannot account for every server configuration or edge case. **Always maintain backups of your Jellyfin data and configuration.** By using this plugin, you accept full responsibility for any data loss or issues that may occur.
 
 ---
 
@@ -90,7 +77,7 @@ The Source Server is the Jellyfin Server you want to sync content **from**. This
 
 ## Content Syncing
 
-Content Syncing copies media files from the Source Server and mirrors them on your Local Server. This is performed in two steps: **Refresh Sync Table** & **Sync Missing Content**.
+Content Syncing copies media files from the Source Server and mirrors them on your Local Server. This is performed in two steps: **Refresh Sync Table** & **Sync Content**.
 
 | Content Sync Table |
 | :--- |
@@ -98,17 +85,21 @@ Content Syncing copies media files from the Source Server and mirrors them on yo
 
 ### Refresh Sync Table
 
-The Plugin builds a table of all content that exists in the mapped Source Libraries. This is compared, **by file path**, against the files that exist on the Local Server. Files that do not exist on the Local Server are Queued *(or set to Pending if `Require Approval` is enabled)*. If files no longer exist on Source Server, they are set to Delete *(this can be disabled in the settings)*.
+The Plugin builds a table of all content that exists in the mapped Source Libraries. Source Server files are compared, **by file path**, against files on the Local Server. The following content states are tracked:
 
-Files in this table can be manually approved/ignored for Download, Replacement, or Deletion using the Approval Process. Files can also *manually* be deleted from the local server using the Delete functionality.
+* Files missing on Local Server are Queued for download *(or Pending if `Require Approval` is enabled)*
+* Files no longer on Source Server are set to Delete *(can be disabled in settings)*
+* Companion files (subtitles, NFOs, images) are included with their parent media
 
-Setting a file to Ignored will skip any future Download, Replacement, or Deletion actions.
+Files can be manually approved or ignored using the Approval Process.
 
-### Sync Missing Content
+Setting a file to Ignored will skip any future actions.
 
-Using the files found in the Sync Table, all Queued files *(and companion files such as subtitles & NFOs)* are downloaded using Jellyfin's API into the Temporary Directory. Once downloaded, these files are moved in the mirroring location on the Local Server and any required folders are created. Files with the Pending & Ignored statuses are not processed by this step. Files that are set to Delete are deleted during this step but, to prevent issues, any nested folders left empty by a deletion are not touched.
+### Sync Content
 
+This operation will start by running the `Refresh Sync Table` task.
 
+Using the files found in the Sync Table, all Queued files are downloaded using Jellyfin's API into the Temporary Directory. Once downloaded, files are moved to the mirrored location on the Local Server and any required folders are created. Files with the Pending & Ignored statuses are not processed. Files set to Delete are removed during this step.
 
 #### For complete information, please see our **[Content Syncing Documentation](Documentation/Content.md)**!
 
@@ -116,27 +107,31 @@ Using the files found in the Sync Table, all Queued files *(and companion files 
 
 ## History Syncing
 
-History Syncing copies media history from the Source Server and mirrors them on your Local Server. This is performed in two steps: **Refresh Sync Table** & **Sync History**.
+History Syncing copies watch history from the Source Server and mirrors it on your Local Server. This is performed in two steps: **Refresh Sync Table** & **Sync History**.
 
-| Content Sync Table |
+| History Sync Table |
 | :--- |
-| ![Content Sync Table](Documentation/Screenshots/HistorySync/Table.png) |
+| ![History Sync Table](Documentation/Screenshots/HistorySync/Table.png) |
 
 ### Refresh Sync Table
 
-The Plugin builds a table of all content that exists on both the Source Server and the Local Server. Source Server content history is compared, **by file path**, against the Local Server. History that varies from the Source Server is Queued for import. The Favorite status is always taken from the value on the Source Server. Play count becomes the greater value of the Source and Local Server. Other history is negotiated, where the Server whose content was more recently played it taken. This applies to:
+The Plugin builds a table of all content that exists on both the Source Server and the Local Server. Source Server watch history is compared, **by file path**, against the Local Server. The following history fields are tracked:
 
-* Played
-* Position
-* Last Played Date
+* Played Status (from the most recently played server)
+* Play Count (uses the greater value between servers)
+* Playback Position (from the most recently played server)
+* Last Played Date (from the most recently played server)
+* Favorite Status (always taken from Source Server)
+
+Items with history that varies are Queued for import.
 
 Setting a file to Ignored will skip any future actions.
 
 ### Sync History
 
-Using the file history found in the Sync Table, all Queued records populate content history using Jellyfin's API.
+This operation will start by running the `Refresh Sync Table` task.
 
-
+Using the watch history found in the Sync Table, all Queued records update content history using Jellyfin's API.
 
 #### For complete information, please see our **[History Syncing Documentation](Documentation/History.md)**!
 
@@ -152,23 +147,32 @@ Metadata Syncing copies media metadata from the Source Server and mirrors them o
 
 ### Refresh Sync Table
 
-...
+The Plugin builds a table of all content that exists on both the Source Server and the Local Server. Source Server metadata is compared, **by file path**, against the Local Server. The following metadata categories are tracked individually:
+
+* Metadata (Name, Overview, Ratings, Dates, etc.)
+* Genres
+* Tags
+* Studios
+* People (Actors, Directors, Writers)
+* Images (Primary, Backdrop, Logo, etc.)
+
+Items with metadata that varies from the Source Server are Queued for import.
 
 Setting a file to Ignored will skip any future actions.
 
 ### Sync Metadata
 
-Using the file metadata found in the Sync Table, all Queued records populate content metadata using Jellyfin's API.
+This operation will start by running the `Refresh Sync Table` task.
 
+Using the metadata found in the Sync Table, all Queued records update content metadata using Jellyfin's API.
 
-
-#### For complete information, please see our **[Metadata Syncing Documentation](Documentation/History.md)**!
+#### For complete information, please see our **[Metadata Syncing Documentation](Documentation/Metadata.md)**!
 
 ---
 
 ## User Syncing
 
-User Syncing copies user images, settings, and configuraiton from the Source Server and mirrors them on your Local Server. This is performed in two steps: **Refresh Sync Table** & **Sync Users**.
+User Syncing copies user images, settings, and configuration from the Source Server and mirrors them on your Local Server. This is performed in two steps: **Refresh Sync Table** & **Sync Users**.
 
 | User Sync Table |
 | :--- |
@@ -176,13 +180,21 @@ User Syncing copies user images, settings, and configuraiton from the Source Ser
 
 ### Refresh Sync Table
 
-...
+The Plugin builds a table of all mapped users that exist on both the Source Server and the Local Server. Source Server user configuration is compared against the Local Server. The following user settings are tracked:
+
+* Profile Images
+* Policy (permissions and library access, translated to local library IDs)
+* Configuration (playback preferences, subtitle mode, display settings)
+
+Users with configuration that varies from the Source Server are Queued for import.
 
 Setting a user to Ignored will skip any future actions.
 
 ### Sync Users
 
-Using the user configurations found in the Sync Table, all Queued records replace the user configuration using Jellyfin's API.
+This operation will start by running the `Refresh Sync Table` task.
+
+Using the user configurations found in the Sync Table, all Queued records update user settings using Jellyfin's API.
 
 
 

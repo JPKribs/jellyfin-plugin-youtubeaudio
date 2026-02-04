@@ -539,7 +539,6 @@ export default function (view, params) {
         view.querySelector('#chkMetadataSyncTags').checked = config.MetadataSyncTags !== false;
         view.querySelector('#chkMetadataSyncStudios').checked = config.MetadataSyncStudios !== false;
         view.querySelector('#chkMetadataSyncPeople').checked = config.MetadataSyncPeople === true;
-        view.querySelector('#chkMetadataSyncSubtitles').checked = config.MetadataSyncSubtitles !== false;
         view.querySelector('#chkMetadataSyncImages').checked = config.MetadataSyncImages !== false;
     }
 
@@ -551,7 +550,6 @@ export default function (view, params) {
         config.MetadataSyncTags = view.querySelector('#chkMetadataSyncTags').checked;
         config.MetadataSyncStudios = view.querySelector('#chkMetadataSyncStudios').checked;
         config.MetadataSyncPeople = view.querySelector('#chkMetadataSyncPeople').checked;
-        config.MetadataSyncSubtitles = view.querySelector('#chkMetadataSyncSubtitles').checked;
         config.MetadataSyncImages = view.querySelector('#chkMetadataSyncImages').checked;
 
         ApiClient.updatePluginConfiguration(pluginId, config).then(function() {

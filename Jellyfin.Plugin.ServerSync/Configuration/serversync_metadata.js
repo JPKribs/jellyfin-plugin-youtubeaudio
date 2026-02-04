@@ -1140,7 +1140,6 @@ export default function (view, params) {
             var tagsEnabled = config.MetadataSyncTags !== false;
             var studiosEnabled = config.MetadataSyncStudios !== false;
             var peopleEnabled = config.MetadataSyncPeople === true;
-            var subtitlesEnabled = config.MetadataSyncSubtitles !== false;
             var imagesEnabled = config.MetadataSyncImages !== false;
 
             // Parse metadata to check for specific changes
@@ -1214,7 +1213,6 @@ export default function (view, params) {
             var tagsEnabled = config.MetadataSyncTags !== false;
             var studiosEnabled = config.MetadataSyncStudios !== false;
             var peopleEnabled = config.MetadataSyncPeople === true;
-            var subtitlesEnabled = config.MetadataSyncSubtitles !== false;
             var imagesEnabled = config.MetadataSyncImages !== false;
 
             // Parse JSON data
@@ -1254,15 +1252,8 @@ export default function (view, params) {
             // --- PEOPLE SECTION ---
             if (peopleEnabled) {
                 html += '<tr class="metadataSyncModal-sectionHeader"><td colspan="4">People</td></tr>';
-                html += self.buildPeopleRows(sourcePeople, localPeople);
+                html += self.buildPeopleComparisonRow(sourcePeople, localPeople);
             }
-
-            // --- SUBTITLES SECTION ---
-            // TODO: Subtitles tracking not yet implemented in backend
-            // if (subtitlesEnabled) {
-            //     html += '<tr class="metadataSyncModal-sectionHeader"><td colspan="4">Subtitles</td></tr>';
-            //     html += self.buildSubtitlesRows(item);
-            // }
 
             // --- IMAGES SECTION ---
             if (imagesEnabled) {
@@ -1366,6 +1357,61 @@ export default function (view, params) {
 
             var sourceSorted = sourceItems.slice().sort().join(',');
             var localSorted = localItems.slice().sort().join(',');
+            var itemsChanged = sourceSorted !== localSorted;
+            var itemsRowClass = itemsChanged ? 'metadataSyncModal-changedRow' : '';
+
+            html += '<tr class="' + itemsRowClass + '">';
+            html += '<td class="historyCompareTable-property">Items</td>';
+            html += '<td class="historyCompareTable-value">' + sourceDisplay + '</td>';
+            html += '<td class="historyCompareTable-value">' + localDisplay + '</td>';
+            html += '<td class="historyCompareTable-value historyCompareTable-merged">' + sourceDisplay + '</td>';
+            html += '</tr>';
+
+            return html;
+        },
+
+        buildPeopleComparisonRow: function(sourcePeople, localPeople) {
+            var html = '';
+
+            // Extract just the names from the people arrays
+            var sourceNames = [];
+            var localNames = [];
+
+            if (Array.isArray(sourcePeople)) {
+                sourcePeople.forEach(function(person) {
+                    if (person && person.Name) {
+                        sourceNames.push(person.Name);
+                    }
+                });
+            }
+
+            if (Array.isArray(localPeople)) {
+                localPeople.forEach(function(person) {
+                    if (person && person.Name) {
+                        localNames.push(person.Name);
+                    }
+                });
+            }
+
+            var sourceCount = sourceNames.length;
+            var localCount = localNames.length;
+
+            // Count row
+            var countChanged = sourceCount !== localCount;
+            var countRowClass = countChanged ? 'metadataSyncModal-changedRow' : '';
+            html += '<tr class="' + countRowClass + '">';
+            html += '<td class="historyCompareTable-property">Count</td>';
+            html += '<td class="historyCompareTable-value">' + sourceCount + '</td>';
+            html += '<td class="historyCompareTable-value">' + localCount + '</td>';
+            html += '<td class="historyCompareTable-value historyCompareTable-merged">' + sourceCount + '</td>';
+            html += '</tr>';
+
+            // Items row (show list of names)
+            var sourceDisplay = sourceNames.length > 0 ? ServerSyncShared.escapeHtml(sourceNames.join(', ')) : '-';
+            var localDisplay = localNames.length > 0 ? ServerSyncShared.escapeHtml(localNames.join(', ')) : '-';
+
+            var sourceSorted = sourceNames.slice().sort().join(',');
+            var localSorted = localNames.slice().sort().join(',');
             var itemsChanged = sourceSorted !== localSorted;
             var itemsRowClass = itemsChanged ? 'metadataSyncModal-changedRow' : '';
 
@@ -1533,61 +1579,6 @@ export default function (view, params) {
                 i++;
             }
             return bytes.toFixed(i > 0 ? 1 : 0) + ' ' + units[i];
-        },
-
-        buildPeopleRows: function(sourcePeople, localPeople) {
-            var html = '';
-
-            var sourceCount = Array.isArray(sourcePeople) ? sourcePeople.length : 0;
-            var localCount = Array.isArray(localPeople) ? localPeople.length : 0;
-
-            // People count row
-            var countChanged = sourceCount !== localCount;
-            var countRowClass = countChanged ? 'metadataSyncModal-changedRow' : '';
-            html += '<tr class="' + countRowClass + '">';
-            html += '<td class="historyCompareTable-property">People Count</td>';
-            html += '<td class="historyCompareTable-value">' + sourceCount + '</td>';
-            html += '<td class="historyCompareTable-value">' + localCount + '</td>';
-            html += '<td class="historyCompareTable-value historyCompareTable-merged">' + sourceCount + '</td>';
-            html += '</tr>';
-
-            // Count by type if available
-            if (sourceCount > 0 || localCount > 0) {
-                var sourceByType = this.countPeopleByType(sourcePeople);
-                var localByType = this.countPeopleByType(localPeople);
-
-                var types = ['Actor', 'Director', 'Writer', 'Producer'];
-                types.forEach(function(type) {
-                    var sourceTypeCount = sourceByType[type] || 0;
-                    var localTypeCount = localByType[type] || 0;
-
-                    if (sourceTypeCount > 0 || localTypeCount > 0) {
-                        var typeChanged = sourceTypeCount !== localTypeCount;
-                        var typeRowClass = typeChanged ? 'metadataSyncModal-changedRow' : '';
-
-                        html += '<tr class="' + typeRowClass + '">';
-                        html += '<td class="historyCompareTable-property" style="padding-left: 24px;">' + type + 's</td>';
-                        html += '<td class="historyCompareTable-value">' + sourceTypeCount + '</td>';
-                        html += '<td class="historyCompareTable-value">' + localTypeCount + '</td>';
-                        html += '<td class="historyCompareTable-value historyCompareTable-merged">' + sourceTypeCount + '</td>';
-                        html += '</tr>';
-                    }
-                });
-            }
-
-            return html;
-        },
-
-        countPeopleByType: function(people) {
-            var counts = {};
-            if (!Array.isArray(people)) return counts;
-
-            people.forEach(function(person) {
-                var type = person.Type || 'Unknown';
-                counts[type] = (counts[type] || 0) + 1;
-            });
-
-            return counts;
         },
 
         closeModal: function() {

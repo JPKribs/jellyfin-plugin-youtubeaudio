@@ -2,174 +2,62 @@
 
 ## Summary
 
-Content syncing enables one-way media synchronization from a source Jellyfin server to your local Jellyfin server. The plugin runs on your local (destination) server and pulls content from a remote source server using API key authentication.
-
-The sync process works in two phases. First, a refresh task scans the source server's libraries and compares each item against your local tracking database. New items, changed items, and items that no longer exist on the source are identified and categorized. Second, a download task processes any items that have been queued for download, streaming the files from the source server to your local storage with optional bandwidth throttling.
-
-Each item is tracked individually with its own status. Items can be automatically queued for download, require manual approval, or be disabled entirely depending on your configuration. The plugin supports three operation types: downloading new content, replacing existing content when the source version changes, and deleting local content when it's removed from the source. Each operation type has its own approval setting, giving you fine-grained control over what happens automatically versus what requires your review.
-
-The plugin also handles companion files (subtitles, NFO metadata files, images) alongside the main media files. When enabled, these are downloaded together with the primary media file. A recycling bin feature allows replaced or deleted files to be soft-deleted first, giving you a recovery window before permanent deletion.
-
-```
-Source Server                         Local Server
-┌─────────────┐                       ┌─────────────────────────────┐
-│             │                       │                             │
-│  Libraries  │ ──── API Scan ─────►  │  Tracking Database          │
-│             │                       │  (compares source vs local) │
-│             │                       │                             │
-│             │                       │         ▼                   │
-│             │                       │  ┌─────────────────────┐    │
-│             │                       │  │ Queued / Pending    │    │
-│             │                       │  └─────────────────────┘    │
-│             │                       │         ▼                   │
-│  Files      │ ◄── Download ───────  │  Download Task              │
-│             │    (throttled)        │  (processes queue)          │
-│             │                       │         ▼                   │
-│             │                       │  Local Storage              │
-└─────────────┘                       └─────────────────────────────┘
-```
+Content Syncing downloads media files from a Source Jellyfin Server and mirrors them on your Local Server. The plugin scans Source Libraries, compares files by path against your Local Server, and queues missing or updated content for download. Companion files like external subtitles, NFO metadata, and images are included automatically. Files removed from the Source can optionally be deleted locally. An approval workflow lets you review pending operations before they execute, and a recycling bin provides a safety net for deletions.
 
 ---
 
-## How it Works
+## Statuses
 
-When you configure content syncing, you map source server libraries to local paths on your server. For example, you might map the source server's "Movies" library (located at `/media/movies`) to your local path `/srv/jellyfin/movies`. The plugin uses this mapping to translate file paths between servers.
-
-The **Refresh Task** runs periodically (default: every 6 hours) and performs a full scan of all mapped libraries on the source server. For each item found, it fetches metadata including the file path, size, and ETag (a change indicator based on the file's modification date). The plugin then compares this against its tracking database to determine what action is needed.
-
-For new items not in the database, the plugin checks if a local file already exists at the expected path with a matching file size. If so, it marks the item as already synced. Otherwise, it either queues the item for download or marks it as pending approval, depending on your "Download New Content" setting.
-
-For existing tracked items, the plugin checks whether the source file has changed by comparing the ETag, file size, and path. If changes are detected and you have "Replace Existing Content" enabled or set to require approval, the item is queued or marked pending accordingly. If "Detect Updated Files" is enabled, the plugin also verifies that previously synced local files still exist and match the expected size.
-
-For items in the database that no longer exist on the source, the plugin can mark them for deletion if you have "Delete Missing Content" enabled. These go through the same approval workflow as other operations.
-
-The **Download Task** runs more frequently (default: every hour) and processes all items with a "Queued" status. For each item, it validates that sufficient disk space exists, streams the file from the source server to a temporary location, then moves it to the final destination. If bandwidth throttling is configured, downloads respect the speed limit. Failed downloads are retried up to 3 times before being marked as errored.
-
-After downloads complete, the plugin triggers a Jellyfin library refresh so new content appears in your server immediately.
+| Status | Description |
+|--------|-------------|
+| **Pending** | Item requires manual approval before processing. The `PendingType` indicates the operation: Download (new file), Replacement (updated file), or Deletion (file removed from source). |
+| **Queued** | Item is approved and waiting for the next sync task to process it. |
+| **Synced** | Item has been successfully downloaded and verified on the Local Server. |
+| **Errored** | Item failed to download after multiple retry attempts. Check the error message for details. |
+| **Ignored** | Item has been explicitly skipped and will not be processed in future syncs. |
+| **Deleting** | Item is queued for deletion from the Local Server (content sync specific). |
 
 ---
 
-## Configuration
+## How It Works
 
-### General Settings
+### Refresh Sync Table
 
-| Setting | Description | Default |
-|---------|-------------|---------|
-| Enable Content Sync | Master toggle for all content syncing functionality | Off |
-| Include Companion Files | Download subtitles, NFO files, and images alongside media | On |
-| Detect Updated Files | Re-queue files if local copy is missing or size mismatches | On |
+The Refresh task scans all mapped Source Libraries and builds a tracking table of content. For each item on the Source Server, it fetches the file path, size, and ETag (a change indicator). The plugin translates the Source path to a Local path using your Library Mappings and checks if the file exists locally.
 
-### Download Settings
+New items not found locally are either Queued for download or set to Pending if approval is required. Existing items are compared by ETag and file size to detect changes—if the Source file has been updated, the item can be queued for replacement. Items in the tracking table that no longer exist on the Source Server can be marked for deletion if that setting is enabled.
 
-| Setting | Description | Default |
-|---------|-------------|---------|
-| Max Concurrent Downloads | Number of simultaneous downloads (1-10) | 2 |
-| Max Download Speed | Bandwidth limit (0 = unlimited) | 0 (unlimited) |
-| Download Speed Unit | Unit for speed limit (KB/s, MB/s, GB/s) | MB/s |
-| Minimum Free Disk Space | Stop downloads when disk space falls below this (GB) | 10 GB |
-| Max Retry Count | Times to retry failed downloads before giving up | 3 |
+**Source Server APIs Used:**
 
-### Bandwidth Scheduling
+| API | Purpose |
+|-----|---------|
+| `GET /Items` | Fetches library items with Path, ETag, MediaSources, and DateCreated fields |
+| `GET /Library/VirtualFolders` | Lists available libraries for mapping configuration |
 
-| Setting | Description | Default |
-|---------|-------------|---------|
-| Enable Bandwidth Scheduling | Use different speed during scheduled hours | Off |
-| Scheduled Start Hour | Hour (0-23) when scheduled speed begins | 0 (midnight) |
-| Scheduled End Hour | Hour (0-24) when scheduled speed ends | 6 (6 AM) |
-| Scheduled Download Speed | Speed during scheduled hours (0 = unlimited) | 0 (unlimited) |
-| Scheduled Speed Unit | Unit for scheduled speed | MB/s |
+### Sync Content
 
-### Approval Modes
+The Sync task processes all Queued items by downloading files from the Source Server. Before each download, it verifies sufficient disk space exists. Files are streamed to a temporary directory first, then moved to their final location once complete. This atomic approach prevents partial files from appearing in your library.
 
-Each operation type can be set to one of three modes:
+Companion files (subtitles, NFO files, images) are downloaded alongside the main media file when enabled. The plugin discovers companion files through the item's MediaSources data and downloads each one to the appropriate location.
 
-| Mode | Behavior |
-|------|----------|
-| Enabled | Operations happen automatically without approval |
-| Require Approval | Operations are queued as "Pending" and require manual approval |
-| Disabled | Operations are not performed |
+**Source Server APIs Used:**
 
-| Setting | Description | Default |
-|---------|-------------|---------|
-| Download New Content | How to handle items on source that don't exist locally | Enabled |
-| Replace Existing Content | How to handle items that have changed on source | Enabled |
-| Delete Missing Content | How to handle items removed from source | Disabled |
+| API | Purpose |
+|-----|---------|
+| `GET /Items/{id}/Download` | Downloads the main media file |
+| `GET /Videos/{id}/Subtitles/Stream` | Downloads external subtitle files |
+| `GET /Items/{id}/File` | Downloads companion files by path |
 
-### Recycling Bin
+### Local Storage
 
-| Setting | Description | Default |
-|---------|-------------|---------|
-| Enable Recycling Bin | Soft-delete files instead of permanent deletion | Off |
-| Recycling Bin Path | Directory where deleted files are moved | (none) |
-| Retention Days | Days to keep files before permanent deletion | 7 |
+Downloaded files are saved to the Local path determined by your Library Mappings. The plugin creates any necessary subdirectories automatically. For example, if the Source has `/media/movies/Film (2024)/Film.mkv` and your mapping translates `/media/movies` to `/srv/jellyfin/movies`, the file saves to `/srv/jellyfin/movies/Film (2024)/Film.mkv`.
 
-### Library Mappings
+When deletion is enabled, files removed from the Source are deleted locally. If the Recycling Bin is configured, deleted files move there instead of being permanently removed, giving you a recovery window.
 
-Library mappings connect source server libraries to local storage paths. Each mapping includes:
+### Comparison Logic
 
-| Field | Description |
-|-------|-------------|
-| Source Library | The library on the source server to sync from |
-| Local Root Path | The local directory where files should be saved |
-| Enabled | Whether this mapping is active |
+Items are matched between servers using **file path translation**. The plugin takes the Source file path, applies your Library Mapping's root path substitution, and looks for a matching file locally. This means files must maintain the same relative path structure on both servers.
 
-The plugin automatically translates paths between servers. For example, if the source has a file at `/media/movies/Film (2024)/Film.mkv` and your mapping specifies source root `/media/movies` with local root `/srv/jellyfin/movies`, the file will be saved to `/srv/jellyfin/movies/Film (2024)/Film.mkv`.
+Change detection uses the ETag (based on file modification time) and file size. If either differs between Source and Local, the item is flagged for replacement. The `Detect Updated Files` setting also checks if previously-synced local files still exist and match their expected size.
 
----
-
-## Approval and Pending Items
-
-When an operation mode is set to "Require Approval", items enter a pending state instead of being processed automatically. This gives you the opportunity to review what will happen before any files are downloaded, replaced, or deleted.
-
-### Status Cards
-
-The Sync Items page displays status cards at the top showing counts for each item status:
-
-- **Synced**: Items that have been successfully downloaded and verified
-- **Queued**: Items approved and waiting for the next download task
-- **Errored**: Items that failed to download (will retry automatically)
-- **Ignored**: Items you've chosen to never sync
-- **Pending Download**: New items awaiting approval to download
-- **Pending Replace**: Changed items awaiting approval to replace
-- **Pending Delete**: Removed items awaiting approval to delete
-
-The pending status cards only appear when you have items in those states.
-
-### Filtering Items
-
-Use the status dropdown filter to view items by status. Click on any status card to quickly filter to that status. The "Select All" checkbox and bulk action buttons let you process multiple items at once.
-
-### Item Detail Modal
-
-Click on any item row to open the detail modal. The modal displays:
-
-- **Status**: Current status with color indicator
-- **Error**: If errored, the error message (useful for troubleshooting)
-- **Retry Count**: Number of download attempts if errored
-- **Size**: File size
-- **Source Path**: Location on the source server
-- **Local Path**: Where the file will be saved locally
-- **Last Sync**: When the item was last successfully synced (if applicable)
-- **Companion Files**: List of associated files (subtitles, etc.)
-
-### Approving Items
-
-From the detail modal or using bulk actions, you can:
-
-- **Queue**: Approve the item for download/replacement/deletion. The item moves to "Queued" status and will be processed on the next download task run.
-- **Ignore**: Mark the item to never sync. The item will be skipped on future scans.
-- **Delete**: Remove the local file (for synced items only). This deletes from your local server, not the source.
-
-For pending deletions specifically, clicking "Queue" approves the deletion. If the recycling bin is enabled, the file will be moved there instead of permanently deleted.
-
-### Bulk Actions
-
-Select multiple items using the checkboxes, then use the header buttons:
-
-- **Ignore**: Mark all selected items as ignored
-- **Queue**: Approve all selected items
-- **Delete**: Delete all selected local files (synced items only)
-
-### Manual Sync
-
-Use the "Sync" button to manually trigger a download task immediately instead of waiting for the scheduled run. Use "Refresh" to reload the item list from the database. Use "Retry Errors" to reset all errored items back to queued status for another attempt.
+After sync completes, the plugin triggers a Jellyfin library scan so new content appears immediately in your Local Server's interface.

@@ -831,9 +831,15 @@ public class MetadataSyncTableService
         {
             if (localItem.Studios != null && localItem.Studios.Length > 0)
             {
-                // Sort for consistent comparison
-                var sortedStudios = localItem.Studios.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
-                item.LocalStudiosValue = JsonSerializer.Serialize(sortedStudios);
+                // Filter out empty/whitespace names and sort for consistent comparison
+                var validStudios = localItem.Studios
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                item.LocalStudiosValue = validStudios.Count > 0
+                    ? JsonSerializer.Serialize(validStudios)
+                    : "[]";
             }
             else
             {

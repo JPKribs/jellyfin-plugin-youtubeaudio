@@ -305,12 +305,6 @@ public class PluginConfiguration : BasePluginConfiguration
     public bool MetadataSyncPeople { get; set; }
 
     /// <summary>
-    /// Track external subtitle files by filename.
-    /// Does not sync embedded subtitles.
-    /// </summary>
-    public bool MetadataSyncSubtitles { get; set; } = true;
-
-    /// <summary>
     /// Sync item images (Primary, Backdrop, Logo, Thumb, etc.).
     /// </summary>
     public bool MetadataSyncImages { get; set; } = true;
