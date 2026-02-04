@@ -453,7 +453,16 @@ public class SyncDatabase : IDisposable
             dataCommand.CommandText = $@"
                 SELECT * FROM SyncItems
                 {whereClause}
-                ORDER BY StatusDate DESC
+                ORDER BY
+                    CASE Status
+                        WHEN 0 THEN 0  -- Pending first
+                        WHEN 3 THEN 1  -- Errored second
+                        WHEN 1 THEN 2  -- Queued third
+                        WHEN 4 THEN 3  -- Ignored fourth
+                        WHEN 2 THEN 4  -- Synced last
+                        ELSE 5
+                    END,
+                    LocalPath ASC
                 LIMIT @take OFFSET @skip";
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
@@ -1382,7 +1391,15 @@ public class SyncDatabase : IDisposable
             dataCommand.CommandText = $@"
                 SELECT * FROM HistorySyncItems
                 {whereClause}
-                ORDER BY StatusDate DESC
+                ORDER BY
+                    CASE Status
+                        WHEN 3 THEN 0  -- Errored first
+                        WHEN 1 THEN 1  -- Queued second
+                        WHEN 4 THEN 2  -- Ignored third
+                        WHEN 2 THEN 3  -- Synced last
+                        ELSE 4
+                    END,
+                    ItemName ASC
                 LIMIT @take OFFSET @skip";
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
@@ -2057,7 +2074,17 @@ public class SyncDatabase : IDisposable
             dataCommand.CommandText = $@"
                 SELECT * FROM UserSyncItems
                 {whereClause}
-                ORDER BY SourceUserName, LocalUserName, PropertyCategory
+                ORDER BY
+                    CASE Status
+                        WHEN 3 THEN 0  -- Errored first
+                        WHEN 1 THEN 1  -- Queued second
+                        WHEN 4 THEN 2  -- Ignored third
+                        WHEN 2 THEN 3  -- Synced last
+                        ELSE 4
+                    END,
+                    SourceUserName ASC,
+                    LocalUserName ASC,
+                    PropertyCategory ASC
                 LIMIT @take OFFSET @skip";
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
@@ -2821,7 +2848,15 @@ public class SyncDatabase : IDisposable
             dataCommand.CommandText = $@"
                 SELECT * FROM MetadataSyncItems
                 {whereClause}
-                ORDER BY ItemName
+                ORDER BY
+                    CASE Status
+                        WHEN 3 THEN 0  -- Errored first
+                        WHEN 1 THEN 1  -- Queued second
+                        WHEN 4 THEN 2  -- Ignored third
+                        WHEN 2 THEN 3  -- Synced last
+                        ELSE 4
+                    END,
+                    ItemName ASC
                 LIMIT @take OFFSET @skip";
 
             if (!string.IsNullOrWhiteSpace(searchTerm))

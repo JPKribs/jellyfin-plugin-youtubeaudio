@@ -455,6 +455,7 @@ export default function (view, params) {
         view.querySelector('#chkEnableRecyclingBin').checked = config.EnableRecyclingBin || false;
         view.querySelector('#txtRecyclingBinPath').value = config.RecyclingBinPath || '';
         view.querySelector('#txtRecyclingBinRetentionDays').value = config.RecyclingBinRetentionDays || 7;
+        view.querySelector('#chkRemoveEmptyFolders').checked = config.RemoveEmptyFoldersOnDelete || false;
         view.querySelector('#txtMaxConcurrentDownloads').value = config.MaxConcurrentDownloads || 2;
         view.querySelector('#txtMaxRetryCount').value = config.MaxRetryCount || 3;
         view.querySelector('#txtTempDownloadPath').value = config.TempDownloadPath || '';
@@ -482,6 +483,7 @@ export default function (view, params) {
         config.EnableRecyclingBin = view.querySelector('#chkEnableRecyclingBin').checked;
         config.RecyclingBinPath = view.querySelector('#txtRecyclingBinPath').value;
         config.RecyclingBinRetentionDays = parseInt(view.querySelector('#txtRecyclingBinRetentionDays').value) || 7;
+        config.RemoveEmptyFoldersOnDelete = view.querySelector('#chkRemoveEmptyFolders').checked;
         config.MaxConcurrentDownloads = parseInt(view.querySelector('#txtMaxConcurrentDownloads').value) || 2;
         config.MaxRetryCount = parseInt(view.querySelector('#txtMaxRetryCount').value) || 3;
         config.TempDownloadPath = view.querySelector('#txtTempDownloadPath').value || null;

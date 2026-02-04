@@ -37,7 +37,7 @@ public class RefreshMetadataSyncTableTask : IScheduledTask
     public string Key => "ServerSyncRefreshMetadataTable";
 
     /// <inheritdoc />
-    public string Description => "Scans source and local servers for metadata differences and updates the metadata sync table.";
+    public string Description => "Scans source and local servers for metadata differences and updates the metadata sync table. Note: The 'Sync Metadata' task runs this automatically before syncing.";
 
     /// <inheritdoc />
     public string Category => "Metadata Sync";
@@ -166,13 +166,7 @@ public class RefreshMetadataSyncTableTask : IScheduledTask
     /// <inheritdoc />
     public IEnumerable<TaskTriggerInfo> GetDefaultTriggers()
     {
-        return new[]
-        {
-            new TaskTriggerInfo
-            {
-                Type = TaskTriggerInfoType.IntervalTrigger,
-                IntervalTicks = TimeSpan.FromHours(12).Ticks
-            }
-        };
+        // No default schedule - the Sync Metadata task runs refresh automatically before syncing
+        return Array.Empty<TaskTriggerInfo>();
     }
 }

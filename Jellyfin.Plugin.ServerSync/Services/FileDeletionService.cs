@@ -22,8 +22,9 @@ public static class FileDeletionService
     /// </summary>
     /// <param name="filePath">Path to the main file to delete.</param>
     /// <param name="logger">Logger for operation output.</param>
+    /// <param name="removeEmptyFolders">Whether to remove parent folders if they become empty.</param>
     /// <returns>True if main file was deleted successfully.</returns>
-    public static bool DeleteWithCompanions(string filePath, ILogger logger)
+    public static bool DeleteWithCompanions(string filePath, ILogger logger, bool removeEmptyFolders = false)
     {
         if (string.IsNullOrEmpty(filePath))
         {
@@ -31,6 +32,7 @@ public static class FileDeletionService
         }
 
         var mainDeleted = false;
+        var parentDirectory = Path.GetDirectoryName(filePath);
 
         try
         {
@@ -50,7 +52,60 @@ public static class FileDeletionService
         // Delete companion files
         DeleteCompanionFiles(filePath, logger);
 
+        // Remove empty parent folders if enabled
+        if (removeEmptyFolders && mainDeleted && !string.IsNullOrEmpty(parentDirectory))
+        {
+            TryRemoveEmptyFolders(parentDirectory, logger);
+        }
+
         return mainDeleted;
+    }
+
+    /// <summary>
+    /// Attempts to remove empty parent folders after file deletion.
+    /// Only removes folders that are completely empty.
+    /// </summary>
+    /// <param name="directoryPath">Starting directory to check.</param>
+    /// <param name="logger">Logger for operation output.</param>
+    public static void TryRemoveEmptyFolders(string directoryPath, ILogger logger)
+    {
+        try
+        {
+            // Walk up the directory tree and remove empty folders
+            var currentDir = directoryPath;
+
+            while (!string.IsNullOrEmpty(currentDir) && Directory.Exists(currentDir))
+            {
+                // Check if directory is empty (no files and no subdirectories)
+                var hasFiles = Directory.EnumerateFiles(currentDir).Any();
+                var hasSubDirs = Directory.EnumerateDirectories(currentDir).Any();
+
+                if (hasFiles || hasSubDirs)
+                {
+                    // Directory is not empty, stop here
+                    break;
+                }
+
+                // Directory is empty, try to delete it
+                try
+                {
+                    Directory.Delete(currentDir, recursive: false);
+                    logger.LogDebug("Removed empty folder: {FolderPath}", currentDir);
+
+                    // Move up to parent directory
+                    currentDir = Path.GetDirectoryName(currentDir);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogDebug(ex, "Could not remove folder (may be in use): {FolderPath}", currentDir);
+                    break;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Error checking empty folders for {DirectoryPath}", directoryPath);
+        }
     }
 
     /// <summary>
@@ -233,9 +288,16 @@ public static class FileDeletionService
 
             if (!string.IsNullOrEmpty(localPath) && File.Exists(localPath))
             {
-                var result = config.EnableRecyclingBin && !string.IsNullOrEmpty(config.RecyclingBinPath)
-                    ? DeleteWithRecyclingBin(localPath, config.RecyclingBinPath, logger)
-                    : new DeletionResult(DeleteWithCompanions(localPath, logger));
+                DeletionResult result;
+                if (config.EnableRecyclingBin && !string.IsNullOrEmpty(config.RecyclingBinPath))
+                {
+                    result = DeleteWithRecyclingBin(localPath, config.RecyclingBinPath, logger);
+                    // Note: Empty folder cleanup not done for recycling bin (files are moved, not deleted)
+                }
+                else
+                {
+                    result = new DeletionResult(DeleteWithCompanions(localPath, logger, config.RemoveEmptyFoldersOnDelete));
+                }
 
                 if (result.Success)
                 {

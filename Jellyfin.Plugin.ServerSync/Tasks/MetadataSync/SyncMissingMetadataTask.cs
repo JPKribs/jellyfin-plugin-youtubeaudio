@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.ServerSync.Models.Common;
+using Jellyfin.Plugin.ServerSync.Models.Configuration;
 using Jellyfin.Plugin.ServerSync.Models.MetadataSync;
 using Jellyfin.Plugin.ServerSync.Services;
 using MediaBrowser.Controller.Library;
@@ -18,7 +19,8 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.ServerSync.Tasks;
 
 /// <summary>
-/// Scheduled task to apply queued metadata sync changes to the local server.
+/// Scheduled task to sync metadata from the source server.
+/// Refreshes the sync table first, then applies queued changes.
 /// </summary>
 public class SyncMissingMetadataTask : IScheduledTask
 {
@@ -46,7 +48,7 @@ public class SyncMissingMetadataTask : IScheduledTask
     public string Key => "ServerSyncMissingMetadata";
 
     /// <inheritdoc />
-    public string Description => "Applies queued metadata changes from the source server to the local server.";
+    public string Description => "Refreshes the sync table and applies queued metadata changes from the source server.";
 
     /// <inheritdoc />
     public string Category => "Metadata Sync";
@@ -68,9 +70,66 @@ public class SyncMissingMetadataTask : IScheduledTask
             return;
         }
 
-        _logger.LogInformation("Starting metadata sync application");
+        // Validate source server configuration
+        if (string.IsNullOrWhiteSpace(config.SourceServerUrl) ||
+            string.IsNullOrWhiteSpace(config.SourceServerApiKey))
+        {
+            _logger.LogWarning("Metadata sync skipped: source server not configured");
+            return;
+        }
+
+        // Get enabled library mappings
+        var enabledLibraryMappings = config.LibraryMappings?.Where(m => m.IsEnabled).ToList() ?? new List<LibraryMapping>();
+
+        if (enabledLibraryMappings.Count == 0)
+        {
+            _logger.LogDebug("Metadata sync skipped: no enabled library mappings");
+            return;
+        }
+
+        // Get enabled category flags
+        var syncMetadata = config.MetadataSyncMetadata;
+        var syncGenres = config.MetadataSyncGenres;
+        var syncTags = config.MetadataSyncTags;
+        var syncImages = config.MetadataSyncImages;
+        var syncPeople = config.MetadataSyncPeople;
+
+        if (!syncMetadata && !syncImages && !syncPeople)
+        {
+            _logger.LogDebug("Metadata sync skipped: no categories enabled");
+            return;
+        }
+
+        _logger.LogInformation("Starting metadata sync from {SourceUrl}", config.SourceServerUrl);
+
+        using var client = new SourceServerClient(
+            plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
+            config.SourceServerUrl,
+            config.SourceServerApiKey);
+
+        // Test connection
+        var connectionResult = await client.TestConnectionAsync(cancellationToken).ConfigureAwait(false);
+        if (!connectionResult.Success)
+        {
+            _logger.LogError("Failed to connect to source server at {SourceUrl}: {Error}",
+                config.SourceServerUrl, connectionResult.ErrorMessage ?? "Unknown error");
+            return;
+        }
 
         var database = plugin.Database;
+
+        // Phase 1: Refresh sync table (0-50% progress)
+        _logger.LogInformation("Phase 1: Refreshing metadata sync table");
+        await RefreshSyncTableAsync(client, database, enabledLibraryMappings, syncMetadata, syncImages, syncPeople,
+            new Progress<double>(p => progress.Report(p * 0.5)), cancellationToken).ConfigureAwait(false);
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        // Phase 2: Apply queued changes (50-100% progress)
+        _logger.LogInformation("Phase 2: Applying queued metadata changes");
 
         // Get all queued metadata items
         var queuedItems = database.GetMetadataSyncItemsByStatus(BaseSyncStatus.Queued);
@@ -79,6 +138,11 @@ public class SyncMissingMetadataTask : IScheduledTask
         if (totalItems == 0)
         {
             _logger.LogInformation("No queued metadata items to sync");
+
+            // Update last sync time
+            config.LastMetadataSyncTime = DateTime.UtcNow;
+            plugin.SaveConfiguration();
+
             progress.Report(100);
             return;
         }
@@ -89,11 +153,6 @@ public class SyncMissingMetadataTask : IScheduledTask
         var successCount = 0;
         var errorCount = 0;
 
-        // Get enabled categories from config
-        var syncMetadata = config.MetadataSyncMetadata;
-        var syncImages = config.MetadataSyncImages;
-        var syncPeople = config.MetadataSyncPeople;
-
         foreach (var item in queuedItems)
         {
             if (cancellationToken.IsCancellationRequested)
@@ -103,7 +162,7 @@ public class SyncMissingMetadataTask : IScheduledTask
 
             try
             {
-                var success = await SyncMetadataItemAsync(item, database, syncMetadata, syncImages, syncPeople, cancellationToken).ConfigureAwait(false);
+                var success = await SyncMetadataItemAsync(item, database, syncMetadata, syncGenres, syncTags, syncImages, syncPeople, cancellationToken).ConfigureAwait(false);
 
                 if (success)
                 {
@@ -125,12 +184,66 @@ public class SyncMissingMetadataTask : IScheduledTask
             }
 
             processedCount++;
-            progress.Report((double)processedCount / totalItems * 100);
+            progress.Report(50 + (double)processedCount / totalItems * 50);
         }
+
+        // Update last sync time
+        config.LastMetadataSyncTime = DateTime.UtcNow;
+        plugin.SaveConfiguration();
 
         _logger.LogInformation(
             "Metadata sync completed: {Success} succeeded, {Error} failed out of {Total}",
             successCount, errorCount, totalItems);
+
+        progress.Report(100);
+    }
+
+    /// <summary>
+    /// Refreshes the metadata sync table from the source server.
+    /// </summary>
+    private async Task RefreshSyncTableAsync(
+        SourceServerClient client,
+        SyncDatabase database,
+        List<LibraryMapping> libraryMappings,
+        bool syncMetadata,
+        bool syncImages,
+        bool syncPeople,
+        IProgress<double> progress,
+        CancellationToken cancellationToken)
+    {
+        var metadataService = new MetadataSyncTableService(_logger, _libraryManager);
+
+        // Get total item count for progress tracking
+        var totalItems = await metadataService.GetTotalItemCountAsync(
+            client, libraryMappings, cancellationToken).ConfigureAwait(false);
+
+        // Process each library mapping
+        var processedItems = 0;
+
+        foreach (var libraryMapping in libraryMappings)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+
+            await metadataService.ProcessLibraryAsync(
+                client,
+                database,
+                libraryMapping,
+                syncMetadata,
+                syncImages,
+                syncPeople,
+                cancellationToken,
+                onItemProcessed: () =>
+                {
+                    processedItems++;
+                    if (totalItems > 0)
+                    {
+                        progress.Report((double)processedItems / totalItems * 100);
+                    }
+                }).ConfigureAwait(false);
+        }
 
         progress.Report(100);
     }
@@ -142,6 +255,8 @@ public class SyncMissingMetadataTask : IScheduledTask
         MetadataSyncItem item,
         SyncDatabase database,
         bool syncMetadata,
+        bool syncGenres,
+        bool syncTags,
         bool syncImages,
         bool syncPeople,
         CancellationToken cancellationToken)
@@ -186,7 +301,7 @@ public class SyncMissingMetadataTask : IScheduledTask
         // Sync metadata if enabled and has changes
         if (syncMetadata && item.HasMetadataChanges)
         {
-            var success = await ApplyMetadataAsync(localItem, item, cancellationToken).ConfigureAwait(false);
+            var success = await ApplyMetadataAsync(localItem, item, syncGenres, syncTags, cancellationToken).ConfigureAwait(false);
             if (success)
             {
                 // Update local value to match source after sync
@@ -273,6 +388,8 @@ public class SyncMissingMetadataTask : IScheduledTask
     private async Task<bool> ApplyMetadataAsync(
         MediaBrowser.Controller.Entities.BaseItem localItem,
         MetadataSyncItem item,
+        bool syncGenres,
+        bool syncTags,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(item.SourceMetadataValue))
@@ -367,7 +484,8 @@ public class SyncMissingMetadataTask : IScheduledTask
                 }
             }
 
-            if (metadata.TryGetValue("Genres", out var genresValue) && genresValue.ValueKind == JsonValueKind.Array)
+            // Only sync Genres if enabled in config
+            if (syncGenres && metadata.TryGetValue("Genres", out var genresValue) && genresValue.ValueKind == JsonValueKind.Array)
             {
                 var genres = new List<string>();
                 foreach (var genre in genresValue.EnumerateArray())
@@ -379,6 +497,22 @@ public class SyncMissingMetadataTask : IScheduledTask
                 }
 
                 localItem.Genres = genres.ToArray();
+                hasChanges = true;
+            }
+
+            // Only sync Tags if enabled in config
+            if (syncTags && metadata.TryGetValue("Tags", out var tagsValue) && tagsValue.ValueKind == JsonValueKind.Array)
+            {
+                var tags = new List<string>();
+                foreach (var tag in tagsValue.EnumerateArray())
+                {
+                    if (tag.ValueKind == JsonValueKind.String)
+                    {
+                        tags.Add(tag.GetString()!);
+                    }
+                }
+
+                localItem.Tags = tags.ToArray();
                 hasChanges = true;
             }
 

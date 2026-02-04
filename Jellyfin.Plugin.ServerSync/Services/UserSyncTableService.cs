@@ -189,6 +189,11 @@ public class UserSyncTableService
                 item.LastSyncTime = existingItem.LastSyncTime;
             }
         }
+        else if (!hasChanges)
+        {
+            // New item that's already in sync - set LastSyncTime to now
+            item.LastSyncTime = DateTime.UtcNow;
+        }
 
         return Task.FromResult<UserSyncItem?>(item);
     }
@@ -236,6 +241,11 @@ public class UserSyncTableService
             {
                 item.LastSyncTime = existingItem.LastSyncTime;
             }
+        }
+        else if (!hasChanges)
+        {
+            // New item that's already in sync - set LastSyncTime to now
+            item.LastSyncTime = DateTime.UtcNow;
         }
 
         return Task.FromResult<UserSyncItem?>(item);
@@ -399,6 +409,11 @@ public class UserSyncTableService
             {
                 item.LastSyncTime = existingItem.LastSyncTime;
             }
+        }
+        else if (!hasChanges)
+        {
+            // New item that's already in sync - set LastSyncTime to now
+            item.LastSyncTime = DateTime.UtcNow;
         }
 
         return item;

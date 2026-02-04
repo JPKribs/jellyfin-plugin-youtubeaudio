@@ -12,7 +12,8 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.ServerSync.Tasks;
 
 /// <summary>
-/// Scheduled task to apply queued user sync changes to the local server.
+/// Scheduled task to sync user data from the source server.
+/// Refreshes the sync table first, then applies queued changes.
 /// </summary>
 public class SyncMissingUserDataTask : IScheduledTask
 {
@@ -46,7 +47,7 @@ public class SyncMissingUserDataTask : IScheduledTask
     public string Key => "ServerSyncMissingUserData";
 
     /// <inheritdoc />
-    public string Description => "Applies queued user setting changes from the source server to the local server.";
+    public string Description => "Refreshes the sync table and applies queued user setting changes from the source server.";
 
     /// <inheritdoc />
     public string Category => "User Sync";
@@ -77,7 +78,14 @@ public class SyncMissingUserDataTask : IScheduledTask
             return;
         }
 
-        _logger.LogInformation("Starting user data sync");
+        var enabledMappings = config.UserMappings.FindAll(m => m.IsEnabled);
+        if (enabledMappings.Count == 0)
+        {
+            _logger.LogWarning("No enabled user mappings, skipping user sync");
+            return;
+        }
+
+        _logger.LogInformation("Starting user data sync from {SourceUrl}", config.SourceServerUrl);
 
         using var sourceClient = new SourceServerClient(
             _loggerFactory.CreateLogger<SourceServerClient>(),
@@ -92,6 +100,27 @@ public class SyncMissingUserDataTask : IScheduledTask
             return;
         }
 
+        // Phase 1: Refresh sync table (0-50% progress)
+        _logger.LogInformation("Phase 1: Refreshing user sync table");
+        var tableService = new UserSyncTableService(
+            _loggerFactory.CreateLogger<UserSyncTableService>(),
+            plugin.Database,
+            _userManager);
+
+        await tableService.RefreshUserSyncTableAsync(
+            sourceClient,
+            config,
+            new Progress<double>(p => progress.Report(p * 0.5)),
+            cancellationToken).ConfigureAwait(false);
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        // Phase 2: Apply queued changes (50-100% progress)
+        _logger.LogInformation("Phase 2: Applying queued user changes");
+
         // Create state service and apply changes
         var stateService = new UserSyncStateService(
             _loggerFactory.CreateLogger<UserSyncStateService>(),
@@ -102,7 +131,7 @@ public class SyncMissingUserDataTask : IScheduledTask
 
         var itemsSynced = await stateService.ApplyQueuedChangesAsync(
             sourceClient,
-            progress,
+            new Progress<double>(p => progress.Report(50 + p * 0.5)),
             cancellationToken).ConfigureAwait(false);
 
         // Update last sync time

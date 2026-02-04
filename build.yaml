@@ -30,6 +30,9 @@ changelog:
   - Metadata Studio Syncing
   - Metadata Tag Syncing
   improvements:
-  - Go here
+  - Order Sync Tables by status > name
+  - Setting to delete empty folders on deletion
   fixes:
+  - Negotiated history was treating True > False instead of negotiating
+  - Changing local information was picked up as a change but not queued
   - Fix Github Action bundling for new web files | Unconfirmed

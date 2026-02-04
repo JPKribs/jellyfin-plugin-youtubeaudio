@@ -442,8 +442,11 @@ public class MetadataSyncTableService
             ["EndDate"] = sourceItem.EndDate,
             ["ProductionYear"] = sourceItem.ProductionYear,
 
-            // Genres (simple strings)
+            // Genres
             ["Genres"] = sourceItem.Genres,
+
+            // Tags
+            ["Tags"] = sourceItem.Tags,
 
             // External provider IDs
             ["ProviderIds"] = sourceProviderIds,
@@ -496,6 +499,9 @@ public class MetadataSyncTableService
 
                 // Genres
                 ["Genres"] = localItem.Genres,
+
+                // Tags
+                ["Tags"] = localItem.Tags,
 
                 // External provider IDs
                 ["ProviderIds"] = localItem.ProviderIds,

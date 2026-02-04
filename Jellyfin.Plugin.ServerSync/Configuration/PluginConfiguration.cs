@@ -197,6 +197,12 @@ public class PluginConfiguration : BasePluginConfiguration
     public int RecyclingBinRetentionDays { get; set; } = 7;
 
     /// <summary>
+    /// Remove empty parent folders after deleting content files.
+    /// Only removes folders if they are completely empty after deletion.
+    /// </summary>
+    public bool RemoveEmptyFoldersOnDelete { get; set; }
+
+    /// <summary>
     /// Maximum number of times to retry failed downloads before giving up.
     /// </summary>
     public int MaxRetryCount { get; set; } = 3;

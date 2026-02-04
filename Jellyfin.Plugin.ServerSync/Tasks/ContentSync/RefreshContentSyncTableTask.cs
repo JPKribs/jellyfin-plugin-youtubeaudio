@@ -30,7 +30,7 @@ public class UpdateSyncTablesTask : IScheduledTask
 
     public string Key => "ServerSyncUpdateTables";
 
-    public string Description => "Fetches item list from source server and updates the sync tracking table.";
+    public string Description => "Fetches item list from source server and updates the sync tracking table. Note: The 'Sync Content' task runs this automatically before syncing.";
 
     public string Category => "Content Sync";
 
@@ -153,13 +153,7 @@ public class UpdateSyncTablesTask : IScheduledTask
 
     public IEnumerable<TaskTriggerInfo> GetDefaultTriggers()
     {
-        return new[]
-        {
-            new TaskTriggerInfo
-            {
-                Type = TaskTriggerInfoType.IntervalTrigger,
-                IntervalTicks = TimeSpan.FromHours(6).Ticks
-            }
-        };
+        // No default schedule - the Sync Content task runs refresh automatically before syncing
+        return Array.Empty<TaskTriggerInfo>();
     }
 }

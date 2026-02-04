@@ -1143,11 +1143,35 @@ export default function (view, params) {
             var subtitlesEnabled = config.MetadataSyncSubtitles !== false;
             var imagesEnabled = config.MetadataSyncImages !== false;
 
+            // Parse metadata to check for specific changes
+            var sourceMetadata = this.parseJsonSafe(item.SourceMetadataValue) || {};
+            var localMetadata = this.parseJsonSafe(item.LocalMetadataValue) || {};
+
             // Metadata badge (only if enabled)
             if (metadataEnabled) {
                 var hasMetadataChanges = item.HasMetadataChanges === true;
                 html += '<span class="metadataSyncModal-changesBadge ' + (hasMetadataChanges ? 'has-changes' : 'no-changes') + '">';
                 html += 'Metadata: ' + (hasMetadataChanges ? 'Changes' : 'Synced');
+                html += '</span>';
+            }
+
+            // Genres badge (only if enabled)
+            if (genresEnabled) {
+                var sourceGenres = sourceMetadata.Genres || [];
+                var localGenres = localMetadata.Genres || [];
+                var hasGenresChanges = JSON.stringify(sourceGenres.slice().sort()) !== JSON.stringify(localGenres.slice().sort());
+                html += '<span class="metadataSyncModal-changesBadge ' + (hasGenresChanges ? 'has-changes' : 'no-changes') + '">';
+                html += 'Genres: ' + (hasGenresChanges ? 'Changes' : 'Synced');
+                html += '</span>';
+            }
+
+            // Tags badge (only if enabled)
+            if (tagsEnabled) {
+                var sourceTags = sourceMetadata.Tags || [];
+                var localTags = localMetadata.Tags || [];
+                var hasTagsChanges = JSON.stringify(sourceTags.slice().sort()) !== JSON.stringify(localTags.slice().sort());
+                html += '<span class="metadataSyncModal-changesBadge ' + (hasTagsChanges ? 'has-changes' : 'no-changes') + '">';
+                html += 'Tags: ' + (hasTagsChanges ? 'Changes' : 'Synced');
                 html += '</span>';
             }
 
@@ -1200,13 +1224,13 @@ export default function (view, params) {
             }
 
             // --- GENRES SECTION ---
-            if (genresEnabled && (sourceMetadata.Genres || localMetadata.Genres)) {
+            if (genresEnabled) {
                 html += '<tr class="metadataSyncModal-sectionHeader"><td colspan="4">Genres</td></tr>';
                 html += self.buildArrayComparisonRow('Genres', sourceMetadata.Genres, localMetadata.Genres);
             }
 
             // --- TAGS SECTION ---
-            if (tagsEnabled && (sourceMetadata.Tags || localMetadata.Tags)) {
+            if (tagsEnabled) {
                 html += '<tr class="metadataSyncModal-sectionHeader"><td colspan="4">Tags</td></tr>';
                 html += self.buildArrayComparisonRow('Tags', sourceMetadata.Tags, localMetadata.Tags);
             }
