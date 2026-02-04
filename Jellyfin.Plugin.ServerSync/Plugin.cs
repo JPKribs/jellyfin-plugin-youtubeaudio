@@ -5,6 +5,7 @@ using Jellyfin.Plugin.ServerSync.Configuration;
 using Jellyfin.Plugin.ServerSync.Services;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Common.Plugins;
+using MediaBrowser.Controller.Configuration;
 using MediaBrowser.Model.Plugins;
 using MediaBrowser.Model.Serialization;
 using Microsoft.Extensions.Logging;
@@ -20,6 +21,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages, IDisposable
     private readonly ILogger<Plugin> _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly IApplicationPaths _applicationPaths;
+    private readonly IServerConfigurationManager _serverConfigurationManager;
     private readonly object _databaseLock = new();
     private SyncDatabase? _database;
     private bool _disposed;
@@ -28,13 +30,15 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages, IDisposable
         IApplicationPaths applicationPaths,
         IXmlSerializer xmlSerializer,
         ILogger<Plugin> logger,
-        ILoggerFactory loggerFactory)
+        ILoggerFactory loggerFactory,
+        IServerConfigurationManager serverConfigurationManager)
         : base(applicationPaths, xmlSerializer)
     {
         Instance = this;
         _logger = logger;
         _loggerFactory = loggerFactory;
         _applicationPaths = applicationPaths;
+        _serverConfigurationManager = serverConfigurationManager;
 
         _logger.LogInformation("Server Sync plugin initialized");
     }
@@ -50,6 +54,11 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages, IDisposable
     public ILoggerFactory LoggerFactory => _loggerFactory;
 
     public new IApplicationPaths ApplicationPaths => _applicationPaths;
+
+    /// <summary>
+    /// Gets the local server's friendly name.
+    /// </summary>
+    public string LocalServerName => _serverConfigurationManager.Configuration.ServerName ?? Environment.MachineName;
 
     public SyncDatabase Database
     {

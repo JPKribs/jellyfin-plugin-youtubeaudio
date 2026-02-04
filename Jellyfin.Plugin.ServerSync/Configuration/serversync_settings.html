@@ -34,18 +34,47 @@
                             <div class="inputContainer">
                                 <label for="txtSourceServerApiKey">API Key:</label>
                                 <input is="emby-input" type="password" id="txtSourceServerApiKey" />
-                                <div class="fieldDescription">Generate one in the source server's Dashboard &gt; API Keys.</div>
+                                <div class="fieldDescription">Generate one in the source server's Dashboard &gt; API Keys, or use the token generator below.</div>
                             </div>
 
-                            <!-- Server Info Display -->
+                            <!-- Server Info Display (shows after successful connection) -->
                             <div id="serverInfoContainer" class="server-info-box hidden">
-                                <div class="flex gap-lg">
-                                    <div>
-                                        <span class="text-muted">Server:</span>
-                                        <span id="txtSourceServerName"></span>
-                                        <span class="text-muted">(<span id="txtSourceServerId"></span>)</span>
-                                    </div>
+                                <div class="server-info-row">
+                                    <span class="server-info-label text-muted">Server:</span>
+                                    <span id="txtSourceServerName"></span>
                                 </div>
+                                <div class="server-info-row">
+                                    <span class="server-info-label text-muted">ID:</span>
+                                    <span id="txtSourceServerId"></span>
+                                </div>
+                                <div id="authenticatedUserRow" class="server-info-row hidden">
+                                    <span class="server-info-label text-muted">User:</span>
+                                    <span id="txtAuthenticatedUser"></span>
+                                </div>
+                            </div>
+
+                            <!-- Token Generator (alternative to API key) -->
+                            <h4 class="subsectionHeader">Generate Token from Credentials</h4>
+                            <div class="fieldDescription mb-md">Authenticate with username and password to generate an access token. The password is not saved.</div>
+
+                            <!-- Token Generator: Username -->
+                            <div class="inputContainer">
+                                <label for="txtAuthUsername">Username:</label>
+                                <input is="emby-input" type="text" id="txtAuthUsername" placeholder="Enter username" />
+                            </div>
+
+                            <!-- Token Generator: Password -->
+                            <div class="inputContainer">
+                                <label for="txtAuthPassword">Password:</label>
+                                <input is="emby-input" type="password" id="txtAuthPassword" placeholder="Enter password" />
+                            </div>
+
+                            <!-- Token Generator: Actions -->
+                            <div class="flex align-items-center gap-sm">
+                                <button is="emby-button" type="button" id="btnGenerateToken" class="raised button-secondary">
+                                    <span>Generate Token</span>
+                                </button>
+                                <span id="tokenGeneratorStatus"></span>
                             </div>
 
                             <!-- Server Actions -->
@@ -719,5 +748,19 @@
             gap: 16px;
             align-items: center;
         }
+
+        /* ===== Server Info Rows ===== */
+        .server-info-row {
+            display: flex;
+            gap: 8px;
+            padding: 2px 0;
+        }
+        .server-info-label {
+            min-width: 50px;
+        }
+
+        /* ===== Additional Utility Classes ===== */
+        .align-items-center { align-items: center; }
+        .gap-sm { gap: 8px; }
     </style>
 </div>

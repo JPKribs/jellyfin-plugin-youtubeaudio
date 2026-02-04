@@ -17,7 +17,17 @@ public class PluginConfiguration : BasePluginConfiguration
 
     public string SourceServerUrl { get; set; } = string.Empty;
 
+    /// <summary>
+    /// API key or access token for authenticating with the source server.
+    /// Can be either a manually entered API key or a token generated from username/password.
+    /// </summary>
     public string SourceServerApiKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Username that was used to generate the access token.
+    /// Empty if using a manually entered API key.
+    /// </summary>
+    public string SourceServerAuthenticatedUser { get; set; } = string.Empty;
 
     public string SourceServerName { get; set; } = string.Empty;
 

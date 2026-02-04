@@ -132,6 +132,79 @@ public class ConfigurationController : ControllerBase
     }
 
     /// <summary>
+    /// Authenticate
+    /// Authenticates with a source server using username and password to generate an access token.
+    /// </summary>
+    /// <param name="request">Authentication request with credentials.</param>
+    /// <returns>Authentication response with access token if successful.</returns>
+    [HttpPost("Authenticate")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<AuthenticateResponse>> Authenticate([FromBody] AuthenticateRequest request)
+    {
+        // Validate URL first
+        var urlValidation = ValidateServerUrl(request.ServerUrl);
+        if (!urlValidation.IsValid)
+        {
+            return Ok(new AuthenticateResponse
+            {
+                Success = false,
+                Message = urlValidation.Message
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Username))
+        {
+            return Ok(new AuthenticateResponse
+            {
+                Success = false,
+                Message = "Username is required"
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Password))
+        {
+            return Ok(new AuthenticateResponse
+            {
+                Success = false,
+                Message = "Password is required"
+            });
+        }
+
+        var result = await SourceServerClient.AuthenticateAsync(
+            urlValidation.NormalizedUrl!,
+            request.Username,
+            request.Password).ConfigureAwait(false);
+
+        if (!result.Success)
+        {
+            return Ok(new AuthenticateResponse
+            {
+                Success = false,
+                Message = result.ErrorMessage ?? "Authentication failed"
+            });
+        }
+
+        // Test the token by getting server info
+        var plugin = Plugin.Instance!;
+        using var client = new SourceServerClient(
+            plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
+            urlValidation.NormalizedUrl!,
+            result.AccessToken!);
+
+        var connectionTest = await client.TestConnectionAsync().ConfigureAwait(false);
+
+        return Ok(new AuthenticateResponse
+        {
+            Success = true,
+            AccessToken = result.AccessToken,
+            Username = result.Username,
+            ServerName = connectionTest.ServerName,
+            ServerId = connectionTest.ServerId,
+            Message = "Authentication successful"
+        });
+    }
+
+    /// <summary>
     /// GetSourceLibraries
     /// Gets libraries from the source server.
     /// </summary>

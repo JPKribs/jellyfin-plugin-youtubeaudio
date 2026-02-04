@@ -1,7 +1,7 @@
 ---
 name: "Server Sync"
 guid: "ebd650b5-6f4c-4ccb-b10d-23dffb3a7286"
-version: "10.11.18"
+version: "10.11.19"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
 overview: "Sync media content from a source Jellyfin server to this server."
@@ -25,14 +25,9 @@ artifacts:
 - "Std.UriTemplate.dll"
 changelog:
   new:
-  - Metadata Genre Syncing
-  - Metadata People Syncing
-  - Metadata Studio Syncing
-  - Metadata Tag Syncing
+  - Token generation from username & password as alternative to API Key
   improvements:
-  - Order Sync Tables by status > name
-  - Setting to delete empty folders on deletion
+  - Client now registers with local server name and plugin version
+  - Consolidated server info display (Server, ID, User)
   fixes:
-  - Negotiated history was treating True > False instead of negotiating
-  - Changing local information was picked up as a change but not queued
-  - Fix Github Action bundling for new web files | Unconfirmed
+  - Connection test now validates API key/token properly

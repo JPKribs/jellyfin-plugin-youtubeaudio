@@ -78,6 +78,8 @@ export default function (view, params) {
     // SERVER MODULE
     // ============================================
 
+    // --- Server Configuration ---
+
     function loadServerConfig(config) {
         var urlEl = view.querySelector('#txtSourceServerUrl');
         var apiKeyEl = view.querySelector('#txtSourceServerApiKey');
@@ -90,6 +92,19 @@ export default function (view, params) {
             if (nameEl) nameEl.textContent = config.SourceServerName || 'Unknown';
             if (idEl) idEl.textContent = config.SourceServerId || 'Unknown';
             setVisible('serverInfoContainer', true);
+        }
+
+        // Load authenticated user if present
+        if (config.SourceServerAuthenticatedUser) {
+            var authUserEl = view.querySelector('#txtAuthenticatedUser');
+            if (authUserEl) authUserEl.textContent = config.SourceServerAuthenticatedUser;
+            setVisible('authenticatedUserRow', true);
+
+            // Pre-fill the username field for convenience
+            var usernameEl = view.querySelector('#txtAuthUsername');
+            if (usernameEl) usernameEl.value = config.SourceServerAuthenticatedUser;
+        } else {
+            setVisible('authenticatedUserRow', false);
         }
     }
 
@@ -139,10 +154,98 @@ export default function (view, params) {
         config.SourceServerUrl = urlEl ? urlEl.value : '';
         config.SourceServerApiKey = apiKeyEl ? apiKeyEl.value : '';
 
+        // Note: SourceServerAuthenticatedUser is set by generateToken, not here
+        // If the API key was manually changed, clear the authenticated user
+        // (This is handled by generateToken setting it, and manual edits won't update it)
+
         ApiClient.updatePluginConfiguration(pluginId, config).then(function() {
             Dashboard.alert('Server settings saved');
         }).catch(function() {
             Dashboard.alert('Failed to save server settings');
+        });
+    }
+
+    // --- Token Generation ---
+
+    function generateToken() {
+        var urlEl = view.querySelector('#txtSourceServerUrl');
+        var usernameEl = view.querySelector('#txtAuthUsername');
+        var passwordEl = view.querySelector('#txtAuthPassword');
+        var statusEl = view.querySelector('#tokenGeneratorStatus');
+
+        var serverUrl = urlEl ? urlEl.value : '';
+        var username = usernameEl ? usernameEl.value : '';
+        var password = passwordEl ? passwordEl.value : '';
+
+        if (!serverUrl) {
+            if (statusEl) statusEl.innerHTML = '<span class="text-error">Please enter a Server URL first</span>';
+            return;
+        }
+
+        if (!username || !password) {
+            if (statusEl) statusEl.innerHTML = '<span class="text-error">Username and password are required</span>';
+            return;
+        }
+
+        if (statusEl) statusEl.textContent = 'Authenticating...';
+
+        apiRequest('Authenticate', 'POST', {
+            ServerUrl: serverUrl,
+            Username: username,
+            Password: password
+        }).then(function(response) {
+            if (response && response.Success) {
+                // Clear the password field for security
+                if (passwordEl) passwordEl.value = '';
+
+                // Update the API key field with the new token
+                var apiKeyEl = view.querySelector('#txtSourceServerApiKey');
+                if (apiKeyEl) apiKeyEl.value = response.AccessToken;
+
+                // Update the authenticated user display
+                var authUserEl = view.querySelector('#txtAuthenticatedUser');
+                if (authUserEl) authUserEl.textContent = response.Username || username;
+                setVisible('authenticatedUserRow', true);
+
+                // Update server info display
+                var nameEl = view.querySelector('#txtSourceServerName');
+                var idEl = view.querySelector('#txtSourceServerId');
+                if (nameEl) nameEl.textContent = response.ServerName || 'Unknown';
+                if (idEl) idEl.textContent = response.ServerId || 'Unknown';
+                setVisible('serverInfoContainer', true);
+
+                // Update currentConfig
+                if (currentConfig) {
+                    currentConfig.SourceServerApiKey = response.AccessToken;
+                    currentConfig.SourceServerAuthenticatedUser = response.Username || username;
+                    currentConfig.SourceServerName = response.ServerName;
+                    currentConfig.SourceServerId = response.ServerId;
+                }
+
+                // Save the configuration automatically
+                var config = currentConfig || {};
+                config.SourceServerUrl = serverUrl;
+                config.SourceServerApiKey = response.AccessToken;
+                config.SourceServerAuthenticatedUser = response.Username || username;
+                config.SourceServerName = response.ServerName;
+                config.SourceServerId = response.ServerId;
+
+                ApiClient.updatePluginConfiguration(pluginId, config).then(function() {
+                    if (statusEl) statusEl.innerHTML = '<span class="text-success">Token generated and saved!</span>';
+
+                    // Fetch source data now that we have valid credentials
+                    fetchSourceLibraries(serverUrl, response.AccessToken);
+                    fetchSourceUsers(serverUrl, response.AccessToken);
+                    showMappingSections();
+                }).catch(function() {
+                    if (statusEl) statusEl.innerHTML = '<span class="text-success">Token generated!</span> <span class="text-error">(Save failed)</span>';
+                });
+            } else {
+                if (statusEl) statusEl.innerHTML = '<span class="text-error">' + escapeHtml((response && response.Message) || 'Authentication failed') + '</span>';
+            }
+        }).catch(function(error) {
+            if (statusEl) statusEl.innerHTML = '<span class="text-error">Authentication failed</span>';
+            console.error('Token generation error:', error);
         });
     }
 
@@ -665,6 +768,7 @@ export default function (view, params) {
             // Server actions
             bindClick('btnTestConnection', testConnection);
             bindClick('btnSaveServer', saveServerConfig);
+            bindClick('btnGenerateToken', generateToken);
 
             // Library mapping actions
             bindClick('btnAddMapping', function() { addLibraryMappingRow(); });

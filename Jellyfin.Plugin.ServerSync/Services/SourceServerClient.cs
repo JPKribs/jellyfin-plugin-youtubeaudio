@@ -21,17 +21,22 @@ namespace Jellyfin.Plugin.ServerSync.Services;
 /// </summary>
 public class SourceServerClient : IDisposable
 {
-    private const string ClientName = "Jellyfin Server Sync";
-    private const string ClientVersion = "1.0.0";
-    private const string DeviceName = "Server Sync Plugin";
-    private static readonly string DeviceId = "serversync-plugin-" + Environment.MachineName.ToLowerInvariant();
+    // Client identification constants
+    private const string DefaultClientName = "Server Sync";
+    private static readonly string DefaultDeviceId = "serversync-plugin-" + Environment.MachineName.ToLowerInvariant();
 
     // Default timeout for API operations (connection, authentication, etc.)
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
 
+    /// <summary>
+    /// Gets the plugin version string.
+    /// </summary>
+    private static string PluginVersion => Plugin.Instance?.Version.ToString() ?? "1.0.0";
+
     private readonly ILogger<SourceServerClient> _logger;
     private readonly string _serverUrl;
     private readonly string _apiKey;
+    private readonly string _localServerName;
     private readonly HttpClient _httpClient;
     private readonly JellyfinSdkSettings _sdkSettings;
     private JellyfinApiClient? _apiClient;
@@ -43,11 +48,13 @@ public class SourceServerClient : IDisposable
     /// <param name="logger">Logger instance.</param>
     /// <param name="serverUrl">Source server URL.</param>
     /// <param name="apiKey">API key for authentication.</param>
-    public SourceServerClient(ILogger<SourceServerClient> logger, string serverUrl, string apiKey)
+    /// <param name="localServerName">Optional local server name for client identification. Defaults to Plugin.LocalServerName.</param>
+    public SourceServerClient(ILogger<SourceServerClient> logger, string serverUrl, string apiKey, string? localServerName = null)
     {
         _logger = logger;
         _serverUrl = serverUrl.TrimEnd('/');
         _apiKey = apiKey;
+        _localServerName = localServerName ?? Plugin.Instance?.LocalServerName ?? Environment.MachineName;
         _httpClient = new HttpClient
         {
             Timeout = DefaultTimeout
@@ -56,10 +63,10 @@ public class SourceServerClient : IDisposable
         _sdkSettings = new JellyfinSdkSettings();
         _sdkSettings.SetServerUrl(_serverUrl);
         _sdkSettings.Initialize(
-            clientName: ClientName,
-            clientVersion: ClientVersion,
-            deviceName: DeviceName,
-            deviceId: DeviceId);
+            clientName: DefaultClientName,
+            clientVersion: PluginVersion,
+            deviceName: _localServerName,
+            deviceId: DefaultDeviceId);
         _sdkSettings.SetAccessToken(_apiKey);
     }
 
@@ -74,7 +81,9 @@ public class SourceServerClient : IDisposable
         try
         {
             var client = GetApiClient();
-            var info = await client.System.Info.Public.GetAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            // Use the authenticated /System/Info endpoint (not /System/Info/Public)
+            // This validates that the API key/token is actually valid
+            var info = await client.System.Info.GetAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
 
             return new ConnectionTestResult
             {
@@ -116,6 +125,112 @@ public class SourceServerClient : IDisposable
             {
                 Success = false,
                 ErrorMessage = $"Connection failed: {ex.Message}"
+            };
+        }
+    }
+
+    /// <summary>
+    /// Authenticates with a Jellyfin server using username and password.
+    /// Returns an access token that can be used for subsequent API calls.
+    /// This is a static method that doesn't require an existing client instance.
+    /// </summary>
+    /// <param name="serverUrl">Server URL.</param>
+    /// <param name="username">Username.</param>
+    /// <param name="password">Password.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Authentication result with access token if successful.</returns>
+    public static async Task<TokenAuthenticationResult> AuthenticateAsync(
+        string serverUrl,
+        string username,
+        string password,
+        CancellationToken cancellationToken = default)
+    {
+        serverUrl = serverUrl.TrimEnd('/');
+
+        using var httpClient = new HttpClient { Timeout = DefaultTimeout };
+
+        // Build the authentication request
+        var authRequest = new
+        {
+            Username = username,
+            Pw = password
+        };
+
+        var json = System.Text.Json.JsonSerializer.Serialize(authRequest);
+        var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+        // Add the required MediaBrowser authorization header (without token for auth request)
+        var deviceName = Plugin.Instance?.LocalServerName ?? Environment.MachineName;
+        var authHeader = $"MediaBrowser Client=\"{DefaultClientName}\", Device=\"{deviceName}\", DeviceId=\"{DefaultDeviceId}\", Version=\"{PluginVersion}\"";
+        content.Headers.Add("X-Emby-Authorization", authHeader);
+
+        try
+        {
+            var response = await httpClient.PostAsync(
+                $"{serverUrl}/Users/AuthenticateByName",
+                content,
+                cancellationToken).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                return new TokenAuthenticationResult
+                {
+                    Success = false,
+                    ErrorMessage = response.StatusCode == System.Net.HttpStatusCode.Unauthorized
+                        ? "Invalid username or password"
+                        : $"Authentication failed: {response.StatusCode}"
+                };
+            }
+
+            var responseJson = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            var authResponse = System.Text.Json.JsonDocument.Parse(responseJson);
+
+            var accessToken = authResponse.RootElement.GetProperty("AccessToken").GetString();
+            var serverName = authResponse.RootElement.TryGetProperty("ServerId", out var serverIdProp)
+                ? serverIdProp.GetString()
+                : null;
+
+            // Get user info
+            string? authenticatedUsername = null;
+            if (authResponse.RootElement.TryGetProperty("User", out var userProp))
+            {
+                if (userProp.TryGetProperty("Name", out var nameProp))
+                {
+                    authenticatedUsername = nameProp.GetString();
+                }
+            }
+
+            return new TokenAuthenticationResult
+            {
+                Success = true,
+                AccessToken = accessToken,
+                Username = authenticatedUsername ?? username,
+                ServerId = serverName
+            };
+        }
+        catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
+        {
+            return new TokenAuthenticationResult
+            {
+                Success = false,
+                ErrorMessage = "Connection timed out - server may be unreachable"
+            };
+        }
+        catch (HttpRequestException ex)
+        {
+            return new TokenAuthenticationResult
+            {
+                Success = false,
+                ErrorMessage = $"Connection error: {ex.Message}"
+            };
+        }
+        catch (Exception ex)
+        {
+            return new TokenAuthenticationResult
+            {
+                Success = false,
+                ErrorMessage = $"Authentication failed: {ex.Message}"
             };
         }
     }
@@ -747,7 +862,7 @@ public class SourceServerClient : IDisposable
     /// <param name="request">HTTP request message.</param>
     private void AddAuthorizationHeader(HttpRequestMessage request)
     {
-        var authValue = $"MediaBrowser Client=\"{ClientName}\", Device=\"{DeviceName}\", DeviceId=\"{DeviceId}\", Version=\"{ClientVersion}\", Token=\"{_apiKey}\"";
+        var authValue = $"MediaBrowser Client=\"{DefaultClientName}\", Device=\"{_localServerName}\", DeviceId=\"{DefaultDeviceId}\", Version=\"{PluginVersion}\", Token=\"{_apiKey}\"";
         request.Headers.Authorization = new AuthenticationHeaderValue("MediaBrowser", authValue);
     }
 
