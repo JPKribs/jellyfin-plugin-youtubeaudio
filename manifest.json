@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "10.11.18",
+        "changelog": "## New\r\n- Metadata Genre Syncing\r\n- Metadata People Syncing\r\n- Metadata Studio Syncing\r\n- Metadata Tag Syncing\r\n\r\n## Improvements\r\n- Order Sync Tables by status > name\r\n- Setting to delete empty folders on deletion\r\n\r\n## Fixes\r\n- Negotiated history was treating True > False instead of negotiating\r\n- Changing local information was picked up as a change but not queued\r\n- Fix Github Action bundling for new web files | Unconfirmed",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-serversync/releases/download/v10.11.18/jellyfin-plugin-serversync-10.11.18.zip",
+        "checksum": "0ab443073cf8eb8ef018a5e1819eed52",
+        "timestamp": "2026-02-04T21:15:39Z"
+      },
+      {
         "version": "10.11.17",
         "changelog": "## New\r\n- User Sync feature for syncing user policies, configuration, and profile images between servers\r\n- Per-property sync records (Policy, Configuration, ProfileImage) for granular control\r\n- SHA256 hash-based comparison for accurate profile image change detection\r\n- Library ID translation for policy sync (EnabledFolders, BlockedMediaFolders)\r\n- Semantic JSON comparison for detecting policy and configuration changes\r\n- User mappings configuration to link source users to local users\r\n- Individual toggles for syncing Policy, Configuration, and Profile Image\r\n- Metadata syncing\r\n\r\n## Improvements\r\n- Complete web rework to utilize exisitng tabs and split out the configPage into multiple files\r\n- Web cleanup & centralization of shared components\r\n- Reorganize web files\r\n- Consolidated duplicate FormatBytes and ComputeHash utilities\r\n- Added HashUtilities for shared SHA256 hash computation\r\n\r\n## Fixes\r\n- Fix CSS inconsistencies\r\n- Fix profile image sync entity state management",
         "targetAbi": "10.11.0.0",
