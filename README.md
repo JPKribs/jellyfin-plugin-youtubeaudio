@@ -1,6 +1,6 @@
 # Server Sync
 
-#### A Jellyfin plugin that enables one-way synchronization from a Source Jellyfin Server to a Local Jellyfin Server. This enables you to not only keep **Content Files** syncronized on multiple servers, but also share **Watch History**, **Metadata**, and **User Settings** as well. The plugin is only required on the Local (destination) Server as all sync tasks are performed using standard Jellyfin APIs.
+#### A Jellyfin plugin that enables one-way synchronization from a Source Jellyfin Server to a Local Jellyfin Server. This enables you to not only keep **Content Files** synchronized on multiple servers, but also share **Watch History**, **Metadata**, and **User Settings** as well. The plugin is only required on the Local (destination) Server as all sync tasks are performed using standard Jellyfin APIs.
 
 *This plugin edits live data in your Jellyfin Server. I created this project for my own personal use case which may not align with your own. While this project is tested extensively, I cannot foresee every possibility or server variation. Please ensure that you take backups of your data and Jellyfin Server to protect against issues.*
 
