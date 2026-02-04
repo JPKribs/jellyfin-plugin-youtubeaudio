@@ -162,3 +162,11 @@ User syncing enables one-way synchronization of user settings from the source se
 ## Verification Check
 
 * After restart, navigate to Dashboard → Plugins → Server Sync to confirm the plugin configuration page loads properly.
+
+---
+
+#### AI Disclaimer
+
+Claude Code was utilized for this project to resolve issues with GitHub Actions & Build Scripts. For project code, it was used to locally to cleanup inline comments and create first drafts of documentation.
+
+**All code was written and tested by humans.**
