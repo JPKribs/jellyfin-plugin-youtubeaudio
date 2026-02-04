@@ -94,11 +94,13 @@ Content Syncing copies media files from the Source Server and mirrors them on yo
 
 ### Refresh Sync Table
 
-The Plugin builds a table of all content that exists in the mapped Source Libraries. This is compared, **by file path**, against the files that exist on the Local Server. Files that do not exist on the Local Server are Queued *(or set to Pending if `Require Approval` is enabled)*. If files no longer exist on Source Server, they are set to Delete *(this can be disabled in the settings)*. 
+The Plugin builds a table of all content that exists in the mapped Source Libraries. This is compared, **by file path**, against the files that exist on the Local Server. Files that do not exist on the Local Server are Queued *(or set to Pending if `Require Approval` is enabled)*. If files no longer exist on Source Server, they are set to Delete *(this can be disabled in the settings)*.
+
+Files in this table can be manually approved/ignored for Download, Replacement, or Deletion using the Approval Process. Files can also *manually* be deleted from the local server using the Delete functionality.
 
 ### Sync Missing Content
 
-Using the files found in the Sync Table, all Queued files *(and companion files such as subtitles & NFOs)* are downloaded using Jellyfin's API into the Temporary Directory. Once downloaded, these files are moved in the mirroring location on the Local Server and any required folders are created. Files with the Pending & Ignored statuses are not processed by this step. Files that are set to Delete are deleting during this step but, to prevent issues, any nested folders left empty by a deletion are not touched.
+Using the files found in the Sync Table, all Queued files *(and companion files such as subtitles & NFOs)* are downloaded using Jellyfin's API into the Temporary Directory. Once downloaded, these files are moved in the mirroring location on the Local Server and any required folders are created. Files with the Pending & Ignored statuses are not processed by this step. Files that are set to Delete are deleted during this step but, to prevent issues, any nested folders left empty by a deletion are not touched.
 
 ---
 
