@@ -23,13 +23,17 @@ A Jellyfin plugin that enables one-way synchronization from a Source Jellyfin Se
 
 # Settings
 
-![Plugin Settings](Documentation/Screenshots/Settings/Main.png)
+| Screenshot: Settings Tab |
+| :--- |
+| ![Plugin Settings](Documentation/Screenshots/Settings/Main.png) |
 
 ## Source Server
 
 The Source Server is the Jellyfin Server you want to sync content **from**. This plugin runs on your Local Server and pulls content from the Source Server.
 
-![Server Configuration](Documentation/Screenshots/Settings/Server%20Configuration.png)
+| Screenshot: Server Configuration |
+| :--- |
+| ![Server Configuration](Documentation/Screenshots/Settings/Server%20Configuration.png) |
 
 1. **Generate an API Key** on the source server:
    - Go to **Dashboard > API Keys** on the source server
@@ -45,7 +49,9 @@ Once connected, you'll see the source server's name and ID displayed, confirming
 
 ## Library Mapping
 
-![Library Configuration](Documentation/Screenshots/Settings/Library%20Mapping.png)
+| Screenshot: Library Mapping |
+| :--- |
+| ![Library Configuration](Documentation/Screenshots/Settings/Library%20Mapping.png) |
 
 1. **Create a new Library Mapping**
 
@@ -62,7 +68,9 @@ Once all of the Libraries that you want to map are mapped, save your settings.
 
 ## User Mapping [Optional]
 
-![User Configuration](Documentation/Screenshots/Settings/User%20Mapping.png)
+| Screenshot: User Mapping |
+| :--- |
+| ![User Configuration](Documentation/Screenshots/Settings/User%20Mapping.png) |
 
 1. **Create a new User Mapping**
 
