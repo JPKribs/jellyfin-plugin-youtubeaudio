@@ -45,7 +45,7 @@ The Source Server is the Jellyfin Server you want to sync content **from**. This
 
 3. **Test the connection** using the "Test" button to verify connectivity
 
-Once connected, you'll see the source server's name and ID displayed, confirming the connection is working.
+#### Once connected, you'll see the source server's name and ID displayed, confirming the connection is working.
 
 ## Library Mapping
 
@@ -64,7 +64,7 @@ Once connected, you'll see the source server's name and ID displayed, confirming
       - *This will take the Source Library file `/media/Track Testing/My Movie (2025)/movie.mp4` and save it to the Local Library at `/media/My Movie (2025)/movie.mp4`*
          - **Only single folder libraries are supported by this plugin.**
 
-Once all of the Libraries that you want to map are mapped, save your settings.
+#### Once all of the Libraries that you want to map are mapped, save your settings.
 
 ## User Mapping [Optional]
 
@@ -78,7 +78,7 @@ Once all of the Libraries that you want to map are mapped, save your settings.
    - *This is only required if you want History or User Syncing*
    - *This NOT required for Content and Metadata Syncing*
 
-Once all of the Users that you want to map are mapped, save your settings.
+#### Once all of the Users that you want to map are mapped, save your settings.
 
 ---
 
