@@ -5,75 +5,81 @@ namespace Jellyfin.Plugin.ServerSync.Services;
 
 /// <summary>
 /// Service for merging watch history data from source and local servers.
-/// Implements two-way merge logic: takes the "best" of both servers' data.
+/// Implements merge logic with the following strategy:
+/// - IsFavorite: Always taken from Source Server
+/// - PlayCount: MAX(source, local)
+/// - Played, Position, LastPlayedDate: Negotiated based on most recent LastPlayedDate
 /// </summary>
 public static class HistorySyncMergeService
 {
     /// <summary>
     /// Merges source and local history data to produce the target merged state.
     /// Merge strategy:
+    /// - IsFavorite: Always from Source Server
     /// - PlayCount: MAX(source, local)
-    /// - LastPlayedDate: MAX(source, local)
-    /// - PlaybackPositionTicks: From whichever has more recent LastPlayedDate
-    /// - IsFavorite: TRUE if either is true (OR logic)
-    /// - IsPlayed: TRUE if either is true (OR logic)
+    /// - Played, Position, LastPlayedDate: From whichever server has more recent LastPlayedDate
     /// </summary>
     /// <param name="item">History sync item to update with merged values.</param>
     public static void MergeHistoryData(HistorySyncItem item)
     {
-        // IsPlayed: OR logic - true if either server has it marked as played
-        item.MergedIsPlayed = (item.SourceIsPlayed ?? false) || (item.LocalIsPlayed ?? false);
+        // IsFavorite: Always taken from Source Server
+        item.MergedIsFavorite = item.SourceIsFavorite ?? false;
 
-        // PlayCount: Take the maximum
+        // PlayCount: Take the maximum of Source and Local
         item.MergedPlayCount = Math.Max(item.SourcePlayCount ?? 0, item.LocalPlayCount ?? 0);
 
-        // IsFavorite: OR logic - true if either server has it as favorite
-        item.MergedIsFavorite = (item.SourceIsFavorite ?? false) || (item.LocalIsFavorite ?? false);
-
-        // LastPlayedDate and PlaybackPositionTicks: Use the more recent activity
-        MergePlaybackPosition(item);
+        // Played, Position, and LastPlayedDate: Negotiated based on most recent LastPlayedDate
+        MergeNegotiatedHistory(item);
     }
 
     /// <summary>
-    /// Merges playback position based on which server has the more recent activity.
+    /// Merges negotiated history fields (Played, Position, LastPlayedDate) based on
+    /// which server has the more recent LastPlayedDate.
     /// </summary>
-    private static void MergePlaybackPosition(HistorySyncItem item)
+    private static void MergeNegotiatedHistory(HistorySyncItem item)
     {
         var sourceDate = item.SourceLastPlayedDate;
         var localDate = item.LocalLastPlayedDate;
 
-        // If neither has a date, use source position if available
+        // If neither has a date, use source values if available
         if (!sourceDate.HasValue && !localDate.HasValue)
         {
+            item.MergedIsPlayed = item.SourceIsPlayed ?? item.LocalIsPlayed;
             item.MergedLastPlayedDate = null;
             item.MergedPlaybackPositionTicks = item.SourcePlaybackPositionTicks ?? item.LocalPlaybackPositionTicks;
             return;
         }
 
-        // If only source has a date
+        // If only source has a date, use source values
         if (sourceDate.HasValue && !localDate.HasValue)
         {
+            item.MergedIsPlayed = item.SourceIsPlayed;
             item.MergedLastPlayedDate = sourceDate;
             item.MergedPlaybackPositionTicks = item.SourcePlaybackPositionTicks;
             return;
         }
 
-        // If only local has a date
+        // If only local has a date, use local values
         if (!sourceDate.HasValue && localDate.HasValue)
         {
+            item.MergedIsPlayed = item.LocalIsPlayed;
             item.MergedLastPlayedDate = localDate;
             item.MergedPlaybackPositionTicks = item.LocalPlaybackPositionTicks;
             return;
         }
 
-        // Both have dates - use the more recent one
+        // Both have dates - use values from whichever server has the more recent date
         if (sourceDate!.Value >= localDate!.Value)
         {
+            // Source was more recently played - use source values
+            item.MergedIsPlayed = item.SourceIsPlayed;
             item.MergedLastPlayedDate = sourceDate;
             item.MergedPlaybackPositionTicks = item.SourcePlaybackPositionTicks;
         }
         else
         {
+            // Local was more recently played - use local values
+            item.MergedIsPlayed = item.LocalIsPlayed;
             item.MergedLastPlayedDate = localDate;
             item.MergedPlaybackPositionTicks = item.LocalPlaybackPositionTicks;
         }
