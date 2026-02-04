@@ -86,7 +86,23 @@ The Source Server is the Jellyfin Server you want to sync content **from**. This
 
 ## Content Syncing
 
-Content syncing enables one-way media file synchronization from the source server to your local server. The plugin periodically scans the source for movies, episodes, audio, and video files, compares them against what exists locally using ETag-based change detection, and queues missing or updated content for download. Downloads respect your configured bandwidth limits and can require manual approval before proceeding. For complete documentation, see **[Documentation/Content.md](Documentation/Content.md)**.
+| Content Sync Table |
+| :--- |
+| ![Content Sync Table](Documentation/Screenshots/ContentSync/Table.png) |
+
+Content Syncing copies media files from the Source Server and mirrors them on your Local Server. This is performed in two steps:
+
+### Refresh Sync Table
+
+The Plugin builds a table of all content that exists in the mapped Source Libraries. This is compared, **by file path**, against the files that exist on the Local Server. Files that do not exist on the Local Server are Queued *(or set to Pending if `Require Approval` is enabled)*. If files no longer exist on Source Server, they are set to Delete *(this can be disabled in the settings)*. 
+
+### Sync Missing Content
+
+Using the files found in the Sync Table, all Queued files *(and companion files such as subtitles & NFOs)* are downloaded using Jellyfin's API into the Temporary Directory. Once downloaded, these files are moved in the mirroring location on the Local Server and any required folders are created. Files with the Pending & Ignored statuses are not processed by this step. Files that are set to Delete are deleting during this step but, to prevent issues, any nested folders left empty by a deletion are not touched.
+
+---
+
+#### For complete information, pleaes see our **[Content Syncing Documentation](Documentation/Content.md)**!
 
 ---
 
@@ -108,27 +124,27 @@ User syncing enables one-way synchronization of user settings from the source se
 
 ---
 
-## Installation
+# Installation
 
-### Step 1: Add Plugin Repository
+## Step 1: Add Plugin Repository
 
 * Open Jellyfin and navigate to Dashboard → Plugins → Repositories
 * Click Add Repository
 * Enter the following repository URL: `https://raw.githubusercontent.com/JPKribs/jellyfin-plugin-serversync/master/manifest.json`
 * Click Save
 
-### Step 2: Install Plugin
+## Step 2: Install Plugin
 
 * Go to the Catalog tab in the Plugins section
 * Find Server Sync in the catalog
 * Click Install
 * Wait for installation to complete
 
-### Step 3: Restart Jellyfin
+## Step 3: Restart Jellyfin
 
 * Restart your Jellyfin server completely
 * Wait for Jellyfin to fully start up
 
-### Verification Check
+## Verification Check
 
 * After restart, navigate to Dashboard → Plugins → Server Sync to confirm the plugin configuration page loads properly.
