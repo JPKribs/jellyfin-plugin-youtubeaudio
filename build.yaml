@@ -1,7 +1,7 @@
 ---
 name: "Server Sync"
 guid: "ebd650b5-6f4c-4ccb-b10d-23dffb3a7286"
-version: "10.11.17"
+version: "10.11.18"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
 overview: "Sync media content from a source Jellyfin server to this server."
@@ -25,20 +25,11 @@ artifacts:
 - "Std.UriTemplate.dll"
 changelog:
   new:
-  - User Sync feature for syncing user policies, configuration, and profile images between servers
-  - Per-property sync records (Policy, Configuration, ProfileImage) for granular control
-  - SHA256 hash-based comparison for accurate profile image change detection
-  - Library ID translation for policy sync (EnabledFolders, BlockedMediaFolders)
-  - Semantic JSON comparison for detecting policy and configuration changes
-  - User mappings configuration to link source users to local users
-  - Individual toggles for syncing Policy, Configuration, and Profile Image
-  - Metadata syncing
+  - Metadata Genre Syncing
+  - Metadata People Syncing
+  - Metadata Studio Syncing
+  - Metadata Tag Syncing
   improvements:
-  - Complete web rework to utilize exisitng tabs and split out the configPage into multiple files
-  - Web cleanup & centralization of shared components
-  - Reorganize web files
-  - Consolidated duplicate FormatBytes and ComputeHash utilities
-  - Added HashUtilities for shared SHA256 hash computation
+  - Go here
   fixes:
-  - Fix CSS inconsistencies
-  - Fix profile image sync entity state management
+  - Fix Github Action bundling for new web files | Unconfirmed
