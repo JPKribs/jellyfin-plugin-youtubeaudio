@@ -128,7 +128,7 @@ The Plugin builds a table of all content that exists on both the Source Server a
 * Position
 * Last Played Date
 
-### Sync Missing Content
+### Sync History
 
 Using the file history found in the Sync Table, all Queued records populate content history using Jellyfin's API.
 
