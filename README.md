@@ -23,7 +23,7 @@ A Jellyfin plugin that enables one-way synchronization from a Source Jellyfin Se
 
 # Settings
 
-| Screenshot: Settings Tab |
+| Settings Tab |
 | :--- |
 | ![Plugin Settings](Documentation/Screenshots/Settings/Main.png) |
 
@@ -31,7 +31,7 @@ A Jellyfin plugin that enables one-way synchronization from a Source Jellyfin Se
 
 The Source Server is the Jellyfin Server you want to sync content **from**. This plugin runs on your Local Server and pulls content from the Source Server.
 
-| Screenshot: Server Configuration |
+| Source Server Configuration |
 | :--- |
 | ![Server Configuration](Documentation/Screenshots/Settings/Server%20Configuration.png) |
 
@@ -49,7 +49,7 @@ Once connected, you'll see the source server's name and ID displayed, confirming
 
 ## Library Mapping
 
-| Screenshot: Library Mapping |
+| Library Mapping |
 | :--- |
 | ![Library Configuration](Documentation/Screenshots/Settings/Library%20Mapping.png) |
 
@@ -68,7 +68,7 @@ Once all of the Libraries that you want to map are mapped, save your settings.
 
 ## User Mapping [Optional]
 
-| Screenshot: User Mapping |
+| User Mapping |
 | :--- |
 | ![User Configuration](Documentation/Screenshots/Settings/User%20Mapping.png) |
 
