@@ -90,14 +90,26 @@ public class MetadataSyncItem
     // ===== People Category =====
 
     /// <summary>
-    /// Gets or sets the source people value (JSON).
+    /// Gets or sets the source people value (JSON array of {Name, Role, Type}).
     /// </summary>
     public string? SourcePeopleValue { get; set; }
 
     /// <summary>
-    /// Gets or sets the local people value (JSON).
+    /// Gets or sets the local people value (JSON array of {Name, Role, Type}).
     /// </summary>
     public string? LocalPeopleValue { get; set; }
+
+    // ===== Studios Category =====
+
+    /// <summary>
+    /// Gets or sets the source studios value (JSON array of studio names).
+    /// </summary>
+    public string? SourceStudiosValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the local studios value (JSON array of studio names).
+    /// </summary>
+    public string? LocalStudiosValue { get; set; }
 
     // ===== Sync Tracking =====
 
@@ -163,6 +175,7 @@ public class MetadataSyncItem
 
     /// <summary>
     /// Gets a value indicating whether people have changes.
+    /// Compares by Name, Role, and Type (not GUID).
     /// </summary>
     public bool HasPeopleChanges
     {
@@ -178,9 +191,33 @@ public class MetadataSyncItem
     }
 
     /// <summary>
+    /// Gets a value indicating whether studios have changes.
+    /// Compares by studio name only. Only flags changes if source has studios to sync.
+    /// </summary>
+    public bool HasStudiosChanges
+    {
+        get
+        {
+            // No local item to sync to
+            if (string.IsNullOrEmpty(LocalItemId))
+            {
+                return false;
+            }
+
+            // No source studios data, or source has empty array - nothing to sync
+            if (string.IsNullOrEmpty(SourceStudiosValue) || SourceStudiosValue == "[]")
+            {
+                return false;
+            }
+
+            return !JsonComparisonUtility.JsonEquals(SourceStudiosValue, LocalStudiosValue);
+        }
+    }
+
+    /// <summary>
     /// Gets a value indicating whether there are any changes to sync.
     /// </summary>
-    public bool HasChanges => HasMetadataChanges || HasImagesChanges;
+    public bool HasChanges => HasMetadataChanges || HasImagesChanges || HasPeopleChanges || HasStudiosChanges;
 
     /// <summary>
     /// Gets a display-friendly summary of the changes.
@@ -210,6 +247,16 @@ public class MetadataSyncItem
             if (HasImagesChanges)
             {
                 changes.Add("Images");
+            }
+
+            if (HasPeopleChanges)
+            {
+                changes.Add("People");
+            }
+
+            if (HasStudiosChanges)
+            {
+                changes.Add("Studios");
             }
 
             return string.Join(", ", changes);

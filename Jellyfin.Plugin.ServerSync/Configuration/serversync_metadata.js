@@ -1191,6 +1191,14 @@ export default function (view, params) {
                 html += '</span>';
             }
 
+            // Studios badge (only if enabled)
+            if (studiosEnabled) {
+                var hasStudiosChanges = item.HasStudiosChanges === true;
+                html += '<span class="metadataSyncModal-changesBadge ' + (hasStudiosChanges ? 'has-changes' : 'no-changes') + '">';
+                html += 'Studios: ' + (hasStudiosChanges ? 'Changes' : 'Synced');
+                html += '</span>';
+            }
+
             container.innerHTML = html;
         },
 
@@ -1216,6 +1224,8 @@ export default function (view, params) {
             var localImages = self.parseJsonSafe(item.LocalImagesValue);
             var sourcePeople = self.parseJsonSafe(item.SourcePeopleValue);
             var localPeople = self.parseJsonSafe(item.LocalPeopleValue);
+            var sourceStudios = self.parseJsonSafe(item.SourceStudiosValue);
+            var localStudios = self.parseJsonSafe(item.LocalStudiosValue);
 
             // --- METADATA SECTION (core fields) ---
             if (metadataEnabled) {
@@ -1236,9 +1246,9 @@ export default function (view, params) {
             }
 
             // --- STUDIOS SECTION ---
-            if (studiosEnabled && (sourceMetadata.Studios || localMetadata.Studios)) {
+            if (studiosEnabled) {
                 html += '<tr class="metadataSyncModal-sectionHeader"><td colspan="4">Studios</td></tr>';
-                html += self.buildArrayComparisonRow('Studios', sourceMetadata.Studios, localMetadata.Studios);
+                html += self.buildArrayComparisonRow('Studios', sourceStudios, localStudios);
             }
 
             // --- PEOPLE SECTION ---

@@ -14,7 +14,7 @@ public static class DatabaseMigrationService
     /// <summary>
     /// Current schema version. Increment this when adding new migrations.
     /// </summary>
-    public const int CurrentSchemaVersion = 13;
+    public const int CurrentSchemaVersion = 14;
 
     /// <summary>
     /// Creates the initial database schema including all tables for the current version.
@@ -125,7 +125,7 @@ public static class DatabaseMigrationService
         ";
         userCmd.ExecuteNonQuery();
 
-        // Create MetadataSyncItems table (Metadata Sync) - v13 schema: one record per item with all categories
+        // Create MetadataSyncItems table (Metadata Sync) - v14 schema: one record per item with all categories including Studios
         using var metadataCmd = connection.CreateCommand();
         metadataCmd.CommandText = @"
             CREATE TABLE IF NOT EXISTS MetadataSyncItems (
@@ -145,6 +145,8 @@ public static class DatabaseMigrationService
                 SyncedImagesHash TEXT,
                 SourcePeopleValue TEXT,
                 LocalPeopleValue TEXT,
+                SourceStudiosValue TEXT,
+                LocalStudiosValue TEXT,
                 Status INTEGER NOT NULL DEFAULT 1,
                 StatusDate TEXT NOT NULL,
                 LastSyncTime TEXT,
@@ -255,6 +257,11 @@ public static class DatabaseMigrationService
             if (fromVersion < 13)
             {
                 MigrateToV13(connection, transaction, logger);
+            }
+
+            if (fromVersion < 14)
+            {
+                MigrateToV14(connection, transaction, logger);
             }
 
             SetSchemaVersion(connection, CurrentSchemaVersion);
@@ -686,6 +693,26 @@ public static class DatabaseMigrationService
         createCmd.ExecuteNonQuery();
 
         logger.LogInformation("Migration v13: MetadataSyncItems now uses one record per item with all categories combined");
+    }
+
+    /// <summary>
+    /// Migration to v14: Add Studios columns to MetadataSyncItems table.
+    /// </summary>
+    private static void MigrateToV14(SqliteConnection connection, SqliteTransaction transaction, ILogger logger)
+    {
+        // Add Studios columns to MetadataSyncItems table
+        var alterStatements = new[]
+        {
+            "ALTER TABLE MetadataSyncItems ADD COLUMN SourceStudiosValue TEXT",
+            "ALTER TABLE MetadataSyncItems ADD COLUMN LocalStudiosValue TEXT"
+        };
+
+        foreach (var statement in alterStatements)
+        {
+            ExecuteAlterIfColumnMissing(connection, transaction, statement, logger);
+        }
+
+        logger.LogInformation("Migration v14: Added Studios columns to MetadataSyncItems table");
     }
 
     /// <summary>

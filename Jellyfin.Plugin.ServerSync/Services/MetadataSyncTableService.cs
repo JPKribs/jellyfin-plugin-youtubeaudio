@@ -48,6 +48,7 @@ public class MetadataSyncTableService
     /// <param name="syncMetadata">Whether to sync metadata fields.</param>
     /// <param name="syncImages">Whether to sync images.</param>
     /// <param name="syncPeople">Whether to sync people.</param>
+    /// <param name="syncStudios">Whether to sync studios.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <param name="onItemProcessed">Optional callback after each item is processed.</param>
     /// <returns>Number of items processed.</returns>
@@ -58,6 +59,7 @@ public class MetadataSyncTableService
         bool syncMetadata,
         bool syncImages,
         bool syncPeople,
+        bool syncStudios,
         CancellationToken cancellationToken,
         Action? onItemProcessed = null)
     {
@@ -85,8 +87,8 @@ public class MetadataSyncTableService
         }
 
         _logger.LogInformation(
-            "Processing metadata for library {Library} (Metadata: {Metadata}, Images: {Images}, People: {People})",
-            libraryMapping.SourceLibraryName, syncMetadata, syncImages, syncPeople);
+            "Processing metadata for library {Library} (Metadata: {Metadata}, Images: {Images}, People: {People}, Studios: {Studios})",
+            libraryMapping.SourceLibraryName, syncMetadata, syncImages, syncPeople, syncStudios);
 
         while (true)
         {
@@ -164,6 +166,7 @@ public class MetadataSyncTableService
                         syncMetadata,
                         syncImages,
                         syncPeople,
+                        syncStudios,
                         existingItems,
                         cancellationToken).ConfigureAwait(false);
 
@@ -203,6 +206,7 @@ public class MetadataSyncTableService
         bool syncMetadata,
         bool syncImages,
         bool syncPeople,
+        bool syncStudios,
         Dictionary<string, MetadataSyncItem> existingItems,
         CancellationToken cancellationToken)
     {
@@ -234,7 +238,7 @@ public class MetadataSyncTableService
         if (existingItem != null)
         {
             // Update existing item with all category values
-            await UpdateMetadataItemAsync(existingItem, sourceItem, localItem, localPath, localItemId, syncMetadata, syncImages, syncPeople, client, cancellationToken).ConfigureAwait(false);
+            await UpdateMetadataItemAsync(existingItem, sourceItem, localItem, localPath, localItemId, syncMetadata, syncImages, syncPeople, syncStudios, client, cancellationToken).ConfigureAwait(false);
             database.UpsertMetadataSyncItem(existingItem);
         }
         else
@@ -251,6 +255,7 @@ public class MetadataSyncTableService
                 syncMetadata,
                 syncImages,
                 syncPeople,
+                syncStudios,
                 client,
                 cancellationToken).ConfigureAwait(false);
 
@@ -272,6 +277,7 @@ public class MetadataSyncTableService
         bool syncMetadata,
         bool syncImages,
         bool syncPeople,
+        bool syncStudios,
         SourceServerClient client,
         CancellationToken cancellationToken)
     {
@@ -309,6 +315,11 @@ public class MetadataSyncTableService
             SetPeopleValues(item, sourceItem, localItem);
         }
 
+        if (syncStudios)
+        {
+            SetStudiosValues(item, sourceItem, localItem);
+        }
+
         // Determine initial status based on whether there are changes
         if (string.IsNullOrEmpty(localItemId))
         {
@@ -342,6 +353,7 @@ public class MetadataSyncTableService
         bool syncMetadata,
         bool syncImages,
         bool syncPeople,
+        bool syncStudios,
         SourceServerClient client,
         CancellationToken cancellationToken)
     {
@@ -383,6 +395,17 @@ public class MetadataSyncTableService
             // Clear people if disabled
             item.SourcePeopleValue = null;
             item.LocalPeopleValue = null;
+        }
+
+        if (syncStudios)
+        {
+            SetStudiosValues(item, sourceItem, localItem);
+        }
+        else
+        {
+            // Clear studios if disabled
+            item.SourceStudiosValue = null;
+            item.LocalStudiosValue = null;
         }
 
         // Preserve Ignored status - don't change status for ignored items
@@ -696,10 +719,11 @@ public class MetadataSyncTableService
 
     /// <summary>
     /// Sets people values (actors, directors, writers).
+    /// Compares by Name, Role, and Type (not GUID) to allow syncing between servers.
     /// </summary>
     private void SetPeopleValues(MetadataSyncItem item, BaseItemDto sourceItem, BaseItem? localItem)
     {
-        // Serialize people from source (using strings for proper deserialization)
+        // Serialize people from source (using Name, Role, Type - not GUID)
         if (sourceItem.People != null && sourceItem.People.Count > 0)
         {
             var sourcePeople = new List<Dictionary<string, string>>();
@@ -734,9 +758,92 @@ public class MetadataSyncTableService
             item.SourcePeopleValue = "[]";
         }
 
-        // TODO: Get local people when applying
-        // For now, we'll compare during the apply phase
-        item.LocalPeopleValue = null;
+        // Extract local people for comparison (using Name, Role, Type - not GUID)
+        if (localItem != null)
+        {
+            var localPeopleList = _libraryManager.GetPeople(localItem);
+            if (localPeopleList != null && localPeopleList.Count > 0)
+            {
+                var localPeople = new List<Dictionary<string, string>>();
+                foreach (var person in localPeopleList)
+                {
+                    var personDict = new Dictionary<string, string>();
+                    if (!string.IsNullOrEmpty(person.Name))
+                    {
+                        personDict["Name"] = person.Name;
+                    }
+
+                    if (!string.IsNullOrEmpty(person.Role))
+                    {
+                        personDict["Role"] = person.Role;
+                    }
+
+                    personDict["Type"] = person.Type.ToString();
+
+                    if (personDict.ContainsKey("Name"))
+                    {
+                        localPeople.Add(personDict);
+                    }
+                }
+
+                item.LocalPeopleValue = JsonSerializer.Serialize(localPeople);
+            }
+            else
+            {
+                item.LocalPeopleValue = "[]";
+            }
+        }
+        else
+        {
+            item.LocalPeopleValue = null;
+        }
+    }
+
+    /// <summary>
+    /// Sets studios values.
+    /// Compares by studio name only to allow syncing between servers.
+    /// </summary>
+    private void SetStudiosValues(MetadataSyncItem item, BaseItemDto sourceItem, BaseItem? localItem)
+    {
+        // Serialize studios from source (just studio names)
+        if (sourceItem.Studios != null && sourceItem.Studios.Count > 0)
+        {
+            // Sort for consistent comparison - extract studio names as strings
+            var studioNames = new List<string>();
+            foreach (var studio in sourceItem.Studios)
+            {
+                if (studio?.Name != null)
+                {
+                    studioNames.Add(studio.Name);
+                }
+            }
+
+            studioNames.Sort(StringComparer.OrdinalIgnoreCase);
+            item.SourceStudiosValue = JsonSerializer.Serialize(studioNames);
+        }
+        else
+        {
+            item.SourceStudiosValue = "[]";
+        }
+
+        // Extract local studios for comparison (just studio names)
+        if (localItem != null)
+        {
+            if (localItem.Studios != null && localItem.Studios.Length > 0)
+            {
+                // Sort for consistent comparison
+                var sortedStudios = localItem.Studios.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
+                item.LocalStudiosValue = JsonSerializer.Serialize(sortedStudios);
+            }
+            else
+            {
+                item.LocalStudiosValue = "[]";
+            }
+        }
+        else
+        {
+            item.LocalStudiosValue = null;
+        }
     }
 
     /// <summary>

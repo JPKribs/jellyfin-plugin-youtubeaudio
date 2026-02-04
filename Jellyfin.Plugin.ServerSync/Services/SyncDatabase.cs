@@ -2930,6 +2930,7 @@ public class SyncDatabase : IDisposable
                     SourceMetadataValue, LocalMetadataValue,
                     SourceImagesValue, LocalImagesValue, SourceImagesHash, SyncedImagesHash,
                     SourcePeopleValue, LocalPeopleValue,
+                    SourceStudiosValue, LocalStudiosValue,
                     Status, StatusDate, LastSyncTime, ErrorMessage
                 ) VALUES (
                     @sourceLibraryId, @localLibraryId, @sourceItemId, @localItemId,
@@ -2937,6 +2938,7 @@ public class SyncDatabase : IDisposable
                     @sourceMetadataValue, @localMetadataValue,
                     @sourceImagesValue, @localImagesValue, @sourceImagesHash, @syncedImagesHash,
                     @sourcePeopleValue, @localPeopleValue,
+                    @sourceStudiosValue, @localStudiosValue,
                     @status, @statusDate, @lastSyncTime, @errorMessage
                 )
                 ON CONFLICT(SourceLibraryId, SourceItemId) DO UPDATE SET
@@ -2956,6 +2958,8 @@ public class SyncDatabase : IDisposable
                     END,
                     SourcePeopleValue = @sourcePeopleValue,
                     LocalPeopleValue = @localPeopleValue,
+                    SourceStudiosValue = @sourceStudiosValue,
+                    LocalStudiosValue = @localStudiosValue,
                     Status = CASE
                         WHEN MetadataSyncItems.Status = @ignoredStatus THEN @ignoredStatus
                         ELSE @status
@@ -2989,6 +2993,8 @@ public class SyncDatabase : IDisposable
             command.Parameters.AddWithValue("@syncedImagesHash", item.SyncedImagesHash ?? (object)DBNull.Value);
             command.Parameters.AddWithValue("@sourcePeopleValue", item.SourcePeopleValue ?? (object)DBNull.Value);
             command.Parameters.AddWithValue("@localPeopleValue", item.LocalPeopleValue ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@sourceStudiosValue", item.SourceStudiosValue ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@localStudiosValue", item.LocalStudiosValue ?? (object)DBNull.Value);
             command.Parameters.AddWithValue("@status", (int)item.Status);
             command.Parameters.AddWithValue("@statusDate", item.StatusDate.ToString("o"));
             command.Parameters.AddWithValue("@lastSyncTime", item.LastSyncTime?.ToString("o") ?? (object)DBNull.Value);
@@ -3211,6 +3217,19 @@ public class SyncDatabase : IDisposable
         if (localPeopleOrdinal >= 0 && !reader.IsDBNull(localPeopleOrdinal))
         {
             item.LocalPeopleValue = reader.GetString(localPeopleOrdinal);
+        }
+
+        // Studios category fields
+        var sourceStudiosOrdinal = TryGetOrdinal(reader, "SourceStudiosValue");
+        if (sourceStudiosOrdinal >= 0 && !reader.IsDBNull(sourceStudiosOrdinal))
+        {
+            item.SourceStudiosValue = reader.GetString(sourceStudiosOrdinal);
+        }
+
+        var localStudiosOrdinal = TryGetOrdinal(reader, "LocalStudiosValue");
+        if (localStudiosOrdinal >= 0 && !reader.IsDBNull(localStudiosOrdinal))
+        {
+            item.LocalStudiosValue = reader.GetString(localStudiosOrdinal);
         }
 
         var lastSyncTimeOrdinal = reader.GetOrdinal("LastSyncTime");

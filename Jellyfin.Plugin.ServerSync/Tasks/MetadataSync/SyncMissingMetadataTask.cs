@@ -93,8 +93,9 @@ public class SyncMissingMetadataTask : IScheduledTask
         var syncTags = config.MetadataSyncTags;
         var syncImages = config.MetadataSyncImages;
         var syncPeople = config.MetadataSyncPeople;
+        var syncStudios = config.MetadataSyncStudios;
 
-        if (!syncMetadata && !syncImages && !syncPeople)
+        if (!syncMetadata && !syncImages && !syncPeople && !syncStudios)
         {
             _logger.LogDebug("Metadata sync skipped: no categories enabled");
             return;
@@ -120,7 +121,7 @@ public class SyncMissingMetadataTask : IScheduledTask
 
         // Phase 1: Refresh sync table (0-50% progress)
         _logger.LogInformation("Phase 1: Refreshing metadata sync table");
-        await RefreshSyncTableAsync(client, database, enabledLibraryMappings, syncMetadata, syncImages, syncPeople,
+        await RefreshSyncTableAsync(client, database, enabledLibraryMappings, syncMetadata, syncImages, syncPeople, syncStudios,
             new Progress<double>(p => progress.Report(p * 0.5)), cancellationToken).ConfigureAwait(false);
 
         if (cancellationToken.IsCancellationRequested)
@@ -162,7 +163,7 @@ public class SyncMissingMetadataTask : IScheduledTask
 
             try
             {
-                var success = await SyncMetadataItemAsync(item, database, syncMetadata, syncGenres, syncTags, syncImages, syncPeople, cancellationToken).ConfigureAwait(false);
+                var success = await SyncMetadataItemAsync(item, database, syncMetadata, syncGenres, syncTags, syncImages, syncPeople, syncStudios, cancellationToken).ConfigureAwait(false);
 
                 if (success)
                 {
@@ -208,6 +209,7 @@ public class SyncMissingMetadataTask : IScheduledTask
         bool syncMetadata,
         bool syncImages,
         bool syncPeople,
+        bool syncStudios,
         IProgress<double> progress,
         CancellationToken cancellationToken)
     {
@@ -234,6 +236,7 @@ public class SyncMissingMetadataTask : IScheduledTask
                 syncMetadata,
                 syncImages,
                 syncPeople,
+                syncStudios,
                 cancellationToken,
                 onItemProcessed: () =>
                 {
@@ -259,6 +262,7 @@ public class SyncMissingMetadataTask : IScheduledTask
         bool syncTags,
         bool syncImages,
         bool syncPeople,
+        bool syncStudios,
         CancellationToken cancellationToken)
     {
         // Validate we have a local item ID
@@ -346,6 +350,23 @@ public class SyncMissingMetadataTask : IScheduledTask
             {
                 allSucceeded = false;
                 _logger.LogWarning("Failed to sync people for {ItemName}", item.ItemName);
+            }
+        }
+
+        // Sync studios if enabled and has changes
+        if (syncStudios && item.HasStudiosChanges)
+        {
+            var success = await ApplyStudiosAsync(localItem, item, cancellationToken).ConfigureAwait(false);
+            if (success)
+            {
+                // Update local value to match source after sync
+                item.LocalStudiosValue = item.SourceStudiosValue;
+                syncedCategories.Add("Studios");
+            }
+            else
+            {
+                allSucceeded = false;
+                _logger.LogWarning("Failed to sync studios for {ItemName}", item.ItemName);
             }
         }
 
@@ -961,6 +982,40 @@ public class SyncMissingMetadataTask : IScheduledTask
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to apply people for {ItemName}", item.ItemName);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Applies studios to a local item.
+    /// </summary>
+    private async Task<bool> ApplyStudiosAsync(
+        MediaBrowser.Controller.Entities.BaseItem localItem,
+        MetadataSyncItem item,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(item.SourceStudiosValue))
+        {
+            return true; // Nothing to apply
+        }
+
+        try
+        {
+            var studiosList = JsonSerializer.Deserialize<List<string>>(item.SourceStudiosValue);
+            if (studiosList == null)
+            {
+                return false;
+            }
+
+            // Apply studios directly - Jellyfin will create/find the studio entities by name
+            localItem.Studios = studiosList.ToArray();
+            await localItem.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to apply studios for {ItemName}", item.ItemName);
             return false;
         }
     }

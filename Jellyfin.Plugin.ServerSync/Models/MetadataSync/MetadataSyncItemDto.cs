@@ -92,6 +92,16 @@ public class MetadataSyncItemDto
     /// </summary>
     public string? LocalPeopleValue { get; set; }
 
+    /// <summary>
+    /// Gets or sets the source studios value (JSON array of studio names).
+    /// </summary>
+    public string? SourceStudiosValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the local studios value (JSON array of studio names).
+    /// </summary>
+    public string? LocalStudiosValue { get; set; }
+
     // ===== Change Detection =====
 
     /// <summary>
@@ -108,6 +118,11 @@ public class MetadataSyncItemDto
     /// Gets or sets whether people have changes.
     /// </summary>
     public bool HasPeopleChanges { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether studios have changes.
+    /// </summary>
+    public bool HasStudiosChanges { get; set; }
 
     /// <summary>
     /// Gets or sets whether there are any changes to sync.

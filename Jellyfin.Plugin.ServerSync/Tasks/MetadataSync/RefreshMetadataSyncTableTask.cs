@@ -85,8 +85,9 @@ public class RefreshMetadataSyncTableTask : IScheduledTask
         var syncMetadata = config.MetadataSyncMetadata;
         var syncImages = config.MetadataSyncImages;
         var syncPeople = config.MetadataSyncPeople;
+        var syncStudios = config.MetadataSyncStudios;
 
-        if (!syncMetadata && !syncImages && !syncPeople)
+        if (!syncMetadata && !syncImages && !syncPeople && !syncStudios)
         {
             _logger.LogDebug("Metadata sync skipped: no categories enabled");
             return;
@@ -142,6 +143,7 @@ public class RefreshMetadataSyncTableTask : IScheduledTask
                 syncMetadata,
                 syncImages,
                 syncPeople,
+                syncStudios,
                 cancellationToken,
                 onItemProcessed: () =>
                 {
