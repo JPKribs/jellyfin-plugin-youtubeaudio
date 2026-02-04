@@ -1,12 +1,23 @@
 # Server Sync
 
-A Jellyfin plugin that enables one-way synchronization from a source Jellyfin server to a local Jellyfin server. Keep your media libraries in sync across multiple servers with configurable approval workflows, bandwidth controls, and intelligent change detection.
+A Jellyfin plugin that enables one-way synchronization from a source Jellyfin server to a local Jellyfin server. This enables you to keep not only your content syncronized on multiple servers, but you can also share Watch History, Metadata, and User Settings as well. The plugin is only required on the destination server because all sync tasks are performed using standard Jellyfin APIs.
 
 ---
 
 # WORK IN PROGRESS
 
 THIS IS NOT CURRENTLY READY FOR PRODUCTION USAGE! FEEL FREE TO TEST THIS OUT BUT DO NOT USE THIS FOR ANYTHING CRITICAL!
+
+AT THIS TIME THE FOLLOWING IS COMPLETE:
+
+- Content Syncing
+- Histoy Syncing
+- User Syncing
+
+THE FOLLOWING IS INCOMPLETE:
+
+- Metadata Syncing
+   - *Images and Metadata sync but array data (Genres, People, Studios, & Tags) does not sync at this time.*
 
 ---
 
@@ -15,6 +26,12 @@ THIS IS NOT CURRENTLY READY FOR PRODUCTION USAGE! FEEL FREE TO TEST THIS OUT BUT
 The source server is the Jellyfin server you want to sync content **from**. This plugin runs on your local (destination) server and pulls content from the source server.
 
 ### Setup
+
+![Plugin Settings](Documentation/Screenshots/Settings/Main.png)
+
+#### Source Server
+
+![Server Configuration](Documentation/Screenshots/Settings/Server%20Configuration.png)
 
 1. **Generate an API Key** on the source server:
    - Go to **Dashboard > API Keys** on the source server
@@ -28,7 +45,38 @@ The source server is the Jellyfin server you want to sync content **from**. This
 
 Once connected, you'll see the source server's name and ID displayed, confirming the connection is working.
 
+#### Library Mapping
+
+![Library Configuration](Documentation/Screenshots/Settings/Library%20Mapping.png)
+
+1. **Create a new Library Mapping**
+
+2. **Map your Source Library** to a library on your Local Server:
+   - **Library**: Select the Source and Local Libraries that should map to each other
+      - *Multiple Source Libraries can be mapped to the same Local Library if desired*
+      - *Multiple Local Libraries can be mapped to the same Source Library if desired*
+         - **I do NOT recommend N-N relationships as this will likely create recursive looping for syncing.**
+   - **Root Path**: This is the base folder path that the library uses for content
+      - *This will take the Source Library file `/media/Track Testing/My Movie (2025)/movie.mp4` and save it to the Local Library at `/media/My Movie (2025)/movie.mp4`*
+         - **Only single folder libraries are supported by this plugin.**
+
+Once all of the Libraries that you want to map are mapped, save your settings.
+
+#### User Mapping [Optional]
+
+![User Configuration](Documentation/Screenshots/Settings/User%20Mapping.png)
+
+1. **Create a new User Mapping**
+
+2. **Map your Source User** to a user on your Local Server
+   - *This is only required if you want History or User Syncing*
+   - *This NOT required for Content and Metadata Syncing*
+
+Once all of the Users that you want to map are mapped, save your settings.
+
 ---
+
+#WIP BELOW
 
 ## Content Syncing
 
