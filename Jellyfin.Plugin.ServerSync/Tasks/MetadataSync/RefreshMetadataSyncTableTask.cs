@@ -168,6 +168,13 @@ public class RefreshMetadataSyncTableTask : IScheduledTask
     /// <inheritdoc />
     public IEnumerable<TaskTriggerInfo> GetDefaultTriggers()
     {
-        return Array.Empty<TaskTriggerInfo>();
+        return new[]
+        {
+            new TaskTriggerInfo
+            {
+                Type = TaskTriggerInfoType.IntervalTrigger,
+                IntervalTicks = TimeSpan.FromHours(10).Ticks
+            }
+        };
     }
 }

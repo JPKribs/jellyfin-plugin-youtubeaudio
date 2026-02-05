@@ -751,6 +751,30 @@ public class MetadataSyncTableService
                 }
             }
 
+            // Sort for consistent comparison (order shouldn't matter for people)
+            sourcePeople.Sort((a, b) =>
+            {
+                a.TryGetValue("Name", out var nameA);
+                b.TryGetValue("Name", out var nameB);
+                var nameCompare = string.Compare(nameA, nameB, StringComparison.OrdinalIgnoreCase);
+                if (nameCompare != 0)
+                {
+                    return nameCompare;
+                }
+
+                a.TryGetValue("Role", out var roleA);
+                b.TryGetValue("Role", out var roleB);
+                var roleCompare = string.Compare(roleA, roleB, StringComparison.OrdinalIgnoreCase);
+                if (roleCompare != 0)
+                {
+                    return roleCompare;
+                }
+
+                a.TryGetValue("Type", out var typeA);
+                b.TryGetValue("Type", out var typeB);
+                return string.Compare(typeA, typeB, StringComparison.OrdinalIgnoreCase);
+            });
+
             item.SourcePeopleValue = JsonSerializer.Serialize(sourcePeople);
         }
         else
@@ -785,6 +809,30 @@ public class MetadataSyncTableService
                         localPeople.Add(personDict);
                     }
                 }
+
+                // Sort for consistent comparison (order shouldn't matter for people)
+                localPeople.Sort((a, b) =>
+                {
+                    a.TryGetValue("Name", out var nameA);
+                    b.TryGetValue("Name", out var nameB);
+                    var nameCompare = string.Compare(nameA, nameB, StringComparison.OrdinalIgnoreCase);
+                    if (nameCompare != 0)
+                    {
+                        return nameCompare;
+                    }
+
+                    a.TryGetValue("Role", out var roleA);
+                    b.TryGetValue("Role", out var roleB);
+                    var roleCompare = string.Compare(roleA, roleB, StringComparison.OrdinalIgnoreCase);
+                    if (roleCompare != 0)
+                    {
+                        return roleCompare;
+                    }
+
+                    a.TryGetValue("Type", out var typeA);
+                    b.TryGetValue("Type", out var typeB);
+                    return string.Compare(typeA, typeB, StringComparison.OrdinalIgnoreCase);
+                });
 
                 item.LocalPeopleValue = JsonSerializer.Serialize(localPeople);
             }
