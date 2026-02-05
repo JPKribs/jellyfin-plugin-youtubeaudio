@@ -38,7 +38,7 @@ public class RefreshUserSyncTableTask : IScheduledTask
     public string Key => "ServerSyncRefreshUserTable";
 
     /// <inheritdoc />
-    public string Description => "Scans source and local servers for user setting differences and updates the user sync table. Note: The 'Sync User Data' task runs this automatically before syncing.";
+    public string Description => "Scans source and local servers for user setting differences and updates the user sync table.";
 
     /// <inheritdoc />
     public string Category => "User Sync";
@@ -110,7 +110,6 @@ public class RefreshUserSyncTableTask : IScheduledTask
     /// <inheritdoc />
     public IEnumerable<TaskTriggerInfo> GetDefaultTriggers()
     {
-        // No default schedule - the Sync User Data task runs refresh automatically before syncing
         return Array.Empty<TaskTriggerInfo>();
     }
 }

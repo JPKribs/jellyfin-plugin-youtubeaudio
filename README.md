@@ -97,8 +97,6 @@ Setting a file to Ignored will skip any future actions.
 
 ### Sync Content
 
-This operation will start by running the `Refresh Sync Table` task.
-
 Using the files found in the Sync Table, all Queued files are downloaded using Jellyfin's API into the Temporary Directory. Once downloaded, files are moved to the mirrored location on the Local Server and any required folders are created. Files with the Pending & Ignored statuses are not processed. Files set to Delete are removed during this step.
 
 #### For complete information, please see our **[Content Syncing Documentation](Documentation/Content.md)**!
@@ -128,8 +126,6 @@ Items with history that varies are Queued for import.
 Setting a file to Ignored will skip any future actions.
 
 ### Sync History
-
-This operation will start by running the `Refresh Sync Table` task.
 
 Using the watch history found in the Sync Table, all Queued records update content history using Jellyfin's API.
 
@@ -162,8 +158,6 @@ Setting a file to Ignored will skip any future actions.
 
 ### Sync Metadata
 
-This operation will start by running the `Refresh Sync Table` task.
-
 Using the metadata found in the Sync Table, all Queued records update content metadata using Jellyfin's API.
 
 #### For complete information, please see our **[Metadata Syncing Documentation](Documentation/Metadata.md)**!
@@ -192,11 +186,7 @@ Setting a user to Ignored will skip any future actions.
 
 ### Sync Users
 
-This operation will start by running the `Refresh Sync Table` task.
-
 Using the user configurations found in the Sync Table, all Queued records update user settings using Jellyfin's API.
-
-
 
 #### For complete information, please see our **[User Syncing Documentation](Documentation/Users.md)**!
 

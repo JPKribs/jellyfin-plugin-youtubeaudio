@@ -13,7 +13,7 @@ namespace Jellyfin.Plugin.ServerSync.Tasks;
 
 /// <summary>
 /// Scheduled task to sync user data from the source server.
-/// Refreshes the sync table first, then applies queued changes.
+/// Applies queued changes from the user sync table.
 /// </summary>
 public class SyncMissingUserDataTask : IScheduledTask
 {
@@ -47,7 +47,7 @@ public class SyncMissingUserDataTask : IScheduledTask
     public string Key => "ServerSyncMissingUserData";
 
     /// <inheritdoc />
-    public string Description => "Refreshes the sync table and applies queued user setting changes from the source server.";
+    public string Description => "Applies queued user setting changes from the sync table to the local server.";
 
     /// <inheritdoc />
     public string Category => "User Sync";
@@ -100,26 +100,8 @@ public class SyncMissingUserDataTask : IScheduledTask
             return;
         }
 
-        // Phase 1: Refresh sync table (0-50% progress)
-        _logger.LogInformation("Phase 1: Refreshing user sync table");
-        var tableService = new UserSyncTableService(
-            _loggerFactory.CreateLogger<UserSyncTableService>(),
-            plugin.Database,
-            _userManager);
-
-        await tableService.RefreshUserSyncTableAsync(
-            sourceClient,
-            config,
-            new Progress<double>(p => progress.Report(p * 0.5)),
-            cancellationToken).ConfigureAwait(false);
-
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return;
-        }
-
-        // Phase 2: Apply queued changes (50-100% progress)
-        _logger.LogInformation("Phase 2: Applying queued user changes");
+        // Apply queued changes
+        _logger.LogInformation("Applying queued user changes");
 
         // Create state service and apply changes
         var stateService = new UserSyncStateService(
@@ -131,7 +113,7 @@ public class SyncMissingUserDataTask : IScheduledTask
 
         var itemsSynced = await stateService.ApplyQueuedChangesAsync(
             sourceClient,
-            new Progress<double>(p => progress.Report(50 + p * 0.5)),
+            progress,
             cancellationToken).ConfigureAwait(false);
 
         // Update last sync time

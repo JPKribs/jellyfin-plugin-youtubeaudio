@@ -43,7 +43,7 @@ public class RefreshHistorySyncTableTask : IScheduledTask
     public string Key => "ServerSyncRefreshHistoryTable";
 
     /// <inheritdoc />
-    public string Description => "Scans source and local servers for watch history differences and updates the history sync table. Note: The 'Sync History' task runs this automatically before syncing.";
+    public string Description => "Scans source and local servers for watch history differences and updates the history sync table.";
 
     /// <inheritdoc />
     public string Category => "History Sync";
@@ -175,7 +175,6 @@ public class RefreshHistorySyncTableTask : IScheduledTask
     /// <inheritdoc />
     public IEnumerable<TaskTriggerInfo> GetDefaultTriggers()
     {
-        // No default schedule - the Sync History task runs refresh automatically before syncing
         return Array.Empty<TaskTriggerInfo>();
     }
 }

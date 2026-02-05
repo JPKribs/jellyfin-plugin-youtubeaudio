@@ -15,7 +15,7 @@ namespace Jellyfin.Plugin.ServerSync.Tasks;
 
 /// <summary>
 /// Scheduled task to sync watch history from the source server.
-/// Refreshes the sync table first, then applies queued changes.
+/// Applies queued changes from the history sync table.
 /// </summary>
 public class SyncMissingHistoryTask : IScheduledTask
 {
@@ -46,7 +46,7 @@ public class SyncMissingHistoryTask : IScheduledTask
     public string Key => "ServerSyncMissingHistory";
 
     /// <inheritdoc />
-    public string Description => "Refreshes the sync table and applies queued watch history changes from the source server.";
+    public string Description => "Applies queued watch history changes from the sync table to the local server.";
 
     /// <inheritdoc />
     public string Category => "History Sync";
@@ -92,36 +92,12 @@ public class SyncMissingHistoryTask : IScheduledTask
             return;
         }
 
-        _logger.LogInformation("Starting history sync from {SourceUrl}", config.SourceServerUrl);
-
-        using var client = new SourceServerClient(
-            plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
-            config.SourceServerUrl,
-            config.SourceServerApiKey);
-
-        // Test connection
-        var connectionResult = await client.TestConnectionAsync(cancellationToken).ConfigureAwait(false);
-        if (!connectionResult.Success)
-        {
-            _logger.LogError("Failed to connect to source server at {SourceUrl}: {Error}",
-                config.SourceServerUrl, connectionResult.ErrorMessage ?? "Unknown error");
-            return;
-        }
+        _logger.LogInformation("Starting history sync");
 
         var database = plugin.Database;
 
-        // Phase 1: Refresh sync table (0-50% progress)
-        _logger.LogInformation("Phase 1: Refreshing history sync table");
-        await RefreshSyncTableAsync(client, database, enabledUserMappings, enabledLibraryMappings,
-            new Progress<double>(p => progress.Report(p * 0.5)), cancellationToken).ConfigureAwait(false);
-
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return;
-        }
-
-        // Phase 2: Apply queued changes (50-100% progress)
-        _logger.LogInformation("Phase 2: Applying queued history changes");
+        // Apply queued changes
+        _logger.LogInformation("Applying queued history changes");
 
         var localClient = new LocalServerClient(_logger, _libraryManager, _userManager, _userDataManager);
 
@@ -173,7 +149,7 @@ public class SyncMissingHistoryTask : IScheduledTask
             }
 
             processedCount++;
-            progress.Report(50 + (double)processedCount / totalItems * 50);
+            progress.Report((double)processedCount / totalItems * 100);
         }
 
         // Update last sync time
@@ -183,60 +159,6 @@ public class SyncMissingHistoryTask : IScheduledTask
         _logger.LogInformation(
             "History sync completed: {Success} succeeded, {Error} failed out of {Total}",
             successCount, errorCount, totalItems);
-
-        progress.Report(100);
-    }
-
-    /// <summary>
-    /// Refreshes the history sync table from the source server.
-    /// </summary>
-    private async Task RefreshSyncTableAsync(
-        SourceServerClient client,
-        SyncDatabase database,
-        List<UserMapping> userMappings,
-        List<LibraryMapping> libraryMappings,
-        IProgress<double> progress,
-        CancellationToken cancellationToken)
-    {
-        var historyService = new HistorySyncTableService(_logger, _libraryManager, _userManager, _userDataManager);
-
-        // Get total item count for progress tracking
-        var totalItems = await historyService.GetTotalItemCountAsync(
-            client, userMappings, libraryMappings, cancellationToken).ConfigureAwait(false);
-
-        // Process each user mapping and library mapping combination
-        var processedItems = 0;
-
-        foreach (var userMapping in userMappings)
-        {
-            if (cancellationToken.IsCancellationRequested)
-            {
-                break;
-            }
-
-            foreach (var libraryMapping in libraryMappings)
-            {
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    break;
-                }
-
-                await historyService.ProcessUserLibraryAsync(
-                    client,
-                    database,
-                    userMapping,
-                    libraryMapping,
-                    cancellationToken,
-                    onItemProcessed: () =>
-                    {
-                        processedItems++;
-                        if (totalItems > 0)
-                        {
-                            progress.Report((double)processedItems / totalItems * 100);
-                        }
-                    }).ConfigureAwait(false);
-            }
-        }
 
         progress.Report(100);
     }

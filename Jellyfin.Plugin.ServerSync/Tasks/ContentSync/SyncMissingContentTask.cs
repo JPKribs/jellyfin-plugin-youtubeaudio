@@ -18,7 +18,7 @@ namespace Jellyfin.Plugin.ServerSync.Tasks;
 
 /// <summary>
 /// Scheduled task to sync content from the source server.
-/// Refreshes the sync table, downloads queued content, processes deletions, and triggers library refresh.
+/// Downloads queued content, processes deletions, and triggers library refresh.
 /// </summary>
 public class DownloadMissingContentTask : IScheduledTask
 {
@@ -45,7 +45,7 @@ public class DownloadMissingContentTask : IScheduledTask
 
     public string Key => "ServerSyncDownloadContent";
 
-    public string Description => "Refreshes the sync table, downloads queued content from the source server, processes deletions, and triggers a library refresh.";
+    public string Description => "Downloads queued content from the source server, processes deletions, and triggers a library refresh.";
 
     public string Category => "Content Sync";
 
@@ -113,15 +113,6 @@ public class DownloadMissingContentTask : IScheduledTask
         // Connection succeeded, record success
         _circuitBreaker.RecordSuccess();
 
-        // Phase 1: Refresh sync table (0-30% progress)
-        _logger.LogInformation("Phase 1: Refreshing sync table");
-        await RefreshSyncTableAsync(client, database, config, new Progress<double>(p => progress.Report(p * 0.3)), cancellationToken).ConfigureAwait(false);
-
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return;
-        }
-
         // Cleanup stale download entries
         var staleCount = ActiveDownloadTracker.CleanupStaleEntries();
         if (staleCount > 0)
@@ -160,7 +151,7 @@ public class DownloadMissingContentTask : IScheduledTask
 
         var totalBytes = itemsToSync.Sum(i => i.SourceSize);
         _logger.LogInformation(
-            "Phase 2: Starting download of {Count} items ({TotalSize})",
+            "Starting download of {Count} items ({TotalSize})",
             itemsToSync.Count,
             FormatUtilities.FormatBytes(totalBytes));
 
@@ -169,7 +160,7 @@ public class DownloadMissingContentTask : IScheduledTask
 
         var downloadService = new DownloadService(_logger);
 
-        // Phase 2: Download content (30-90% progress)
+        // Download content (0-90% progress)
         var (successCount, failCount) = await ProcessDownloadsAsync(
             client,
             database,
@@ -179,7 +170,7 @@ public class DownloadMissingContentTask : IScheduledTask
             config.MaxConcurrentDownloads,
             config.GetEffectiveDownloadSpeedBytes(),
             config,
-            new Progress<double>(p => progress.Report(30 + p * 0.6)),
+            new Progress<double>(p => progress.Report(p * 0.9)),
             cancellationToken).ConfigureAwait(false);
 
         config.LastSyncEndTime = DateTime.UtcNow;
@@ -198,7 +189,7 @@ public class DownloadMissingContentTask : IScheduledTask
             failCount,
             itemsToSync.Count);
 
-        // Phase 3: Process deletions and library refresh (90-100% progress)
+        // Process deletions and library refresh (90-100% progress)
         progress.Report(90);
         var (deletedCount, _) = FileDeletionService.ProcessPendingDeletions(database, config, _logger, cancellationToken);
 
@@ -206,7 +197,7 @@ public class DownloadMissingContentTask : IScheduledTask
         {
             try
             {
-                _logger.LogInformation("Phase 3: Triggering library refresh");
+                _logger.LogInformation("Triggering library refresh");
                 await _libraryManager.ValidateMediaLibrary(new Progress<double>(), cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
@@ -214,77 +205,6 @@ public class DownloadMissingContentTask : IScheduledTask
                 _logger.LogError(ex, "Failed to trigger library refresh");
             }
         }
-
-        progress.Report(100);
-    }
-
-    /// <summary>
-    /// Refreshes the sync table from the source server.
-    /// </summary>
-    private async Task RefreshSyncTableAsync(
-        SourceServerClient client,
-        SyncDatabase database,
-        PluginConfiguration config,
-        IProgress<double> progress,
-        CancellationToken cancellationToken)
-    {
-        var enabledMappings = config.LibraryMappings?.Where(m => m.IsEnabled).ToList() ?? new List<LibraryMapping>();
-        if (enabledMappings.Count == 0)
-        {
-            _logger.LogDebug("No enabled library mappings, skipping sync table refresh");
-            progress.Report(100);
-            return;
-        }
-
-        var syncTableService = new SyncTableService(_logger, _libraryManager);
-
-        // Get total item counts for progress
-        var totalItems = 0;
-        foreach (var mapping in enabledMappings)
-        {
-            if (cancellationToken.IsCancellationRequested)
-            {
-                return;
-            }
-
-            var count = await client.GetLibraryItemCountAsync(
-                Guid.Parse(mapping.SourceLibraryId),
-                cancellationToken).ConfigureAwait(false);
-
-            totalItems += count;
-        }
-
-        // Process each library
-        var processedItems = 0;
-        foreach (var mapping in enabledMappings)
-        {
-            if (cancellationToken.IsCancellationRequested)
-            {
-                break;
-            }
-
-            await syncTableService.ProcessLibraryAsync(
-                client,
-                database,
-                mapping,
-                config.DownloadNewContentMode,
-                config.ReplaceExistingContentMode,
-                config.DeleteMissingContentMode,
-                config.DetectUpdatedFiles,
-                config.ChangeDetectionPolicy,
-                cancellationToken,
-                onItemProcessed: () =>
-                {
-                    processedItems++;
-                    if (totalItems > 0)
-                    {
-                        progress.Report((double)processedItems / totalItems * 100);
-                    }
-                }).ConfigureAwait(false);
-        }
-
-        // Resolve LocalItemIds for synced items
-        syncTableService.ResolveLocalItemIds(database);
 
         progress.Report(100);
     }

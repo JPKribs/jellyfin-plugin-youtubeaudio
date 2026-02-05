@@ -20,7 +20,7 @@ namespace Jellyfin.Plugin.ServerSync.Tasks;
 
 /// <summary>
 /// Scheduled task to sync metadata from the source server.
-/// Refreshes the sync table first, then applies queued changes.
+/// Applies queued changes from the metadata sync table.
 /// </summary>
 public class SyncMissingMetadataTask : IScheduledTask
 {
@@ -48,7 +48,7 @@ public class SyncMissingMetadataTask : IScheduledTask
     public string Key => "ServerSyncMissingMetadata";
 
     /// <inheritdoc />
-    public string Description => "Refreshes the sync table and applies queued metadata changes from the source server.";
+    public string Description => "Applies queued metadata changes from the sync table to the local server.";
 
     /// <inheritdoc />
     public string Category => "Metadata Sync";
@@ -101,36 +101,12 @@ public class SyncMissingMetadataTask : IScheduledTask
             return;
         }
 
-        _logger.LogInformation("Starting metadata sync from {SourceUrl}", config.SourceServerUrl);
-
-        using var client = new SourceServerClient(
-            plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
-            config.SourceServerUrl,
-            config.SourceServerApiKey);
-
-        // Test connection
-        var connectionResult = await client.TestConnectionAsync(cancellationToken).ConfigureAwait(false);
-        if (!connectionResult.Success)
-        {
-            _logger.LogError("Failed to connect to source server at {SourceUrl}: {Error}",
-                config.SourceServerUrl, connectionResult.ErrorMessage ?? "Unknown error");
-            return;
-        }
+        _logger.LogInformation("Starting metadata sync");
 
         var database = plugin.Database;
 
-        // Phase 1: Refresh sync table (0-50% progress)
-        _logger.LogInformation("Phase 1: Refreshing metadata sync table");
-        await RefreshSyncTableAsync(client, database, enabledLibraryMappings, syncMetadata, syncImages, syncPeople, syncStudios,
-            new Progress<double>(p => progress.Report(p * 0.5)), cancellationToken).ConfigureAwait(false);
-
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return;
-        }
-
-        // Phase 2: Apply queued changes (50-100% progress)
-        _logger.LogInformation("Phase 2: Applying queued metadata changes");
+        // Apply queued changes
+        _logger.LogInformation("Applying queued metadata changes");
 
         // Get all queued metadata items
         var queuedItems = database.GetMetadataSyncItemsByStatus(BaseSyncStatus.Queued);
@@ -185,7 +161,7 @@ public class SyncMissingMetadataTask : IScheduledTask
             }
 
             processedCount++;
-            progress.Report(50 + (double)processedCount / totalItems * 50);
+            progress.Report((double)processedCount / totalItems * 100);
         }
 
         // Update last sync time
@@ -195,58 +171,6 @@ public class SyncMissingMetadataTask : IScheduledTask
         _logger.LogInformation(
             "Metadata sync completed: {Success} succeeded, {Error} failed out of {Total}",
             successCount, errorCount, totalItems);
-
-        progress.Report(100);
-    }
-
-    /// <summary>
-    /// Refreshes the metadata sync table from the source server.
-    /// </summary>
-    private async Task RefreshSyncTableAsync(
-        SourceServerClient client,
-        SyncDatabase database,
-        List<LibraryMapping> libraryMappings,
-        bool syncMetadata,
-        bool syncImages,
-        bool syncPeople,
-        bool syncStudios,
-        IProgress<double> progress,
-        CancellationToken cancellationToken)
-    {
-        var metadataService = new MetadataSyncTableService(_logger, _libraryManager);
-
-        // Get total item count for progress tracking
-        var totalItems = await metadataService.GetTotalItemCountAsync(
-            client, libraryMappings, cancellationToken).ConfigureAwait(false);
-
-        // Process each library mapping
-        var processedItems = 0;
-
-        foreach (var libraryMapping in libraryMappings)
-        {
-            if (cancellationToken.IsCancellationRequested)
-            {
-                break;
-            }
-
-            await metadataService.ProcessLibraryAsync(
-                client,
-                database,
-                libraryMapping,
-                syncMetadata,
-                syncImages,
-                syncPeople,
-                syncStudios,
-                cancellationToken,
-                onItemProcessed: () =>
-                {
-                    processedItems++;
-                    if (totalItems > 0)
-                    {
-                        progress.Report((double)processedItems / totalItems * 100);
-                    }
-                }).ConfigureAwait(false);
-        }
 
         progress.Report(100);
     }
