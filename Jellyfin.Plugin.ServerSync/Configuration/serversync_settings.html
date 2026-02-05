@@ -500,6 +500,20 @@
                                         <div class="fieldDescription checkboxFieldDescription">Sync primary, backdrop, logo, and other images.</div>
                                     </div>
                                 </div>
+
+                                <!-- Refresh Mode Subsection -->
+                                <h3 class="subsectionHeader">Refresh Mode</h3>
+                                <div class="settingsGroup">
+                                    <div class="selectContainer">
+                                        <label class="selectLabel" for="selMetadataRefreshMode">Metadata Refresh Mode</label>
+                                        <select is="emby-select" id="selMetadataRefreshMode" class="emby-select-withcolor emby-select">
+                                            <option value="FullRefresh">Full Refresh</option>
+                                            <option value="SkipUnchanged">Skip Unchanged</option>
+                                        </select>
+                                        <div class="fieldDescription">Full Refresh compares all metadata every run. Skip Unchanged uses ETags to skip items that haven't changed on the source server, which is faster for large libraries.</div>
+                                        <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="collapsibleActions">

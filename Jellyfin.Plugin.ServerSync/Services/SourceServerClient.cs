@@ -353,7 +353,8 @@ public class SourceServerClient : IDisposable
                         ItemFields.ProductionLocations,
                         ItemFields.Taglines,
                         ItemFields.Settings,     // For LockedFields, PreferredMetadataLanguage, PreferredMetadataCountryCode
-                        ItemFields.CustomRating  // For CustomRating field
+                        ItemFields.CustomRating, // For CustomRating field
+                        ItemFields.Etag          // For change detection in SkipUnchanged refresh mode
                     };
                     config.QueryParameters.StartIndex = startIndex;
                     config.QueryParameters.Limit = limit;

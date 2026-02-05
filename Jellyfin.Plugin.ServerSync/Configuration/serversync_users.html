@@ -604,6 +604,20 @@
             flex: 1;
             text-align: center;
             justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .syncActionButton .btn-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            width: 0;
+            background: rgba(255, 255, 255, 0.7);
+            transition: width 0.3s ease;
+        }
+        .syncActionButton.button-primary .btn-progress {
+            background: rgba(255, 255, 255, 0.5);
         }
 
         /* ===== Sync Table Header ===== */
@@ -971,6 +985,14 @@
         .pt-bulk-actions button:disabled {
             opacity: 0.4;
             cursor: not-allowed;
+        }
+        .pt-bulk-icon-btn {
+            padding: 4px 8px !important;
+            min-width: 36px !important;
+            line-height: 1 !important;
+        }
+        .pt-bulk-icon-btn .material-icons {
+            font-size: 20px;
         }
 
         /* ===== PaginatedTable Content Styles ===== */

@@ -121,6 +121,52 @@ export default function (view, params) {
         // Safe click binding shorthand
         bindClick: function(id, handler, moduleName) {
             return this.bindEvent(id, 'click', handler, moduleName);
+        },
+
+        // Poll a scheduled task for progress and update button UI
+        pollTaskProgress: function(btn, taskKey, label, onComplete) {
+            var progressBar = btn.querySelector('.btn-progress');
+            if (!progressBar) {
+                progressBar = document.createElement('div');
+                progressBar.className = 'btn-progress';
+                btn.appendChild(progressBar);
+            }
+            progressBar.style.width = '0%';
+            btn.disabled = true;
+
+            var pollInterval = setInterval(function() {
+                ApiClient.getScheduledTasks().then(function(tasks) {
+                    var task = tasks.find(function(t) { return t.Key === taskKey; });
+                    if (!task) {
+                        clearInterval(pollInterval);
+                        btn.querySelector('span').textContent = label;
+                        progressBar.style.width = '0%';
+                        btn.disabled = false;
+                        if (onComplete) onComplete();
+                        return;
+                    }
+
+                    if (task.State === 'Running') {
+                        var pct = Math.round(task.CurrentProgressPercentage || 0);
+                        btn.querySelector('span').textContent = label + ' ' + pct + '%';
+                        progressBar.style.width = pct + '%';
+                    } else if (task.State === 'Idle') {
+                        clearInterval(pollInterval);
+                        btn.querySelector('span').textContent = label;
+                        progressBar.style.width = '0%';
+                        btn.disabled = false;
+                        if (onComplete) onComplete();
+                    }
+                }).catch(function() {
+                    clearInterval(pollInterval);
+                    btn.querySelector('span').textContent = label;
+                    progressBar.style.width = '0%';
+                    btn.disabled = false;
+                    if (onComplete) onComplete();
+                });
+            }, 1500);
+
+            return pollInterval;
         }
     };
 
@@ -893,8 +939,8 @@ export default function (view, params) {
             if (!bulkContainer) return;
 
             bulkContainer.innerHTML =
-                '<button is="emby-button" type="button" id="btnHistoryBulkIgnore" class="raised" disabled><span>Ignore</span></button>' +
-                '<button is="emby-button" type="button" id="btnHistoryBulkQueue" class="raised button-primary" disabled><span>Queue</span></button>';
+                '<button is="emby-button" type="button" id="btnHistoryBulkIgnore" class="raised pt-bulk-icon-btn" title="Ignore" disabled><span class="material-icons">block</span></button>' +
+                '<button is="emby-button" type="button" id="btnHistoryBulkQueue" class="raised button-primary pt-bulk-icon-btn" title="Queue" disabled><span class="material-icons">playlist_add</span></button>';
 
             view.querySelector('#btnHistoryBulkIgnore').addEventListener('click', function() { self.bulkIgnore(); });
             view.querySelector('#btnHistoryBulkQueue').addEventListener('click', function() { self.bulkQueue(); });
@@ -966,15 +1012,14 @@ export default function (view, params) {
             var self = this;
             var btn = view.querySelector('#btnRefreshHistoryItems');
             btn.disabled = true;
-            btn.querySelector('span').textContent = 'Refreshing...';
+            btn.querySelector('span').textContent = 'Starting...';
 
             ServerSyncShared.apiRequest('TriggerHistoryRefresh', 'POST').then(function() {
-                ServerSyncShared.showAlert('History refresh task started');
-                btn.querySelector('span').textContent = 'Refresh';
-                btn.disabled = false;
-                self.loadHistoryStatus();
-                self.loadHistoryItems();
-                self.loadHealthStats();
+                ServerSyncShared.pollTaskProgress(btn, 'ServerSyncRefreshHistoryTable', 'Refresh', function() {
+                    self.loadHistoryStatus();
+                    self.loadHistoryItems();
+                    self.loadHealthStats();
+                });
             }).catch(function() {
                 ServerSyncShared.showAlert('Failed to start history refresh task');
                 btn.querySelector('span').textContent = 'Refresh';
@@ -983,14 +1028,17 @@ export default function (view, params) {
         },
 
         triggerHistorySync: function() {
+            var self = this;
             var btn = view.querySelector('#btnTriggerHistorySync');
             btn.disabled = true;
             btn.querySelector('span').textContent = 'Starting...';
 
             ServerSyncShared.apiRequest('TriggerHistorySync', 'POST').then(function() {
-                ServerSyncShared.showAlert('History sync task started');
-                btn.querySelector('span').textContent = 'Sync';
-                btn.disabled = false;
+                ServerSyncShared.pollTaskProgress(btn, 'ServerSyncMissingHistory', 'Sync', function() {
+                    self.loadHistoryStatus();
+                    self.loadHistoryItems();
+                    self.loadHealthStats();
+                });
             }).catch(function() {
                 ServerSyncShared.showAlert('Failed to start history sync task');
                 btn.querySelector('span').textContent = 'Sync';

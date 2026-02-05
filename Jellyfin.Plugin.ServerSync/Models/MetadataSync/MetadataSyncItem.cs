@@ -133,6 +133,12 @@ public class MetadataSyncItem
     /// </summary>
     public string? ErrorMessage { get; set; }
 
+    /// <summary>
+    /// Gets or sets the ETag from the source server for change detection.
+    /// Used by SkipUnchanged refresh mode to avoid reprocessing items that haven't changed.
+    /// </summary>
+    public string? SourceETag { get; set; }
+
     // ===== Computed Properties =====
 
     /// <summary>

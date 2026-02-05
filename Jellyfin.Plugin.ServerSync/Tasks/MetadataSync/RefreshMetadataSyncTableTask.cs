@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.ServerSync.Models.Configuration;
+using Jellyfin.Plugin.ServerSync.Models.MetadataSync.Configuration;
 using Jellyfin.Plugin.ServerSync.Services;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Tasks;
@@ -86,6 +87,7 @@ public class RefreshMetadataSyncTableTask : IScheduledTask
         var syncImages = config.MetadataSyncImages;
         var syncPeople = config.MetadataSyncPeople;
         var syncStudios = config.MetadataSyncStudios;
+        var refreshMode = config.MetadataRefreshMode;
 
         if (!syncMetadata && !syncImages && !syncPeople && !syncStudios)
         {
@@ -144,6 +146,7 @@ public class RefreshMetadataSyncTableTask : IScheduledTask
                 syncImages,
                 syncPeople,
                 syncStudios,
+                refreshMode,
                 cancellationToken,
                 onItemProcessed: () =>
                 {

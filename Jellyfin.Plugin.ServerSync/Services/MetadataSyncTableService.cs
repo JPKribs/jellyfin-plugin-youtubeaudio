@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Jellyfin.Plugin.ServerSync.Models.Common;
 using Jellyfin.Plugin.ServerSync.Models.Configuration;
 using Jellyfin.Plugin.ServerSync.Models.MetadataSync;
+using Jellyfin.Plugin.ServerSync.Models.MetadataSync.Configuration;
 using Jellyfin.Plugin.ServerSync.Utilities;
 using Jellyfin.Sdk.Generated.Models;
 using MediaBrowser.Controller.Entities;
@@ -60,6 +61,7 @@ public class MetadataSyncTableService
         bool syncImages,
         bool syncPeople,
         bool syncStudios,
+        MetadataRefreshMode refreshMode,
         CancellationToken cancellationToken,
         Action? onItemProcessed = null)
     {
@@ -87,8 +89,8 @@ public class MetadataSyncTableService
         }
 
         _logger.LogInformation(
-            "Processing metadata for library {Library} (Metadata: {Metadata}, Images: {Images}, People: {People}, Studios: {Studios})",
-            libraryMapping.SourceLibraryName, syncMetadata, syncImages, syncPeople, syncStudios);
+            "Processing metadata for library {Library} (Metadata: {Metadata}, Images: {Images}, People: {People}, Studios: {Studios}, Mode: {Mode})",
+            libraryMapping.SourceLibraryName, syncMetadata, syncImages, syncPeople, syncStudios, refreshMode);
 
         while (true)
         {
@@ -167,6 +169,7 @@ public class MetadataSyncTableService
                         syncImages,
                         syncPeople,
                         syncStudios,
+                        refreshMode,
                         existingItems,
                         cancellationToken).ConfigureAwait(false);
 
@@ -207,6 +210,7 @@ public class MetadataSyncTableService
         bool syncImages,
         bool syncPeople,
         bool syncStudios,
+        MetadataRefreshMode refreshMode,
         Dictionary<string, MetadataSyncItem> existingItems,
         CancellationToken cancellationToken)
     {
@@ -237,13 +241,23 @@ public class MetadataSyncTableService
 
         if (existingItem != null)
         {
+            // In SkipUnchanged mode, skip items whose ETag hasn't changed
+            if (refreshMode == MetadataRefreshMode.SkipUnchanged
+                && !string.IsNullOrEmpty(existingItem.SourceETag)
+                && string.Equals(existingItem.SourceETag, sourceItem.Etag, StringComparison.Ordinal))
+            {
+                // ETag matches stored value - item unchanged, skip entirely
+                return;
+            }
+
             // Update existing item with all category values
             await UpdateMetadataItemAsync(existingItem, sourceItem, localItem, localPath, localItemId, syncMetadata, syncImages, syncPeople, syncStudios, client, cancellationToken).ConfigureAwait(false);
+            existingItem.SourceETag = sourceItem.Etag;
             database.UpsertMetadataSyncItem(existingItem);
         }
         else
         {
-            // Create new item with all category values
+            // Create new item with all category values (always process fully regardless of mode)
             var newItem = await CreateMetadataItemAsync(
                 libraryMapping,
                 sourceItem,
@@ -259,6 +273,7 @@ public class MetadataSyncTableService
                 client,
                 cancellationToken).ConfigureAwait(false);
 
+            newItem.SourceETag = sourceItem.Etag;
             database.UpsertMetadataSyncItem(newItem);
         }
     }
@@ -435,8 +450,10 @@ public class MetadataSyncTableService
     private void SetMetadataFieldValues(MetadataSyncItem item, BaseItemDto sourceItem, BaseItem? localItem)
     {
         // Extract provider IDs as a simple dictionary (external IDs like IMDB, TMDB)
+        // Sort by key to ensure consistent ordering for comparison
         var sourceProviderIds = sourceItem.ProviderIds?.AdditionalData?
             .Where(kvp => kvp.Value != null)
+            .OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(kvp => kvp.Key, kvp => kvp.Value?.ToString());
 
         // Extract only simple metadata fields that can be directly copied
@@ -526,8 +543,11 @@ public class MetadataSyncTableService
                 // Tags
                 ["Tags"] = localItem.Tags,
 
-                // External provider IDs
-                ["ProviderIds"] = localItem.ProviderIds,
+                // External provider IDs (normalize: filter nulls and sort to match source format)
+                ["ProviderIds"] = localItem.ProviderIds?
+                    .Where(kvp => kvp.Value != null)
+                    .OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
 
                 // Series/Episode info
                 ["IndexNumber"] = localItem.IndexNumber,

@@ -108,6 +108,52 @@ export default function (view, params) {
 
         bindClick: function(id, handler, moduleName) {
             return this.bindEvent(id, 'click', handler, moduleName);
+        },
+
+        // Poll a scheduled task for progress and update button UI
+        pollTaskProgress: function(btn, taskKey, label, onComplete) {
+            var progressBar = btn.querySelector('.btn-progress');
+            if (!progressBar) {
+                progressBar = document.createElement('div');
+                progressBar.className = 'btn-progress';
+                btn.appendChild(progressBar);
+            }
+            progressBar.style.width = '0%';
+            btn.disabled = true;
+
+            var pollInterval = setInterval(function() {
+                ApiClient.getScheduledTasks().then(function(tasks) {
+                    var task = tasks.find(function(t) { return t.Key === taskKey; });
+                    if (!task) {
+                        clearInterval(pollInterval);
+                        btn.querySelector('span').textContent = label;
+                        progressBar.style.width = '0%';
+                        btn.disabled = false;
+                        if (onComplete) onComplete();
+                        return;
+                    }
+
+                    if (task.State === 'Running') {
+                        var pct = Math.round(task.CurrentProgressPercentage || 0);
+                        btn.querySelector('span').textContent = label + ' ' + pct + '%';
+                        progressBar.style.width = pct + '%';
+                    } else if (task.State === 'Idle') {
+                        clearInterval(pollInterval);
+                        btn.querySelector('span').textContent = label;
+                        progressBar.style.width = '0%';
+                        btn.disabled = false;
+                        if (onComplete) onComplete();
+                    }
+                }).catch(function() {
+                    clearInterval(pollInterval);
+                    btn.querySelector('span').textContent = label;
+                    progressBar.style.width = '0%';
+                    btn.disabled = false;
+                    if (onComplete) onComplete();
+                });
+            }, 1500);
+
+            return pollInterval;
         }
     };
 
@@ -884,8 +930,8 @@ export default function (view, params) {
             if (!bulkContainer) return;
 
             bulkContainer.innerHTML =
-                '<button is="emby-button" type="button" id="btnMetadataBulkIgnore" class="raised" disabled><span>Ignore</span></button>' +
-                '<button is="emby-button" type="button" id="btnMetadataBulkQueue" class="raised button-primary" disabled><span>Queue</span></button>';
+                '<button is="emby-button" type="button" id="btnMetadataBulkIgnore" class="raised pt-bulk-icon-btn" title="Ignore" disabled><span class="material-icons">block</span></button>' +
+                '<button is="emby-button" type="button" id="btnMetadataBulkQueue" class="raised button-primary pt-bulk-icon-btn" title="Queue" disabled><span class="material-icons">playlist_add</span></button>';
 
             view.querySelector('#btnMetadataBulkIgnore').addEventListener('click', function() { self.bulkIgnore(); });
             view.querySelector('#btnMetadataBulkQueue').addEventListener('click', function() { self.bulkQueue(); });
@@ -957,15 +1003,14 @@ export default function (view, params) {
             var self = this;
             var btn = view.querySelector('#btnRefreshMetadataItems');
             btn.disabled = true;
-            btn.querySelector('span').textContent = 'Refreshing...';
+            btn.querySelector('span').textContent = 'Starting...';
 
             ServerSyncShared.apiRequest('TriggerMetadataRefresh', 'POST').then(function() {
-                ServerSyncShared.showAlert('Metadata refresh task started');
-                btn.querySelector('span').textContent = 'Refresh';
-                btn.disabled = false;
-                self.loadMetadataStatus();
-                self.loadMetadataItems();
-                self.loadHealthStats();
+                ServerSyncShared.pollTaskProgress(btn, 'ServerSyncRefreshMetadataTable', 'Refresh', function() {
+                    self.loadMetadataStatus();
+                    self.loadMetadataItems();
+                    self.loadHealthStats();
+                });
             }).catch(function() {
                 ServerSyncShared.showAlert('Failed to start metadata refresh task');
                 btn.querySelector('span').textContent = 'Refresh';
@@ -974,14 +1019,17 @@ export default function (view, params) {
         },
 
         triggerMetadataSync: function() {
+            var self = this;
             var btn = view.querySelector('#btnTriggerMetadataSync');
             btn.disabled = true;
             btn.querySelector('span').textContent = 'Starting...';
 
             ServerSyncShared.apiRequest('TriggerMetadataSync', 'POST').then(function() {
-                ServerSyncShared.showAlert('Metadata sync task started');
-                btn.querySelector('span').textContent = 'Sync';
-                btn.disabled = false;
+                ServerSyncShared.pollTaskProgress(btn, 'ServerSyncMissingMetadata', 'Sync', function() {
+                    self.loadMetadataStatus();
+                    self.loadMetadataItems();
+                    self.loadHealthStats();
+                });
             }).catch(function() {
                 ServerSyncShared.showAlert('Failed to start metadata sync task');
                 btn.querySelector('span').textContent = 'Sync';
@@ -1329,6 +1377,41 @@ export default function (view, params) {
                 html += '<td class="historyCompareTable-value historyCompareTable-merged">' + mergedDisplay + '</td>';
                 html += '</tr>';
             });
+
+            // Provider IDs (dictionary - render one row per provider key)
+            var sourceProviders = source.ProviderIds || {};
+            var localProviders = local.ProviderIds || {};
+            var allProviderKeys = Object.keys(sourceProviders).concat(Object.keys(localProviders));
+            var uniqueKeys = [];
+            allProviderKeys.forEach(function(k) {
+                if (uniqueKeys.indexOf(k) === -1) uniqueKeys.push(k);
+            });
+            uniqueKeys.sort();
+
+            uniqueKeys.forEach(function(key) {
+                var srcVal = sourceProviders[key] != null ? String(sourceProviders[key]) : '';
+                var lclVal = localProviders[key] != null ? String(localProviders[key]) : '';
+                var srcDisplay = srcVal || '-';
+                var lclDisplay = lclVal || '-';
+                var isChanged = srcVal !== lclVal;
+                var rowClass = isChanged ? 'metadataSyncModal-changedRow' : '';
+
+                html += '<tr class="' + rowClass + '">';
+                html += '<td class="historyCompareTable-property">' + ServerSyncShared.escapeHtml(key) + '</td>';
+                html += '<td class="historyCompareTable-value">' + ServerSyncShared.escapeHtml(srcDisplay) + '</td>';
+                html += '<td class="historyCompareTable-value">' + ServerSyncShared.escapeHtml(lclDisplay) + '</td>';
+                html += '<td class="historyCompareTable-value historyCompareTable-merged">' + ServerSyncShared.escapeHtml(srcDisplay) + '</td>';
+                html += '</tr>';
+            });
+
+            if (uniqueKeys.length === 0) {
+                html += '<tr>';
+                html += '<td class="historyCompareTable-property">Provider IDs</td>';
+                html += '<td class="historyCompareTable-value">-</td>';
+                html += '<td class="historyCompareTable-value">-</td>';
+                html += '<td class="historyCompareTable-value historyCompareTable-merged">-</td>';
+                html += '</tr>';
+            }
 
             return html;
         },

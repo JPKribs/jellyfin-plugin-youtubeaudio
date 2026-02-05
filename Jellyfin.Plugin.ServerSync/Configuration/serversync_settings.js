@@ -643,6 +643,7 @@ export default function (view, params) {
         view.querySelector('#chkMetadataSyncStudios').checked = config.MetadataSyncStudios !== false;
         view.querySelector('#chkMetadataSyncPeople').checked = config.MetadataSyncPeople === true;
         view.querySelector('#chkMetadataSyncImages').checked = config.MetadataSyncImages !== false;
+        view.querySelector('#selMetadataRefreshMode').value = config.MetadataRefreshMode || 'FullRefresh';
     }
 
     function saveMetadataSettings() {
@@ -654,6 +655,7 @@ export default function (view, params) {
         config.MetadataSyncStudios = view.querySelector('#chkMetadataSyncStudios').checked;
         config.MetadataSyncPeople = view.querySelector('#chkMetadataSyncPeople').checked;
         config.MetadataSyncImages = view.querySelector('#chkMetadataSyncImages').checked;
+        config.MetadataRefreshMode = view.querySelector('#selMetadataRefreshMode').value;
 
         ApiClient.updatePluginConfiguration(pluginId, config).then(function() {
             Dashboard.alert('Metadata settings saved');

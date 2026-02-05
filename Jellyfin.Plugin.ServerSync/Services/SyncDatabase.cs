@@ -2931,7 +2931,7 @@ public class SyncDatabase : IDisposable
                     SourceImagesValue, LocalImagesValue, SourceImagesHash, SyncedImagesHash,
                     SourcePeopleValue, LocalPeopleValue,
                     SourceStudiosValue, LocalStudiosValue,
-                    Status, StatusDate, LastSyncTime, ErrorMessage
+                    Status, StatusDate, LastSyncTime, ErrorMessage, SourceETag
                 ) VALUES (
                     @sourceLibraryId, @localLibraryId, @sourceItemId, @localItemId,
                     @itemName, @sourcePath, @localPath,
@@ -2939,7 +2939,7 @@ public class SyncDatabase : IDisposable
                     @sourceImagesValue, @localImagesValue, @sourceImagesHash, @syncedImagesHash,
                     @sourcePeopleValue, @localPeopleValue,
                     @sourceStudiosValue, @localStudiosValue,
-                    @status, @statusDate, @lastSyncTime, @errorMessage
+                    @status, @statusDate, @lastSyncTime, @errorMessage, @sourceETag
                 )
                 ON CONFLICT(SourceLibraryId, SourceItemId) DO UPDATE SET
                     LocalLibraryId = @localLibraryId,
@@ -2975,7 +2975,8 @@ public class SyncDatabase : IDisposable
                     ErrorMessage = CASE
                         WHEN MetadataSyncItems.Status = @ignoredStatus THEN MetadataSyncItems.ErrorMessage
                         ELSE @errorMessage
-                    END
+                    END,
+                    SourceETag = @sourceETag
             ";
 
             command.Parameters.AddWithValue("@sourceLibraryId", item.SourceLibraryId);
@@ -3000,6 +3001,7 @@ public class SyncDatabase : IDisposable
             command.Parameters.AddWithValue("@lastSyncTime", item.LastSyncTime?.ToString("o") ?? (object)DBNull.Value);
             command.Parameters.AddWithValue("@errorMessage", item.ErrorMessage ?? (object)DBNull.Value);
             command.Parameters.AddWithValue("@ignoredStatus", (int)BaseSyncStatus.Ignored);
+            command.Parameters.AddWithValue("@sourceETag", item.SourceETag ?? (object)DBNull.Value);
 
             command.ExecuteNonQuery();
         }
@@ -3230,6 +3232,13 @@ public class SyncDatabase : IDisposable
         if (localStudiosOrdinal >= 0 && !reader.IsDBNull(localStudiosOrdinal))
         {
             item.LocalStudiosValue = reader.GetString(localStudiosOrdinal);
+        }
+
+        // ETag for change detection
+        var sourceETagOrdinal = TryGetOrdinal(reader, "SourceETag");
+        if (sourceETagOrdinal >= 0 && !reader.IsDBNull(sourceETagOrdinal))
+        {
+            item.SourceETag = reader.GetString(sourceETagOrdinal);
         }
 
         var lastSyncTimeOrdinal = reader.GetOrdinal("LastSyncTime");

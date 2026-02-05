@@ -14,7 +14,7 @@ public static class DatabaseMigrationService
     /// <summary>
     /// Current schema version. Increment this when adding new migrations.
     /// </summary>
-    public const int CurrentSchemaVersion = 14;
+    public const int CurrentSchemaVersion = 15;
 
     /// <summary>
     /// Creates the initial database schema including all tables for the current version.
@@ -125,7 +125,7 @@ public static class DatabaseMigrationService
         ";
         userCmd.ExecuteNonQuery();
 
-        // Create MetadataSyncItems table (Metadata Sync) - v14 schema: one record per item with all categories including Studios
+        // Create MetadataSyncItems table (Metadata Sync) - v15 schema: includes SourceETag for change detection
         using var metadataCmd = connection.CreateCommand();
         metadataCmd.CommandText = @"
             CREATE TABLE IF NOT EXISTS MetadataSyncItems (
@@ -151,6 +151,7 @@ public static class DatabaseMigrationService
                 StatusDate TEXT NOT NULL,
                 LastSyncTime TEXT,
                 ErrorMessage TEXT,
+                SourceETag TEXT,
                 UNIQUE(SourceLibraryId, SourceItemId)
             );
             CREATE INDEX IF NOT EXISTS idx_metadata_sync_item ON MetadataSyncItems(SourceItemId);
@@ -262,6 +263,11 @@ public static class DatabaseMigrationService
             if (fromVersion < 14)
             {
                 MigrateToV14(connection, transaction, logger);
+            }
+
+            if (fromVersion < 15)
+            {
+                MigrateToV15(connection, transaction, logger);
             }
 
             SetSchemaVersion(connection, CurrentSchemaVersion);
@@ -713,6 +719,20 @@ public static class DatabaseMigrationService
         }
 
         logger.LogInformation("Migration v14: Added Studios columns to MetadataSyncItems table");
+    }
+
+    /// <summary>
+    /// Migration to v15: Add SourceETag column to MetadataSyncItems for change detection.
+    /// </summary>
+    private static void MigrateToV15(SqliteConnection connection, SqliteTransaction transaction, ILogger logger)
+    {
+        ExecuteAlterIfColumnMissing(
+            connection,
+            transaction,
+            "ALTER TABLE MetadataSyncItems ADD COLUMN SourceETag TEXT",
+            logger);
+
+        logger.LogInformation("Migration v15: Added SourceETag column to MetadataSyncItems for change detection");
     }
 
     /// <summary>

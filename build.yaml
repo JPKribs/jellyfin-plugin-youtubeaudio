@@ -1,7 +1,7 @@
 ---
 name: "Server Sync"
 guid: "ebd650b5-6f4c-4ccb-b10d-23dffb3a7286"
-version: "10.11.22"
+version: "10.11.23"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
 overview: "Sync media content from a source Jellyfin server to this server."
@@ -24,7 +24,12 @@ artifacts:
 - "Microsoft.Kiota.Serialization.Text.dll"
 - "Std.UriTemplate.dll"
 changelog:
-  fixes:
-  - Fix people changes falsely detected due to ordering differences
+  features:
+  - Add Metadata Refresh Mode setting (Full Refresh / Skip Unchanged) for ETag-based change detection to skip unmodified items during metadata sync
   improvements:
-  - Add default triggers for refresh sync table tasks (2 hours before sync tasks)
+  - Add real-time progress percentage and progress bar to Refresh and Sync buttons across all sync pages
+  - Replace bulk action text buttons with Material Icons across all sync tables for better mobile layout
+  - Standardize empty table messages across all four sync pages
+  - Add Provider IDs display to the metadata sync comparison modal
+  fixes:
+  - Fix false-positive metadata change detection caused by ProviderIds serialization mismatch between source and local servers
