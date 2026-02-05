@@ -34,7 +34,31 @@ public class SyncDatabase : IDisposable
         var dbDir = Path.Combine(dataPath, "serversync");
         Directory.CreateDirectory(dbDir);
         _dbPath = Path.Combine(dbDir, "sync.db");
+
+        _logger.LogInformation("Sync database path: {DbPath}", _dbPath);
+        _logger.LogInformation("Database directory exists: {Exists}, writable: {Writable}",
+            Directory.Exists(dbDir),
+            IsDirectoryWritable(dbDir));
+
         InitializeDatabase();
+    }
+
+    /// <summary>
+    /// Checks if a directory is writable by attempting to create a temp file.
+    /// </summary>
+    private static bool IsDirectoryWritable(string dirPath)
+    {
+        try
+        {
+            var testPath = Path.Combine(dirPath, ".write_test_" + Guid.NewGuid().ToString("N"));
+            File.WriteAllText(testPath, "test");
+            File.Delete(testPath);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>
@@ -44,9 +68,9 @@ public class SyncDatabase : IDisposable
     {
         // Use a connection string with settings for better reliability:
         // - Mode=ReadWriteCreate: Create the file if it doesn't exist
-        // - Cache=Shared: Allow connection sharing within the process
-        // - Pooling=True: Enable connection pooling (default)
-        return $"Data Source={_dbPath};Mode=ReadWriteCreate;Cache=Shared";
+        // - Pooling=False: Disable connection pooling to avoid stale cached connections
+        //   causing SQLITE_READONLY errors after server restarts or crashes
+        return $"Data Source={_dbPath};Mode=ReadWriteCreate;Pooling=False";
     }
 
     /// <summary>
@@ -118,6 +142,17 @@ public class SyncDatabase : IDisposable
             _connection = new SqliteConnection(BuildConnectionString());
             _connection.Open();
 
+            // Set pragmas for reliability in multi-threaded environments
+            using (var pragmaCmd = _connection.CreateCommand())
+            {
+                pragmaCmd.CommandText = @"
+                    PRAGMA journal_mode=WAL;
+                    PRAGMA busy_timeout=5000;
+                    PRAGMA synchronous=NORMAL;
+                ";
+                pragmaCmd.ExecuteNonQuery();
+            }
+
             var currentVersion = DatabaseMigrationService.GetSchemaVersion(_connection);
 
             if (currentVersion == 0)
@@ -184,6 +219,18 @@ public class SyncDatabase : IDisposable
 
         _connection = new SqliteConnection(BuildConnectionString());
         _connection.Open();
+
+        // Set pragmas on fresh connection
+        using (var pragmaCmd = _connection.CreateCommand())
+        {
+            pragmaCmd.CommandText = @"
+                PRAGMA journal_mode=WAL;
+                PRAGMA busy_timeout=5000;
+                PRAGMA synchronous=NORMAL;
+            ";
+            pragmaCmd.ExecuteNonQuery();
+        }
+
         DatabaseMigrationService.CreateInitialSchema(_connection);
         DatabaseMigrationService.SetSchemaVersion(_connection, DatabaseMigrationService.CurrentSchemaVersion);
         _logger.LogInformation("Database recreated with fresh schema v{Version}", DatabaseMigrationService.CurrentSchemaVersion);
@@ -1069,6 +1116,15 @@ public class SyncDatabase : IDisposable
         {
             _connection = new SqliteConnection(BuildConnectionString());
             _connection.Open();
+
+            // Re-apply pragmas on reconnection
+            using var pragmaCmd = _connection.CreateCommand();
+            pragmaCmd.CommandText = @"
+                PRAGMA journal_mode=WAL;
+                PRAGMA busy_timeout=5000;
+                PRAGMA synchronous=NORMAL;
+            ";
+            pragmaCmd.ExecuteNonQuery();
         }
         catch (Exception ex)
         {
@@ -1111,6 +1167,7 @@ public class SyncDatabase : IDisposable
     /// <summary>
     /// ResetHistoryDatabase
     /// Clears all history sync items from the database.
+    /// Falls back to a full database recreation if the database is readonly or corrupted.
     /// </summary>
     public void ResetHistoryDatabase()
     {
@@ -1118,12 +1175,11 @@ public class SyncDatabase : IDisposable
         {
             _logger.LogWarning("Resetting history sync database - all history tracking data will be lost");
 
-            EnsureConnection();
-            using var command = _connection!.CreateCommand();
-            // Use DELETE with IF EXISTS logic - if table doesn't exist, this is a no-op
-            command.CommandText = "DELETE FROM HistorySyncItems WHERE 1=1";
             try
             {
+                EnsureConnection();
+                using var command = _connection!.CreateCommand();
+                command.CommandText = "DELETE FROM HistorySyncItems WHERE 1=1";
                 var deleted = command.ExecuteNonQuery();
                 _logger.LogInformation("History sync database has been reset, {Count} items removed", deleted);
             }
@@ -1131,6 +1187,11 @@ public class SyncDatabase : IDisposable
             {
                 // Table doesn't exist - that's fine, nothing to delete
                 _logger.LogInformation("History sync table does not exist yet, nothing to reset");
+            }
+            catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.SqliteErrorCode == 8)
+            {
+                _logger.LogWarning(ex, "Database is readonly, falling back to full database recreation");
+                RecreateDatabase();
             }
         }
     }
@@ -2360,6 +2421,7 @@ public class SyncDatabase : IDisposable
 
     /// <summary>
     /// Resets the user sync database by clearing all items.
+    /// Falls back to a full database recreation if the database is readonly or corrupted.
     /// </summary>
     public void ResetUserSyncDatabase()
     {
@@ -2367,17 +2429,22 @@ public class SyncDatabase : IDisposable
         {
             _logger.LogWarning("Resetting user sync database - all user sync tracking data will be lost");
 
-            EnsureConnection();
-            using var command = _connection!.CreateCommand();
-            command.CommandText = "DELETE FROM UserSyncItems WHERE 1=1";
             try
             {
+                EnsureConnection();
+                using var command = _connection!.CreateCommand();
+                command.CommandText = "DELETE FROM UserSyncItems WHERE 1=1";
                 var deleted = command.ExecuteNonQuery();
                 _logger.LogInformation("User sync database has been reset, {Count} items removed", deleted);
             }
             catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.SqliteErrorCode == 1)
             {
                 _logger.LogInformation("User sync table does not exist yet, nothing to reset");
+            }
+            catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.SqliteErrorCode == 8)
+            {
+                _logger.LogWarning(ex, "Database is readonly, falling back to full database recreation");
+                RecreateDatabase();
             }
         }
     }
@@ -3108,6 +3175,7 @@ public class SyncDatabase : IDisposable
 
     /// <summary>
     /// Resets the metadata sync database by clearing all items.
+    /// Falls back to a full database recreation if the database is readonly or corrupted.
     /// </summary>
     public void ResetMetadataSyncDatabase()
     {
@@ -3115,17 +3183,22 @@ public class SyncDatabase : IDisposable
         {
             _logger.LogWarning("Resetting metadata sync database - all metadata sync tracking data will be lost");
 
-            EnsureConnection();
-            using var command = _connection!.CreateCommand();
-            command.CommandText = "DELETE FROM MetadataSyncItems WHERE 1=1";
             try
             {
+                EnsureConnection();
+                using var command = _connection!.CreateCommand();
+                command.CommandText = "DELETE FROM MetadataSyncItems WHERE 1=1";
                 var deleted = command.ExecuteNonQuery();
                 _logger.LogInformation("Metadata sync database has been reset, {Count} items removed", deleted);
             }
             catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.SqliteErrorCode == 1)
             {
                 _logger.LogInformation("Metadata sync table does not exist yet, nothing to reset");
+            }
+            catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.SqliteErrorCode == 8)
+            {
+                _logger.LogWarning(ex, "Database is readonly, falling back to full database recreation");
+                RecreateDatabase();
             }
         }
     }
