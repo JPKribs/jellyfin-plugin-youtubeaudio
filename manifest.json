@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "10.11.22",
+        "changelog": "## Fixes\r\n- Fix people changes falsely detected due to ordering differences\r\n\r\n## Improvements\r\n- Add default triggers for refresh sync table tasks (2 hours before sync tasks)",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-serversync/releases/download/v10.11.22/jellyfin-plugin-serversync-10.11.22.zip",
+        "checksum": "449a0148b727a2f996abc696bf227fab",
+        "timestamp": "2026-02-05T04:03:40Z"
+      },
+      {
         "version": "10.11.21",
         "changelog": "## Improvements\r\n- Remove syncs also performing refreshes",
         "targetAbi": "10.11.0.0",
