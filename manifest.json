@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "10.11.23",
+        "changelog": "## Features\r\n- Add Metadata Refresh Mode setting (Full Refresh / Skip Unchanged) for ETag-based change detection to skip unmodified items during metadata sync\r\n\r\n## Improvements\r\n- Add real-time progress percentage and progress bar to Refresh and Sync buttons across all sync pages\r\n- Replace bulk action text buttons with Material Icons across all sync tables for better mobile layout\r\n- Standardize empty table messages across all four sync pages\r\n- Add Provider IDs display to the metadata sync comparison modal\r\n\r\n## Fixes\r\n- Fix false-positive metadata change detection caused by ProviderIds serialization mismatch between source and local servers",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-serversync/releases/download/v10.11.23/jellyfin-plugin-serversync-10.11.23.zip",
+        "checksum": "f4bb6b3aca46cbf0985602a73048befa",
+        "timestamp": "2026-02-05T16:56:47Z"
+      },
+      {
         "version": "10.11.22",
         "changelog": "## Fixes\r\n- Fix people changes falsely detected due to ordering differences\r\n\r\n## Improvements\r\n- Add default triggers for refresh sync table tasks (2 hours before sync tasks)",
         "targetAbi": "10.11.0.0",
