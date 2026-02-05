@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "10.11.20",
+        "changelog": "## Improvements\r\n- Hightlight changes in the history modal\r\n\r\n## Fixes\r\n- Highlight images in metadata modal on change",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-serversync/releases/download/v10.11.20/jellyfin-plugin-serversync-10.11.20.zip",
+        "checksum": "2ac85eeb61be61f5680ba7d7c2904273",
+        "timestamp": "2026-02-05T03:23:10Z"
+      },
+      {
         "version": "10.11.19",
         "changelog": "## New\r\n- Token generation from username & password as alternative to API Key\r\n\r\n## Improvements\r\n- Client now registers with local server name and plugin version\r\n- Consolidated server info display (Server, ID, User)\r\n\r\n## Fixes\r\n- Connection test now validates API key/token properly",
         "targetAbi": "10.11.0.0",
