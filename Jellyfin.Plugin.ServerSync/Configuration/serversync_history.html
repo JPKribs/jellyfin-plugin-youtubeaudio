@@ -141,31 +141,31 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr>
+                        <tr id="historyModalRowPlayed">
                             <td class="historyCompareTable-property">Played</td>
                             <td id="historyModalSourcePlayed" class="historyCompareTable-value">-</td>
                             <td id="historyModalLocalPlayed" class="historyCompareTable-value">-</td>
                             <td id="historyModalMergedPlayed" class="historyCompareTable-value historyCompareTable-merged">-</td>
                         </tr>
-                        <tr>
+                        <tr id="historyModalRowFavorite">
                             <td class="historyCompareTable-property">Favorite</td>
                             <td id="historyModalSourceFavorite" class="historyCompareTable-value">-</td>
                             <td id="historyModalLocalFavorite" class="historyCompareTable-value">-</td>
                             <td id="historyModalMergedFavorite" class="historyCompareTable-value historyCompareTable-merged">-</td>
                         </tr>
-                        <tr>
+                        <tr id="historyModalRowPlayCount">
                             <td class="historyCompareTable-property">Play Count</td>
                             <td id="historyModalSourcePlayCount" class="historyCompareTable-value">-</td>
                             <td id="historyModalLocalPlayCount" class="historyCompareTable-value">-</td>
                             <td id="historyModalMergedPlayCount" class="historyCompareTable-value historyCompareTable-merged">-</td>
                         </tr>
-                        <tr>
+                        <tr id="historyModalRowPosition">
                             <td class="historyCompareTable-property">Position</td>
                             <td id="historyModalSourcePosition" class="historyCompareTable-value">-</td>
                             <td id="historyModalLocalPosition" class="historyCompareTable-value">-</td>
                             <td id="historyModalMergedPosition" class="historyCompareTable-value historyCompareTable-merged">-</td>
                         </tr>
-                        <tr>
+                        <tr id="historyModalRowLastPlayed">
                             <td class="historyCompareTable-property">Last Played</td>
                             <td id="historyModalSourceLastPlayed" class="historyCompareTable-value">-</td>
                             <td id="historyModalLocalLastPlayed" class="historyCompareTable-value">-</td>
@@ -424,6 +424,14 @@
         }
         .historyCompareTable tr:last-child td {
             border-bottom: none;
+        }
+
+        /* ===== Changed Row Highlighting ===== */
+        .historySyncModal-changedRow {
+            background: rgba(240, 173, 78, 0.1);
+        }
+        .historySyncModal-changedRow td:first-child {
+            border-left: 3px solid #f0ad4e;
         }
 
         /* ===== Section Separator ===== */

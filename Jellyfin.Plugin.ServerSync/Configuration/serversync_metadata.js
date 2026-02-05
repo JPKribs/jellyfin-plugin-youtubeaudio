@@ -1538,7 +1538,8 @@ export default function (view, params) {
                 var srcDisplay = self.formatImageDisplay(srcSize, srcCount);
                 var localDisplay = self.formatImageDisplay(localSize, localCount);
 
-                var isChanged = srcCount !== localCount;
+                // Changed if count differs OR size differs (different image)
+                var isChanged = srcCount !== localCount || srcSize !== localSize;
                 var rowClass = isChanged ? 'metadataSyncModal-changedRow' : '';
 
                 html += '<tr class="' + rowClass + '">';

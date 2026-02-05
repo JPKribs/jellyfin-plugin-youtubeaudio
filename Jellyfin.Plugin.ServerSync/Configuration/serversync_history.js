@@ -1149,6 +1149,13 @@ export default function (view, params) {
             self.setTableValue('historyModalMergedLastPlayed', item.MergedLastPlayedDate, 'date');
             self.setTableValue('historyModalMergedFavorite', item.MergedIsFavorite, 'favorite');
 
+            // Highlight rows where merged differs from local (will change after sync)
+            self.highlightChangedRow('historyModalRowPlayed', item.MergedIsPlayed, item.LocalIsPlayed);
+            self.highlightChangedRow('historyModalRowFavorite', item.MergedIsFavorite, item.LocalIsFavorite);
+            self.highlightChangedRow('historyModalRowPlayCount', item.MergedPlayCount, item.LocalPlayCount);
+            self.highlightChangedRow('historyModalRowPosition', item.MergedPlaybackPositionTicks, item.LocalPlaybackPositionTicks);
+            self.highlightChangedRow('historyModalRowLastPlayed', item.MergedLastPlayedDate, item.LocalLastPlayedDate);
+
             view.querySelector('#historyItemDetailModal').classList.remove('hidden');
         },
 
@@ -1205,6 +1212,25 @@ export default function (view, params) {
                 return ServerSyncShared.formatRelativeTime(new Date(dateStr));
             } catch (e) {
                 return dateStr;
+            }
+        },
+
+        // Highlight row if merged value differs from local value
+        highlightChangedRow: function(rowId, mergedValue, localValue) {
+            var row = view.querySelector('#' + rowId);
+            if (!row) return;
+
+            // Normalize null/undefined to comparable values
+            var merged = (mergedValue === null || mergedValue === undefined) ? null : mergedValue;
+            var local = (localValue === null || localValue === undefined) ? null : localValue;
+
+            // Compare values - highlight if different
+            var isChanged = merged !== local;
+
+            if (isChanged) {
+                row.classList.add('historySyncModal-changedRow');
+            } else {
+                row.classList.remove('historySyncModal-changedRow');
             }
         },
 
