@@ -1,7 +1,7 @@
 ---
 name: "Server Sync"
 guid: "ebd650b5-6f4c-4ccb-b10d-23dffb3a7286"
-version: "10.11.24"
+version: "10.11.25"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
 overview: "Sync media content from a source Jellyfin server to this server."
@@ -24,5 +24,13 @@ artifacts:
 - "Microsoft.Kiota.Serialization.Text.dll"
 - "Std.UriTemplate.dll"
 changelog:
+  improvements:
+  - Harden all database read operations with error handling and safe fallbacks for transient SQLite errors
+  - Add disposed-state guards to all SyncDatabase public methods to prevent use-after-dispose crashes
+  - Fix connection leak in database reconnection when pragma execution fails
+  - Fix race condition in database disposal
   fixes:
-  - Fix database reset operations for metadata, history, and user sync tables failing with readonly database errors by falling back to full database recreation
+  - Resolve CodeQL alerts for log entries created from user input by breaking taint chain with local variables
+  - Fix useless assignment in SourceServerClient authentication error handling
+  - Fix constant condition in HistorySyncMergeService merge logic
+  - Fix missing Dispose on StringContent in SourceServerClient authentication

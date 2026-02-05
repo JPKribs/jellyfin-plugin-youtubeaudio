@@ -4,6 +4,7 @@ using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using Jellyfin.Plugin.ServerSync.Models.Common;
 using Jellyfin.Plugin.ServerSync.Models.ContentSync;
 using Jellyfin.Plugin.ServerSync.Models.HistorySync;
@@ -41,6 +42,52 @@ public class SyncDatabase : IDisposable
             IsDirectoryWritable(dbDir));
 
         InitializeDatabase();
+    }
+
+    /// <summary>
+    /// Throws ObjectDisposedException if the database has been disposed.
+    /// </summary>
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(SyncDatabase), "The sync database has been disposed");
+        }
+    }
+
+    /// <summary>
+    /// Executes a read operation with error handling for transient SQLite errors.
+    /// Returns the fallback value if the database is temporarily unavailable.
+    /// </summary>
+    /// <typeparam name="T">Return type of the read operation.</typeparam>
+    /// <param name="readOperation">The read operation to execute.</param>
+    /// <param name="fallbackValue">Value to return if the database is unavailable.</param>
+    /// <param name="callerName">Auto-populated caller method name for logging.</param>
+    /// <returns>Result of the read operation, or fallback value on transient error.</returns>
+    private T ExecuteRead<T>(Func<T> readOperation, T fallbackValue, [CallerMemberName] string? callerName = null)
+    {
+        ThrowIfDisposed();
+
+        try
+        {
+            EnsureConnection();
+            return readOperation();
+        }
+        catch (SqliteException ex) when (
+            ex.SqliteErrorCode == 5 ||  // SQLITE_BUSY
+            ex.SqliteErrorCode == 6 ||  // SQLITE_LOCKED
+            ex.SqliteErrorCode == 8 ||  // SQLITE_READONLY
+            ex.SqliteErrorCode == 11 || // SQLITE_CORRUPT
+            ex.SqliteErrorCode == 14)   // SQLITE_CANTOPEN
+        {
+            _logger.LogWarning(ex, "Database read '{Operation}' failed with SQLite error {ErrorCode}, returning fallback", callerName, ex.SqliteErrorCode);
+            return fallbackValue;
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("connection", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning(ex, "Database connection error during '{Operation}', returning fallback", callerName);
+            return fallbackValue;
+        }
     }
 
     /// <summary>
@@ -243,6 +290,7 @@ public class SyncDatabase : IDisposable
     /// <returns>A new SQLite transaction.</returns>
     public SqliteTransaction BeginTransaction()
     {
+        ThrowIfDisposed();
         EnsureConnection();
         return _connection!.BeginTransaction();
     }
@@ -256,22 +304,23 @@ public class SyncDatabase : IDisposable
     /// <returns>True if collision exists.</returns>
     public bool CheckPathCollision(string localPath, string? excludeSourceItemId = null)
     {
-        EnsureConnection();
-
-        using var command = _connection!.CreateCommand();
-        if (excludeSourceItemId != null)
+        return ExecuteRead(() =>
         {
-            command.CommandText = "SELECT COUNT(*) FROM SyncItems WHERE LocalPath = @localPath AND SourceItemId != @excludeId";
-            command.Parameters.AddWithValue("@excludeId", excludeSourceItemId);
-        }
-        else
-        {
-            command.CommandText = "SELECT COUNT(*) FROM SyncItems WHERE LocalPath = @localPath";
-        }
+            using var command = _connection!.CreateCommand();
+            if (excludeSourceItemId != null)
+            {
+                command.CommandText = "SELECT COUNT(*) FROM SyncItems WHERE LocalPath = @localPath AND SourceItemId != @excludeId";
+                command.Parameters.AddWithValue("@excludeId", excludeSourceItemId);
+            }
+            else
+            {
+                command.CommandText = "SELECT COUNT(*) FROM SyncItems WHERE LocalPath = @localPath";
+            }
 
-        command.Parameters.AddWithValue("@localPath", localPath);
-        var count = Convert.ToInt64(command.ExecuteScalar());
-        return count > 0;
+            command.Parameters.AddWithValue("@localPath", localPath);
+            var count = Convert.ToInt64(command.ExecuteScalar());
+            return count > 0;
+        }, fallbackValue: false);
     }
 
     /// <summary>
@@ -282,14 +331,15 @@ public class SyncDatabase : IDisposable
     /// <returns>Sync item or null if not found.</returns>
     public SyncItem? GetBySourceItemId(string sourceItemId)
     {
-        EnsureConnection();
+        return ExecuteRead(() =>
+        {
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "SELECT * FROM SyncItems WHERE SourceItemId = @sourceItemId";
+            command.Parameters.AddWithValue("@sourceItemId", sourceItemId);
 
-        using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT * FROM SyncItems WHERE SourceItemId = @sourceItemId";
-        command.Parameters.AddWithValue("@sourceItemId", sourceItemId);
-
-        using var reader = command.ExecuteReader();
-        return reader.Read() ? ReadSyncItem(reader) : null;
+            using var reader = command.ExecuteReader();
+            return reader.Read() ? ReadSyncItem(reader) : null;
+        }, fallbackValue: null);
     }
 
     /// <summary>
@@ -300,14 +350,15 @@ public class SyncDatabase : IDisposable
     /// <returns>Sync item or null if not found.</returns>
     public SyncItem? GetByLocalPath(string localPath)
     {
-        EnsureConnection();
+        return ExecuteRead(() =>
+        {
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "SELECT * FROM SyncItems WHERE LocalPath = @localPath";
+            command.Parameters.AddWithValue("@localPath", localPath);
 
-        using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT * FROM SyncItems WHERE LocalPath = @localPath";
-        command.Parameters.AddWithValue("@localPath", localPath);
-
-        using var reader = command.ExecuteReader();
-        return reader.Read() ? ReadSyncItem(reader) : null;
+            using var reader = command.ExecuteReader();
+            return reader.Read() ? ReadSyncItem(reader) : null;
+        }, fallbackValue: null);
     }
 
     /// <summary>
@@ -318,20 +369,21 @@ public class SyncDatabase : IDisposable
     /// <returns>List of matching sync items.</returns>
     public List<SyncItem> GetByStatus(SyncStatus status)
     {
-        EnsureConnection();
-
-        var items = new List<SyncItem>();
-        using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT * FROM SyncItems WHERE Status = @status";
-        command.Parameters.AddWithValue("@status", (int)status);
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        return ExecuteRead(() =>
         {
-            items.Add(ReadSyncItem(reader));
-        }
+            var items = new List<SyncItem>();
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "SELECT * FROM SyncItems WHERE Status = @status";
+            command.Parameters.AddWithValue("@status", (int)status);
 
-        return items;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                items.Add(ReadSyncItem(reader));
+            }
+
+            return items;
+        }, fallbackValue: new List<SyncItem>());
     }
 
     /// <summary>
@@ -342,20 +394,21 @@ public class SyncDatabase : IDisposable
     /// <returns>List of sync items in the library.</returns>
     public List<SyncItem> GetBySourceLibrary(string sourceLibraryId)
     {
-        EnsureConnection();
-
-        var items = new List<SyncItem>();
-        using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT * FROM SyncItems WHERE SourceLibraryId = @sourceLibraryId";
-        command.Parameters.AddWithValue("@sourceLibraryId", sourceLibraryId);
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        return ExecuteRead(() =>
         {
-            items.Add(ReadSyncItem(reader));
-        }
+            var items = new List<SyncItem>();
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "SELECT * FROM SyncItems WHERE SourceLibraryId = @sourceLibraryId";
+            command.Parameters.AddWithValue("@sourceLibraryId", sourceLibraryId);
 
-        return items;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                items.Add(ReadSyncItem(reader));
+            }
+
+            return items;
+        }, fallbackValue: new List<SyncItem>());
     }
 
     /// <summary>
@@ -365,19 +418,20 @@ public class SyncDatabase : IDisposable
     /// <returns>List of all sync items.</returns>
     public List<SyncItem> GetAll()
     {
-        EnsureConnection();
-
-        var items = new List<SyncItem>();
-        using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT * FROM SyncItems";
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        return ExecuteRead(() =>
         {
-            items.Add(ReadSyncItem(reader));
-        }
+            var items = new List<SyncItem>();
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "SELECT * FROM SyncItems";
 
-        return items;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                items.Add(ReadSyncItem(reader));
+            }
+
+            return items;
+        }, fallbackValue: new List<SyncItem>());
     }
 
     /// <summary>
@@ -390,42 +444,43 @@ public class SyncDatabase : IDisposable
     /// <returns>List of matching sync items.</returns>
     public List<SyncItem> Search(string? searchTerm, SyncStatus? status = null, PendingType? pendingType = null)
     {
-        EnsureConnection();
-
-        var items = new List<SyncItem>();
-        using var command = _connection!.CreateCommand();
-
-        var conditions = new List<string>();
-        if (!string.IsNullOrWhiteSpace(searchTerm))
+        return ExecuteRead(() =>
         {
-            // Search in filename portion of SourcePath (case-insensitive)
-            conditions.Add("(SourcePath LIKE @searchTerm OR LocalPath LIKE @searchTerm)");
-            command.Parameters.AddWithValue("@searchTerm", $"%{searchTerm}%");
-        }
+            var items = new List<SyncItem>();
+            using var command = _connection!.CreateCommand();
 
-        if (status.HasValue)
-        {
-            conditions.Add("Status = @status");
-            command.Parameters.AddWithValue("@status", (int)status.Value);
-        }
+            var conditions = new List<string>();
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                // Search in filename portion of SourcePath (case-insensitive)
+                conditions.Add("(SourcePath LIKE @searchTerm OR LocalPath LIKE @searchTerm)");
+                command.Parameters.AddWithValue("@searchTerm", $"%{searchTerm}%");
+            }
 
-        if (pendingType.HasValue)
-        {
-            conditions.Add("PendingType = @pendingType");
-            command.Parameters.AddWithValue("@pendingType", (int)pendingType.Value);
-        }
+            if (status.HasValue)
+            {
+                conditions.Add("Status = @status");
+                command.Parameters.AddWithValue("@status", (int)status.Value);
+            }
 
-        command.CommandText = conditions.Count > 0
-            ? $"SELECT * FROM SyncItems WHERE {string.Join(" AND ", conditions)}"
-            : "SELECT * FROM SyncItems";
+            if (pendingType.HasValue)
+            {
+                conditions.Add("PendingType = @pendingType");
+                command.Parameters.AddWithValue("@pendingType", (int)pendingType.Value);
+            }
 
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
-        {
-            items.Add(ReadSyncItem(reader));
-        }
+            command.CommandText = conditions.Count > 0
+                ? $"SELECT * FROM SyncItems WHERE {string.Join(" AND ", conditions)}"
+                : "SELECT * FROM SyncItems";
 
-        return items;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                items.Add(ReadSyncItem(reader));
+            }
+
+            return items;
+        }, fallbackValue: new List<SyncItem>());
     }
 
     /// <summary>
@@ -445,99 +500,100 @@ public class SyncDatabase : IDisposable
         int skip = 0,
         int take = 50)
     {
-        EnsureConnection();
-
-        var conditions = new List<string>();
-
-        // Build WHERE clause conditions
-        if (!string.IsNullOrWhiteSpace(searchTerm))
+        return ExecuteRead(() =>
         {
-            conditions.Add("(SourcePath LIKE @searchTerm OR LocalPath LIKE @searchTerm)");
-        }
+            var conditions = new List<string>();
 
-        if (status.HasValue)
-        {
-            conditions.Add("Status = @status");
-        }
-
-        if (pendingType.HasValue)
-        {
-            conditions.Add("PendingType = @pendingType");
-        }
-
-        var whereClause = conditions.Count > 0
-            ? $"WHERE {string.Join(" AND ", conditions)}"
-            : string.Empty;
-
-        // Get total count
-        int totalCount;
-        using (var countCommand = _connection!.CreateCommand())
-        {
-            countCommand.CommandText = $"SELECT COUNT(*) FROM SyncItems {whereClause}";
-
+            // Build WHERE clause conditions
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
-                countCommand.Parameters.AddWithValue("@searchTerm", $"%{searchTerm}%");
+                conditions.Add("(SourcePath LIKE @searchTerm OR LocalPath LIKE @searchTerm)");
             }
 
             if (status.HasValue)
             {
-                countCommand.Parameters.AddWithValue("@status", (int)status.Value);
+                conditions.Add("Status = @status");
             }
 
             if (pendingType.HasValue)
             {
-                countCommand.Parameters.AddWithValue("@pendingType", (int)pendingType.Value);
+                conditions.Add("PendingType = @pendingType");
             }
 
-            totalCount = Convert.ToInt32(countCommand.ExecuteScalar());
-        }
+            var whereClause = conditions.Count > 0
+                ? $"WHERE {string.Join(" AND ", conditions)}"
+                : string.Empty;
 
-        // Get paginated data
-        var items = new List<SyncItem>();
-        using (var dataCommand = _connection!.CreateCommand())
-        {
-            dataCommand.CommandText = $@"
-                SELECT * FROM SyncItems
-                {whereClause}
-                ORDER BY
-                    CASE Status
-                        WHEN 0 THEN 0  -- Pending first
-                        WHEN 3 THEN 1  -- Errored second
-                        WHEN 1 THEN 2  -- Queued third
-                        WHEN 4 THEN 3  -- Ignored fourth
-                        WHEN 2 THEN 4  -- Synced last
-                        ELSE 5
-                    END,
-                    LocalPath ASC
-                LIMIT @take OFFSET @skip";
-
-            if (!string.IsNullOrWhiteSpace(searchTerm))
+            // Get total count
+            int totalCount;
+            using (var countCommand = _connection!.CreateCommand())
             {
-                dataCommand.Parameters.AddWithValue("@searchTerm", $"%{searchTerm}%");
+                countCommand.CommandText = $"SELECT COUNT(*) FROM SyncItems {whereClause}";
+
+                if (!string.IsNullOrWhiteSpace(searchTerm))
+                {
+                    countCommand.Parameters.AddWithValue("@searchTerm", $"%{searchTerm}%");
+                }
+
+                if (status.HasValue)
+                {
+                    countCommand.Parameters.AddWithValue("@status", (int)status.Value);
+                }
+
+                if (pendingType.HasValue)
+                {
+                    countCommand.Parameters.AddWithValue("@pendingType", (int)pendingType.Value);
+                }
+
+                totalCount = Convert.ToInt32(countCommand.ExecuteScalar());
             }
 
-            if (status.HasValue)
+            // Get paginated data
+            var items = new List<SyncItem>();
+            using (var dataCommand = _connection!.CreateCommand())
             {
-                dataCommand.Parameters.AddWithValue("@status", (int)status.Value);
+                dataCommand.CommandText = $@"
+                    SELECT * FROM SyncItems
+                    {whereClause}
+                    ORDER BY
+                        CASE Status
+                            WHEN 0 THEN 0  -- Pending first
+                            WHEN 3 THEN 1  -- Errored second
+                            WHEN 1 THEN 2  -- Queued third
+                            WHEN 4 THEN 3  -- Ignored fourth
+                            WHEN 2 THEN 4  -- Synced last
+                            ELSE 5
+                        END,
+                        LocalPath ASC
+                    LIMIT @take OFFSET @skip";
+
+                if (!string.IsNullOrWhiteSpace(searchTerm))
+                {
+                    dataCommand.Parameters.AddWithValue("@searchTerm", $"%{searchTerm}%");
+                }
+
+                if (status.HasValue)
+                {
+                    dataCommand.Parameters.AddWithValue("@status", (int)status.Value);
+                }
+
+                if (pendingType.HasValue)
+                {
+                    dataCommand.Parameters.AddWithValue("@pendingType", (int)pendingType.Value);
+                }
+
+                dataCommand.Parameters.AddWithValue("@take", take);
+                dataCommand.Parameters.AddWithValue("@skip", skip);
+
+                using var reader = dataCommand.ExecuteReader();
+                while (reader.Read())
+                {
+                    items.Add(ReadSyncItem(reader));
+                }
             }
 
-            if (pendingType.HasValue)
-            {
-                dataCommand.Parameters.AddWithValue("@pendingType", (int)pendingType.Value);
-            }
-
-            dataCommand.Parameters.AddWithValue("@take", take);
-            dataCommand.Parameters.AddWithValue("@skip", skip);
-
-            using var reader = dataCommand.ExecuteReader();
-            while (reader.Read())
-            {
-                items.Add(ReadSyncItem(reader));
-            }
-        }
-
-        return (items, totalCount);
+            return (items, totalCount);
+        }, fallbackValue: (new List<SyncItem>(), 0));
     }
 
     /// <summary>
@@ -548,21 +604,22 @@ public class SyncDatabase : IDisposable
     /// <returns>List of pending sync items.</returns>
     public List<SyncItem> GetPendingByType(PendingType pendingType)
     {
-        EnsureConnection();
-
-        var items = new List<SyncItem>();
-        using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT * FROM SyncItems WHERE Status = @status AND PendingType = @pendingType";
-        command.Parameters.AddWithValue("@status", (int)SyncStatus.Pending);
-        command.Parameters.AddWithValue("@pendingType", (int)pendingType);
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        return ExecuteRead(() =>
         {
-            items.Add(ReadSyncItem(reader));
-        }
+            var items = new List<SyncItem>();
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "SELECT * FROM SyncItems WHERE Status = @status AND PendingType = @pendingType";
+            command.Parameters.AddWithValue("@status", (int)SyncStatus.Pending);
+            command.Parameters.AddWithValue("@pendingType", (int)pendingType);
 
-        return items;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                items.Add(ReadSyncItem(reader));
+            }
+
+            return items;
+        }, fallbackValue: new List<SyncItem>());
     }
 
     /// <summary>
@@ -572,22 +629,23 @@ public class SyncDatabase : IDisposable
     /// <returns>Dictionary of pending type to count.</returns>
     public Dictionary<PendingType, int> GetPendingCounts()
     {
-        EnsureConnection();
-
-        var counts = new Dictionary<PendingType, int>();
-        using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT PendingType, COUNT(*) as Count FROM SyncItems WHERE Status = @status AND PendingType IS NOT NULL GROUP BY PendingType";
-        command.Parameters.AddWithValue("@status", (int)SyncStatus.Pending);
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        return ExecuteRead(() =>
         {
-            var pendingType = (PendingType)reader.GetInt32(0);
-            var count = reader.GetInt32(1);
-            counts[pendingType] = count;
-        }
+            var counts = new Dictionary<PendingType, int>();
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "SELECT PendingType, COUNT(*) as Count FROM SyncItems WHERE Status = @status AND PendingType IS NOT NULL GROUP BY PendingType";
+            command.Parameters.AddWithValue("@status", (int)SyncStatus.Pending);
 
-        return counts;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                var pendingType = (PendingType)reader.GetInt32(0);
+                var count = reader.GetInt32(1);
+                counts[pendingType] = count;
+            }
+
+            return counts;
+        }, fallbackValue: new Dictionary<PendingType, int>());
     }
 
     /// <summary>
@@ -598,41 +656,42 @@ public class SyncDatabase : IDisposable
     /// <returns>Dictionary with size breakdown and total.</returns>
     public Dictionary<string, long> GetPendingSizes()
     {
-        EnsureConnection();
+        return ExecuteRead(() =>
+        {
+            var sizes = new Dictionary<string, long>();
 
-        var sizes = new Dictionary<string, long>();
+            // Get pending download size
+            using var pendingDownloadCmd = _connection!.CreateCommand();
+            pendingDownloadCmd.CommandText = "SELECT COALESCE(SUM(SourceSize), 0) FROM SyncItems WHERE Status = @status AND PendingType = @pendingType";
+            pendingDownloadCmd.Parameters.AddWithValue("@status", (int)SyncStatus.Pending);
+            pendingDownloadCmd.Parameters.AddWithValue("@pendingType", (int)PendingType.Download);
+            sizes["PendingDownload"] = Convert.ToInt64(pendingDownloadCmd.ExecuteScalar());
 
-        // Get pending download size
-        using var pendingDownloadCmd = _connection!.CreateCommand();
-        pendingDownloadCmd.CommandText = "SELECT COALESCE(SUM(SourceSize), 0) FROM SyncItems WHERE Status = @status AND PendingType = @pendingType";
-        pendingDownloadCmd.Parameters.AddWithValue("@status", (int)SyncStatus.Pending);
-        pendingDownloadCmd.Parameters.AddWithValue("@pendingType", (int)PendingType.Download);
-        sizes["PendingDownload"] = Convert.ToInt64(pendingDownloadCmd.ExecuteScalar());
+            // Get pending replacement size
+            using var pendingReplacementCmd = _connection.CreateCommand();
+            pendingReplacementCmd.CommandText = "SELECT COALESCE(SUM(SourceSize), 0) FROM SyncItems WHERE Status = @status AND PendingType = @pendingType";
+            pendingReplacementCmd.Parameters.AddWithValue("@status", (int)SyncStatus.Pending);
+            pendingReplacementCmd.Parameters.AddWithValue("@pendingType", (int)PendingType.Replacement);
+            sizes["PendingReplacement"] = Convert.ToInt64(pendingReplacementCmd.ExecuteScalar());
 
-        // Get pending replacement size
-        using var pendingReplacementCmd = _connection.CreateCommand();
-        pendingReplacementCmd.CommandText = "SELECT COALESCE(SUM(SourceSize), 0) FROM SyncItems WHERE Status = @status AND PendingType = @pendingType";
-        pendingReplacementCmd.Parameters.AddWithValue("@status", (int)SyncStatus.Pending);
-        pendingReplacementCmd.Parameters.AddWithValue("@pendingType", (int)PendingType.Replacement);
-        sizes["PendingReplacement"] = Convert.ToInt64(pendingReplacementCmd.ExecuteScalar());
+            // Get pending deletion size
+            using var pendingDeletionCmd = _connection.CreateCommand();
+            pendingDeletionCmd.CommandText = "SELECT COALESCE(SUM(SourceSize), 0) FROM SyncItems WHERE Status = @status AND PendingType = @pendingType";
+            pendingDeletionCmd.Parameters.AddWithValue("@status", (int)SyncStatus.Pending);
+            pendingDeletionCmd.Parameters.AddWithValue("@pendingType", (int)PendingType.Deletion);
+            sizes["PendingDeletion"] = Convert.ToInt64(pendingDeletionCmd.ExecuteScalar());
 
-        // Get pending deletion size
-        using var pendingDeletionCmd = _connection.CreateCommand();
-        pendingDeletionCmd.CommandText = "SELECT COALESCE(SUM(SourceSize), 0) FROM SyncItems WHERE Status = @status AND PendingType = @pendingType";
-        pendingDeletionCmd.Parameters.AddWithValue("@status", (int)SyncStatus.Pending);
-        pendingDeletionCmd.Parameters.AddWithValue("@pendingType", (int)PendingType.Deletion);
-        sizes["PendingDeletion"] = Convert.ToInt64(pendingDeletionCmd.ExecuteScalar());
+            // Get queued size
+            using var queuedCmd = _connection.CreateCommand();
+            queuedCmd.CommandText = "SELECT COALESCE(SUM(SourceSize), 0) FROM SyncItems WHERE Status = @status";
+            queuedCmd.Parameters.AddWithValue("@status", (int)SyncStatus.Queued);
+            sizes["Queued"] = Convert.ToInt64(queuedCmd.ExecuteScalar());
 
-        // Get queued size
-        using var queuedCmd = _connection.CreateCommand();
-        queuedCmd.CommandText = "SELECT COALESCE(SUM(SourceSize), 0) FROM SyncItems WHERE Status = @status";
-        queuedCmd.Parameters.AddWithValue("@status", (int)SyncStatus.Queued);
-        sizes["Queued"] = Convert.ToInt64(queuedCmd.ExecuteScalar());
+            // Calculate total: PendingDownload + PendingReplacement + Queued - PendingDeletion
+            sizes["Total"] = sizes["PendingDownload"] + sizes["PendingReplacement"] + sizes["Queued"] - sizes["PendingDeletion"];
 
-        // Calculate total: PendingDownload + PendingReplacement + Queued - PendingDeletion
-        sizes["Total"] = sizes["PendingDownload"] + sizes["PendingReplacement"] + sizes["Queued"] - sizes["PendingDeletion"];
-
-        return sizes;
+            return sizes;
+        }, fallbackValue: new Dictionary<string, long>());
     }
 
     /// <summary>
@@ -643,21 +702,22 @@ public class SyncDatabase : IDisposable
     /// <returns>List of errored items eligible for retry.</returns>
     public List<SyncItem> GetErroredItemsForRetry(int maxRetries)
     {
-        EnsureConnection();
-
-        var items = new List<SyncItem>();
-        using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT * FROM SyncItems WHERE Status = @status AND (RetryCount IS NULL OR RetryCount < @maxRetries)";
-        command.Parameters.AddWithValue("@status", (int)SyncStatus.Errored);
-        command.Parameters.AddWithValue("@maxRetries", maxRetries);
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        return ExecuteRead(() =>
         {
-            items.Add(ReadSyncItem(reader));
-        }
+            var items = new List<SyncItem>();
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "SELECT * FROM SyncItems WHERE Status = @status AND (RetryCount IS NULL OR RetryCount < @maxRetries)";
+            command.Parameters.AddWithValue("@status", (int)SyncStatus.Errored);
+            command.Parameters.AddWithValue("@maxRetries", maxRetries);
 
-        return items;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                items.Add(ReadSyncItem(reader));
+            }
+
+            return items;
+        }, fallbackValue: new List<SyncItem>());
     }
 
     /// <summary>
@@ -668,6 +728,7 @@ public class SyncDatabase : IDisposable
     /// <param name="transaction">Optional transaction.</param>
     public void Upsert(SyncItem item, SqliteTransaction? transaction = null)
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             UpsertInternal(item, transaction);
@@ -753,6 +814,7 @@ public class SyncDatabase : IDisposable
         long? sourceSize = null,
         string? companionFiles = null)
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             EnsureConnection();
@@ -862,6 +924,7 @@ public class SyncDatabase : IDisposable
     /// <param name="transaction">Optional transaction.</param>
     public void Delete(string sourceItemId, SqliteTransaction? transaction = null)
     {
+        ThrowIfDisposed();
         // Only lock if we're not already inside a transaction (which would have its own lock)
         if (transaction == null)
         {
@@ -894,21 +957,22 @@ public class SyncDatabase : IDisposable
     /// <returns>Dictionary of status to count.</returns>
     public Dictionary<SyncStatus, int> GetStatusCounts()
     {
-        EnsureConnection();
-
-        var counts = new Dictionary<SyncStatus, int>();
-        using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT Status, COUNT(*) as Count FROM SyncItems GROUP BY Status";
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        return ExecuteRead(() =>
         {
-            var status = (SyncStatus)reader.GetInt32(0);
-            var count = reader.GetInt32(1);
-            counts[status] = count;
-        }
+            var counts = new Dictionary<SyncStatus, int>();
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "SELECT Status, COUNT(*) as Count FROM SyncItems GROUP BY Status";
 
-        return counts;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                var status = (SyncStatus)reader.GetInt32(0);
+                var count = reader.GetInt32(1);
+                counts[status] = count;
+            }
+
+            return counts;
+        }, fallbackValue: new Dictionary<SyncStatus, int>());
     }
 
     /// <summary>
@@ -918,39 +982,40 @@ public class SyncDatabase : IDisposable
     /// <returns>Sync statistics object.</returns>
     public SyncStats GetSyncStats()
     {
-        EnsureConnection();
-
-        var stats = new SyncStats();
-
-        using var countCmd = _connection!.CreateCommand();
-        countCmd.CommandText = "SELECT Status, COUNT(*) FROM SyncItems GROUP BY Status";
-        using var reader = countCmd.ExecuteReader();
-        while (reader.Read())
+        return ExecuteRead(() =>
         {
-            var status = (SyncStatus)reader.GetInt32(0);
-            var count = reader.GetInt32(1);
-            stats.StatusCounts[status] = count;
-        }
+            var stats = new SyncStats();
 
-        using var queuedSizeCmd = _connection.CreateCommand();
-        queuedSizeCmd.CommandText = "SELECT COALESCE(SUM(SourceSize), 0) FROM SyncItems WHERE Status = @status";
-        queuedSizeCmd.Parameters.AddWithValue("@status", (int)SyncStatus.Queued);
-        stats.TotalQueuedBytes = Convert.ToInt64(queuedSizeCmd.ExecuteScalar());
+            using var countCmd = _connection!.CreateCommand();
+            countCmd.CommandText = "SELECT Status, COUNT(*) FROM SyncItems GROUP BY Status";
+            using var reader = countCmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var status = (SyncStatus)reader.GetInt32(0);
+                var count = reader.GetInt32(1);
+                stats.StatusCounts[status] = count;
+            }
 
-        using var syncedSizeCmd = _connection.CreateCommand();
-        syncedSizeCmd.CommandText = "SELECT COALESCE(SUM(SourceSize), 0) FROM SyncItems WHERE Status = @status";
-        syncedSizeCmd.Parameters.AddWithValue("@status", (int)SyncStatus.Synced);
-        stats.TotalSyncedBytes = Convert.ToInt64(syncedSizeCmd.ExecuteScalar());
+            using var queuedSizeCmd = _connection.CreateCommand();
+            queuedSizeCmd.CommandText = "SELECT COALESCE(SUM(SourceSize), 0) FROM SyncItems WHERE Status = @status";
+            queuedSizeCmd.Parameters.AddWithValue("@status", (int)SyncStatus.Queued);
+            stats.TotalQueuedBytes = Convert.ToInt64(queuedSizeCmd.ExecuteScalar());
 
-        using var lastSyncCmd = _connection.CreateCommand();
-        lastSyncCmd.CommandText = "SELECT MAX(LastSyncTime) FROM SyncItems WHERE LastSyncTime IS NOT NULL";
-        var lastSync = lastSyncCmd.ExecuteScalar();
-        if (lastSync != null && lastSync != DBNull.Value)
-        {
-            stats.LastSyncTime = DateTime.Parse((string)lastSync);
-        }
+            using var syncedSizeCmd = _connection.CreateCommand();
+            syncedSizeCmd.CommandText = "SELECT COALESCE(SUM(SourceSize), 0) FROM SyncItems WHERE Status = @status";
+            syncedSizeCmd.Parameters.AddWithValue("@status", (int)SyncStatus.Synced);
+            stats.TotalSyncedBytes = Convert.ToInt64(syncedSizeCmd.ExecuteScalar());
 
-        return stats;
+            using var lastSyncCmd = _connection.CreateCommand();
+            lastSyncCmd.CommandText = "SELECT MAX(LastSyncTime) FROM SyncItems WHERE LastSyncTime IS NOT NULL";
+            var lastSync = lastSyncCmd.ExecuteScalar();
+            if (lastSync != null && lastSync != DBNull.Value)
+            {
+                stats.LastSyncTime = DateTime.Parse((string)lastSync);
+            }
+
+            return stats;
+        }, fallbackValue: new SyncStats());
     }
 
     /// <summary>
@@ -961,6 +1026,7 @@ public class SyncDatabase : IDisposable
     /// <returns>Number of items reset.</returns>
     public int ClearStaleErrors(int olderThanDays)
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             EnsureConnection();
@@ -1109,27 +1175,39 @@ public class SyncDatabase : IDisposable
             _logger.LogWarning(ex, "Error disposing old database connection");
         }
 
+        _connection = null;
+
         // Clear the connection pool to avoid stale cached connections
         SqliteConnection.ClearAllPools();
 
+        SqliteConnection? newConnection = null;
         try
         {
-            _connection = new SqliteConnection(BuildConnectionString());
-            _connection.Open();
+            newConnection = new SqliteConnection(BuildConnectionString());
+            newConnection.Open();
 
             // Re-apply pragmas on reconnection
-            using var pragmaCmd = _connection.CreateCommand();
+            using var pragmaCmd = newConnection.CreateCommand();
             pragmaCmd.CommandText = @"
                 PRAGMA journal_mode=WAL;
                 PRAGMA busy_timeout=5000;
                 PRAGMA synchronous=NORMAL;
             ";
             pragmaCmd.ExecuteNonQuery();
+
+            _connection = newConnection;
+            newConnection = null; // Transfer ownership, prevent dispose in finally
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to open database connection to {DbPath}", _dbPath);
             throw new InvalidOperationException($"Unable to open database connection: {ex.Message}", ex);
+        }
+        finally
+        {
+            // If newConnection is still set, we failed after Open() but before
+            // assigning to _connection — dispose to prevent leak
+            newConnection?.Dispose();
         }
     }
 
@@ -1139,6 +1217,7 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public void ResetDatabase()
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             _logger.LogWarning("Resetting sync database - all tracking data will be lost");
@@ -1171,6 +1250,7 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public void ResetHistoryDatabase()
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             _logger.LogWarning("Resetting history sync database - all history tracking data will be lost");
@@ -1204,6 +1284,7 @@ public class SyncDatabase : IDisposable
     /// <returns>True if committed successfully.</returns>
     public bool ExecuteInTransaction(Action<SqliteTransaction> action)
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             EnsureConnection();
@@ -1240,6 +1321,7 @@ public class SyncDatabase : IDisposable
     /// <returns>Number of items deleted.</returns>
     public int BatchDelete(IEnumerable<string> sourceItemIds)
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             EnsureConnection();
@@ -1276,6 +1358,7 @@ public class SyncDatabase : IDisposable
     /// <returns>Number of items updated.</returns>
     public int BatchUpdateStatus(IEnumerable<string> sourceItemIds, SyncStatus status, string? errorMessage = null)
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             EnsureConnection();
@@ -1334,15 +1417,16 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public HistorySyncItem? GetHistoryItem(string sourceUserId, string sourceItemId)
     {
-        EnsureConnection();
+        return ExecuteRead(() =>
+        {
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "SELECT * FROM HistorySyncItems WHERE SourceUserId = @sourceUserId AND SourceItemId = @sourceItemId";
+            command.Parameters.AddWithValue("@sourceUserId", sourceUserId);
+            command.Parameters.AddWithValue("@sourceItemId", sourceItemId);
 
-        using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT * FROM HistorySyncItems WHERE SourceUserId = @sourceUserId AND SourceItemId = @sourceItemId";
-        command.Parameters.AddWithValue("@sourceUserId", sourceUserId);
-        command.Parameters.AddWithValue("@sourceItemId", sourceItemId);
-
-        using var reader = command.ExecuteReader();
-        return reader.Read() ? ReadHistorySyncItem(reader) : null;
+            using var reader = command.ExecuteReader();
+            return reader.Read() ? ReadHistorySyncItem(reader) : null;
+        }, fallbackValue: null);
     }
 
     /// <summary>
@@ -1350,21 +1434,22 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public List<HistorySyncItem> GetHistoryItemsByUserMapping(string sourceUserId, string localUserId)
     {
-        EnsureConnection();
-
-        var items = new List<HistorySyncItem>();
-        using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT * FROM HistorySyncItems WHERE SourceUserId = @sourceUserId AND LocalUserId = @localUserId";
-        command.Parameters.AddWithValue("@sourceUserId", sourceUserId);
-        command.Parameters.AddWithValue("@localUserId", localUserId);
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        return ExecuteRead(() =>
         {
-            items.Add(ReadHistorySyncItem(reader));
-        }
+            var items = new List<HistorySyncItem>();
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "SELECT * FROM HistorySyncItems WHERE SourceUserId = @sourceUserId AND LocalUserId = @localUserId";
+            command.Parameters.AddWithValue("@sourceUserId", sourceUserId);
+            command.Parameters.AddWithValue("@localUserId", localUserId);
 
-        return items;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                items.Add(ReadHistorySyncItem(reader));
+            }
+
+            return items;
+        }, fallbackValue: new List<HistorySyncItem>());
     }
 
     /// <summary>
@@ -1372,20 +1457,21 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public List<HistorySyncItem> GetHistoryItemsByStatus(BaseSyncStatus status)
     {
-        EnsureConnection();
-
-        var items = new List<HistorySyncItem>();
-        using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT * FROM HistorySyncItems WHERE Status = @status";
-        command.Parameters.AddWithValue("@status", (int)status);
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        return ExecuteRead(() =>
         {
-            items.Add(ReadHistorySyncItem(reader));
-        }
+            var items = new List<HistorySyncItem>();
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "SELECT * FROM HistorySyncItems WHERE Status = @status";
+            command.Parameters.AddWithValue("@status", (int)status);
 
-        return items;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                items.Add(ReadHistorySyncItem(reader));
+            }
+
+            return items;
+        }, fallbackValue: new List<HistorySyncItem>());
     }
 
     /// <summary>
@@ -1398,97 +1484,98 @@ public class SyncDatabase : IDisposable
         int skip = 0,
         int take = 50)
     {
-        EnsureConnection();
-
-        var conditions = new List<string>();
-
-        if (!string.IsNullOrWhiteSpace(searchTerm))
+        return ExecuteRead(() =>
         {
-            conditions.Add("(ItemName LIKE @searchTerm OR SourcePath LIKE @searchTerm)");
-        }
-
-        if (status.HasValue)
-        {
-            conditions.Add("Status = @status");
-        }
-
-        if (!string.IsNullOrWhiteSpace(sourceUserId))
-        {
-            conditions.Add("SourceUserId = @sourceUserId");
-        }
-
-        var whereClause = conditions.Count > 0
-            ? $"WHERE {string.Join(" AND ", conditions)}"
-            : string.Empty;
-
-        // Get total count
-        int totalCount;
-        using (var countCommand = _connection!.CreateCommand())
-        {
-            countCommand.CommandText = $"SELECT COUNT(*) FROM HistorySyncItems {whereClause}";
+            var conditions = new List<string>();
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
-                countCommand.Parameters.AddWithValue("@searchTerm", $"%{searchTerm}%");
+                conditions.Add("(ItemName LIKE @searchTerm OR SourcePath LIKE @searchTerm)");
             }
 
             if (status.HasValue)
             {
-                countCommand.Parameters.AddWithValue("@status", (int)status.Value);
+                conditions.Add("Status = @status");
             }
 
             if (!string.IsNullOrWhiteSpace(sourceUserId))
             {
-                countCommand.Parameters.AddWithValue("@sourceUserId", sourceUserId);
+                conditions.Add("SourceUserId = @sourceUserId");
             }
 
-            totalCount = Convert.ToInt32(countCommand.ExecuteScalar());
-        }
+            var whereClause = conditions.Count > 0
+                ? $"WHERE {string.Join(" AND ", conditions)}"
+                : string.Empty;
 
-        // Get paginated data
-        var items = new List<HistorySyncItem>();
-        using (var dataCommand = _connection!.CreateCommand())
-        {
-            dataCommand.CommandText = $@"
-                SELECT * FROM HistorySyncItems
-                {whereClause}
-                ORDER BY
-                    CASE Status
-                        WHEN 3 THEN 0  -- Errored first
-                        WHEN 1 THEN 1  -- Queued second
-                        WHEN 4 THEN 2  -- Ignored third
-                        WHEN 2 THEN 3  -- Synced last
-                        ELSE 4
-                    END,
-                    ItemName ASC
-                LIMIT @take OFFSET @skip";
-
-            if (!string.IsNullOrWhiteSpace(searchTerm))
+            // Get total count
+            int totalCount;
+            using (var countCommand = _connection!.CreateCommand())
             {
-                dataCommand.Parameters.AddWithValue("@searchTerm", $"%{searchTerm}%");
+                countCommand.CommandText = $"SELECT COUNT(*) FROM HistorySyncItems {whereClause}";
+
+                if (!string.IsNullOrWhiteSpace(searchTerm))
+                {
+                    countCommand.Parameters.AddWithValue("@searchTerm", $"%{searchTerm}%");
+                }
+
+                if (status.HasValue)
+                {
+                    countCommand.Parameters.AddWithValue("@status", (int)status.Value);
+                }
+
+                if (!string.IsNullOrWhiteSpace(sourceUserId))
+                {
+                    countCommand.Parameters.AddWithValue("@sourceUserId", sourceUserId);
+                }
+
+                totalCount = Convert.ToInt32(countCommand.ExecuteScalar());
             }
 
-            if (status.HasValue)
+            // Get paginated data
+            var items = new List<HistorySyncItem>();
+            using (var dataCommand = _connection!.CreateCommand())
             {
-                dataCommand.Parameters.AddWithValue("@status", (int)status.Value);
+                dataCommand.CommandText = $@"
+                    SELECT * FROM HistorySyncItems
+                    {whereClause}
+                    ORDER BY
+                        CASE Status
+                            WHEN 3 THEN 0  -- Errored first
+                            WHEN 1 THEN 1  -- Queued second
+                            WHEN 4 THEN 2  -- Ignored third
+                            WHEN 2 THEN 3  -- Synced last
+                            ELSE 4
+                        END,
+                        ItemName ASC
+                    LIMIT @take OFFSET @skip";
+
+                if (!string.IsNullOrWhiteSpace(searchTerm))
+                {
+                    dataCommand.Parameters.AddWithValue("@searchTerm", $"%{searchTerm}%");
+                }
+
+                if (status.HasValue)
+                {
+                    dataCommand.Parameters.AddWithValue("@status", (int)status.Value);
+                }
+
+                if (!string.IsNullOrWhiteSpace(sourceUserId))
+                {
+                    dataCommand.Parameters.AddWithValue("@sourceUserId", sourceUserId);
+                }
+
+                dataCommand.Parameters.AddWithValue("@take", take);
+                dataCommand.Parameters.AddWithValue("@skip", skip);
+
+                using var reader = dataCommand.ExecuteReader();
+                while (reader.Read())
+                {
+                    items.Add(ReadHistorySyncItem(reader));
+                }
             }
 
-            if (!string.IsNullOrWhiteSpace(sourceUserId))
-            {
-                dataCommand.Parameters.AddWithValue("@sourceUserId", sourceUserId);
-            }
-
-            dataCommand.Parameters.AddWithValue("@take", take);
-            dataCommand.Parameters.AddWithValue("@skip", skip);
-
-            using var reader = dataCommand.ExecuteReader();
-            while (reader.Read())
-            {
-                items.Add(ReadHistorySyncItem(reader));
-            }
-        }
-
-        return (items, totalCount);
+            return (items, totalCount);
+        }, fallbackValue: (new List<HistorySyncItem>(), 0));
     }
 
     /// <summary>
@@ -1496,21 +1583,22 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public Dictionary<BaseSyncStatus, int> GetHistoryStatusCounts()
     {
-        EnsureConnection();
-
-        var counts = new Dictionary<BaseSyncStatus, int>();
-        using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT Status, COUNT(*) as Count FROM HistorySyncItems GROUP BY Status";
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        return ExecuteRead(() =>
         {
-            var status = (BaseSyncStatus)reader.GetInt32(0);
-            var count = reader.GetInt32(1);
-            counts[status] = count;
-        }
+            var counts = new Dictionary<BaseSyncStatus, int>();
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "SELECT Status, COUNT(*) as Count FROM HistorySyncItems GROUP BY Status";
 
-        return counts;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                var status = (BaseSyncStatus)reader.GetInt32(0);
+                var count = reader.GetInt32(1);
+                counts[status] = count;
+            }
+
+            return counts;
+        }, fallbackValue: new Dictionary<BaseSyncStatus, int>());
     }
 
     /// <summary>
@@ -1518,6 +1606,7 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public void UpsertHistoryItem(HistorySyncItem item, SqliteTransaction? transaction = null)
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             EnsureConnection();
@@ -1619,6 +1708,7 @@ public class SyncDatabase : IDisposable
         BaseSyncStatus status,
         string? errorMessage = null)
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             EnsureConnection();
@@ -1662,6 +1752,7 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public int BatchUpdateHistoryItemStatus(IEnumerable<(string SourceUserId, string SourceItemId)> items, BaseSyncStatus status)
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             EnsureConnection();
@@ -1707,6 +1798,7 @@ public class SyncDatabase : IDisposable
     /// <param name="errorMessage">Optional error message.</param>
     public void UpdateHistoryItemStatusById(long id, BaseSyncStatus status, string? errorMessage = null)
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             EnsureConnection();
@@ -1749,6 +1841,7 @@ public class SyncDatabase : IDisposable
     /// <returns>True if an item was deleted, false otherwise.</returns>
     public bool DeleteHistoryItem(long id)
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             EnsureConnection();
@@ -1769,6 +1862,7 @@ public class SyncDatabase : IDisposable
     /// <returns>Number of items updated.</returns>
     public int BatchUpdateHistoryItemStatusByIds(IEnumerable<long> ids, BaseSyncStatus status)
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             EnsureConnection();
@@ -1966,14 +2060,15 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public UserSyncItem? GetUserSyncItemById(long id)
     {
-        EnsureConnection();
+        return ExecuteRead(() =>
+        {
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "SELECT * FROM UserSyncItems WHERE Id = @id";
+            command.Parameters.AddWithValue("@id", id);
 
-        using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT * FROM UserSyncItems WHERE Id = @id";
-        command.Parameters.AddWithValue("@id", id);
-
-        using var reader = command.ExecuteReader();
-        return reader.Read() ? ReadUserSyncItem(reader) : null;
+            using var reader = command.ExecuteReader();
+            return reader.Read() ? ReadUserSyncItem(reader) : null;
+        }, fallbackValue: null);
     }
 
     /// <summary>
@@ -1981,20 +2076,21 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public UserSyncItem? GetUserSyncItem(string sourceUserId, string localUserId, string propertyCategory)
     {
-        EnsureConnection();
+        return ExecuteRead(() =>
+        {
+            using var command = _connection!.CreateCommand();
+            command.CommandText = @"
+                SELECT * FROM UserSyncItems
+                WHERE SourceUserId = @sourceUserId
+                  AND LocalUserId = @localUserId
+                  AND PropertyCategory = @propertyCategory";
+            command.Parameters.AddWithValue("@sourceUserId", sourceUserId);
+            command.Parameters.AddWithValue("@localUserId", localUserId);
+            command.Parameters.AddWithValue("@propertyCategory", propertyCategory);
 
-        using var command = _connection!.CreateCommand();
-        command.CommandText = @"
-            SELECT * FROM UserSyncItems
-            WHERE SourceUserId = @sourceUserId
-              AND LocalUserId = @localUserId
-              AND PropertyCategory = @propertyCategory";
-        command.Parameters.AddWithValue("@sourceUserId", sourceUserId);
-        command.Parameters.AddWithValue("@localUserId", localUserId);
-        command.Parameters.AddWithValue("@propertyCategory", propertyCategory);
-
-        using var reader = command.ExecuteReader();
-        return reader.Read() ? ReadUserSyncItem(reader) : null;
+            using var reader = command.ExecuteReader();
+            return reader.Read() ? ReadUserSyncItem(reader) : null;
+        }, fallbackValue: null);
     }
 
     /// <summary>
@@ -2002,21 +2098,22 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public List<UserSyncItem> GetUserSyncItemsByUserMapping(string sourceUserId, string localUserId)
     {
-        EnsureConnection();
-
-        var items = new List<UserSyncItem>();
-        using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT * FROM UserSyncItems WHERE SourceUserId = @sourceUserId AND LocalUserId = @localUserId ORDER BY PropertyCategory";
-        command.Parameters.AddWithValue("@sourceUserId", sourceUserId);
-        command.Parameters.AddWithValue("@localUserId", localUserId);
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        return ExecuteRead(() =>
         {
-            items.Add(ReadUserSyncItem(reader));
-        }
+            var items = new List<UserSyncItem>();
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "SELECT * FROM UserSyncItems WHERE SourceUserId = @sourceUserId AND LocalUserId = @localUserId ORDER BY PropertyCategory";
+            command.Parameters.AddWithValue("@sourceUserId", sourceUserId);
+            command.Parameters.AddWithValue("@localUserId", localUserId);
 
-        return items;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                items.Add(ReadUserSyncItem(reader));
+            }
+
+            return items;
+        }, fallbackValue: new List<UserSyncItem>());
     }
 
     /// <summary>
@@ -2024,19 +2121,20 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public List<UserSyncItem> GetAllUserSyncItems()
     {
-        EnsureConnection();
-
-        var items = new List<UserSyncItem>();
-        using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT * FROM UserSyncItems ORDER BY SourceUserName, LocalUserName";
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        return ExecuteRead(() =>
         {
-            items.Add(ReadUserSyncItem(reader));
-        }
+            var items = new List<UserSyncItem>();
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "SELECT * FROM UserSyncItems ORDER BY SourceUserName, LocalUserName";
 
-        return items;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                items.Add(ReadUserSyncItem(reader));
+            }
+
+            return items;
+        }, fallbackValue: new List<UserSyncItem>());
     }
 
     /// <summary>
@@ -2044,20 +2142,21 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public List<UserSyncItem> GetUserSyncItemsByStatus(BaseSyncStatus status)
     {
-        EnsureConnection();
-
-        var items = new List<UserSyncItem>();
-        using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT * FROM UserSyncItems WHERE Status = @status";
-        command.Parameters.AddWithValue("@status", (int)status);
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        return ExecuteRead(() =>
         {
-            items.Add(ReadUserSyncItem(reader));
-        }
+            var items = new List<UserSyncItem>();
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "SELECT * FROM UserSyncItems WHERE Status = @status";
+            command.Parameters.AddWithValue("@status", (int)status);
 
-        return items;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                items.Add(ReadUserSyncItem(reader));
+            }
+
+            return items;
+        }, fallbackValue: new List<UserSyncItem>());
     }
 
     /// <summary>
@@ -2071,9 +2170,9 @@ public class SyncDatabase : IDisposable
         int skip = 0,
         int take = 50)
     {
-        EnsureConnection();
-
-        var conditions = new List<string>();
+        return ExecuteRead(() =>
+        {
+            var conditions = new List<string>();
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
@@ -2178,7 +2277,8 @@ public class SyncDatabase : IDisposable
             }
         }
 
-        return (items, totalCount);
+            return (items, totalCount);
+        }, fallbackValue: (new List<UserSyncItem>(), 0));
     }
 
     /// <summary>
@@ -2187,10 +2287,10 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public Dictionary<BaseSyncStatus, int> GetUserSyncStatusCounts()
     {
-        EnsureConnection();
-
-        var counts = new Dictionary<BaseSyncStatus, int>();
-        using var command = _connection!.CreateCommand();
+        return ExecuteRead(() =>
+        {
+            var counts = new Dictionary<BaseSyncStatus, int>();
+            using var command = _connection!.CreateCommand();
 
         // For each unique user mapping (SourceUserId, LocalUserId), determine overall status:
         // - If ANY record is Errored -> user is Errored
@@ -2223,7 +2323,8 @@ public class SyncDatabase : IDisposable
             counts[syncStatus] = count;
         }
 
-        return counts;
+            return counts;
+        }, fallbackValue: new Dictionary<BaseSyncStatus, int>());
     }
 
     /// <summary>
@@ -2231,6 +2332,7 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public void UpsertUserSyncItem(UserSyncItem item, SqliteTransaction? transaction = null)
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             EnsureConnection();
@@ -2324,6 +2426,7 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public void UpdateUserSyncItemStatusById(long id, BaseSyncStatus status, string? errorMessage = null)
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             EnsureConnection();
@@ -2364,6 +2467,7 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public int BatchUpdateUserSyncItemStatusByIds(IEnumerable<long> ids, BaseSyncStatus status)
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             EnsureConnection();
@@ -2406,6 +2510,7 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public int DeleteUserSyncItemsByUserMapping(string sourceUserId, string localUserId)
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             EnsureConnection();
@@ -2425,6 +2530,7 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public void ResetUserSyncDatabase()
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             _logger.LogWarning("Resetting user sync database - all user sync tracking data will be lost");
@@ -2463,9 +2569,9 @@ public class SyncDatabase : IDisposable
         int skip = 0,
         int take = 50)
     {
-        EnsureConnection();
-
-        var conditions = new List<string>();
+        return ExecuteRead(() =>
+        {
+            var conditions = new List<string>();
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
@@ -2577,7 +2683,8 @@ public class SyncDatabase : IDisposable
             result.Add((sourceUserId, localUserId, sourceUserName, localUserName, items));
         }
 
-        return (result, totalCount);
+            return (result, totalCount);
+        }, fallbackValue: (new List<(string SourceUserId, string LocalUserId, string? SourceUserName, string? LocalUserName, List<UserSyncItem> Items)>(), 0));
     }
 
     /// <summary>
@@ -2594,6 +2701,7 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public int BatchUpdateUserSyncStatusByMapping(string sourceUserId, string localUserId, BaseSyncStatus status)
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             EnsureConnection();
@@ -2619,6 +2727,7 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public int BatchUpdateUserSyncStatusByMappings(IEnumerable<(string SourceUserId, string LocalUserId)> mappings, BaseSyncStatus status)
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             EnsureConnection();
@@ -2765,14 +2874,15 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public MetadataSyncItem? GetMetadataSyncItemById(long id)
     {
-        EnsureConnection();
+        return ExecuteRead(() =>
+        {
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "SELECT * FROM MetadataSyncItems WHERE Id = @id";
+            command.Parameters.AddWithValue("@id", id);
 
-        using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT * FROM MetadataSyncItems WHERE Id = @id";
-        command.Parameters.AddWithValue("@id", id);
-
-        using var reader = command.ExecuteReader();
-        return reader.Read() ? ReadMetadataSyncItem(reader) : null;
+            using var reader = command.ExecuteReader();
+            return reader.Read() ? ReadMetadataSyncItem(reader) : null;
+        }, fallbackValue: null);
     }
 
     /// <summary>
@@ -2780,18 +2890,19 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public MetadataSyncItem? GetMetadataSyncItem(string sourceLibraryId, string sourceItemId)
     {
-        EnsureConnection();
+        return ExecuteRead(() =>
+        {
+            using var command = _connection!.CreateCommand();
+            command.CommandText = @"
+                SELECT * FROM MetadataSyncItems
+                WHERE SourceLibraryId = @sourceLibraryId
+                  AND SourceItemId = @sourceItemId";
+            command.Parameters.AddWithValue("@sourceLibraryId", sourceLibraryId);
+            command.Parameters.AddWithValue("@sourceItemId", sourceItemId);
 
-        using var command = _connection!.CreateCommand();
-        command.CommandText = @"
-            SELECT * FROM MetadataSyncItems
-            WHERE SourceLibraryId = @sourceLibraryId
-              AND SourceItemId = @sourceItemId";
-        command.Parameters.AddWithValue("@sourceLibraryId", sourceLibraryId);
-        command.Parameters.AddWithValue("@sourceItemId", sourceItemId);
-
-        using var reader = command.ExecuteReader();
-        return reader.Read() ? ReadMetadataSyncItem(reader) : null;
+            using var reader = command.ExecuteReader();
+            return reader.Read() ? ReadMetadataSyncItem(reader) : null;
+        }, fallbackValue: null);
     }
 
     /// <summary>
@@ -2799,14 +2910,15 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public MetadataSyncItem? GetMetadataSyncItemBySourceItem(string sourceItemId)
     {
-        EnsureConnection();
+        return ExecuteRead(() =>
+        {
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "SELECT * FROM MetadataSyncItems WHERE SourceItemId = @sourceItemId";
+            command.Parameters.AddWithValue("@sourceItemId", sourceItemId);
 
-        using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT * FROM MetadataSyncItems WHERE SourceItemId = @sourceItemId";
-        command.Parameters.AddWithValue("@sourceItemId", sourceItemId);
-
-        using var reader = command.ExecuteReader();
-        return reader.Read() ? ReadMetadataSyncItem(reader) : null;
+            using var reader = command.ExecuteReader();
+            return reader.Read() ? ReadMetadataSyncItem(reader) : null;
+        }, fallbackValue: null);
     }
 
     /// <summary>
@@ -2814,20 +2926,21 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public List<MetadataSyncItem> GetMetadataSyncItemsByLibrary(string sourceLibraryId)
     {
-        EnsureConnection();
-
-        var items = new List<MetadataSyncItem>();
-        using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT * FROM MetadataSyncItems WHERE SourceLibraryId = @sourceLibraryId";
-        command.Parameters.AddWithValue("@sourceLibraryId", sourceLibraryId);
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        return ExecuteRead(() =>
         {
-            items.Add(ReadMetadataSyncItem(reader));
-        }
+            var items = new List<MetadataSyncItem>();
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "SELECT * FROM MetadataSyncItems WHERE SourceLibraryId = @sourceLibraryId";
+            command.Parameters.AddWithValue("@sourceLibraryId", sourceLibraryId);
 
-        return items;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                items.Add(ReadMetadataSyncItem(reader));
+            }
+
+            return items;
+        }, fallbackValue: new List<MetadataSyncItem>());
     }
 
     /// <summary>
@@ -2835,20 +2948,21 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public List<MetadataSyncItem> GetMetadataSyncItemsByStatus(BaseSyncStatus status)
     {
-        EnsureConnection();
-
-        var items = new List<MetadataSyncItem>();
-        using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT * FROM MetadataSyncItems WHERE Status = @status";
-        command.Parameters.AddWithValue("@status", (int)status);
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        return ExecuteRead(() =>
         {
-            items.Add(ReadMetadataSyncItem(reader));
-        }
+            var items = new List<MetadataSyncItem>();
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "SELECT * FROM MetadataSyncItems WHERE Status = @status";
+            command.Parameters.AddWithValue("@status", (int)status);
 
-        return items;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                items.Add(ReadMetadataSyncItem(reader));
+            }
+
+            return items;
+        }, fallbackValue: new List<MetadataSyncItem>());
     }
 
     /// <summary>
@@ -2861,9 +2975,9 @@ public class SyncDatabase : IDisposable
         int skip = 0,
         int take = 50)
     {
-        EnsureConnection();
-
-        var conditions = new List<string>();
+        return ExecuteRead(() =>
+        {
+            var conditions = new List<string>();
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
@@ -2951,7 +3065,8 @@ public class SyncDatabase : IDisposable
             }
         }
 
-        return (items, totalCount);
+            return (items, totalCount);
+        }, fallbackValue: (new List<MetadataSyncItem>(), 0));
     }
 
     /// <summary>
@@ -2959,21 +3074,22 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public Dictionary<BaseSyncStatus, int> GetMetadataSyncStatusCounts()
     {
-        EnsureConnection();
-
-        var counts = new Dictionary<BaseSyncStatus, int>();
-        using var command = _connection!.CreateCommand();
-        command.CommandText = "SELECT Status, COUNT(*) as Count FROM MetadataSyncItems GROUP BY Status";
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        return ExecuteRead(() =>
         {
-            var syncStatus = (BaseSyncStatus)reader.GetInt32(0);
-            var count = reader.GetInt32(1);
-            counts[syncStatus] = count;
-        }
+            var counts = new Dictionary<BaseSyncStatus, int>();
+            using var command = _connection!.CreateCommand();
+            command.CommandText = "SELECT Status, COUNT(*) as Count FROM MetadataSyncItems GROUP BY Status";
 
-        return counts;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                var syncStatus = (BaseSyncStatus)reader.GetInt32(0);
+                var count = reader.GetInt32(1);
+                counts[syncStatus] = count;
+            }
+
+            return counts;
+        }, fallbackValue: new Dictionary<BaseSyncStatus, int>());
     }
 
     /// <summary>
@@ -2981,6 +3097,7 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public void UpsertMetadataSyncItem(MetadataSyncItem item, SqliteTransaction? transaction = null)
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             EnsureConnection();
@@ -3079,6 +3196,7 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public void UpdateMetadataSyncItemStatusById(long id, BaseSyncStatus status, string? errorMessage = null)
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             EnsureConnection();
@@ -3119,6 +3237,7 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public int BatchUpdateMetadataSyncItemStatusByIds(IEnumerable<long> ids, BaseSyncStatus status)
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             EnsureConnection();
@@ -3161,6 +3280,7 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public int DeleteMetadataSyncItemsBySourceItem(string sourceItemId)
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             EnsureConnection();
@@ -3179,6 +3299,7 @@ public class SyncDatabase : IDisposable
     /// </summary>
     public void ResetMetadataSyncDatabase()
     {
+        ThrowIfDisposed();
         lock (_writeLock)
         {
             _logger.LogWarning("Resetting metadata sync database - all metadata sync tracking data will be lost");
@@ -3341,6 +3462,8 @@ public class SyncDatabase : IDisposable
         {
             lock (_writeLock)
             {
+                _disposed = true; // Set first inside lock to prevent races
+
                 try
                 {
                     _connection?.Close();
@@ -3355,8 +3478,6 @@ public class SyncDatabase : IDisposable
                     _logger.LogWarning(ex, "Error during database disposal");
                 }
             }
-
-            _disposed = true;
         }
     }
 }

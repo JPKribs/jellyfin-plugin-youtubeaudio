@@ -386,6 +386,7 @@ public class ConfigurationController : ControllerBase
     /// <returns>Sync stats response.</returns>
     [HttpGet("Stats")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public ActionResult<SyncStatsResponse> GetSyncStats()
     {
         var plugin = Plugin.Instance;
@@ -394,31 +395,38 @@ public class ConfigurationController : ControllerBase
             return NotFound();
         }
 
-        var config = plugin.Configuration;
-        var stats = plugin.Database.GetSyncStats();
-        var pendingCounts = plugin.Database.GetPendingCounts();
-        var diskInfo = DiskSpaceService.GetMinimumDiskSpaceInfo(config);
-
-        return Ok(new SyncStatsResponse
+        try
         {
-            TotalItems = stats.StatusCounts.Values.Sum(),
-            SyncedItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Synced, 0),
-            QueuedItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Queued, 0),
-            ErroredItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Errored, 0),
-            PendingItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Pending, 0),
-            PendingDownloadItems = pendingCounts.GetValueOrDefault(PendingType.Download, 0),
-            PendingReplacementItems = pendingCounts.GetValueOrDefault(PendingType.Replacement, 0),
-            PendingDeletionItems = pendingCounts.GetValueOrDefault(PendingType.Deletion, 0),
-            IgnoredItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Ignored, 0),
-            TotalSyncedBytes = stats.TotalSyncedBytes,
-            TotalQueuedBytes = stats.TotalQueuedBytes,
-            LastSyncTime = stats.LastSyncTime,
-            LastSyncStartTime = config.LastSyncStartTime,
-            LastSyncEndTime = config.LastSyncEndTime,
-            FreeDiskSpaceBytes = diskInfo?.FreeBytes ?? 0,
-            MinimumRequiredBytes = (long)config.MinimumFreeDiskSpaceGb * 1024 * 1024 * 1024,
-            HasSufficientDiskSpace = diskInfo?.IsSufficient ?? true
-        });
+            var config = plugin.Configuration;
+            var stats = plugin.Database.GetSyncStats();
+            var pendingCounts = plugin.Database.GetPendingCounts();
+            var diskInfo = DiskSpaceService.GetMinimumDiskSpaceInfo(config);
+
+            return Ok(new SyncStatsResponse
+            {
+                TotalItems = stats.StatusCounts.Values.Sum(),
+                SyncedItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Synced, 0),
+                QueuedItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Queued, 0),
+                ErroredItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Errored, 0),
+                PendingItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Pending, 0),
+                PendingDownloadItems = pendingCounts.GetValueOrDefault(PendingType.Download, 0),
+                PendingReplacementItems = pendingCounts.GetValueOrDefault(PendingType.Replacement, 0),
+                PendingDeletionItems = pendingCounts.GetValueOrDefault(PendingType.Deletion, 0),
+                IgnoredItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Ignored, 0),
+                TotalSyncedBytes = stats.TotalSyncedBytes,
+                TotalQueuedBytes = stats.TotalQueuedBytes,
+                LastSyncTime = stats.LastSyncTime,
+                LastSyncStartTime = config.LastSyncStartTime,
+                LastSyncEndTime = config.LastSyncEndTime,
+                FreeDiskSpaceBytes = diskInfo?.FreeBytes ?? 0,
+                MinimumRequiredBytes = (long)config.MinimumFreeDiskSpaceGb * 1024 * 1024 * 1024,
+                HasSufficientDiskSpace = diskInfo?.IsSufficient ?? true
+            });
+        }
+        catch (ObjectDisposedException)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, "Database is not available");
+        }
     }
 
     /// <summary>
@@ -605,8 +613,9 @@ public class ConfigurationController : ControllerBase
             }
             catch (Exception ex)
             {
+                var sanitizedId = SanitizeForLog(itemId);
                 plugin.LoggerFactory.CreateLogger<ConfigurationController>()
-                    .LogWarning(ex, "Failed to update status for item {ItemId}", SanitizeForLog(itemId));
+                    .LogWarning(ex, "Failed to update status for item {ItemId}", sanitizedId);
             }
         }
 
@@ -645,8 +654,9 @@ public class ConfigurationController : ControllerBase
             }
             catch (Exception ex)
             {
+                var sanitizedId = SanitizeForLog(itemId);
                 plugin.LoggerFactory.CreateLogger<ConfigurationController>()
-                    .LogWarning(ex, "Failed to update status for item {ItemId}", SanitizeForLog(itemId));
+                    .LogWarning(ex, "Failed to update status for item {ItemId}", sanitizedId);
             }
         }
 
@@ -688,20 +698,23 @@ public class ConfigurationController : ControllerBase
             var item = plugin.Database.GetBySourceItemId(sourceItemId);
             if (item == null)
             {
-                logger.LogWarning("SKIPPED DELETE: Item {SourceItemId} not found in tracking database", SanitizeForLog(sourceItemId));
+                var sanitizedSourceId = SanitizeForLog(sourceItemId);
+                logger.LogWarning("SKIPPED DELETE: Item {SourceItemId} not found in tracking database", sanitizedSourceId);
                 skippedCount++;
                 continue;
             }
 
             var fileName = Path.GetFileName(item.LocalPath);
+            var sanitizedFileName = SanitizeForLog(fileName);
+            var sanitizedLocalPath = SanitizeForLog(item.LocalPath);
 
             // Validate path is within configured library directories (safety check)
             if (!string.IsNullOrEmpty(item.LocalPath) && !FileValidationService.IsPathWithinLibrary(item.LocalPath, config))
             {
                 logger.LogWarning(
                     "SKIPPED DELETE: {FileName} - Path is outside configured library directories. Local path: {LocalPath}",
-                    SanitizeForLog(fileName),
-                    SanitizeForLog(item.LocalPath));
+                    sanitizedFileName,
+                    sanitizedLocalPath);
                 skippedCount++;
                 continue;
             }
@@ -726,10 +739,11 @@ public class ConfigurationController : ControllerBase
             if (!fileExists)
             {
                 // File doesn't exist anywhere - remove from tracking since there's nothing to delete
+                var sanitizedSourcePath = SanitizeForLog(item.SourcePath);
                 logger.LogWarning(
                     "SKIPPED DELETE: {FileName} - File not found in Jellyfin library or on disk, removing from tracking. Source path: {SourcePath}",
-                    SanitizeForLog(fileName),
-                    SanitizeForLog(item.SourcePath));
+                    sanitizedFileName,
+                    sanitizedSourcePath);
                 plugin.Database.Delete(sourceItemId);
                 skippedCount++;
                 continue;
@@ -743,7 +757,7 @@ public class ConfigurationController : ControllerBase
                 var useRecyclingBin = config.EnableRecyclingBin && !string.IsNullOrEmpty(config.RecyclingBinPath);
                 var action = useRecyclingBin ? "RECYCLED" : "DELETED";
                 var suffix = localItem == null ? " (direct)" : string.Empty;
-                logger.LogInformation("{Action}{Suffix}: {FileName} - Local path: {LocalPath}", action, suffix, SanitizeForLog(fileName), SanitizeForLog(item.LocalPath));
+                logger.LogInformation("{Action}{Suffix}: {FileName} - Local path: {LocalPath}", action, suffix, sanitizedFileName, sanitizedLocalPath);
                 plugin.Database.Delete(sourceItemId);
                 deletedCount++;
             }
@@ -757,14 +771,15 @@ public class ConfigurationController : ControllerBase
                     // File is gone (deleted elsewhere) - remove from tracking
                     logger.LogInformation(
                         "DELETE (external): {FileName} - File no longer exists after deletion attempt, removing from tracking. Local path: {LocalPath}",
-                        SanitizeForLog(fileName),
-                        SanitizeForLog(item.LocalPath));
+                        sanitizedFileName,
+                        sanitizedLocalPath);
                     plugin.Database.Delete(sourceItemId);
                     deletedCount++;
                 }
                 else
                 {
-                    logger.LogError("FAILED DELETE: {FileName} - {Error}. Local path: {LocalPath}", SanitizeForLog(fileName), SanitizeForLog(result.ErrorMessage), SanitizeForLog(item.LocalPath));
+                    var sanitizedError = SanitizeForLog(result.ErrorMessage);
+                    logger.LogError("FAILED DELETE: {FileName} - {Error}. Local path: {LocalPath}", sanitizedFileName, sanitizedError, sanitizedLocalPath);
                     failedCount++;
                 }
             }
@@ -812,8 +827,9 @@ public class ConfigurationController : ControllerBase
             }
             catch (Exception ex)
             {
+                var sanitizedId = SanitizeForLog(sourceItemId);
                 plugin.LoggerFactory.CreateLogger<ConfigurationController>()
-                    .LogWarning(ex, "Failed to remove tracking for item {ItemId}", SanitizeForLog(sourceItemId));
+                    .LogWarning(ex, "Failed to remove tracking for item {ItemId}", sanitizedId);
             }
         }
 
@@ -904,6 +920,7 @@ public class ConfigurationController : ControllerBase
                     continue;
                 }
 
+                var sanitizedFileName = SanitizeForLog(Path.GetFileName(item.LocalPath));
                 try
                 {
                     // Try to find the item in Jellyfin by path
@@ -916,12 +933,12 @@ public class ConfigurationController : ControllerBase
                             localPath: item.LocalPath,
                             localItemId: localItem.Id.ToString());
                         resolvedCount++;
-                        logger.LogDebug("Resolved LocalItemId for {FileName}", SanitizeForLog(Path.GetFileName(item.LocalPath)));
+                        logger.LogDebug("Resolved LocalItemId for {FileName}", sanitizedFileName);
                     }
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Failed to resolve LocalItemId for {FileName}", SanitizeForLog(Path.GetFileName(item.LocalPath)));
+                    logger.LogWarning(ex, "Failed to resolve LocalItemId for {FileName}", sanitizedFileName);
                 }
             }
 
@@ -1269,9 +1286,11 @@ public class ConfigurationController : ControllerBase
                 }
                 catch (Exception ex)
                 {
+                    var sanitizedUserId = SanitizeForLog(item.SourceUserId);
+                    var sanitizedItemId = SanitizeForLog(item.SourceItemId);
                     plugin.LoggerFactory.CreateLogger<ConfigurationController>()
                         .LogWarning(ex, "Failed to queue history item {SourceUserId}/{SourceItemId}",
-                            SanitizeForLog(item.SourceUserId), SanitizeForLog(item.SourceItemId));
+                            sanitizedUserId, sanitizedItemId);
                 }
             }
         }
@@ -1330,9 +1349,11 @@ public class ConfigurationController : ControllerBase
                 }
                 catch (Exception ex)
                 {
+                    var sanitizedUserId = SanitizeForLog(item.SourceUserId);
+                    var sanitizedItemId = SanitizeForLog(item.SourceItemId);
                     plugin.LoggerFactory.CreateLogger<ConfigurationController>()
                         .LogWarning(ex, "Failed to ignore history item {SourceUserId}/{SourceItemId}",
-                            SanitizeForLog(item.SourceUserId), SanitizeForLog(item.SourceItemId));
+                            sanitizedUserId, sanitizedItemId);
                 }
             }
         }

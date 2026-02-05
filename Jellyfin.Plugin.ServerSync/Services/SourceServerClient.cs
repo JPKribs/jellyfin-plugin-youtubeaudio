@@ -157,7 +157,7 @@ public class SourceServerClient : IDisposable
         };
 
         var json = System.Text.Json.JsonSerializer.Serialize(authRequest);
-        var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
 
         // Add the required MediaBrowser authorization header (without token for auth request)
         var deviceName = Plugin.Instance?.LocalServerName ?? Environment.MachineName;
@@ -179,7 +179,7 @@ public class SourceServerClient : IDisposable
                     Success = false,
                     ErrorMessage = response.StatusCode == System.Net.HttpStatusCode.Unauthorized
                         ? "Invalid username or password"
-                        : $"Authentication failed: {response.StatusCode}"
+                        : $"Authentication failed: {response.StatusCode} - {errorContent}"
                 };
             }
 

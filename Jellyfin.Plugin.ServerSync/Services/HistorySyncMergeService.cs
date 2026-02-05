@@ -47,38 +47,31 @@ public static class HistorySyncMergeService
             item.MergedIsPlayed = item.SourceIsPlayed ?? item.LocalIsPlayed;
             item.MergedLastPlayedDate = null;
             item.MergedPlaybackPositionTicks = item.SourcePlaybackPositionTicks ?? item.LocalPlaybackPositionTicks;
-            return;
         }
-
-        // If only source has a date, use source values
-        if (sourceDate.HasValue && !localDate.HasValue)
+        else if (sourceDate.HasValue && !localDate.HasValue)
         {
+            // Only source has a date, use source values
             item.MergedIsPlayed = item.SourceIsPlayed;
             item.MergedLastPlayedDate = sourceDate;
             item.MergedPlaybackPositionTicks = item.SourcePlaybackPositionTicks;
-            return;
         }
-
-        // If only local has a date, use local values
-        if (!sourceDate.HasValue && localDate.HasValue)
+        else if (!sourceDate.HasValue)
         {
+            // Only local has a date, use local values
             item.MergedIsPlayed = item.LocalIsPlayed;
             item.MergedLastPlayedDate = localDate;
             item.MergedPlaybackPositionTicks = item.LocalPlaybackPositionTicks;
-            return;
         }
-
-        // Both have dates - use values from whichever server has the more recent date
-        if (sourceDate!.Value >= localDate!.Value)
+        else if (sourceDate.Value >= localDate!.Value)
         {
-            // Source was more recently played - use source values
+            // Both have dates - source was more recently played, use source values
             item.MergedIsPlayed = item.SourceIsPlayed;
             item.MergedLastPlayedDate = sourceDate;
             item.MergedPlaybackPositionTicks = item.SourcePlaybackPositionTicks;
         }
         else
         {
-            // Local was more recently played - use local values
+            // Both have dates - local was more recently played, use local values
             item.MergedIsPlayed = item.LocalIsPlayed;
             item.MergedLastPlayedDate = localDate;
             item.MergedPlaybackPositionTicks = item.LocalPlaybackPositionTicks;
