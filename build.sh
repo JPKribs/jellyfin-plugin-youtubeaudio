@@ -67,16 +67,12 @@ validate_resources() {
     
     local missing_files=()
     local config_files=(
+        "$PROJECT_DIR/Configuration/serversync_sync.html"
+        "$PROJECT_DIR/Configuration/serversync_sync.js"
         "$PROJECT_DIR/Configuration/serversync_settings.html"
         "$PROJECT_DIR/Configuration/serversync_settings.js"
-        "$PROJECT_DIR/Configuration/serversync_content.html"
-        "$PROJECT_DIR/Configuration/serversync_content.js"
-        "$PROJECT_DIR/Configuration/serversync_history.html"
-        "$PROJECT_DIR/Configuration/serversync_history.js"
-        "$PROJECT_DIR/Configuration/serversync_metadata.html"
-        "$PROJECT_DIR/Configuration/serversync_metadata.js"
-        "$PROJECT_DIR/Configuration/serversync_users.html"
-        "$PROJECT_DIR/Configuration/serversync_users.js"
+        "$PROJECT_DIR/Configuration/serversync_shared.css"
+        "$PROJECT_DIR/Configuration/serversync_shared.js"
     )
     
     for file in "${config_files[@]}"; do
