@@ -142,20 +142,43 @@ public static class SyncStateService
         // Check for source changes using configured detection policy
         var sourceChanged = HasMetadataChanged(existingItem, sourcePath, sourceSize, sourceETag, changeDetectionPolicy);
 
-        // Queued items stay queued but update metadata if changed
-        if (existingItem.Status == SyncStatus.Queued)
+        // Queued/Errored items: check if local file has appeared since last scan
+        if (existingItem.Status == SyncStatus.Queued || existingItem.Status == SyncStatus.Errored)
         {
+            try
+            {
+                if (File.Exists(localPath))
+                {
+                    var localInfo = new FileInfo(localPath);
+                    if (localInfo.Length == sourceSize)
+                    {
+                        existingItem.Status = SyncStatus.Synced;
+                        existingItem.PendingType = null;
+                        existingItem.StatusDate = DateTime.UtcNow;
+                        UpdateItemMetadata(existingItem, sourcePath, sourceSize, sourceCreateDate, sourceETag, localPath);
+                        database.Upsert(existingItem);
+                        logger.LogInformation("Marked {FileName} as synced (local file found with matching size)", Path.GetFileName(localPath));
+                        return new TransitionResult(true, "Synced (local file found)");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to check local file status for {LocalPath}", localPath);
+            }
+
+            // Still queued/errored - update metadata if source changed
             if (sourceChanged)
             {
                 UpdateItemMetadata(existingItem, sourcePath, sourceSize, sourceCreateDate, sourceETag, localPath);
                 database.Upsert(existingItem);
-                return new TransitionResult(true, "Metadata updated (still queued)");
+                return new TransitionResult(true, "Metadata updated (still " + existingItem.Status.ToString().ToLowerInvariant() + ")");
             }
 
-            return new TransitionResult(false, "No changes (queued)");
+            return new TransitionResult(false, "No changes (" + existingItem.Status.ToString().ToLowerInvariant() + ")");
         }
 
-        // Handle source changes for Synced/Errored items
+        // Handle source changes for Synced items
         if (sourceChanged)
         {
             return HandleSourceChanged(database, existingItem, sourcePath, sourceSize, sourceCreateDate, sourceETag, localPath, replaceMode, logger);

@@ -1247,6 +1247,39 @@ public class SyncDatabase : IDisposable
     }
 
     /// <summary>
+    /// ResetContentSyncTable
+    /// Clears all content sync items from the database without affecting other tables.
+    /// Falls back to a full database recreation if the database is readonly or corrupted.
+    /// </summary>
+    public void ResetContentSyncTable()
+    {
+        ThrowIfDisposed();
+        lock (_writeLock)
+        {
+            _logger.LogWarning("Resetting content sync table - all content tracking data will be lost");
+
+            try
+            {
+                EnsureConnection();
+                using var command = _connection!.CreateCommand();
+                command.CommandText = "DELETE FROM SyncItems WHERE 1=1";
+                var deleted = command.ExecuteNonQuery();
+                _logger.LogInformation("Content sync table has been reset, {Count} items removed", deleted);
+            }
+            catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.SqliteErrorCode == 1)
+            {
+                // Table doesn't exist - that's fine, nothing to delete
+                _logger.LogInformation("Content sync table does not exist yet, nothing to reset");
+            }
+            catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.SqliteErrorCode == 8)
+            {
+                _logger.LogWarning(ex, "Database is readonly, falling back to full database recreation");
+                RecreateDatabase();
+            }
+        }
+    }
+
+    /// <summary>
     /// ResetHistoryDatabase
     /// Clears all history sync items from the database.
     /// Falls back to a full database recreation if the database is readonly or corrupted.

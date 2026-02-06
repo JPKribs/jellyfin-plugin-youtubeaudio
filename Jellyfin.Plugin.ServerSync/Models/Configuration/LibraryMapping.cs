@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Jellyfin.Plugin.ServerSync.Models.Configuration;
 
 /// <summary>
@@ -40,4 +42,12 @@ public class LibraryMapping
     /// Whether this mapping is currently enabled.
     /// </summary>
     public bool IsEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Source-relative folder paths to ignore during sync.
+    /// Each entry is relative to <see cref="SourceRootPath"/> (e.g., "The Simpsons" or "The Simpsons/Season 2").
+    /// A trailing <c>*</c> wildcard matches any folder starting with the prefix (e.g., "Star Wars*").
+    /// Items whose source path falls under any ignored path are skipped across Content, Metadata, and History sync.
+    /// </summary>
+    public List<string> IgnoredPaths { get; set; } = new();
 }

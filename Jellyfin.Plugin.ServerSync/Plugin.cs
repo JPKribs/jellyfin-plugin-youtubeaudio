@@ -103,8 +103,10 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages, IDisposable
         {
             Name = "serversync_sync",
             EmbeddedResourcePath = $"{ns}.Configuration.serversync_sync.html",
-            MenuSection = "plugin",
-            DisplayName = "Server Sync"
+            MenuSection = "server",
+            DisplayName = "Server Sync",
+            EnableInMainMenu = true,
+            MenuIcon = "sync"
         };
 
         yield return new PluginPageInfo

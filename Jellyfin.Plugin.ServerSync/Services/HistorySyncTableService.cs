@@ -98,6 +98,20 @@ public class HistorySyncTableService
             return 0;
         }
 
+        // Remove existing history records for items under newly-ignored paths
+        if (libraryMapping.IgnoredPaths?.Count > 0)
+        {
+            foreach (var kvp in existingItems)
+            {
+                if (!string.IsNullOrEmpty(kvp.Value.SourcePath)
+                    && PathUtilities.IsPathIgnored(kvp.Value.SourcePath, libraryMapping.SourceRootPath, libraryMapping.IgnoredPaths))
+                {
+                    database.DeleteHistoryItem(kvp.Value.Id);
+                    _logger.LogInformation("Removed history record for {Path} (path matches ignored folder)", kvp.Value.SourcePath);
+                }
+            }
+        }
+
         _logger.LogInformation(
             "Processing history for user {SourceUser} -> {LocalUser} in library {Library}",
             userMapping.SourceUserName, userMapping.LocalUserName, libraryMapping.SourceLibraryName);
@@ -165,6 +179,12 @@ public class HistorySyncTableService
                 }
 
                 if (sourceItem.Id == null || string.IsNullOrEmpty(sourceItem.Path))
+                {
+                    continue;
+                }
+
+                // Skip items under ignored folder paths
+                if (PathUtilities.IsPathIgnored(sourceItem.Path, libraryMapping.SourceRootPath, libraryMapping.IgnoredPaths))
                 {
                     continue;
                 }

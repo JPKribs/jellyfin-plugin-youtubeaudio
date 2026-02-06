@@ -789,12 +789,25 @@ export function createPaginatedTable(view, ServerSyncShared, options) {
             }
         },
 
-        // Disconnect the IntersectionObserver (call on viewhide to prevent leaks)
+        // Disconnect the IntersectionObserver (call on viewhide or tab switch to prevent stale state)
         disconnectObserver: function() {
             if (table._scrollObserver) {
                 table._scrollObserver.disconnect();
                 table._scrollObserver = null;
             }
+        },
+
+        // Reconnect the IntersectionObserver (call when the table's container becomes visible again)
+        reconnectObserver: function() {
+            if (table._scrollObserver || !table.elements.scrollSentinel) {
+                return; // Already connected or no sentinel element
+            }
+            table._scrollObserver = new IntersectionObserver(function(entries) {
+                if (entries[0].isIntersecting && !table.state.isLoading && table.state.hasMore) {
+                    _loadMore();
+                }
+            }, { rootMargin: '200px' });
+            table._scrollObserver.observe(table.elements.scrollSentinel);
         }
     };
 

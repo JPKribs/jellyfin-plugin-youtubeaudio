@@ -88,6 +88,20 @@ public class MetadataSyncTableService
             return 0;
         }
 
+        // Remove existing metadata records for items under newly-ignored paths
+        if (libraryMapping.IgnoredPaths?.Count > 0)
+        {
+            foreach (var kvp in existingItems)
+            {
+                if (!string.IsNullOrEmpty(kvp.Value.SourcePath)
+                    && PathUtilities.IsPathIgnored(kvp.Value.SourcePath, libraryMapping.SourceRootPath, libraryMapping.IgnoredPaths))
+                {
+                    database.DeleteMetadataSyncItemsBySourceItem(kvp.Key);
+                    _logger.LogInformation("Removed metadata record for {Path} (path matches ignored folder)", kvp.Value.SourcePath);
+                }
+            }
+        }
+
         _logger.LogInformation(
             "Processing metadata for library {Library} (Metadata: {Metadata}, Images: {Images}, People: {People}, Studios: {Studios}, Mode: {Mode})",
             libraryMapping.SourceLibraryName, syncMetadata, syncImages, syncPeople, syncStudios, refreshMode);
@@ -154,6 +168,12 @@ public class MetadataSyncTableService
                 }
 
                 if (sourceItem.Id == null || string.IsNullOrEmpty(sourceItem.Path))
+                {
+                    continue;
+                }
+
+                // Skip items under ignored folder paths
+                if (PathUtilities.IsPathIgnored(sourceItem.Path, libraryMapping.SourceRootPath, libraryMapping.IgnoredPaths))
                 {
                     continue;
                 }

@@ -119,9 +119,6 @@
                             <button is="emby-button" type="button" id="btnRetryErrors" class="raised button-primary syncActionButton hidden">
                                 <span>Retry Errors</span>
                             </button>
-                            <button is="emby-button" type="button" id="btnResetDatabase" class="raised button-destructive syncActionButton">
-                                <span>Reset Database</span>
-                            </button>
                         </div>
 
                         <div class="syncSectionSeparator"></div>
@@ -258,9 +255,6 @@
                             </button>
                             <button is="emby-button" type="button" id="btnRetryHistoryErrors" class="raised button-primary syncActionButton hidden">
                                 <span>Retry Errors</span>
-                            </button>
-                            <button is="emby-button" type="button" id="btnResetHistoryDatabase" class="raised button-destructive syncActionButton">
-                                <span>Reset Database</span>
                             </button>
                         </div>
 
@@ -413,9 +407,6 @@
                             <button is="emby-button" type="button" id="btnRetryMetadataErrors" class="raised button-primary syncActionButton hidden">
                                 <span>Retry Errors</span>
                             </button>
-                            <button is="emby-button" type="button" id="btnResetMetadataDatabase" class="raised button-destructive syncActionButton">
-                                <span>Reset Database</span>
-                            </button>
                         </div>
 
                         <div class="syncSectionSeparator"></div>
@@ -540,9 +531,6 @@
                             </button>
                             <button is="emby-button" type="button" id="btnRetryUserErrors" class="raised button-primary syncActionButton hidden">
                                 <span>Retry Errors</span>
-                            </button>
-                            <button is="emby-button" type="button" id="btnResetUserDatabase" class="raised button-destructive syncActionButton">
-                                <span>Reset Database</span>
                             </button>
                         </div>
 
@@ -670,7 +658,7 @@
 
         /* ===== Shared Changes Badge ===== */
         .metadataSyncModal-changesSummary, .userSyncModal-changesSummary {
-            display: flex; gap: 12px; margin-bottom: 16px;
+            display: flex; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 16px;
         }
         .metadataSyncModal-changesBadge, .userSyncModal-changesBadge {
             display: inline-flex; align-items: center; gap: 6px;

@@ -345,9 +345,51 @@ export default function (view) {
                     '<div class="inputContainer"><label class="inputLabel">Local Library</label><select is="emby-select" class="localLibrarySelect"></select></div>' +
                     '<div class="inputContainer"><label class="inputLabel">Local Root Path</label><input is="emby-input" type="text" class="localRootPath" value="' + escapeHtml(mapping.LocalRootPath || '') + '" /></div>' +
                 '</div>' +
+            '</div>' +
+            '<div class="ignoredPathsSection">' +
+                '<label class="inputLabel ignoredPathsLabel">Ignored Paths</label>' +
+                '<div class="fieldDescription">Folder paths to skip during sync (relative to source root). Use * as a wildcard (e.g. Star Wars*). Applies to Content, Metadata, and History sync.</div>' +
+                '<div class="ignoredPathsList"></div>' +
+                '<button is="emby-button" type="button" class="btnAddIgnoredPath raised button-secondary button-small">' +
+                    '<span>+ Add Ignored Path</span>' +
+                '</button>' +
             '</div>';
 
         container.appendChild(div);
+
+        // Wire up ignored paths add/remove
+        var ignoredList = div.querySelector('.ignoredPathsList');
+        var sourceRootInput = div.querySelector('.sourceRootPath');
+
+        function getSourceRootPrefix() {
+            var root = (sourceRootInput ? sourceRootInput.value : '').replace(/\\/g, '/').replace(/\/+$/, '');
+            return root ? root + '/' : '';
+        }
+
+        function updateAllIgnoredPrefixes() {
+            var prefix = getSourceRootPrefix();
+            div.querySelectorAll('.ignoredPathPrefix').forEach(function(span) {
+                span.textContent = prefix;
+            });
+        }
+
+        function addIgnoredPathRow(pathValue) {
+            var row = document.createElement('div');
+            row.className = 'ignoredPathRow';
+            row.innerHTML =
+                '<span class="ignoredPathPrefix">' + escapeHtml(getSourceRootPrefix()) + '</span>' +
+                '<input is="emby-input" type="text" class="ignoredPathInput" placeholder="e.g. The Simpsons or Star Wars*" value="' + escapeHtml(pathValue || '') + '" />' +
+                '<button is="emby-button" type="button" class="btnRemoveIgnoredPath raised button-destructive button-small" title="Remove"><span class="material-icons">delete</span></button>';
+            ignoredList.appendChild(row);
+            row.querySelector('.btnRemoveIgnoredPath').addEventListener('click', function() { row.remove(); });
+        }
+        (mapping.IgnoredPaths || []).forEach(function(p) { addIgnoredPathRow(p); });
+        div.querySelector('.btnAddIgnoredPath').addEventListener('click', function() { addIgnoredPathRow(''); });
+
+        // Keep prefix in sync when source root path changes
+        if (sourceRootInput) {
+            sourceRootInput.addEventListener('input', updateAllIgnoredPrefixes);
+        }
 
         // Populate source library select
         var sourceSelect = div.querySelector('.sourceLibrarySelect');
@@ -367,6 +409,7 @@ export default function (view) {
                 var locations = JSON.parse(option.dataset.locations);
                 if (locations.length > 0) div.querySelector('.sourceRootPath').value = locations[0];
             }
+            updateAllIgnoredPrefixes();
         });
 
         // Populate local library select
@@ -397,6 +440,11 @@ export default function (view) {
         view.querySelectorAll('.libraryMapping').forEach(function(row) {
             var sourceSelect = row.querySelector('.sourceLibrarySelect');
             var localSelect = row.querySelector('.localLibrarySelect');
+            var ignoredPaths = [];
+            row.querySelectorAll('.ignoredPathInput').forEach(function(input) {
+                var val = input.value.trim();
+                if (val.length > 0) { ignoredPaths.push(val); }
+            });
             mappings.push({
                 IsEnabled: row.querySelector('.mappingEnabled').checked,
                 SourceLibraryId: sourceSelect.value,
@@ -404,7 +452,8 @@ export default function (view) {
                 SourceRootPath: row.querySelector('.sourceRootPath').value,
                 LocalLibraryId: localSelect.value,
                 LocalLibraryName: localSelect.options[localSelect.selectedIndex] ? localSelect.options[localSelect.selectedIndex].textContent : '',
-                LocalRootPath: row.querySelector('.localRootPath').value
+                LocalRootPath: row.querySelector('.localRootPath').value,
+                IgnoredPaths: ignoredPaths
             });
         });
         return mappings;
@@ -769,6 +818,36 @@ export default function (view) {
     }
 
     // ============================================
+    // TROUBLESHOOTING: DATABASE RESET
+    // ============================================
+
+    function resetTable(endpoint, tableName) {
+        if (!confirm('Are you sure you want to reset the ' + tableName + ' table?\n\nThis will delete all ' + tableName + ' tracking data and you will need to re-sync. This cannot be undone.')) {
+            return;
+        }
+
+        ServerSyncShared.apiRequest(endpoint, 'POST').then(function() {
+            ServerSyncShared.showAlert('The ' + tableName + ' table has been reset.');
+        }).catch(function(err) {
+            console.error(endpoint + ' error:', err);
+            ServerSyncShared.showAlert('Failed to reset ' + tableName + ' table.');
+        });
+    }
+
+    function resetEntireDatabase() {
+        if (!confirm('Are you sure you want to reset the ENTIRE sync database?\n\nThis will delete ALL tracking data across all sync types (Content, History, Metadata, Users). You will need to re-sync everything from scratch. This cannot be undone.')) {
+            return;
+        }
+
+        ServerSyncShared.apiRequest('ResetSyncDatabase', 'POST').then(function() {
+            ServerSyncShared.showAlert('The entire sync database has been reset.');
+        }).catch(function(err) {
+            console.error('ResetSyncDatabase error:', err);
+            ServerSyncShared.showAlert('Failed to reset sync database.');
+        });
+    }
+
+    // ============================================
     // EVENT LISTENERS
     // ============================================
 
@@ -800,6 +879,13 @@ export default function (view) {
                 bindClick('btnSaveHistorySettings', saveHistorySettings);
                 bindClick('btnSaveMetadataSettings', saveMetadataSettings);
                 bindClick('btnSaveUserSyncSettings', saveUserSyncSettings);
+
+                // Troubleshooting: Database reset actions
+                bindClick('btnResetContentTable', function() { resetTable('ResetContentSyncDatabase', 'content sync'); });
+                bindClick('btnResetHistoryTable', function() { resetTable('ResetHistorySyncDatabase', 'history sync'); });
+                bindClick('btnResetMetadataTable', function() { resetTable('ResetMetadataSyncDatabase', 'metadata sync'); });
+                bindClick('btnResetUserTable', function() { resetTable('ResetUserSyncDatabase', 'user sync'); });
+                bindClick('btnResetEntireDatabase', resetEntireDatabase);
             }
 
             loadConfig();

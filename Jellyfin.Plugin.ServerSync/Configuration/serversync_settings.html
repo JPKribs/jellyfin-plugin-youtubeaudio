@@ -582,6 +582,79 @@
                         </div>
                     </div>
 
+                    <!-- SECTION: Troubleshooting Header -->
+
+                    <div class="sectionTitleContainer flex align-items-center">
+                        <h1 class="sectionTitle">Troubleshooting</h1>
+                    </div>
+
+                    <!-- COLLAPSIBLE SECTION: Database -->
+
+                    <div class="collapsibleSection">
+                        <button type="button" class="collapsibleHeader collapsed" aria-expanded="false" data-target="databaseTroubleshootingContent">
+                            <span class="collapsibleTitle">Database</span>
+                            <span class="collapsibleIcon">&#9660;</span>
+                        </button>
+                        <div id="databaseTroubleshootingContent" class="collapsibleContent collapsed">
+                            <div class="fieldDescription mb-md">Reset individual sync tables or the entire database. These actions are destructive and cannot be undone.</div>
+
+                            <!-- Individual Table Resets -->
+                            <h3 class="subsectionHeader">Reset Individual Tables</h3>
+                            <div class="resetButtonGroup">
+                                <div class="resetButtonRow">
+                                    <div class="resetButtonInfo">
+                                        <div>Content Sync</div>
+                                        <div class="fieldDescription">Remove all content tracking data. You will need to re-scan content.</div>
+                                    </div>
+                                    <button is="emby-button" type="button" id="btnResetContentTable" class="raised button-destructive button-small">
+                                        <span>Reset</span>
+                                    </button>
+                                </div>
+                                <div class="resetButtonRow">
+                                    <div class="resetButtonInfo">
+                                        <div>History Sync</div>
+                                        <div class="fieldDescription">Remove all history tracking data. You will need to re-scan history.</div>
+                                    </div>
+                                    <button is="emby-button" type="button" id="btnResetHistoryTable" class="raised button-destructive button-small">
+                                        <span>Reset</span>
+                                    </button>
+                                </div>
+                                <div class="resetButtonRow">
+                                    <div class="resetButtonInfo">
+                                        <div>Metadata Sync</div>
+                                        <div class="fieldDescription">Remove all metadata tracking data. You will need to re-scan metadata.</div>
+                                    </div>
+                                    <button is="emby-button" type="button" id="btnResetMetadataTable" class="raised button-destructive button-small">
+                                        <span>Reset</span>
+                                    </button>
+                                </div>
+                                <div class="resetButtonRow">
+                                    <div class="resetButtonInfo">
+                                        <div>User Sync</div>
+                                        <div class="fieldDescription">Remove all user sync tracking data. You will need to re-scan users.</div>
+                                    </div>
+                                    <button is="emby-button" type="button" id="btnResetUserTable" class="raised button-destructive button-small">
+                                        <span>Reset</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Full Database Reset -->
+                            <h3 class="subsectionHeader">Reset Entire Database</h3>
+                            <div class="resetButtonGroup">
+                                <div class="resetButtonRow resetButtonRow-nuclear">
+                                    <div class="resetButtonInfo">
+                                        <div>Full Database Reset</div>
+                                        <div class="fieldDescription">Delete the entire sync database file and recreate it from scratch. All tracking data across all sync types will be lost.</div>
+                                    </div>
+                                    <button is="emby-button" type="button" id="btnResetEntireDatabase" class="raised button-destructive button-small">
+                                        <span>Reset All</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </form>
         </div>
@@ -693,6 +766,53 @@
             flex-direction: column;
         }
 
+        /* ===== Ignored Paths ===== */
+        .ignoredPathsSection {
+            margin-top: 1em;
+            padding-top: 0.75em;
+            border-top: 1px solid rgba(85, 85, 85, 0.3);
+        }
+        .ignoredPathsLabel {
+            font-weight: bold;
+            margin-bottom: 0.25em;
+        }
+        .ignoredPathsSection .fieldDescription {
+            margin-bottom: 0.5em;
+            font-size: 0.85em;
+            color: rgba(255, 255, 255, 0.5);
+        }
+        .ignoredPathsList {
+            margin-bottom: 0.5em;
+        }
+        .ignoredPathPrefix {
+            flex-shrink: 0;
+            font-family: var(--font-mono);
+            font-size: 0.9em;
+            color: rgba(255, 255, 255, 0.4);
+            white-space: nowrap;
+        }
+        .ignoredPathRow {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        .ignoredPathRow .ignoredPathInput {
+            flex: 1;
+            font-family: var(--font-mono);
+            font-size: 0.9em;
+        }
+        .ignoredPathRow .btnRemoveIgnoredPath {
+            flex-shrink: 0;
+            min-width: auto;
+            padding: 0.2em 0.6em;
+            font-size: 1.1em;
+            line-height: 1;
+        }
+        .btnAddIgnoredPath {
+            font-size: 0.85em;
+        }
+
         /* ===== Nested Settings ===== */
         .nested-settings {
             margin-left: 1.5em;
@@ -752,6 +872,36 @@
         }
         .server-info-label {
             min-width: 50px;
+        }
+
+        /* ===== Database Reset Buttons ===== */
+        .resetButtonGroup {
+            margin-bottom: 16px;
+        }
+        .resetButtonRow {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .resetButtonRow:last-child {
+            border-bottom: none;
+        }
+        .resetButtonRow-nuclear {
+            background: rgba(217, 83, 79, 0.08);
+            border-radius: 4px;
+            border-bottom: none;
+        }
+        .resetButtonInfo {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            flex: 1;
+            margin-right: 16px;
+        }
+        .resetButtonInfo .fieldDescription {
+            margin-top: 2px;
         }
 
         /* ===== Additional Utility Classes ===== */

@@ -177,10 +177,28 @@ export default function (view) {
             }
         },
 
+        // Map view names to their table module for observer management
+        _getTableModule: function(name) {
+            switch (name) {
+                case 'content': return SyncTableModule;
+                case 'history': return HistorySyncTableModule;
+                case 'metadata': return MetadataSyncTableModule;
+                case 'users': return UserSyncTableModule;
+                default: return null;
+            }
+        },
+
         // Switch to a different sync view: hide all views, show the target,
         // update page title, and lazy-initialize the view's controller
         switchView: function(viewName) {
             if (this.currentView === viewName) return;
+
+            // Disconnect IntersectionObserver on the outgoing tab's table
+            // (prevents stale triggers while the container is hidden)
+            var outgoingModule = this._getTableModule(this.currentView);
+            if (outgoingModule && outgoingModule.table && outgoingModule.table.disconnectObserver) {
+                outgoingModule.table.disconnectObserver();
+            }
 
             // Hide all views
             var views = view.querySelectorAll('.syncView');
@@ -209,6 +227,13 @@ export default function (view) {
             }
 
             this.currentView = viewName;
+
+            // Reconnect IntersectionObserver on the incoming tab's table
+            // (restores infinite scroll after the container is visible again)
+            var incomingModule = this._getTableModule(viewName);
+            if (incomingModule && incomingModule.table && incomingModule.table.reconnectObserver) {
+                incomingModule.table.reconnectObserver();
+            }
 
             // Lazy-initialize the controller for this view (wait for shared module)
             if (!this.initialized[viewName]) {
@@ -372,7 +397,6 @@ export default function (view) {
             bind('btnRefreshItems', function() { self.refreshSyncTable(); });
             bind('btnTriggerSync', function() { self.triggerSync(); });
             bind('btnRetryErrors', function() { self.retryErrors(); });
-            bind('btnResetDatabase', function() { self.resetDatabase(); });
 
             // Modal action buttons
             bind('btnModalIgnore', function() { self.modalIgnore(); });
@@ -568,25 +592,6 @@ export default function (view) {
                 self.loadSyncItems();
             }).catch(function() {
                 ServerSyncShared.showAlert('Failed to retry errored items');
-            });
-        },
-
-        // Reset the entire content sync database (requires user confirmation)
-        resetDatabase: function() {
-            var self = this;
-
-            if (!confirm('Are you sure you want to reset the sync database?\n\nThis will delete ALL tracking data and you will need to re-sync everything. This cannot be undone.')) {
-                return;
-            }
-
-            ServerSyncShared.apiRequest('ResetSyncDatabase', 'POST').then(function() {
-                ServerSyncShared.showAlert('Sync database has been reset');
-                self.loadSyncStatus();
-                self.loadSyncItems();
-                self.loadHealthStats();
-            }).catch(function(err) {
-                console.error('ResetSyncDatabase error:', err);
-                ServerSyncShared.showAlert('Failed to reset sync database');
             });
         },
 
@@ -1071,7 +1076,6 @@ export default function (view) {
             bind('btnRefreshHistoryItems', function() { self.refreshHistoryTable(); });
             bind('btnTriggerHistorySync', function() { self.triggerHistorySync(); });
             bind('btnRetryHistoryErrors', function() { self.retryErrors(); });
-            bind('btnResetHistoryDatabase', function() { self.resetHistoryDatabase(); });
 
             // Modal action buttons
             bind('btnHistoryModalIgnore', function() { self.modalIgnore(); });
@@ -1199,25 +1203,6 @@ export default function (view) {
                 self.loadHistoryItems();
             }).catch(function() {
                 ServerSyncShared.showAlert('Failed to retry errored items');
-            });
-        },
-
-        // Reset the history sync database (requires user confirmation)
-        resetHistoryDatabase: function() {
-            var self = this;
-
-            if (!confirm('Are you sure you want to reset the history sync database?\n\nThis will delete ALL history tracking data and you will need to re-sync everything. This cannot be undone.')) {
-                return;
-            }
-
-            ServerSyncShared.apiRequest('ResetHistorySyncDatabase', 'POST').then(function() {
-                ServerSyncShared.showAlert('History sync database has been reset');
-                self.loadHistoryStatus();
-                self.loadHistoryItems();
-                self.loadHealthStats();
-            }).catch(function(err) {
-                console.error('ResetHistorySyncDatabase error:', err);
-                ServerSyncShared.showAlert('Failed to reset history sync database');
             });
         },
 
@@ -1615,7 +1600,6 @@ export default function (view) {
             bind('btnRefreshMetadataItems', function() { self.refreshMetadataTable(); });
             bind('btnTriggerMetadataSync', function() { self.triggerMetadataSync(); });
             bind('btnRetryMetadataErrors', function() { self.retryErrors(); });
-            bind('btnResetMetadataDatabase', function() { self.resetMetadataDatabase(); });
 
             bind('btnMetadataSyncModalIgnore', function() { self.modalIgnore(); });
             bind('btnMetadataSyncModalQueue', function() { self.modalQueue(); });
@@ -1742,25 +1726,6 @@ export default function (view) {
                 self.loadMetadataItems();
             }).catch(function() {
                 ServerSyncShared.showAlert('Failed to retry errored items');
-            });
-        },
-
-        // Reset the metadata sync database (requires user confirmation)
-        resetMetadataDatabase: function() {
-            var self = this;
-
-            if (!confirm('Are you sure you want to reset the metadata sync database?\n\nThis will delete ALL metadata tracking data and you will need to re-sync everything. This cannot be undone.')) {
-                return;
-            }
-
-            ServerSyncShared.apiRequest('ResetMetadataSyncDatabase', 'POST').then(function() {
-                ServerSyncShared.showAlert('Metadata sync database has been reset');
-                self.loadMetadataStatus();
-                self.loadMetadataItems();
-                self.loadHealthStats();
-            }).catch(function(err) {
-                console.error('ResetMetadataSyncDatabase error:', err);
-                ServerSyncShared.showAlert('Failed to reset metadata sync database');
             });
         },
 
@@ -2516,7 +2481,6 @@ export default function (view) {
             bind('btnRefreshUserItems', function() { self.triggerRefresh(); });
             bind('btnTriggerUserSync', function() { self.triggerSync(); });
             bind('btnRetryUserErrors', function() { self.retryErrors(); });
-            bind('btnResetUserDatabase', function() { self.resetUserDatabase(); });
 
             bind('btnUserSyncModalIgnore', function() { self.modalIgnore(); });
             bind('btnUserSyncModalQueue', function() { self.modalQueue(); });
@@ -2639,25 +2603,6 @@ export default function (view) {
                 self.loadUserItems();
             }).catch(function() {
                 ServerSyncShared.showAlert('Failed to retry errored items');
-            });
-        },
-
-        // Reset the user sync database (requires user confirmation)
-        resetUserDatabase: function() {
-            var self = this;
-
-            if (!confirm('Are you sure you want to reset the user sync database?\n\nThis will delete ALL user sync tracking data. This cannot be undone.')) {
-                return;
-            }
-
-            ServerSyncShared.apiRequest('ResetUserSyncDatabase', 'POST').then(function() {
-                ServerSyncShared.showAlert('User sync database has been reset');
-                self.loadUserStatus();
-                self.loadUserItems();
-                self.loadHealthStats();
-            }).catch(function(err) {
-                console.error('ResetUserSyncDatabase error:', err);
-                ServerSyncShared.showAlert('Failed to reset user sync database');
             });
         },
 

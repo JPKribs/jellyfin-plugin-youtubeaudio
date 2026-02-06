@@ -983,6 +983,37 @@ public class ConfigurationController : ControllerBase
     }
 
     /// <summary>
+    /// ResetContentSyncDatabase
+    /// Resets the content sync table only, removing all tracked content items.
+    /// Other tables (History, Metadata, User) are not affected.
+    /// </summary>
+    /// <returns>Action result with success status.</returns>
+    [HttpPost("ResetContentSyncDatabase")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult ResetContentSyncDatabase()
+    {
+        var plugin = Plugin.Instance;
+        if (plugin == null)
+        {
+            return NotFound();
+        }
+
+        var logger = plugin.LoggerFactory.CreateLogger<ConfigurationController>();
+
+        try
+        {
+            plugin.Database.ResetContentSyncTable();
+            logger.LogInformation("Content sync table has been reset");
+            return Ok(new { Success = true, Message = "Content sync table reset successfully" });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to reset content sync table");
+            return StatusCode(500, new { Success = false, Error = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// ResetHistorySyncDatabase
     /// Resets the history sync database, removing all tracked history items.
     /// </summary>

@@ -79,6 +79,28 @@ public class SyncTableService
 
         var seenSourceItemIds = new HashSet<string>();
 
+        // Mark existing items under ignored paths as Ignored and exclude them from missing-item processing
+        if (mapping.IgnoredPaths?.Count > 0)
+        {
+            foreach (var kvp in existingItems)
+            {
+                if (PathUtilities.IsPathIgnored(kvp.Value.SourcePath, mapping.SourceRootPath, mapping.IgnoredPaths))
+                {
+                    // Prevent ProcessMissingItems from treating ignored items as deleted
+                    seenSourceItemIds.Add(kvp.Key);
+
+                    if (kvp.Value.Status != SyncStatus.Ignored)
+                    {
+                        kvp.Value.Status = SyncStatus.Ignored;
+                        kvp.Value.PendingType = null;
+                        kvp.Value.StatusDate = DateTime.UtcNow;
+                        database.Upsert(kvp.Value);
+                        _logger.LogInformation("Marked {FileName} as ignored (path matches ignored folder)", System.IO.Path.GetFileName(kvp.Value.SourcePath));
+                    }
+                }
+            }
+        }
+
         while (true)
         {
             if (cancellationToken.IsCancellationRequested)
@@ -139,6 +161,12 @@ public class SyncTableService
                 }
 
                 if (item.Id == null || string.IsNullOrEmpty(item.Path))
+                {
+                    continue;
+                }
+
+                // Skip items under ignored folder paths
+                if (PathUtilities.IsPathIgnored(item.Path, mapping.SourceRootPath, mapping.IgnoredPaths))
                 {
                     continue;
                 }

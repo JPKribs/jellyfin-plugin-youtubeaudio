@@ -1,7 +1,7 @@
 ---
 name: "Server Sync"
 guid: "ebd650b5-6f4c-4ccb-b10d-23dffb3a7286"
-version: "10.11.26"
+version: "10.11.27"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
 overview: "Sync media content from a source Jellyfin server to this server."
@@ -25,47 +25,14 @@ artifacts:
 - "Std.UriTemplate.dll"
 changelog:
   new:
-  - Consolidate 4 sync pages (Content, History, Metadata, Users) into a unified Sync tab with a dropdown selector
-  - Extract shared JS utilities and PaginatedTable into serversync_shared.js, reducing ~4,700 lines of duplication
-  - Extract shared CSS into serversync_shared.css for consistent styling across all sync views
-  - Add Sync Type dropdown that dynamically shows only enabled sync types based on Settings configuration
-  - Add styled empty state with icon and Settings link when no sync types are enabled
-  - Add async file move utility to avoid blocking thread pool threads during downloads
-  - Add ResponseDisposingStream to ensure HTTP connections are released when download streams are closed
+  - Enable Server Sync in the admin dashboard sidebar (EnableInMainMenu) for quick access alongside other server management pages
+  - Add library-level ignored paths to skip entire folders from Content, Metadata, and History sync
+  - Add wildcard support for ignored paths (e.g., "Star Wars*" matches all folders starting with that prefix)
   improvements:
-  - Replace scroll-event-based pagination with IntersectionObserver for reliable infinite scroll in all containers
-  - Fix task polling race condition where completion was detected before the task started running
-  - Remove debug console.log statements from shared, sync, and settings modules
-  - Eliminate duplicate getDisplayStatus and getStatusClass functions in sync page table options
-  - Replace duplicate utility functions in settings page with shared module imports
-  - Use standard Jellyfin dropdown styling for Sync Type selector with proper chevron arrow
-  - Dynamic page title updates to reflect selected sync type
-  - Consolidate hardcoded CSS colors to use CSS custom properties (--status-queued-color, --status-synced-color, etc.)
-  - Extract repeated monospace font-family to --font-mono CSS variable
-  - Extract border color to --border-subtle CSS variable for consistent theming
-  - Remove redundant .syncView.hidden and .button-submit CSS rules
-  - Add aria-label="Close" to all modal close buttons for accessibility
-  - Add consistent inline comments to all JS methods across all 4 sync table modules
-  - Reuse single HttpClient for image downloads across all metadata items (prevents socket exhaustion)
-  - Convert SyncHistoryItem from fake-async Task<bool> to synchronous bool (eliminates Task.FromResult allocations)
-  - Cache FileNameSanitizer invalid character HashSet and underscore-collapse regex as static fields
-  - Eliminate reentrant lock acquisition in CircuitBreaker.AllowOperation
+  - Move database reset controls from sync tabs to Settings > Troubleshooting > Database for centralized management
+  - Add individual table resets (Content, History, Metadata, User) alongside full database reset
+  - Use native Jellyfin fonts and CSS for Troubleshooting section styling consistency
+  - Modal change summary badges wrap to multiple rows on narrow/mobile screens
   fixes:
-  - Resolve CodeQL alerts for log entries created from user input by breaking taint chain with local variables
-  - Fix useless assignment in SourceServerClient authentication error handling
-  - Fix constant condition in HistorySyncMergeService merge logic
-  - Fix missing Dispose on StringContent in SourceServerClient authentication
-  - Harden all database read operations with error handling and safe fallbacks for transient SQLite errors
-  - Add disposed-state guards to all SyncDatabase public methods to prevent use-after-dispose crashes
-  - Fix connection leak in database reconnection when pragma execution fails
-  - Fix race condition in database disposal
-  - Fix JsonDocument memory leak in SourceServerClient.AuthenticateAsync (pooled ArrayPool buffers not returned)
-  - Fix HttpResponseMessage leak on companion file download fallback path (socket exhaustion)
-  - Fix HttpResponseMessage leak in DownloadFileAsync and DownloadCompanionFileAsync (callers now auto-dispose)
-  - Fix thread-unsafe database reads where EnsureConnection could replace connection mid-read
-  - Fix culture-dependent DateTime.Parse in SyncDatabase, SyncMissingMetadataTask, and JsonComparisonUtility
-  - Fix potential integer overflow in RetryPolicy exponential backoff calculation
-  - Fix NullReferenceException on UserMappings in SyncMissingUserDataTask and RefreshUserSyncTableTask
-  - Fix FormatException crash on invalid library GUID in RefreshContentSyncTableTask (now skips with warning)
-  - Fix non-thread-safe static CircuitBreaker initialization with double-checked locking
-  - Add missing .catch() handlers on all PageController loadConfig promise chains in sync page JS
+  - Fix pagination breaking when switching between sync tabs without refreshing the page
+  - Fix queued/errored items not transitioning to synced when local file appears on subsequent refresh
