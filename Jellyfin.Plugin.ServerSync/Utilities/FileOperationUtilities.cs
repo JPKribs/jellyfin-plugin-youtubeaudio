@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.ServerSync.Utilities;
@@ -48,6 +49,47 @@ public static class FileOperationUtilities
                     maxRetries,
                     Path.GetFileName(destinationPath));
                 Thread.Sleep(retryDelayMs * attempt);
+            }
+        }
+
+        // Final attempt - let exception propagate
+        File.Move(sourcePath, destinationPath, overwrite: true);
+    }
+
+    /// <summary>
+    /// Async version of MoveFileWithOverwrite that uses Task.Delay instead of Thread.Sleep.
+    /// Preferred for callers in async contexts (download pipeline, etc.) to avoid blocking thread pool threads.
+    /// </summary>
+    /// <param name="sourcePath">Source file path.</param>
+    /// <param name="destinationPath">Destination file path.</param>
+    /// <param name="logger">Optional logger for retry warnings.</param>
+    /// <param name="maxRetries">Maximum number of retry attempts.</param>
+    /// <param name="retryDelayMs">Base delay between retries in milliseconds.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public static async Task MoveFileWithOverwriteAsync(
+        string sourcePath,
+        string destinationPath,
+        ILogger? logger = null,
+        int maxRetries = 3,
+        int retryDelayMs = 100,
+        CancellationToken cancellationToken = default)
+    {
+        for (var attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                File.Move(sourcePath, destinationPath, overwrite: true);
+                return;
+            }
+            catch (IOException ex) when (attempt < maxRetries)
+            {
+                logger?.LogWarning(
+                    ex,
+                    "File move attempt {Attempt}/{MaxRetries} failed for {Destination}, retrying",
+                    attempt,
+                    maxRetries,
+                    Path.GetFileName(destinationPath));
+                await Task.Delay(retryDelayMs * attempt, cancellationToken).ConfigureAwait(false);
             }
         }
 

@@ -167,16 +167,17 @@ public class CircuitBreaker
     {
         lock (_lock)
         {
-            if (!IsOpen)
+            // Use direct field access (not public properties) to avoid re-acquiring _lock
+            if (_circuitOpenedAt == null || DateTime.UtcNow - _circuitOpenedAt.Value >= _cooldownPeriod)
             {
                 reason = null;
                 return true;
             }
 
-            var remaining = CooldownRemaining;
+            var remaining = _cooldownPeriod - (DateTime.UtcNow - _circuitOpenedAt.Value);
             reason = $"Circuit breaker open for {_serviceName}: " +
                      $"{_consecutiveFailures} consecutive failures. " +
-                     $"Retry in {remaining?.TotalSeconds:F0} seconds.";
+                     $"Retry in {remaining.TotalSeconds:F0} seconds.";
             return false;
         }
     }

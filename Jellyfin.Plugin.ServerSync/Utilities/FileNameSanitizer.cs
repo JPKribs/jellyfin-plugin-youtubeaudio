@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -22,6 +23,19 @@ public static partial class FileNameSanitizer
     private static readonly char[] AdditionalInvalidChars = { ':', '*', '?', '"', '<', '>', '|', '\0' };
 
     /// <summary>
+    /// Pre-computed set of all invalid characters (union of OS-invalid + additional).
+    /// </summary>
+    private static readonly HashSet<char> AllInvalidChars = InvalidChars
+        .Concat(AdditionalInvalidChars)
+        .Distinct()
+        .ToHashSet();
+
+    /// <summary>
+    /// Pre-compiled regex for collapsing consecutive underscores.
+    /// </summary>
+    private static readonly Regex UnderscoreCollapseRegex = new(@"_+", RegexOptions.Compiled);
+
+    /// <summary>
     /// Maximum file name length (conservative limit for cross-platform compatibility).
     /// </summary>
     private const int MaxFileNameLength = 200;
@@ -39,16 +53,11 @@ public static partial class FileNameSanitizer
             return $"unnamed_{Guid.NewGuid():N}";
         }
 
-        var allInvalidChars = InvalidChars
-            .Concat(AdditionalInvalidChars)
-            .Distinct()
-            .ToHashSet();
-
         var sb = new StringBuilder(fileName.Length);
 
         foreach (var c in fileName)
         {
-            if (allInvalidChars.Contains(c) || char.IsControl(c))
+            if (AllInvalidChars.Contains(c) || char.IsControl(c))
             {
                 sb.Append(replacement);
             }
@@ -108,6 +117,11 @@ public static partial class FileNameSanitizer
     /// </summary>
     private static string CollapseReplacements(string input, char replacement)
     {
+        if (replacement == '_')
+        {
+            return UnderscoreCollapseRegex.Replace(input, "_");
+        }
+
         var pattern = $"{Regex.Escape(replacement.ToString())}+";
         return Regex.Replace(input, pattern, replacement.ToString());
     }

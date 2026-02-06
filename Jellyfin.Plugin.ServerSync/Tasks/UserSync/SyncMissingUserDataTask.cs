@@ -78,7 +78,7 @@ public class SyncMissingUserDataTask : IScheduledTask
             return;
         }
 
-        var enabledMappings = config.UserMappings.FindAll(m => m.IsEnabled);
+        var enabledMappings = config.UserMappings?.FindAll(m => m.IsEnabled) ?? [];
         if (enabledMappings.Count == 0)
         {
             _logger.LogWarning("No enabled user mappings, skipping user sync");

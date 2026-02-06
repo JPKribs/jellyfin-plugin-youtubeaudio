@@ -123,7 +123,8 @@ public static class RetryPolicy
     private static int CalculateDelay(int attempt)
     {
         // Exponential backoff: 1s, 2s, 4s, 8s, ... capped at MaxDelayMs
-        var exponentialDelay = BaseDelayMs * (int)Math.Pow(2, attempt - 1);
+        var clampedExponent = Math.Min(attempt - 1, 20); // Cap exponent to prevent int overflow
+        var exponentialDelay = (int)(BaseDelayMs * Math.Pow(2, clampedExponent));
         var cappedDelay = Math.Min(exponentialDelay, MaxDelayMs);
 
         // Add jitter (±25%) to prevent thundering herd

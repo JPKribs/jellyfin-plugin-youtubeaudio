@@ -107,7 +107,7 @@ public class DownloadService
             }
 
             // Use atomic move with overwrite
-            FileOperationUtilities.MoveFileWithOverwrite(tempFilePath, item.LocalPath, _logger);
+            await FileOperationUtilities.MoveFileWithOverwriteAsync(tempFilePath, item.LocalPath, _logger, cancellationToken: cancellationToken).ConfigureAwait(false);
 
             string? companionFilesList = null;
             if (includeCompanionFiles)
@@ -206,7 +206,7 @@ public class DownloadService
                         $"Download companion {companion.FileName}",
                         cancellationToken).ConfigureAwait(false);
 
-                    FileOperationUtilities.MoveFileWithOverwrite(tempFilePath, targetPath, _logger);
+                    await FileOperationUtilities.MoveFileWithOverwriteAsync(tempFilePath, targetPath, _logger, cancellationToken: cancellationToken).ConfigureAwait(false);
                     downloadedFiles.Add(companion.FileName);
                     _logger.LogInformation("Downloaded companion file {FileName}", companion.FileName);
                 }

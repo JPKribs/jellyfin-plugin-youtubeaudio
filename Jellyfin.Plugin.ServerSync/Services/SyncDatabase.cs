@@ -70,8 +70,11 @@ public class SyncDatabase : IDisposable
 
         try
         {
-            EnsureConnection();
-            return readOperation();
+            lock (_writeLock)
+            {
+                EnsureConnection();
+                return readOperation();
+            }
         }
         catch (SqliteException ex) when (
             ex.SqliteErrorCode == 5 ||  // SQLITE_BUSY
@@ -139,7 +142,7 @@ public class SyncDatabase : IDisposable
             catch (IOException ex) when (i < maxRetries - 1)
             {
                 _logger.LogDebug(ex, "Failed to delete {FilePath}, retrying ({Attempt}/{Max})", filePath, i + 1, maxRetries);
-                System.Threading.Thread.Sleep(100 * (i + 1)); // Exponential backoff
+                System.Threading.Thread.Sleep(50 * (i + 1)); // Brief backoff (may block while _writeLock is held)
             }
             catch (Exception ex)
             {
@@ -1011,7 +1014,7 @@ public class SyncDatabase : IDisposable
             var lastSync = lastSyncCmd.ExecuteScalar();
             if (lastSync != null && lastSync != DBNull.Value)
             {
-                stats.LastSyncTime = DateTime.Parse((string)lastSync);
+                stats.LastSyncTime = DateTime.Parse((string)lastSync, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind);
             }
 
             return stats;

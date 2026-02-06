@@ -52,12 +52,12 @@ public class SyncMissingHistoryTask : IScheduledTask
     public string Category => "History Sync";
 
     /// <inheritdoc />
-    public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
+    public Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
         var plugin = Plugin.Instance;
         if (plugin == null)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         var config = plugin.Configuration;
@@ -65,7 +65,7 @@ public class SyncMissingHistoryTask : IScheduledTask
         // Check if history sync is enabled
         if (!config.EnableHistorySync)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         // Validate source server configuration
@@ -73,7 +73,7 @@ public class SyncMissingHistoryTask : IScheduledTask
             string.IsNullOrWhiteSpace(config.SourceServerApiKey))
         {
             _logger.LogWarning("History sync skipped: source server not configured");
-            return;
+            return Task.CompletedTask;
         }
 
         // Get enabled mappings
@@ -83,13 +83,13 @@ public class SyncMissingHistoryTask : IScheduledTask
         if (enabledUserMappings.Count == 0)
         {
             _logger.LogDebug("History sync skipped: no enabled user mappings");
-            return;
+            return Task.CompletedTask;
         }
 
         if (enabledLibraryMappings.Count == 0)
         {
             _logger.LogDebug("History sync skipped: no enabled library mappings");
-            return;
+            return Task.CompletedTask;
         }
 
         _logger.LogInformation("Starting history sync");
@@ -109,7 +109,7 @@ public class SyncMissingHistoryTask : IScheduledTask
         {
             _logger.LogInformation("No queued history items to sync");
             progress.Report(100);
-            return;
+            return Task.CompletedTask;
         }
 
         _logger.LogInformation("Processing {Count} queued history items", totalItems);
@@ -127,7 +127,7 @@ public class SyncMissingHistoryTask : IScheduledTask
 
             try
             {
-                var success = await SyncHistoryItemAsync(item, localClient, database).ConfigureAwait(false);
+                var success = SyncHistoryItem(item, localClient, database);
 
                 if (success)
                 {
@@ -161,12 +161,13 @@ public class SyncMissingHistoryTask : IScheduledTask
             successCount, errorCount, totalItems);
 
         progress.Report(100);
+        return Task.CompletedTask;
     }
 
     /// <summary>
     /// Syncs a single history item to the local server.
     /// </summary>
-    private Task<bool> SyncHistoryItemAsync(
+    private bool SyncHistoryItem(
         HistorySyncItem item,
         LocalServerClient localClient,
         SyncDatabase database)
@@ -179,7 +180,7 @@ public class SyncMissingHistoryTask : IScheduledTask
             item.ErrorMessage = "Local item not found";
             item.StatusDate = DateTime.UtcNow;
             database.UpsertHistoryItem(item);
-            return Task.FromResult(false);
+            return false;
         }
 
         // Validate we have a local user ID
@@ -190,7 +191,7 @@ public class SyncMissingHistoryTask : IScheduledTask
             item.ErrorMessage = "Local user not found";
             item.StatusDate = DateTime.UtcNow;
             database.UpsertHistoryItem(item);
-            return Task.FromResult(false);
+            return false;
         }
 
         // Parse IDs
@@ -202,7 +203,7 @@ public class SyncMissingHistoryTask : IScheduledTask
             item.ErrorMessage = "Invalid user or item ID";
             item.StatusDate = DateTime.UtcNow;
             database.UpsertHistoryItem(item);
-            return Task.FromResult(false);
+            return false;
         }
 
         // Apply the merged history data
@@ -236,7 +237,7 @@ public class SyncMissingHistoryTask : IScheduledTask
             item.LocalIsFavorite = item.MergedIsFavorite;
 
             database.UpsertHistoryItem(item);
-            return Task.FromResult(true);
+            return true;
         }
         else
         {
@@ -245,7 +246,7 @@ public class SyncMissingHistoryTask : IScheduledTask
             item.ErrorMessage = "Failed to update user data";
             item.StatusDate = DateTime.UtcNow;
             database.UpsertHistoryItem(item);
-            return Task.FromResult(false);
+            return false;
         }
     }
 

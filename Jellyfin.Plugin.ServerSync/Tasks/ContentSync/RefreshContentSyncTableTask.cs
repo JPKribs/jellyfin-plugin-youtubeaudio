@@ -102,8 +102,15 @@ public class UpdateSyncTablesTask : IScheduledTask
                 return;
             }
 
+            if (!Guid.TryParse(mapping.SourceLibraryId, out var sourceLibraryGuid))
+            {
+                _logger.LogWarning("Invalid source library ID '{LibraryId}' in mapping for {LibraryName}, skipping",
+                    mapping.SourceLibraryId, mapping.SourceLibraryName);
+                continue;
+            }
+
             var count = await client.GetLibraryItemCountAsync(
-                Guid.Parse(mapping.SourceLibraryId),
+                sourceLibraryGuid,
                 cancellationToken).ConfigureAwait(false);
 
             totalItems += count;

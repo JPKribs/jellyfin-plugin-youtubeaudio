@@ -2,26 +2,32 @@
 // SETTINGS - PAGE CONTROLLER
 // ============================================
 
-// ============================================
-// TAB NAVIGATION
-// ============================================
-function getTabs() {
-    return [
-        { href: 'configurationpage?name=serversync_settings', name: 'Settings' },
-        { href: 'configurationpage?name=serversync_content', name: 'Content' },
-        { href: 'configurationpage?name=serversync_history', name: 'History' },
-        { href: 'configurationpage?name=serversync_metadata', name: 'Metadata' },
-        { href: 'configurationpage?name=serversync_users', name: 'Users' }
-    ];
-}
-
-export default function (view, params) {
+export default function (view) {
     'use strict';
+
+    // ============================================
+    // TAB NAVIGATION (local copy for synchronous access)
+    // ============================================
+
+    function getTabs() {
+        return [
+            { href: 'configurationpage?name=serversync_sync', name: 'Sync' },
+            { href: 'configurationpage?name=serversync_settings', name: 'Settings' }
+        ];
+    }
+
+    // ============================================
+    // SHARED MODULE IMPORT (deferred)
+    // ============================================
+
+    var ServerSyncShared = null;
+    var _sharedPromise = import('/web/configurationpage?name=serversync_shared.js').then(function(shared) {
+        ServerSyncShared = shared.createServerSyncShared(view);
+    });
 
     // ============================================
     // CONSTANTS & STATE
     // ============================================
-    var pluginId = 'ebd650b5-6f4c-4ccb-b10d-23dffb3a7286';
     var _initialized = false;
 
     var currentConfig = null;
@@ -31,47 +37,52 @@ export default function (view, params) {
     var localUsers = [];
 
     // ============================================
-    // UTILITY FUNCTIONS
+    // UTILITY ALIASES (delegate to shared module)
     // ============================================
 
     function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        return ServerSyncShared.escapeHtml(str);
     }
 
     function apiRequest(endpoint, method, data) {
-        var options = {
-            url: ApiClient.getUrl('ServerSync/' + endpoint),
-            type: method || 'GET',
-            dataType: 'json'
-        };
-        if (data) {
-            options.contentType = 'application/json';
-            options.data = JSON.stringify(data);
-        }
-        return ApiClient.fetch(options).catch(function(error) {
-            if (error && error.message && error.message.indexOf('JSON') !== -1) {
-                return null;
-            }
-            throw error;
-        });
+        return ServerSyncShared.apiRequest(endpoint, method, data);
     }
 
     function setVisible(elementId, visible) {
-        var el = view.querySelector('#' + elementId);
-        if (el) {
-            if (visible) {
-                el.classList.remove('hidden');
-            } else {
-                el.classList.add('hidden');
-            }
-        }
+        ServerSyncShared.setVisible(elementId, visible);
     }
 
     function bindClick(id, handler) {
-        var el = view.querySelector('#' + id);
-        if (el) el.addEventListener('click', handler);
-        return el;
+        return ServerSyncShared.bindClick(id, handler);
+    }
+
+    // Safe DOM accessors for load/save settings
+    function getEl(id) {
+        return view.querySelector('#' + id);
+    }
+
+    function setChecked(id, value) {
+        var el = getEl(id);
+        if (el) el.checked = value;
+    }
+
+    function getChecked(id) {
+        var el = getEl(id);
+        return el ? el.checked : false;
+    }
+
+    function setValue(id, value) {
+        var el = getEl(id);
+        if (el) el.value = value;
+    }
+
+    function getValue(id, fallback) {
+        var el = getEl(id);
+        return el ? el.value : (fallback || '');
+    }
+
+    function getIntValue(id, fallback) {
+        return parseInt(getValue(id, '0')) || fallback;
     }
 
     // ============================================
@@ -158,7 +169,7 @@ export default function (view, params) {
         // If the API key was manually changed, clear the authenticated user
         // (This is handled by generateToken setting it, and manual edits won't update it)
 
-        ApiClient.updatePluginConfiguration(pluginId, config).then(function() {
+        ServerSyncShared.saveConfig(config).then(function() {
             Dashboard.alert('Server settings saved');
         }).catch(function() {
             Dashboard.alert('Failed to save server settings');
@@ -230,7 +241,7 @@ export default function (view, params) {
                 config.SourceServerName = response.ServerName;
                 config.SourceServerId = response.ServerId;
 
-                ApiClient.updatePluginConfiguration(pluginId, config).then(function() {
+                ServerSyncShared.saveConfig(config).then(function() {
                     if (statusEl) statusEl.innerHTML = '<span class="text-success">Token generated and saved!</span>';
 
                     // Fetch source data now that we have valid credentials
@@ -402,7 +413,7 @@ export default function (view, params) {
     function saveLibraries() {
         var config = currentConfig || {};
         config.LibraryMappings = collectLibraryMappings();
-        ApiClient.updatePluginConfiguration(pluginId, config).then(function() {
+        ServerSyncShared.saveConfig(config).then(function() {
             Dashboard.alert('Library mappings saved');
         }).catch(function() {
             Dashboard.alert('Failed to save library mappings');
@@ -534,7 +545,7 @@ export default function (view, params) {
     function saveUsers() {
         var config = currentConfig || {};
         config.UserMappings = collectUserMappings();
-        ApiClient.updatePluginConfiguration(pluginId, config).then(function() {
+        ServerSyncShared.saveConfig(config).then(function() {
             Dashboard.alert('User mappings saved');
         }).catch(function() {
             Dashboard.alert('Failed to save user mappings');
@@ -548,58 +559,58 @@ export default function (view, params) {
     // --- Content Settings ---
 
     function loadContentSettings(config) {
-        view.querySelector('#chkEnableContentSync').checked = config.EnableContentSync || false;
-        view.querySelector('#chkDetectUpdatedFiles').checked = config.DetectUpdatedFiles !== false;
-        view.querySelector('#selChangeDetectionPolicy').value = config.ChangeDetectionPolicy || 'SizeOnly';
-        view.querySelector('#chkIncludeExtras').checked = config.IncludeCompanionFiles || false;
-        view.querySelector('#selDownloadNewContentMode').value = config.DownloadNewContentMode || 'Enabled';
-        view.querySelector('#selReplaceExistingContentMode').value = config.ReplaceExistingContentMode || 'Enabled';
-        view.querySelector('#selDeleteMissingContentMode').value = config.DeleteMissingContentMode || 'Disabled';
-        view.querySelector('#chkEnableRecyclingBin').checked = config.EnableRecyclingBin || false;
-        view.querySelector('#txtRecyclingBinPath').value = config.RecyclingBinPath || '';
-        view.querySelector('#txtRecyclingBinRetentionDays').value = config.RecyclingBinRetentionDays || 7;
-        view.querySelector('#chkRemoveEmptyFolders').checked = config.RemoveEmptyFoldersOnDelete || false;
-        view.querySelector('#txtMaxConcurrentDownloads').value = config.MaxConcurrentDownloads || 2;
-        view.querySelector('#txtMaxRetryCount').value = config.MaxRetryCount || 3;
-        view.querySelector('#txtTempDownloadPath').value = config.TempDownloadPath || '';
-        view.querySelector('#txtMaxDownloadSpeed').value = config.MaxDownloadSpeed || 0;
-        view.querySelector('#selDownloadSpeedUnit').value = config.DownloadSpeedUnit || 'MB';
-        view.querySelector('#txtMinFreeDiskSpace').value = config.MinimumFreeDiskSpaceGb || 10;
-        view.querySelector('#chkEnableBandwidthScheduling').checked = config.EnableBandwidthScheduling || false;
-        view.querySelector('#txtScheduledStartHour').value = config.ScheduledStartHour || 0;
-        view.querySelector('#txtScheduledEndHour').value = config.ScheduledEndHour || 6;
-        view.querySelector('#txtScheduledDownloadSpeed').value = config.ScheduledDownloadSpeed || 0;
-        view.querySelector('#selScheduledDownloadSpeedUnit').value = config.ScheduledDownloadSpeedUnit || 'MB';
+        setChecked('chkEnableContentSync', config.EnableContentSync || false);
+        setChecked('chkDetectUpdatedFiles', config.DetectUpdatedFiles !== false);
+        setValue('selChangeDetectionPolicy', config.ChangeDetectionPolicy || 'SizeOnly');
+        setChecked('chkIncludeExtras', config.IncludeCompanionFiles || false);
+        setValue('selDownloadNewContentMode', config.DownloadNewContentMode || 'Enabled');
+        setValue('selReplaceExistingContentMode', config.ReplaceExistingContentMode || 'Enabled');
+        setValue('selDeleteMissingContentMode', config.DeleteMissingContentMode || 'Disabled');
+        setChecked('chkEnableRecyclingBin', config.EnableRecyclingBin || false);
+        setValue('txtRecyclingBinPath', config.RecyclingBinPath || '');
+        setValue('txtRecyclingBinRetentionDays', config.RecyclingBinRetentionDays || 7);
+        setChecked('chkRemoveEmptyFolders', config.RemoveEmptyFoldersOnDelete || false);
+        setValue('txtMaxConcurrentDownloads', config.MaxConcurrentDownloads || 2);
+        setValue('txtMaxRetryCount', config.MaxRetryCount || 3);
+        setValue('txtTempDownloadPath', config.TempDownloadPath || '');
+        setValue('txtMaxDownloadSpeed', config.MaxDownloadSpeed || 0);
+        setValue('selDownloadSpeedUnit', config.DownloadSpeedUnit || 'MB');
+        setValue('txtMinFreeDiskSpace', config.MinimumFreeDiskSpaceGb || 10);
+        setChecked('chkEnableBandwidthScheduling', config.EnableBandwidthScheduling || false);
+        setValue('txtScheduledStartHour', config.ScheduledStartHour || 0);
+        setValue('txtScheduledEndHour', config.ScheduledEndHour || 6);
+        setValue('txtScheduledDownloadSpeed', config.ScheduledDownloadSpeed || 0);
+        setValue('selScheduledDownloadSpeedUnit', config.ScheduledDownloadSpeedUnit || 'MB');
 
         updateNestedVisibility();
     }
 
     function saveContentSettings() {
         var config = currentConfig || {};
-        config.EnableContentSync = view.querySelector('#chkEnableContentSync').checked;
-        config.DetectUpdatedFiles = view.querySelector('#chkDetectUpdatedFiles').checked;
-        config.ChangeDetectionPolicy = view.querySelector('#selChangeDetectionPolicy').value;
-        config.IncludeCompanionFiles = view.querySelector('#chkIncludeExtras').checked;
-        config.DownloadNewContentMode = view.querySelector('#selDownloadNewContentMode').value;
-        config.ReplaceExistingContentMode = view.querySelector('#selReplaceExistingContentMode').value;
-        config.DeleteMissingContentMode = view.querySelector('#selDeleteMissingContentMode').value;
-        config.EnableRecyclingBin = view.querySelector('#chkEnableRecyclingBin').checked;
-        config.RecyclingBinPath = view.querySelector('#txtRecyclingBinPath').value;
-        config.RecyclingBinRetentionDays = parseInt(view.querySelector('#txtRecyclingBinRetentionDays').value) || 7;
-        config.RemoveEmptyFoldersOnDelete = view.querySelector('#chkRemoveEmptyFolders').checked;
-        config.MaxConcurrentDownloads = parseInt(view.querySelector('#txtMaxConcurrentDownloads').value) || 2;
-        config.MaxRetryCount = parseInt(view.querySelector('#txtMaxRetryCount').value) || 3;
-        config.TempDownloadPath = view.querySelector('#txtTempDownloadPath').value || null;
-        config.MaxDownloadSpeed = parseInt(view.querySelector('#txtMaxDownloadSpeed').value) || 0;
-        config.DownloadSpeedUnit = view.querySelector('#selDownloadSpeedUnit').value;
-        config.MinimumFreeDiskSpaceGb = parseInt(view.querySelector('#txtMinFreeDiskSpace').value) || 10;
-        config.EnableBandwidthScheduling = view.querySelector('#chkEnableBandwidthScheduling').checked;
-        config.ScheduledStartHour = parseInt(view.querySelector('#txtScheduledStartHour').value) || 0;
-        config.ScheduledEndHour = parseInt(view.querySelector('#txtScheduledEndHour').value) || 6;
-        config.ScheduledDownloadSpeed = parseInt(view.querySelector('#txtScheduledDownloadSpeed').value) || 0;
-        config.ScheduledDownloadSpeedUnit = view.querySelector('#selScheduledDownloadSpeedUnit').value;
+        config.EnableContentSync = getChecked('chkEnableContentSync');
+        config.DetectUpdatedFiles = getChecked('chkDetectUpdatedFiles');
+        config.ChangeDetectionPolicy = getValue('selChangeDetectionPolicy', 'SizeOnly');
+        config.IncludeCompanionFiles = getChecked('chkIncludeExtras');
+        config.DownloadNewContentMode = getValue('selDownloadNewContentMode', 'Enabled');
+        config.ReplaceExistingContentMode = getValue('selReplaceExistingContentMode', 'Enabled');
+        config.DeleteMissingContentMode = getValue('selDeleteMissingContentMode', 'Disabled');
+        config.EnableRecyclingBin = getChecked('chkEnableRecyclingBin');
+        config.RecyclingBinPath = getValue('txtRecyclingBinPath');
+        config.RecyclingBinRetentionDays = getIntValue('txtRecyclingBinRetentionDays', 7);
+        config.RemoveEmptyFoldersOnDelete = getChecked('chkRemoveEmptyFolders');
+        config.MaxConcurrentDownloads = getIntValue('txtMaxConcurrentDownloads', 2);
+        config.MaxRetryCount = getIntValue('txtMaxRetryCount', 3);
+        config.TempDownloadPath = getValue('txtTempDownloadPath') || null;
+        config.MaxDownloadSpeed = getIntValue('txtMaxDownloadSpeed', 0);
+        config.DownloadSpeedUnit = getValue('selDownloadSpeedUnit', 'MB');
+        config.MinimumFreeDiskSpaceGb = getIntValue('txtMinFreeDiskSpace', 10);
+        config.EnableBandwidthScheduling = getChecked('chkEnableBandwidthScheduling');
+        config.ScheduledStartHour = getIntValue('txtScheduledStartHour', 0);
+        config.ScheduledEndHour = getIntValue('txtScheduledEndHour', 6);
+        config.ScheduledDownloadSpeed = getIntValue('txtScheduledDownloadSpeed', 0);
+        config.ScheduledDownloadSpeedUnit = getValue('selScheduledDownloadSpeedUnit', 'MB');
 
-        ApiClient.updatePluginConfiguration(pluginId, config).then(function() {
+        ServerSyncShared.saveConfig(config).then(function() {
             Dashboard.alert('Content settings saved');
         }).catch(function() {
             Dashboard.alert('Failed to save content settings');
@@ -609,24 +620,24 @@ export default function (view, params) {
     // --- History Settings ---
 
     function loadHistorySettings(config) {
-        view.querySelector('#chkEnableHistorySync').checked = config.EnableHistorySync || false;
-        view.querySelector('#chkHistorySyncPlayedStatus').checked = config.SyncPlayedStatus !== false;
-        view.querySelector('#chkHistorySyncPlaybackPosition').checked = config.SyncPlaybackPosition !== false;
-        view.querySelector('#chkHistorySyncPlayCount').checked = config.SyncPlayCount !== false;
-        view.querySelector('#chkHistorySyncLastPlayedDate').checked = config.SyncLastPlayedDate !== false;
-        view.querySelector('#chkHistorySyncFavorites').checked = config.SyncFavorites !== false;
+        setChecked('chkEnableHistorySync', config.EnableHistorySync || false);
+        setChecked('chkHistorySyncPlayedStatus', config.SyncPlayedStatus !== false);
+        setChecked('chkHistorySyncPlaybackPosition', config.SyncPlaybackPosition !== false);
+        setChecked('chkHistorySyncPlayCount', config.SyncPlayCount !== false);
+        setChecked('chkHistorySyncLastPlayedDate', config.SyncLastPlayedDate !== false);
+        setChecked('chkHistorySyncFavorites', config.SyncFavorites !== false);
     }
 
     function saveHistorySettings() {
         var config = currentConfig || {};
-        config.EnableHistorySync = view.querySelector('#chkEnableHistorySync').checked;
-        config.SyncPlayedStatus = view.querySelector('#chkHistorySyncPlayedStatus').checked;
-        config.SyncPlaybackPosition = view.querySelector('#chkHistorySyncPlaybackPosition').checked;
-        config.SyncPlayCount = view.querySelector('#chkHistorySyncPlayCount').checked;
-        config.SyncLastPlayedDate = view.querySelector('#chkHistorySyncLastPlayedDate').checked;
-        config.SyncFavorites = view.querySelector('#chkHistorySyncFavorites').checked;
+        config.EnableHistorySync = getChecked('chkEnableHistorySync');
+        config.SyncPlayedStatus = getChecked('chkHistorySyncPlayedStatus');
+        config.SyncPlaybackPosition = getChecked('chkHistorySyncPlaybackPosition');
+        config.SyncPlayCount = getChecked('chkHistorySyncPlayCount');
+        config.SyncLastPlayedDate = getChecked('chkHistorySyncLastPlayedDate');
+        config.SyncFavorites = getChecked('chkHistorySyncFavorites');
 
-        ApiClient.updatePluginConfiguration(pluginId, config).then(function() {
+        ServerSyncShared.saveConfig(config).then(function() {
             Dashboard.alert('History settings saved');
         }).catch(function() {
             Dashboard.alert('Failed to save history settings');
@@ -636,28 +647,28 @@ export default function (view, params) {
     // --- Metadata Settings ---
 
     function loadMetadataSettings(config) {
-        view.querySelector('#chkEnableMetadataSync').checked = config.EnableMetadataSync || false;
-        view.querySelector('#chkMetadataSyncMetadata').checked = config.MetadataSyncMetadata !== false;
-        view.querySelector('#chkMetadataSyncGenres').checked = config.MetadataSyncGenres !== false;
-        view.querySelector('#chkMetadataSyncTags').checked = config.MetadataSyncTags !== false;
-        view.querySelector('#chkMetadataSyncStudios').checked = config.MetadataSyncStudios !== false;
-        view.querySelector('#chkMetadataSyncPeople').checked = config.MetadataSyncPeople === true;
-        view.querySelector('#chkMetadataSyncImages').checked = config.MetadataSyncImages !== false;
-        view.querySelector('#selMetadataRefreshMode').value = config.MetadataRefreshMode || 'FullRefresh';
+        setChecked('chkEnableMetadataSync', config.EnableMetadataSync || false);
+        setChecked('chkMetadataSyncMetadata', config.MetadataSyncMetadata !== false);
+        setChecked('chkMetadataSyncGenres', config.MetadataSyncGenres !== false);
+        setChecked('chkMetadataSyncTags', config.MetadataSyncTags !== false);
+        setChecked('chkMetadataSyncStudios', config.MetadataSyncStudios !== false);
+        setChecked('chkMetadataSyncPeople', config.MetadataSyncPeople === true);
+        setChecked('chkMetadataSyncImages', config.MetadataSyncImages !== false);
+        setValue('selMetadataRefreshMode', config.MetadataRefreshMode || 'FullRefresh');
     }
 
     function saveMetadataSettings() {
         var config = currentConfig || {};
-        config.EnableMetadataSync = view.querySelector('#chkEnableMetadataSync').checked;
-        config.MetadataSyncMetadata = view.querySelector('#chkMetadataSyncMetadata').checked;
-        config.MetadataSyncGenres = view.querySelector('#chkMetadataSyncGenres').checked;
-        config.MetadataSyncTags = view.querySelector('#chkMetadataSyncTags').checked;
-        config.MetadataSyncStudios = view.querySelector('#chkMetadataSyncStudios').checked;
-        config.MetadataSyncPeople = view.querySelector('#chkMetadataSyncPeople').checked;
-        config.MetadataSyncImages = view.querySelector('#chkMetadataSyncImages').checked;
-        config.MetadataRefreshMode = view.querySelector('#selMetadataRefreshMode').value;
+        config.EnableMetadataSync = getChecked('chkEnableMetadataSync');
+        config.MetadataSyncMetadata = getChecked('chkMetadataSyncMetadata');
+        config.MetadataSyncGenres = getChecked('chkMetadataSyncGenres');
+        config.MetadataSyncTags = getChecked('chkMetadataSyncTags');
+        config.MetadataSyncStudios = getChecked('chkMetadataSyncStudios');
+        config.MetadataSyncPeople = getChecked('chkMetadataSyncPeople');
+        config.MetadataSyncImages = getChecked('chkMetadataSyncImages');
+        config.MetadataRefreshMode = getValue('selMetadataRefreshMode', 'FullRefresh');
 
-        ApiClient.updatePluginConfiguration(pluginId, config).then(function() {
+        ServerSyncShared.saveConfig(config).then(function() {
             Dashboard.alert('Metadata settings saved');
         }).catch(function() {
             Dashboard.alert('Failed to save metadata settings');
@@ -667,20 +678,20 @@ export default function (view, params) {
     // --- User Sync Settings ---
 
     function loadUserSyncSettings(config) {
-        view.querySelector('#chkEnableUserSync').checked = config.EnableUserSync || false;
-        view.querySelector('#chkUserSyncPolicy').checked = config.SyncUserPolicy !== false;
-        view.querySelector('#chkUserSyncConfiguration').checked = config.SyncUserConfiguration !== false;
-        view.querySelector('#chkUserSyncProfileImage').checked = config.SyncUserProfileImage !== false;
+        setChecked('chkEnableUserSync', config.EnableUserSync || false);
+        setChecked('chkUserSyncPolicy', config.SyncUserPolicy !== false);
+        setChecked('chkUserSyncConfiguration', config.SyncUserConfiguration !== false);
+        setChecked('chkUserSyncProfileImage', config.SyncUserProfileImage !== false);
     }
 
     function saveUserSyncSettings() {
         var config = currentConfig || {};
-        config.EnableUserSync = view.querySelector('#chkEnableUserSync').checked;
-        config.SyncUserPolicy = view.querySelector('#chkUserSyncPolicy').checked;
-        config.SyncUserConfiguration = view.querySelector('#chkUserSyncConfiguration').checked;
-        config.SyncUserProfileImage = view.querySelector('#chkUserSyncProfileImage').checked;
+        config.EnableUserSync = getChecked('chkEnableUserSync');
+        config.SyncUserPolicy = getChecked('chkUserSyncPolicy');
+        config.SyncUserConfiguration = getChecked('chkUserSyncConfiguration');
+        config.SyncUserProfileImage = getChecked('chkUserSyncProfileImage');
 
-        ApiClient.updatePluginConfiguration(pluginId, config).then(function() {
+        ServerSyncShared.saveConfig(config).then(function() {
             Dashboard.alert('User sync settings saved');
         }).catch(function() {
             Dashboard.alert('Failed to save user sync settings');
@@ -690,9 +701,9 @@ export default function (view, params) {
     // --- Nested Visibility ---
 
     function updateNestedVisibility() {
-        setVisible('detectUpdatedFilesSettings', view.querySelector('#chkDetectUpdatedFiles').checked);
-        setVisible('recyclingBinSettings', view.querySelector('#chkEnableRecyclingBin').checked);
-        setVisible('bandwidthScheduleContainer', view.querySelector('#chkEnableBandwidthScheduling').checked);
+        setVisible('detectUpdatedFilesSettings', getChecked('chkDetectUpdatedFiles'));
+        setVisible('recyclingBinSettings', getChecked('chkEnableRecyclingBin'));
+        setVisible('bandwidthScheduleContainer', getChecked('chkEnableBandwidthScheduling'));
     }
 
     // ============================================
@@ -712,6 +723,8 @@ export default function (view, params) {
                 if (content) {
                     this.classList.toggle('collapsed');
                     content.classList.toggle('collapsed');
+                    var isExpanded = !this.classList.contains('collapsed');
+                    this.setAttribute('aria-expanded', String(isExpanded));
                 }
             });
         });
@@ -727,7 +740,7 @@ export default function (view, params) {
     }
 
     function loadConfig() {
-        ApiClient.getPluginConfiguration(pluginId).then(function(config) {
+        ServerSyncShared.getConfig().then(function(config) {
             currentConfig = config;
 
             loadServerConfig(config);
@@ -750,6 +763,8 @@ export default function (view, params) {
                 renderLibraryMappings(config.LibraryMappings || []);
                 renderUserMappings(config.UserMappings || []);
             });
+        }).catch(function() {
+            Dashboard.alert('Failed to load plugin configuration');
         });
     }
 
@@ -758,35 +773,36 @@ export default function (view, params) {
     // ============================================
 
     view.addEventListener('viewshow', function () {
-        console.log('ServerSync Settings: viewshow');
-        LibraryMenu.setTabs('serversync', 0, getTabs);
+        LibraryMenu.setTabs('serversync', 1, getTabs);
 
-        if (!_initialized) {
-            _initialized = true;
+        _sharedPromise.then(function() {
+            if (!_initialized) {
+                _initialized = true;
 
-            initCollapsibles();
-            initNestedVisibilityHandlers();
+                initCollapsibles();
+                initNestedVisibilityHandlers();
 
-            // Server actions
-            bindClick('btnTestConnection', testConnection);
-            bindClick('btnSaveServer', saveServerConfig);
-            bindClick('btnGenerateToken', generateToken);
+                // Server actions
+                bindClick('btnTestConnection', testConnection);
+                bindClick('btnSaveServer', saveServerConfig);
+                bindClick('btnGenerateToken', generateToken);
 
-            // Library mapping actions
-            bindClick('btnAddMapping', function() { addLibraryMappingRow(); });
-            bindClick('btnSaveLibraries', saveLibraries);
+                // Library mapping actions
+                bindClick('btnAddMapping', function() { addLibraryMappingRow(); });
+                bindClick('btnSaveLibraries', saveLibraries);
 
-            // User mapping actions
-            bindClick('btnAddUserMapping', function() { addUserMappingRow(); });
-            bindClick('btnSaveUsers', saveUsers);
+                // User mapping actions
+                bindClick('btnAddUserMapping', function() { addUserMappingRow(); });
+                bindClick('btnSaveUsers', saveUsers);
 
-            // Sync settings actions
-            bindClick('btnSaveContentSettings', saveContentSettings);
-            bindClick('btnSaveHistorySettings', saveHistorySettings);
-            bindClick('btnSaveMetadataSettings', saveMetadataSettings);
-            bindClick('btnSaveUserSyncSettings', saveUserSyncSettings);
-        }
+                // Sync settings actions
+                bindClick('btnSaveContentSettings', saveContentSettings);
+                bindClick('btnSaveHistorySettings', saveHistorySettings);
+                bindClick('btnSaveMetadataSettings', saveMetadataSettings);
+                bindClick('btnSaveUserSyncSettings', saveUserSyncSettings);
+            }
 
-        loadConfig();
+            loadConfig();
+        });
     });
 }

@@ -242,7 +242,8 @@ public static class JsonComparisonUtility
                 }
 
                 // Try to parse as dates and compare (handles timezone format differences)
-                if (DateTime.TryParse(s1, out var dt1) && DateTime.TryParse(s2, out var dt2))
+                if (DateTime.TryParse(s1, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out var dt1) &&
+                    DateTime.TryParse(s2, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out var dt2))
                 {
                     // Compare as UTC to handle timezone differences like +00:00 vs Z
                     return dt1.ToUniversalTime() == dt2.ToUniversalTime();

@@ -184,7 +184,7 @@ public class SourceServerClient : IDisposable
             }
 
             var responseJson = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            var authResponse = System.Text.Json.JsonDocument.Parse(responseJson);
+            using var authResponse = System.Text.Json.JsonDocument.Parse(responseJson);
 
             var accessToken = authResponse.RootElement.GetProperty("AccessToken").GetString();
             var serverName = authResponse.RootElement.TryGetProperty("ServerId", out var serverIdProp)
@@ -444,18 +444,23 @@ public class SourceServerClient : IDisposable
     /// <returns>Stream of file content or null on failure.</returns>
     public async Task<Stream?> DownloadFileAsync(Guid itemId, CancellationToken cancellationToken = default)
     {
+        HttpResponseMessage? response = null;
         try
         {
             var url = $"{_serverUrl}/Items/{itemId}/Download";
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
             AddAuthorizationHeader(request);
 
-            var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            request.Dispose();
             response.EnsureSuccessStatusCode();
-            return await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+
+            var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+            return new ResponseDisposingStream(stream, response);
         }
         catch (Exception ex)
         {
+            response?.Dispose();
             _logger.LogError(ex, "Failed to download item {ItemId}", itemId);
             return null;
         }
@@ -517,30 +522,37 @@ public class SourceServerClient : IDisposable
     /// <returns>Stream of file content or null on failure.</returns>
     public async Task<Stream?> DownloadCompanionFileAsync(Guid itemId, string filePath, CancellationToken cancellationToken = default)
     {
+        HttpResponseMessage? response = null;
         try
         {
             var encodedPath = Uri.EscapeDataString(filePath);
             var url = $"{_serverUrl}/Videos/{itemId}/Subtitles/Stream?mediaSourceId={itemId}&path={encodedPath}";
 
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
             AddAuthorizationHeader(request);
 
-            var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            request.Dispose();
 
             if (!response.IsSuccessStatusCode)
             {
+                response.Dispose(); // Dispose the failed response before making the fallback request
+
                 var directUrl = $"{_serverUrl}/Items/{itemId}/File?path={encodedPath}";
-                using var directRequest = new HttpRequestMessage(HttpMethod.Get, directUrl);
+                var directRequest = new HttpRequestMessage(HttpMethod.Get, directUrl);
                 AddAuthorizationHeader(directRequest);
 
                 response = await _httpClient.SendAsync(directRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                directRequest.Dispose();
             }
 
             response.EnsureSuccessStatusCode();
-            return await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+            var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+            return new ResponseDisposingStream(stream, response);
         }
         catch (Exception ex)
         {
+            response?.Dispose();
             _logger.LogError(ex, "Failed to download companion file {FilePath} for {ItemId}", filePath, itemId);
             return null;
         }
@@ -897,5 +909,62 @@ public class SourceServerClient : IDisposable
             _httpClient.Dispose();
             _disposed = true;
         }
+    }
+
+    /// <summary>
+    /// A stream wrapper that disposes the underlying HttpResponseMessage when the stream is closed.
+    /// This ensures the HTTP connection is properly released when the caller is done reading.
+    /// </summary>
+    private sealed class ResponseDisposingStream : Stream
+    {
+        private readonly Stream _inner;
+        private readonly HttpResponseMessage _response;
+
+        public ResponseDisposingStream(Stream inner, HttpResponseMessage response)
+        {
+            _inner = inner;
+            _response = response;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _inner.Dispose();
+                _response.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
+
+        public override bool CanRead => _inner.CanRead;
+
+        public override bool CanSeek => _inner.CanSeek;
+
+        public override bool CanWrite => _inner.CanWrite;
+
+        public override long Length => _inner.Length;
+
+        public override long Position
+        {
+            get => _inner.Position;
+            set => _inner.Position = value;
+        }
+
+        public override void Flush() => _inner.Flush();
+
+        public override int Read(byte[] buffer, int offset, int count) => _inner.Read(buffer, offset, count);
+
+        public override long Seek(long offset, SeekOrigin origin) => _inner.Seek(offset, origin);
+
+        public override void SetLength(long value) => _inner.SetLength(value);
+
+        public override void Write(byte[] buffer, int offset, int count) => _inner.Write(buffer, offset, count);
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            _inner.ReadAsync(buffer, offset, count, cancellationToken);
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+            _inner.ReadAsync(buffer, cancellationToken);
     }
 }

@@ -17,7 +17,7 @@
                     <!-- COLLAPSIBLE SECTION: Server Configuration -->
 
                     <div class="collapsibleSection">
-                        <button type="button" class="collapsibleHeader collapsed" data-target="serverConfigContent">
+                        <button type="button" class="collapsibleHeader collapsed" aria-expanded="false" data-target="serverConfigContent">
                             <span class="collapsibleTitle">Server</span>
                             <span class="collapsibleIcon">&#9660;</span>
                         </button>
@@ -79,7 +79,7 @@
 
                             <!-- Server Actions -->
                             <div class="collapsibleActions">
-                                <button is="emby-button" type="button" id="btnSaveServer" class="raised button-submit">
+                                <button is="emby-button" type="button" id="btnSaveServer" class="raised button-primary">
                                     <span>Save</span>
                                 </button>
                                 <button is="emby-button" type="button" id="btnTestConnection" class="raised">
@@ -93,7 +93,7 @@
                     <!-- COLLAPSIBLE SECTION: Library Mappings -->
 
                     <div class="collapsibleSection hidden" id="librariesSection">
-                        <button type="button" class="collapsibleHeader collapsed" data-target="librariesConfigContent">
+                        <button type="button" class="collapsibleHeader collapsed" aria-expanded="false" data-target="librariesConfigContent">
                             <span class="collapsibleTitle">Libraries</span>
                             <span class="collapsibleIcon">&#9660;</span>
                         </button>
@@ -108,7 +108,7 @@
                             </button>
 
                             <div class="collapsibleActions">
-                                <button is="emby-button" type="button" id="btnSaveLibraries" class="raised button-submit">
+                                <button is="emby-button" type="button" id="btnSaveLibraries" class="raised button-primary">
                                     <span>Save Libraries</span>
                                 </button>
                             </div>
@@ -118,7 +118,7 @@
                     <!-- COLLAPSIBLE SECTION: User Mappings -->
 
                     <div class="collapsibleSection hidden" id="usersSection">
-                        <button type="button" class="collapsibleHeader collapsed" data-target="usersConfigContent">
+                        <button type="button" class="collapsibleHeader collapsed" aria-expanded="false" data-target="usersConfigContent">
                             <span class="collapsibleTitle">Users</span>
                             <span class="collapsibleIcon">&#9660;</span>
                         </button>
@@ -133,7 +133,7 @@
                             </button>
 
                             <div class="collapsibleActions">
-                                <button is="emby-button" type="button" id="btnSaveUsers" class="raised button-submit">
+                                <button is="emby-button" type="button" id="btnSaveUsers" class="raised button-primary">
                                     <span>Save Users</span>
                                 </button>
                             </div>
@@ -149,7 +149,7 @@
                     <!-- COLLAPSIBLE SECTION: Content Sync Settings -->
 
                     <div class="collapsibleSection">
-                        <button type="button" class="collapsibleHeader collapsed" data-target="contentSyncSettingsContent">
+                        <button type="button" class="collapsibleHeader collapsed" aria-expanded="false" data-target="contentSyncSettingsContent">
                             <span class="collapsibleTitle">Content</span>
                             <span class="collapsibleIcon">&#9660;</span>
                         </button>
@@ -188,7 +188,7 @@
                                                 <option value="Both">Both Size and ETag</option>
                                             </select>
                                             <div class="fieldDescription">How to detect if a file has changed. Size Only is most stable.</div>
-                                            <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
+                                            <div class="selectArrowContainer"><div style="display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
                                         </div>
                                     </div>
 
@@ -212,7 +212,7 @@
                                             <option value="Disabled">Disabled</option>
                                         </select>
                                         <div class="fieldDescription">Download content from source that doesn't exist locally.</div>
-                                        <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
+                                        <div class="selectArrowContainer"><div style="display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
                                     </div>
 
                                     <div class="selectContainer">
@@ -223,7 +223,7 @@
                                             <option value="Disabled">Disabled</option>
                                         </select>
                                         <div class="fieldDescription">Replace local content when it differs from the source version.</div>
-                                        <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
+                                        <div class="selectArrowContainer"><div style="display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
                                     </div>
 
                                     <div class="selectContainer">
@@ -234,7 +234,7 @@
                                             <option value="Disabled" selected>Disabled</option>
                                         </select>
                                         <div class="fieldDescription">Delete local content that no longer exists on the source server.</div>
-                                        <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
+                                        <div class="selectArrowContainer"><div style="display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
                                     </div>
 
                                     <div class="checkboxContainer checkboxContainer-withDescription">
@@ -346,7 +346,7 @@
                             </div>
 
                             <div class="collapsibleActions">
-                                <button is="emby-button" type="button" id="btnSaveContentSettings" class="raised button-submit">
+                                <button is="emby-button" type="button" id="btnSaveContentSettings" class="raised button-primary">
                                     <span>Save Content Settings</span>
                                 </button>
                             </div>
@@ -356,7 +356,7 @@
                     <!-- COLLAPSIBLE SECTION: History Sync Settings -->
 
                     <div class="collapsibleSection">
-                        <button type="button" class="collapsibleHeader collapsed" data-target="historySyncSettingsContent">
+                        <button type="button" class="collapsibleHeader collapsed" aria-expanded="false" data-target="historySyncSettingsContent">
                             <span class="collapsibleTitle">History</span>
                             <span class="collapsibleIcon">&#9660;</span>
                         </button>
@@ -421,7 +421,7 @@
                             </div>
 
                             <div class="collapsibleActions">
-                                <button is="emby-button" type="button" id="btnSaveHistorySettings" class="raised button-submit">
+                                <button is="emby-button" type="button" id="btnSaveHistorySettings" class="raised button-primary">
                                     <span>Save History Settings</span>
                                 </button>
                             </div>
@@ -431,7 +431,7 @@
                     <!-- COLLAPSIBLE SECTION: Metadata Sync Settings -->
 
                     <div class="collapsibleSection">
-                        <button type="button" class="collapsibleHeader collapsed" data-target="metadataSyncSettingsContent">
+                        <button type="button" class="collapsibleHeader collapsed" aria-expanded="false" data-target="metadataSyncSettingsContent">
                             <span class="collapsibleTitle">Metadata</span>
                             <span class="collapsibleIcon">&#9660;</span>
                         </button>
@@ -511,13 +511,13 @@
                                             <option value="SkipUnchanged">Skip Unchanged</option>
                                         </select>
                                         <div class="fieldDescription">Full Refresh compares all metadata every run. Skip Unchanged uses ETags to skip items that haven't changed on the source server, which is faster for large libraries.</div>
-                                        <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
+                                        <div class="selectArrowContainer"><div style="display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="collapsibleActions">
-                                <button is="emby-button" type="button" id="btnSaveMetadataSettings" class="raised button-submit">
+                                <button is="emby-button" type="button" id="btnSaveMetadataSettings" class="raised button-primary">
                                     <span>Save Metadata Settings</span>
                                 </button>
                             </div>
@@ -526,7 +526,7 @@
 
                     <!-- COLLAPSIBLE SECTION: User Sync Settings -->
                     <div class="collapsibleSection">
-                        <button type="button" class="collapsibleHeader collapsed" data-target="userSyncSettingsContent">
+                        <button type="button" class="collapsibleHeader collapsed" aria-expanded="false" data-target="userSyncSettingsContent">
                             <span class="collapsibleTitle">Users</span>
                             <span class="collapsibleIcon">&#9660;</span>
                         </button>
@@ -575,7 +575,7 @@
                             </div>
 
                             <div class="collapsibleActions">
-                                <button is="emby-button" type="button" id="btnSaveUserSyncSettings" class="raised button-submit">
+                                <button is="emby-button" type="button" id="btnSaveUserSyncSettings" class="raised button-primary">
                                     <span>Save User Sync Settings</span>
                                 </button>
                             </div>
@@ -587,22 +587,22 @@
         </div>
     </div>
 
-    <!-- STYLES -->
+    <!-- STYLES: Shared -->
+    <link rel="stylesheet" href="configurationpage?name=serversync_shared.css">
 
+    <!-- STYLES: Settings-specific -->
     <style>
         /* ===== Utility Classes ===== */
-        .text-success { color: #5cb85c; }
-        .text-error { color: #d9534f; }
+        .text-success { color: var(--status-synced-color, #5cb85c); }
+        .text-error { color: var(--status-errored-color, #d9534f); }
         .text-muted { opacity: 0.7; }
-        .hidden { display: none !important; }
         .flex { display: flex; }
-        .gap-lg { gap: 24px; }
         .mt-sm { margin-top: 8px; }
         .mb-md { margin-bottom: 12px; }
         .w-auto { width: auto !important; }
         .w-80 { width: 80px; }
 
-        /* ===== Section Title Styling ===== */
+        /* ===== Section Title (extends shared.css) ===== */
         .sectionTitleContainer {
             margin-top: 1.5em;
         }
@@ -611,25 +611,6 @@
         }
         .sectionTitleContainer .sectionTitle {
             flex: 1;
-            border-bottom: 1px solid #555;
-            padding-bottom: 0.5em;
-            margin-bottom: 1em;
-        }
-
-        /* ===== Button Styles ===== */
-        .button-submit {
-            background-color: #00a4dc !important;
-            color: #fff !important;
-        }
-        .button-submit:hover {
-            background-color: #0088cc !important;
-        }
-        .button-destructive {
-            background-color: #d9534f !important;
-            color: #fff !important;
-        }
-        .button-destructive:hover {
-            background-color: #c9302c !important;
         }
 
         /* ===== Collapsible Sections ===== */
@@ -690,7 +671,7 @@
         .mapping {
             margin-bottom: 2em;
             padding-bottom: 1em;
-            border-bottom: 1px solid #555;
+            border-bottom: 1px solid var(--border-subtle);
         }
         .mapping:last-child {
             border-bottom: none;
@@ -774,7 +755,6 @@
         }
 
         /* ===== Additional Utility Classes ===== */
-        .align-items-center { align-items: center; }
         .gap-sm { gap: 8px; }
     </style>
 </div>

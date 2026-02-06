@@ -98,13 +98,26 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages, IDisposable
     {
         var ns = typeof(Plugin).Namespace;
 
-        // Settings page (main entry point, shows in menu)
+        // Sync page (main entry point, shows in menu, default tab)
+        yield return new PluginPageInfo
+        {
+            Name = "serversync_sync",
+            EmbeddedResourcePath = $"{ns}.Configuration.serversync_sync.html",
+            MenuSection = "plugin",
+            DisplayName = "Server Sync"
+        };
+
+        yield return new PluginPageInfo
+        {
+            Name = "serversync_sync.js",
+            EmbeddedResourcePath = $"{ns}.Configuration.serversync_sync.js"
+        };
+
+        // Settings page
         yield return new PluginPageInfo
         {
             Name = "serversync_settings",
-            EmbeddedResourcePath = $"{ns}.Configuration.serversync_settings.html",
-            MenuSection = "plugin",
-            DisplayName = "Server Sync"
+            EmbeddedResourcePath = $"{ns}.Configuration.serversync_settings.html"
         };
 
         yield return new PluginPageInfo
@@ -113,56 +126,17 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages, IDisposable
             EmbeddedResourcePath = $"{ns}.Configuration.serversync_settings.js"
         };
 
-        // Content sync page
+        // Shared resources (CSS and JS used by sync pages)
         yield return new PluginPageInfo
         {
-            Name = "serversync_content",
-            EmbeddedResourcePath = $"{ns}.Configuration.serversync_content.html"
+            Name = "serversync_shared.css",
+            EmbeddedResourcePath = $"{ns}.Configuration.serversync_shared.css"
         };
 
         yield return new PluginPageInfo
         {
-            Name = "serversync_content.js",
-            EmbeddedResourcePath = $"{ns}.Configuration.serversync_content.js"
-        };
-
-        // History sync page
-        yield return new PluginPageInfo
-        {
-            Name = "serversync_history",
-            EmbeddedResourcePath = $"{ns}.Configuration.serversync_history.html"
-        };
-
-        yield return new PluginPageInfo
-        {
-            Name = "serversync_history.js",
-            EmbeddedResourcePath = $"{ns}.Configuration.serversync_history.js"
-        };
-
-        // Metadata sync page
-        yield return new PluginPageInfo
-        {
-            Name = "serversync_metadata",
-            EmbeddedResourcePath = $"{ns}.Configuration.serversync_metadata.html"
-        };
-
-        yield return new PluginPageInfo
-        {
-            Name = "serversync_metadata.js",
-            EmbeddedResourcePath = $"{ns}.Configuration.serversync_metadata.js"
-        };
-
-        // Users sync page
-        yield return new PluginPageInfo
-        {
-            Name = "serversync_users",
-            EmbeddedResourcePath = $"{ns}.Configuration.serversync_users.html"
-        };
-
-        yield return new PluginPageInfo
-        {
-            Name = "serversync_users.js",
-            EmbeddedResourcePath = $"{ns}.Configuration.serversync_users.js"
+            Name = "serversync_shared.js",
+            EmbeddedResourcePath = $"{ns}.Configuration.serversync_shared.js"
         };
     }
 

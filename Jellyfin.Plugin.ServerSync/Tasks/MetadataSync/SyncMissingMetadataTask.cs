@@ -126,6 +126,9 @@ public class SyncMissingMetadataTask : IScheduledTask
 
         _logger.LogInformation("Processing {Count} queued metadata items", totalItems);
 
+        // Create a shared HttpClient for image downloads (reused across all items to avoid socket exhaustion)
+        using var imageHttpClient = syncImages ? CreateImageHttpClient(config) : null;
+
         var processedCount = 0;
         var successCount = 0;
         var errorCount = 0;
@@ -139,7 +142,7 @@ public class SyncMissingMetadataTask : IScheduledTask
 
             try
             {
-                var success = await SyncMetadataItemAsync(item, database, syncMetadata, syncGenres, syncTags, syncImages, syncPeople, syncStudios, cancellationToken).ConfigureAwait(false);
+                var success = await SyncMetadataItemAsync(item, database, syncMetadata, syncGenres, syncTags, syncImages, syncPeople, syncStudios, imageHttpClient, cancellationToken).ConfigureAwait(false);
 
                 if (success)
                 {
@@ -187,6 +190,7 @@ public class SyncMissingMetadataTask : IScheduledTask
         bool syncImages,
         bool syncPeople,
         bool syncStudios,
+        HttpClient? imageHttpClient,
         CancellationToken cancellationToken)
     {
         // Validate we have a local item ID
@@ -246,7 +250,7 @@ public class SyncMissingMetadataTask : IScheduledTask
         // Sync images if enabled and has changes
         if (syncImages && item.HasImagesChanges)
         {
-            var success = await ApplyImagesAsync(localItem, item, cancellationToken).ConfigureAwait(false);
+            var success = await ApplyImagesAsync(localItem, item, imageHttpClient, cancellationToken).ConfigureAwait(false);
             if (success)
             {
                 // Track what source hash we synced - used for comparison on refresh
@@ -512,7 +516,7 @@ public class SyncMissingMetadataTask : IScheduledTask
                 if (premiereDateValue.ValueKind == JsonValueKind.String)
                 {
                     var dateStr = premiereDateValue.GetString();
-                    if (!string.IsNullOrEmpty(dateStr) && DateTime.TryParse(dateStr, out var parsed))
+                    if (!string.IsNullOrEmpty(dateStr) && DateTime.TryParse(dateStr, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out var parsed))
                     {
                         premiereDate = parsed;
                     }
@@ -532,7 +536,7 @@ public class SyncMissingMetadataTask : IScheduledTask
                 if (endDateValue.ValueKind == JsonValueKind.String)
                 {
                     var dateStr = endDateValue.GetString();
-                    if (!string.IsNullOrEmpty(dateStr) && DateTime.TryParse(dateStr, out var parsed))
+                    if (!string.IsNullOrEmpty(dateStr) && DateTime.TryParse(dateStr, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out var parsed))
                     {
                         endDate = parsed;
                     }
@@ -706,6 +710,7 @@ public class SyncMissingMetadataTask : IScheduledTask
     private async Task<bool> ApplyImagesAsync(
         MediaBrowser.Controller.Entities.BaseItem localItem,
         MetadataSyncItem item,
+        HttpClient? httpClient,
         CancellationToken cancellationToken)
     {
         var plugin = Plugin.Instance;
@@ -735,8 +740,11 @@ public class SyncMissingMetadataTask : IScheduledTask
                 return true;
             }
 
-            using var httpClient = new HttpClient();
-            httpClient.DefaultRequestHeaders.Add("X-Emby-Token", config.SourceServerApiKey);
+            if (httpClient == null)
+            {
+                _logger.LogWarning("No HTTP client available for image sync");
+                return false;
+            }
 
             var baseUrl = config.SourceServerUrl.TrimEnd('/');
             var sourceItemId = item.SourceItemId;
@@ -942,6 +950,21 @@ public class SyncMissingMetadataTask : IScheduledTask
             _logger.LogError(ex, "Failed to apply studios for {ItemName}", item.ItemName);
             return false;
         }
+    }
+
+    /// <summary>
+    /// Creates a shared HttpClient configured for image downloading from the source server.
+    /// </summary>
+    private static HttpClient? CreateImageHttpClient(Configuration.PluginConfiguration config)
+    {
+        if (string.IsNullOrWhiteSpace(config.SourceServerUrl) || string.IsNullOrWhiteSpace(config.SourceServerApiKey))
+        {
+            return null;
+        }
+
+        var client = new HttpClient();
+        client.DefaultRequestHeaders.Add("X-Emby-Token", config.SourceServerApiKey);
+        return client;
     }
 
     /// <inheritdoc />

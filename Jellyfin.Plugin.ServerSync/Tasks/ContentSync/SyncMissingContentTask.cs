@@ -33,7 +33,8 @@ public class DownloadMissingContentTask : IScheduledTask
     /// <summary>
     /// Circuit breaker for source server failures.
     /// </summary>
-    private static CircuitBreaker? _circuitBreaker;
+    private static volatile CircuitBreaker? _circuitBreaker;
+    private static readonly object _circuitBreakerLock = new();
 
     public DownloadMissingContentTask(ILogger<DownloadMissingContentTask> logger, ILibraryManager libraryManager)
     {
@@ -88,12 +89,18 @@ public class DownloadMissingContentTask : IScheduledTask
             config.SourceServerUrl,
             config.SourceServerApiKey);
 
-        // Initialize or get circuit breaker
-        _circuitBreaker ??= new CircuitBreaker(
-            _logger,
-            "SourceServer",
-            failureThreshold: 5,
-            cooldownPeriod: TimeSpan.FromMinutes(5));
+        // Initialize or get circuit breaker (thread-safe double-checked locking)
+        if (_circuitBreaker == null)
+        {
+            lock (_circuitBreakerLock)
+            {
+                _circuitBreaker ??= new CircuitBreaker(
+                    _logger,
+                    "SourceServer",
+                    failureThreshold: 5,
+                    cooldownPeriod: TimeSpan.FromMinutes(5));
+            }
+        }
 
         // Check circuit breaker before attempting connection
         if (!_circuitBreaker.AllowOperation(out var circuitReason))
