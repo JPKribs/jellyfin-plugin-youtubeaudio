@@ -801,7 +801,7 @@ public class SyncMissingMetadataTask : IScheduledTask
                             }
                             catch
                             {
-                                memoryStream.Dispose();
+                                await memoryStream.DisposeAsync().ConfigureAwait(false);
                                 throw;
                             }
                         }
@@ -871,7 +871,7 @@ public class SyncMissingMetadataTask : IScheduledTask
                 }
                 finally
                 {
-                    // Ensure all downloaded streams are disposed even on exception
+                    // Ensure all downloaded streams are sed even on exception
                     foreach (var (_, data, _) in downloadedImages)
                     {
                         await data.DisposeAsync().ConfigureAwait(false);
