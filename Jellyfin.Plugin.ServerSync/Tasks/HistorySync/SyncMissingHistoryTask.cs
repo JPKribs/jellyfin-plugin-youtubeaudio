@@ -7,7 +7,6 @@ using Jellyfin.Plugin.ServerSync.Models.Common;
 using Jellyfin.Plugin.ServerSync.Models.Configuration;
 using Jellyfin.Plugin.ServerSync.Models.HistorySync;
 using Jellyfin.Plugin.ServerSync.Services;
-using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -20,23 +19,23 @@ namespace Jellyfin.Plugin.ServerSync.Tasks;
 public class SyncMissingHistoryTask : IScheduledTask
 {
     private readonly ILogger<SyncMissingHistoryTask> _logger;
-    private readonly ILibraryManager _libraryManager;
-    private readonly IUserManager _userManager;
-    private readonly IUserDataManager _userDataManager;
+    private readonly IPluginConfigurationManager _configManager;
+    private readonly ISyncDatabaseProvider _databaseProvider;
+    private readonly LocalServerClient _localClient;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SyncMissingHistoryTask"/> class.
     /// </summary>
     public SyncMissingHistoryTask(
         ILogger<SyncMissingHistoryTask> logger,
-        ILibraryManager libraryManager,
-        IUserManager userManager,
-        IUserDataManager userDataManager)
+        IPluginConfigurationManager configManager,
+        ISyncDatabaseProvider databaseProvider,
+        LocalServerClient localClient)
     {
         _logger = logger;
-        _libraryManager = libraryManager;
-        _userManager = userManager;
-        _userDataManager = userDataManager;
+        _configManager = configManager;
+        _databaseProvider = databaseProvider;
+        _localClient = localClient;
     }
 
     /// <inheritdoc />
@@ -54,13 +53,7 @@ public class SyncMissingHistoryTask : IScheduledTask
     /// <inheritdoc />
     public Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        var plugin = Plugin.Instance;
-        if (plugin == null)
-        {
-            return Task.CompletedTask;
-        }
-
-        var config = plugin.Configuration;
+        var config = _configManager.Configuration;
 
         // Check if history sync is enabled
         if (!config.EnableHistorySync)
@@ -94,12 +87,10 @@ public class SyncMissingHistoryTask : IScheduledTask
 
         _logger.LogInformation("Starting history sync");
 
-        var database = plugin.Database;
+        var database = _databaseProvider.Database;
 
         // Apply queued changes
         _logger.LogInformation("Applying queued history changes");
-
-        var localClient = new LocalServerClient(_logger, _libraryManager, _userManager, _userDataManager);
 
         // Get all queued history items
         var queuedItems = database.GetHistoryItemsByStatus(BaseSyncStatus.Queued);
@@ -127,7 +118,7 @@ public class SyncMissingHistoryTask : IScheduledTask
 
             try
             {
-                var success = SyncHistoryItem(item, localClient, database);
+                var success = SyncHistoryItem(item, _localClient, database);
 
                 if (success)
                 {
@@ -154,7 +145,7 @@ public class SyncMissingHistoryTask : IScheduledTask
 
         // Update last sync time
         config.LastHistorySyncTime = DateTime.UtcNow;
-        plugin.SaveConfiguration();
+        _configManager.SaveConfiguration();
 
         _logger.LogInformation(
             "History sync completed: {Success} succeeded, {Error} failed out of {Total}",

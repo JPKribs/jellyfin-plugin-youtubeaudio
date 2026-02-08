@@ -38,7 +38,7 @@ public static class JsonComparisonUtility
 
             return JsonElementEquals(doc1.RootElement, doc2.RootElement);
         }
-        catch
+        catch (JsonException)
         {
             // If parsing fails, fall back to string comparison
             return string.Equals(json1, json2, StringComparison.Ordinal);
@@ -114,7 +114,7 @@ public static class JsonComparisonUtility
 
             return diffCount;
         }
-        catch
+        catch (JsonException)
         {
             return 1;
         }
@@ -252,7 +252,14 @@ public static class JsonComparisonUtility
                 return false;
 
             case JsonValueKind.Number:
-                return e1.GetRawText() == e2.GetRawText();
+                // Compare numbers semantically rather than by raw text
+                // (e.g., 1.0 and 1 should be considered equal)
+                if (e1.TryGetInt64(out var l1) && e2.TryGetInt64(out var l2))
+                {
+                    return l1 == l2;
+                }
+
+                return e1.TryGetDouble(out var d1) && e2.TryGetDouble(out var d2) && d1.Equals(d2);
 
             case JsonValueKind.True:
             case JsonValueKind.False:

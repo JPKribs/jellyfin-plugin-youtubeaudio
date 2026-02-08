@@ -146,8 +146,8 @@ public class UserSyncTableService
 
     private Task<UserSyncItem?> CreatePolicySyncItemAsync(
         UserMapping mapping,
-        dynamic sourceUser,
-        dynamic localUserDto,
+        Jellyfin.Sdk.Generated.Models.UserDto sourceUser,
+        MediaBrowser.Model.Dto.UserDto localUserDto,
         PluginConfiguration config)
     {
         var sourcePolicy = UserSyncMergeService.ExtractPolicyJson(sourceUser.Policy);
@@ -200,8 +200,8 @@ public class UserSyncTableService
 
     private Task<UserSyncItem?> CreateConfigurationSyncItemAsync(
         UserMapping mapping,
-        dynamic sourceUser,
-        dynamic localUserDto)
+        Jellyfin.Sdk.Generated.Models.UserDto sourceUser,
+        MediaBrowser.Model.Dto.UserDto localUserDto)
     {
         var sourceConfig = UserSyncMergeService.ExtractConfigurationJson(sourceUser.Configuration);
         var localConfig = UserSyncMergeService.ExtractConfigurationJson(localUserDto.Configuration);
@@ -253,20 +253,20 @@ public class UserSyncTableService
 
     private async Task<UserSyncItem?> CreateProfileImageSyncItemAsync(
         UserMapping mapping,
-        dynamic sourceUser,
+        Jellyfin.Sdk.Generated.Models.UserDto sourceUser,
         Jellyfin.Database.Implementations.Entities.User localUser,
         SourceServerClient sourceClient,
         CancellationToken cancellationToken)
     {
         var sourceUserId = Guid.Parse(mapping.SourceUserId);
-        var sourceUserName = (string)sourceUser.Name;
+        var sourceUserName = sourceUser.Name ?? mapping.SourceUserName;
         string? sourceImageHash = null;
         long? sourceImageSize = null;
         string? localImageHash = null;
         long? localImageSize = null;
 
         // Get source image hash (and size for display)
-        if (!string.IsNullOrEmpty(sourceUser.PrimaryImageTag as string))
+        if (!string.IsNullOrEmpty(sourceUser.PrimaryImageTag))
         {
             _logger.LogDebug(
                 "ProfileImage: Fetching source image hash for user {SourceUser} ({SourceUserId})",

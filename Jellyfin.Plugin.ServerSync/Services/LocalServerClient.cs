@@ -15,7 +15,7 @@ namespace Jellyfin.Plugin.ServerSync.Services;
 /// </summary>
 public class LocalServerClient
 {
-    private readonly ILogger _logger;
+    private readonly ILogger<LocalServerClient> _logger;
     private readonly ILibraryManager _libraryManager;
     private readonly IUserManager _userManager;
     private readonly IUserDataManager _userDataManager;
@@ -28,7 +28,7 @@ public class LocalServerClient
     /// <param name="userManager">User manager.</param>
     /// <param name="userDataManager">User data manager.</param>
     public LocalServerClient(
-        ILogger logger,
+        ILogger<LocalServerClient> logger,
         ILibraryManager libraryManager,
         IUserManager userManager,
         IUserDataManager userDataManager)

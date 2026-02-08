@@ -106,6 +106,11 @@ public static class HistorySyncMergeService
             return true;
         }
 
+        if (item.MergedLastPlayedDate != item.LocalLastPlayedDate && item.MergedLastPlayedDate.HasValue)
+        {
+            return true;
+        }
+
         // Also check if we have source data but no local data was matched yet
         if (string.IsNullOrEmpty(item.LocalItemId) && !string.IsNullOrEmpty(item.SourceItemId))
         {

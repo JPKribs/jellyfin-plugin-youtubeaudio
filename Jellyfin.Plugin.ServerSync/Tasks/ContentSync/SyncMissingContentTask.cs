@@ -24,6 +24,10 @@ public class DownloadMissingContentTask : IScheduledTask
 {
     private readonly ILogger<DownloadMissingContentTask> _logger;
     private readonly ILibraryManager _libraryManager;
+    private readonly IPluginConfigurationManager _configManager;
+    private readonly ISyncDatabaseProvider _databaseProvider;
+    private readonly ISourceServerClientFactory _clientFactory;
+    private readonly DownloadService _downloadService;
 
     /// <summary>
     /// Default maximum retry count if not configured.
@@ -36,10 +40,20 @@ public class DownloadMissingContentTask : IScheduledTask
     private static volatile CircuitBreaker? _circuitBreaker;
     private static readonly object _circuitBreakerLock = new();
 
-    public DownloadMissingContentTask(ILogger<DownloadMissingContentTask> logger, ILibraryManager libraryManager)
+    public DownloadMissingContentTask(
+        ILogger<DownloadMissingContentTask> logger,
+        ILibraryManager libraryManager,
+        IPluginConfigurationManager configManager,
+        ISyncDatabaseProvider databaseProvider,
+        ISourceServerClientFactory clientFactory,
+        DownloadService downloadService)
     {
         _logger = logger;
         _libraryManager = libraryManager;
+        _configManager = configManager;
+        _databaseProvider = databaseProvider;
+        _clientFactory = clientFactory;
+        _downloadService = downloadService;
     }
 
     public string Name => "Sync Content";
@@ -52,13 +66,7 @@ public class DownloadMissingContentTask : IScheduledTask
 
     public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        var plugin = Plugin.Instance;
-        if (plugin == null)
-        {
-            return;
-        }
-
-        var config = plugin.Configuration;
+        var config = _configManager.Configuration;
 
         if (!config.EnableContentSync)
         {
@@ -81,13 +89,10 @@ public class DownloadMissingContentTask : IScheduledTask
             return;
         }
 
-        var database = plugin.Database;
+        var database = _databaseProvider.Database;
 
         // Initialize client for all operations
-        using var client = new SourceServerClient(
-            plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
-            config.SourceServerUrl,
-            config.SourceServerApiKey);
+        using var client = _clientFactory.Create(config.SourceServerUrl, config.SourceServerApiKey);
 
         // Initialize or get circuit breaker (thread-safe double-checked locking)
         if (_circuitBreaker == null)
@@ -154,7 +159,7 @@ public class DownloadMissingContentTask : IScheduledTask
         }
 
         config.LastSyncStartTime = DateTime.UtcNow;
-        plugin.SaveConfiguration();
+        _configManager.SaveConfiguration();
 
         var totalBytes = itemsToSync.Sum(i => i.SourceSize);
         _logger.LogInformation(
@@ -162,16 +167,14 @@ public class DownloadMissingContentTask : IScheduledTask
             itemsToSync.Count,
             FormatUtilities.FormatBytes(totalBytes));
 
-        var tempPath = plugin.GetTempDownloadPath();
+        var tempPath = _configManager.GetTempDownloadPath();
         Directory.CreateDirectory(tempPath);
-
-        var downloadService = new DownloadService(_logger);
 
         // Download content (0-90% progress)
         var (successCount, failCount) = await ProcessDownloadsAsync(
             client,
             database,
-            downloadService,
+            _downloadService,
             itemsToSync,
             tempPath,
             config.MaxConcurrentDownloads,
@@ -183,7 +186,7 @@ public class DownloadMissingContentTask : IScheduledTask
         config.LastSyncEndTime = DateTime.UtcNow;
         try
         {
-            plugin.SaveConfiguration();
+            _configManager.SaveConfiguration();
         }
         catch (Exception ex)
         {
@@ -233,22 +236,19 @@ public class DownloadMissingContentTask : IScheduledTask
         var successCount = 0;
         var failCount = 0;
 
-        using var semaphore = new SemaphoreSlim(Math.Max(1, maxConcurrent));
-
-        var downloadTasks = itemsToSync.Select(async item =>
+        var parallelOptions = new ParallelOptions
         {
-            await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+            MaxDegreeOfParallelism = Math.Max(1, maxConcurrent),
+            CancellationToken = cancellationToken
+        };
 
-            // Generate sanitized temp file path for this item
-            var tempFileName = FileNameSanitizer.SanitizeTempFileName(item.SourceItemId, item.LocalPath);
-            var tempFilePath = Path.Combine(tempPath, tempFileName);
-
-            try
+        try
+        {
+            await Parallel.ForEachAsync(itemsToSync, parallelOptions, async (item, ct) =>
             {
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    return;
-                }
+                // Generate sanitized temp file path for this item
+                var tempFileName = FileNameSanitizer.SanitizeTempFileName(item.SourceItemId, item.LocalPath);
+                var tempFilePath = Path.Combine(tempPath, tempFileName);
 
                 // Register download with the centralized tracker
                 if (!ActiveDownloadTracker.TryStartDownload(item.SourceItemId, tempFilePath))
@@ -257,32 +257,29 @@ public class DownloadMissingContentTask : IScheduledTask
                     return;
                 }
 
-                var result = await ProcessSingleDownloadAsync(
-                    client, database, downloadService, item, tempPath,
-                    speedLimitBytesPerSecond, config, cancellationToken).ConfigureAwait(false);
-
-                if (result.Success)
+                try
                 {
-                    Interlocked.Increment(ref successCount);
+                    var result = await ProcessSingleDownloadAsync(
+                        client, database, downloadService, item, tempPath,
+                        speedLimitBytesPerSecond, config, ct).ConfigureAwait(false);
+
+                    if (result.Success)
+                    {
+                        Interlocked.Increment(ref successCount);
+                    }
+                    else
+                    {
+                        Interlocked.Increment(ref failCount);
+                    }
+
+                    var processed = Interlocked.Increment(ref processedItems);
+                    progress.Report((double)processed / totalItems * 100);
                 }
-                else
+                finally
                 {
-                    Interlocked.Increment(ref failCount);
+                    ActiveDownloadTracker.CompleteDownload(item.SourceItemId);
                 }
-
-                var processed = Interlocked.Increment(ref processedItems);
-                progress.Report((double)processed / totalItems * 100);
-            }
-            finally
-            {
-                ActiveDownloadTracker.CompleteDownload(item.SourceItemId);
-                semaphore.Release();
-            }
-        });
-
-        try
-        {
-            await Task.WhenAll(downloadTasks).ConfigureAwait(false);
+            }).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

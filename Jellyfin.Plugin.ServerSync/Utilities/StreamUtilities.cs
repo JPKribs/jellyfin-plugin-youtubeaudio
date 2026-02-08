@@ -47,7 +47,7 @@ public static class StreamUtilities
 
             if (actualTime < expectedTime)
             {
-                var delay = (int)(expectedTime - actualTime);
+                var delay = (int)Math.Min(expectedTime - actualTime, int.MaxValue);
                 if (delay > 10)
                 {
                     await Task.Delay(delay, cancellationToken).ConfigureAwait(false);

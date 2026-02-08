@@ -1,7 +1,7 @@
 ---
 name: "Server Sync"
 guid: "ebd650b5-6f4c-4ccb-b10d-23dffb3a7286"
-version: "10.11.27"
+version: "10.11.28"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
 overview: "Sync media content from a source Jellyfin server to this server."
@@ -24,15 +24,30 @@ artifacts:
 - "Microsoft.Kiota.Serialization.Text.dll"
 - "Std.UriTemplate.dll"
 changelog:
-  new:
-  - Enable Server Sync in the admin dashboard sidebar (EnableInMainMenu) for quick access alongside other server management pages
-  - Add library-level ignored paths to skip entire folders from Content, Metadata, and History sync
-  - Add wildcard support for ignored paths (e.g., "Star Wars*" matches all folders starting with that prefix)
   improvements:
-  - Move database reset controls from sync tabs to Settings > Troubleshooting > Database for centralized management
-  - Add individual table resets (Content, History, Metadata, User) alongside full database reset
-  - Use native Jellyfin fonts and CSS for Troubleshooting section styling consistency
-  - Modal change summary badges wrap to multiple rows on narrow/mobile screens
+  - Replace all direct HttpClient usage with IHttpClientFactory to prevent socket exhaustion and memory leaks
+  - Introduce full dependency injection across all tasks and controllers, removing Plugin.Instance singleton dependencies
+  - Add proper disposal of all HttpResponseMessage objects via ResponseDisposingStream pattern
+  - Add CancellationToken support to TestConnection, Authenticate, and GetMetadataItemImageInfo API endpoints
+  - Reuse SqliteCommand objects in batch database operations instead of recreating per iteration
+  - Use thread-safe double-checked locking for lazy SyncDatabase and JellyfinApiClient initialization
+  - Replace Parallel.ForEachAsync with bounded concurrency in place of unbounded Task.WhenAll+Select
+  - Add SSRF protection with URL and IP validation on source server connection endpoints
+  - Suppress internal exception details from API error responses to prevent information leakage
   fixes:
-  - Fix pagination breaking when switching between sync tabs without refreshing the page
-  - Fix queued/errored items not transitioning to synced when local file appears on subsequent refresh
+  - Fix SQL ORDER BY MIN() without GROUP BY causing incorrect user sync pagination
+  - Fix HistorySyncItem.HasChanges not detecting MergedLastPlayedDate changes
+  - Fix SyncStatusResponse.Total double-counting the Deleting status
+  - Fix BaseSyncStatus enum mapping bug where Ignored (4) was incorrectly mapped as Synced (2)
+  - Fix UTC/Local datetime mismatch in recycling bin timestamp parsing
+  - Fix integer overflow in stream speed-limiting delay calculation
+  - Fix OverallStatus returning Ignored for empty item lists due to vacuous truth in LINQ All()
+  - Fix GetPendingSizes returning negative Total values
+  - Fix temp file leak in UserSyncStateService using incorrect Path.GetTempFileName pattern
+  - Fix stale dictionary entries in History and Metadata sync table services
+  - Fix CircuitBreaker half-open state check incorrectly requiring null _circuitOpenedAt
+  - Fix DiskSpaceService returning false-on-error instead of properly handling IOException
+  - Replace bare catch blocks with specific exception types across 5 service files
+  - Add InvariantCulture and RoundtripKind to all database datetime parsing
+  - Remove dead DownloadAndSaveImageAsync method and unused BeginTransaction from SyncDatabase
+  - Fix RetryPolicy retrying non-transient IOException subtypes (FileNotFoundException, DirectoryNotFoundException)

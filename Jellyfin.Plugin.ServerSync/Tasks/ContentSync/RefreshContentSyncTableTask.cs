@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Jellyfin.Plugin.ServerSync.Models.Configuration;
 using Jellyfin.Plugin.ServerSync.Models.ContentSync.Configuration;
 using Jellyfin.Plugin.ServerSync.Services;
-using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -18,12 +17,23 @@ namespace Jellyfin.Plugin.ServerSync.Tasks;
 public class UpdateSyncTablesTask : IScheduledTask
 {
     private readonly ILogger<UpdateSyncTablesTask> _logger;
-    private readonly ILibraryManager _libraryManager;
+    private readonly IPluginConfigurationManager _configManager;
+    private readonly ISyncDatabaseProvider _databaseProvider;
+    private readonly ISourceServerClientFactory _clientFactory;
+    private readonly SyncTableService _syncTableService;
 
-    public UpdateSyncTablesTask(ILogger<UpdateSyncTablesTask> logger, ILibraryManager libraryManager)
+    public UpdateSyncTablesTask(
+        ILogger<UpdateSyncTablesTask> logger,
+        IPluginConfigurationManager configManager,
+        ISyncDatabaseProvider databaseProvider,
+        ISourceServerClientFactory clientFactory,
+        SyncTableService syncTableService)
     {
         _logger = logger;
-        _libraryManager = libraryManager;
+        _configManager = configManager;
+        _databaseProvider = databaseProvider;
+        _clientFactory = clientFactory;
+        _syncTableService = syncTableService;
     }
 
     public string Name => "Refresh Sync Table";
@@ -36,13 +46,7 @@ public class UpdateSyncTablesTask : IScheduledTask
 
     public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        var plugin = Plugin.Instance;
-        if (plugin == null)
-        {
-            return;
-        }
-
-        var config = plugin.Configuration;
+        var config = _configManager.Configuration;
 
         if (!config.EnableContentSync)
         {
@@ -70,10 +74,7 @@ public class UpdateSyncTablesTask : IScheduledTask
 
         _logger.LogInformation("Starting sync table update from {SourceUrl}", config.SourceServerUrl);
 
-        using var client = new SourceServerClient(
-            plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
-            config.SourceServerUrl,
-            config.SourceServerApiKey);
+        using var client = _clientFactory.Create(config.SourceServerUrl, config.SourceServerApiKey);
 
         var connectionResult = await client.TestConnectionAsync(cancellationToken).ConfigureAwait(false);
         if (!connectionResult.Success)
@@ -83,8 +84,7 @@ public class UpdateSyncTablesTask : IScheduledTask
             return;
         }
 
-        var database = plugin.Database;
-        var syncTableService = new SyncTableService(_logger, _libraryManager);
+        var database = _databaseProvider.Database;
 
         // Progress tracking: 10% for init, 80% for processing items, 10% for finalization
         const double InitProgress = 10.0;
@@ -128,7 +128,7 @@ public class UpdateSyncTablesTask : IScheduledTask
                 break;
             }
 
-            await syncTableService.ProcessLibraryAsync(
+            await _syncTableService.ProcessLibraryAsync(
                 client,
                 database,
                 mapping,
@@ -152,7 +152,7 @@ public class UpdateSyncTablesTask : IScheduledTask
         progress.Report(InitProgress + ProcessingProgress);
 
         // Resolve LocalItemIds for synced items that don't have them yet
-        syncTableService.ResolveLocalItemIds(database);
+        _syncTableService.ResolveLocalItemIds(database);
 
         progress.Report(100);
         _logger.LogInformation("Sync table update completed");

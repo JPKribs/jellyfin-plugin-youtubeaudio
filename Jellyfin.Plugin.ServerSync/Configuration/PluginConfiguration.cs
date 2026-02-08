@@ -511,9 +511,9 @@ public class PluginConfiguration : BasePluginConfiguration
                 errors.Add("At least one library mapping must be enabled for metadata sync");
             }
 
-            if (!MetadataSyncMetadata && !MetadataSyncImages && !MetadataSyncPeople)
+            if (!MetadataSyncMetadata && !MetadataSyncImages && !MetadataSyncPeople && !MetadataSyncStudios && !MetadataSyncGenres && !MetadataSyncTags)
             {
-                errors.Add("At least one metadata sync option (Metadata, Images, or People) must be enabled");
+                errors.Add("At least one metadata sync option (Metadata, Images, People, Studios, Genres, or Tags) must be enabled");
             }
         }
 

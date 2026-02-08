@@ -19,13 +19,10 @@ namespace Jellyfin.Plugin.ServerSync.Services;
 /// </summary>
 public class SyncTableService
 {
-    private readonly ILogger _logger;
+    private readonly ILogger<SyncTableService> _logger;
     private readonly ILibraryManager _libraryManager;
 
-    private const int DefaultBatchSize = 100;
-    private const int MaxConsecutiveErrors = 3;
-
-    public SyncTableService(ILogger logger, ILibraryManager libraryManager)
+    public SyncTableService(ILogger<SyncTableService> logger, ILibraryManager libraryManager)
     {
         _logger = logger;
         _libraryManager = libraryManager;
@@ -57,9 +54,7 @@ public class SyncTableService
         CancellationToken cancellationToken,
         Action? onItemProcessed = null)
     {
-        var startIndex = 0;
         var processedItems = 0;
-        var consecutiveErrors = 0;
 
         Dictionary<string, SyncItem> existingItems;
         try
@@ -101,98 +96,23 @@ public class SyncTableService
             }
         }
 
-        while (true)
-        {
-            if (cancellationToken.IsCancellationRequested)
+        var sourceLibraryGuid = Guid.Parse(mapping.SourceLibraryId);
+
+        processedItems = await PaginatedFetchUtility.FetchAllPagesAsync(
+            fetchPage: (startIndex, batchSize, ct) => client.GetLibraryItemsAsync(sourceLibraryGuid, startIndex, batchSize, ct),
+            processItem: (item, _) =>
             {
-                break;
-            }
-
-            BaseItemDtoQueryResult? result;
-            try
-            {
-                result = await client.GetLibraryItemsAsync(
-                    Guid.Parse(mapping.SourceLibraryId),
-                    startIndex,
-                    DefaultBatchSize,
-                    cancellationToken).ConfigureAwait(false);
-
-                consecutiveErrors = 0;
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-            catch (Exception ex)
-            {
-                consecutiveErrors++;
-                _logger.LogWarning(ex, "Failed to fetch items from library {LibraryName} at index {Index} (attempt {Attempt}/{Max})",
-                    mapping.SourceLibraryName, startIndex, consecutiveErrors, MaxConsecutiveErrors);
-
-                if (consecutiveErrors >= MaxConsecutiveErrors)
-                {
-                    _logger.LogError("Too many consecutive errors fetching from {LibraryName}, stopping sync for this library",
-                        mapping.SourceLibraryName);
-                    break;
-                }
-
-                try
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(consecutiveErrors * 2), cancellationToken).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-
-                continue;
-            }
-
-            if (result?.Items == null || result.Items.Count == 0)
-            {
-                break;
-            }
-
-            foreach (var item in result.Items)
-            {
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    break;
-                }
-
-                if (item.Id == null || string.IsNullOrEmpty(item.Path))
-                {
-                    continue;
-                }
-
-                // Skip items under ignored folder paths
-                if (PathUtilities.IsPathIgnored(item.Path, mapping.SourceRootPath, mapping.IgnoredPaths))
-                {
-                    continue;
-                }
-
-                var sourceItemId = item.Id.Value.ToString("N", CultureInfo.InvariantCulture);
+                var sourceItemId = item.Id!.Value.ToString("N", CultureInfo.InvariantCulture);
                 seenSourceItemIds.Add(sourceItemId);
-
-                try
-                {
-                    ProcessItem(database, mapping, item, existingItems, downloadNewMode, replaceExistingMode, detectUpdatedFiles, changeDetectionPolicy);
-                    processedItems++;
-                    onItemProcessed?.Invoke();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to process item {ItemId} ({Path})", item.Id, item.Path);
-                }
-            }
-
-            startIndex += DefaultBatchSize;
-
-            if (result.Items.Count < DefaultBatchSize)
-            {
-                break;
-            }
-        }
+                ProcessItem(database, mapping, item, existingItems, downloadNewMode, replaceExistingMode, detectUpdatedFiles, changeDetectionPolicy);
+                return Task.FromResult(true);
+            },
+            libraryName: mapping.SourceLibraryName,
+            sourceRootPath: mapping.SourceRootPath,
+            ignoredPaths: mapping.IgnoredPaths,
+            logger: _logger,
+            cancellationToken: cancellationToken,
+            onItemProcessed: onItemProcessed).ConfigureAwait(false);
 
         // Handle items that exist in our database but no longer exist on the source
         if (deleteMissingMode != ApprovalMode.Disabled)

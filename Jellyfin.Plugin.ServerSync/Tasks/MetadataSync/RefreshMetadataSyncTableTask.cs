@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Jellyfin.Plugin.ServerSync.Models.Configuration;
 using Jellyfin.Plugin.ServerSync.Models.MetadataSync.Configuration;
 using Jellyfin.Plugin.ServerSync.Services;
-using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -18,17 +17,26 @@ namespace Jellyfin.Plugin.ServerSync.Tasks;
 public class RefreshMetadataSyncTableTask : IScheduledTask
 {
     private readonly ILogger<RefreshMetadataSyncTableTask> _logger;
-    private readonly ILibraryManager _libraryManager;
+    private readonly IPluginConfigurationManager _configManager;
+    private readonly ISyncDatabaseProvider _databaseProvider;
+    private readonly ISourceServerClientFactory _clientFactory;
+    private readonly MetadataSyncTableService _metadataService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RefreshMetadataSyncTableTask"/> class.
     /// </summary>
     public RefreshMetadataSyncTableTask(
         ILogger<RefreshMetadataSyncTableTask> logger,
-        ILibraryManager libraryManager)
+        IPluginConfigurationManager configManager,
+        ISyncDatabaseProvider databaseProvider,
+        ISourceServerClientFactory clientFactory,
+        MetadataSyncTableService metadataService)
     {
         _logger = logger;
-        _libraryManager = libraryManager;
+        _configManager = configManager;
+        _databaseProvider = databaseProvider;
+        _clientFactory = clientFactory;
+        _metadataService = metadataService;
     }
 
     /// <inheritdoc />
@@ -46,13 +54,7 @@ public class RefreshMetadataSyncTableTask : IScheduledTask
     /// <inheritdoc />
     public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        var plugin = Plugin.Instance;
-        if (plugin == null)
-        {
-            return;
-        }
-
-        var config = plugin.Configuration;
+        var config = _configManager.Configuration;
 
         // Check if metadata sync is enabled
         if (!config.EnableMetadataSync)
@@ -97,10 +99,7 @@ public class RefreshMetadataSyncTableTask : IScheduledTask
 
         _logger.LogInformation("Starting metadata sync table refresh from {SourceUrl}", config.SourceServerUrl);
 
-        using var client = new SourceServerClient(
-            plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
-            config.SourceServerUrl,
-            config.SourceServerApiKey);
+        using var client = _clientFactory.Create(config.SourceServerUrl, config.SourceServerApiKey);
 
         // Test connection
         var connectionResult = await client.TestConnectionAsync(cancellationToken).ConfigureAwait(false);
@@ -111,8 +110,7 @@ public class RefreshMetadataSyncTableTask : IScheduledTask
             return;
         }
 
-        var database = plugin.Database;
-        var metadataService = new MetadataSyncTableService(_logger, _libraryManager);
+        var database = _databaseProvider.Database;
 
         // Progress tracking
         const double InitProgress = 10.0;
@@ -121,7 +119,7 @@ public class RefreshMetadataSyncTableTask : IScheduledTask
         progress.Report(0);
 
         // Get total item count for progress tracking
-        var totalItems = await metadataService.GetTotalItemCountAsync(
+        var totalItems = await _metadataService.GetTotalItemCountAsync(
             client,
             enabledLibraryMappings,
             cancellationToken).ConfigureAwait(false);
@@ -138,7 +136,7 @@ public class RefreshMetadataSyncTableTask : IScheduledTask
                 break;
             }
 
-            await metadataService.ProcessLibraryAsync(
+            await _metadataService.ProcessLibraryAsync(
                 client,
                 database,
                 libraryMapping,
@@ -163,7 +161,7 @@ public class RefreshMetadataSyncTableTask : IScheduledTask
 
         // Update last sync time
         config.LastMetadataSyncTime = DateTime.UtcNow;
-        plugin.SaveConfiguration();
+        _configManager.SaveConfiguration();
 
         _logger.LogInformation("Metadata sync table refresh completed");
     }

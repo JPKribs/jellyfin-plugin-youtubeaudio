@@ -12,4 +12,9 @@ public class ConnectionTestResult
     public string? ServerId { get; set; }
 
     public string? ErrorMessage { get; set; }
+
+    /// <summary>
+    /// Gets or sets the user-facing message for the connection test result.
+    /// </summary>
+    public string? Message { get; set; }
 }

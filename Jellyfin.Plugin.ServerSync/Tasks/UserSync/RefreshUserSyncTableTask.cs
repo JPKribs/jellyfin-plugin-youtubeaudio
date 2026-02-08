@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.ServerSync.Services;
-using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -15,20 +14,23 @@ namespace Jellyfin.Plugin.ServerSync.Tasks;
 public class RefreshUserSyncTableTask : IScheduledTask
 {
     private readonly ILogger<RefreshUserSyncTableTask> _logger;
-    private readonly ILoggerFactory _loggerFactory;
-    private readonly IUserManager _userManager;
+    private readonly IPluginConfigurationManager _configManager;
+    private readonly ISourceServerClientFactory _clientFactory;
+    private readonly UserSyncTableService _tableService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RefreshUserSyncTableTask"/> class.
     /// </summary>
     public RefreshUserSyncTableTask(
         ILogger<RefreshUserSyncTableTask> logger,
-        ILoggerFactory loggerFactory,
-        IUserManager userManager)
+        IPluginConfigurationManager configManager,
+        ISourceServerClientFactory clientFactory,
+        UserSyncTableService tableService)
     {
         _logger = logger;
-        _loggerFactory = loggerFactory;
-        _userManager = userManager;
+        _configManager = configManager;
+        _clientFactory = clientFactory;
+        _tableService = tableService;
     }
 
     /// <inheritdoc />
@@ -46,13 +48,7 @@ public class RefreshUserSyncTableTask : IScheduledTask
     /// <inheritdoc />
     public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        var plugin = Plugin.Instance;
-        if (plugin == null)
-        {
-            return;
-        }
-
-        var config = plugin.Configuration;
+        var config = _configManager.Configuration;
 
         // Check if user sync is enabled
         if (!config.EnableUserSync)
@@ -78,10 +74,7 @@ public class RefreshUserSyncTableTask : IScheduledTask
 
         _logger.LogInformation("Starting user sync table refresh");
 
-        using var sourceClient = new SourceServerClient(
-            _loggerFactory.CreateLogger<SourceServerClient>(),
-            config.SourceServerUrl,
-            config.SourceServerApiKey);
+        using var sourceClient = _clientFactory.Create(config.SourceServerUrl, config.SourceServerApiKey);
 
         // Test connection
         var connectionResult = await sourceClient.TestConnectionAsync(cancellationToken).ConfigureAwait(false);
@@ -91,13 +84,7 @@ public class RefreshUserSyncTableTask : IScheduledTask
             return;
         }
 
-        // Create table service and refresh
-        var tableService = new UserSyncTableService(
-            _loggerFactory.CreateLogger<UserSyncTableService>(),
-            plugin.Database,
-            _userManager);
-
-        var itemsProcessed = await tableService.RefreshUserSyncTableAsync(
+        var itemsProcessed = await _tableService.RefreshUserSyncTableAsync(
             sourceClient,
             config,
             progress,

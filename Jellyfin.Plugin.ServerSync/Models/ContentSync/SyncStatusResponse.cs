@@ -31,5 +31,5 @@ public class SyncStatusResponse : BaseSyncStatusResponse
     /// <summary>
     /// Gets the total count including content-specific statuses.
     /// </summary>
-    public override int Total => base.Total + PendingDownload + PendingReplacement + PendingDeletion + Deleting;
+    public override int Total => base.Total + Deleting;
 }

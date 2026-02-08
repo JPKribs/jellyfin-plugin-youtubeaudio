@@ -172,5 +172,6 @@ public class HistorySyncItem
         (MergedIsPlayed != LocalIsPlayed && MergedIsPlayed.HasValue) ||
         (MergedPlayCount != LocalPlayCount && MergedPlayCount.HasValue) ||
         (MergedPlaybackPositionTicks != LocalPlaybackPositionTicks && MergedPlaybackPositionTicks.HasValue) ||
-        (MergedIsFavorite != LocalIsFavorite && MergedIsFavorite.HasValue);
+        (MergedIsFavorite != LocalIsFavorite && MergedIsFavorite.HasValue) ||
+        (MergedLastPlayedDate != LocalLastPlayedDate && MergedLastPlayedDate.HasValue);
 }

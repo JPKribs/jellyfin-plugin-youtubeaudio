@@ -79,7 +79,7 @@ public static class UserSyncMergeService
         {
             return JsonSerializer.Deserialize<T>(json);
         }
-        catch
+        catch (JsonException)
         {
             return default;
         }
@@ -169,9 +169,9 @@ public static class UserSyncMergeService
 
                 syncableProps[prop.Name] = value;
             }
-            catch
+            catch (TargetInvocationException)
             {
-                // Skip properties that can't be read
+                // Skip properties that throw during read
             }
         }
 
@@ -196,9 +196,9 @@ public static class UserSyncMergeService
             {
                 syncableProps[prop.Name] = prop.GetValue(config);
             }
-            catch
+            catch (TargetInvocationException)
             {
-                // Skip properties that can't be read
+                // Skip properties that throw during read
             }
         }
 
@@ -238,7 +238,7 @@ public static class UserSyncMergeService
 
             return JsonSerializer.Serialize(mergedDict);
         }
-        catch
+        catch (JsonException)
         {
             return sourcePolicy;
         }

@@ -15,10 +15,12 @@ namespace Jellyfin.Plugin.ServerSync.Tasks;
 public class EmptyRecyclingBinTask : IScheduledTask
 {
     private readonly ILogger<EmptyRecyclingBinTask> _logger;
+    private readonly IPluginConfigurationManager _configManager;
 
-    public EmptyRecyclingBinTask(ILogger<EmptyRecyclingBinTask> logger)
+    public EmptyRecyclingBinTask(ILogger<EmptyRecyclingBinTask> logger, IPluginConfigurationManager configManager)
     {
         _logger = logger;
+        _configManager = configManager;
     }
 
     public string Name => "Empty Recycling Bin";
@@ -31,13 +33,7 @@ public class EmptyRecyclingBinTask : IScheduledTask
 
     public Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        var plugin = Plugin.Instance;
-        if (plugin == null)
-        {
-            return Task.CompletedTask;
-        }
-
-        var config = plugin.Configuration;
+        var config = _configManager.Configuration;
 
         // Skip if content sync is not enabled
         if (!config.EnableContentSync)

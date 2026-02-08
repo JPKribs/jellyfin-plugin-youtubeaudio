@@ -16,14 +16,14 @@ namespace Jellyfin.Plugin.ServerSync.Services;
 /// </summary>
 public class DownloadService
 {
-    private readonly ILogger _logger;
+    private readonly ILogger<DownloadService> _logger;
 
     /// <summary>
     /// Default retry count for network operations.
     /// </summary>
     private const int DefaultNetworkRetries = 3;
 
-    public DownloadService(ILogger logger)
+    public DownloadService(ILogger<DownloadService> logger)
     {
         _logger = logger;
     }
@@ -177,9 +177,26 @@ public class DownloadService
 
             foreach (var companion in companions)
             {
-                var tempFileName = FileNameSanitizer.SanitizeTempFileName(itemId.ToString(), companion.FileName);
+                // Validate companion file name to prevent path traversal from remote server
+                var companionFileName = Path.GetFileName(companion.FileName);
+                if (string.IsNullOrEmpty(companionFileName) || companionFileName != companion.FileName)
+                {
+                    _logger.LogWarning("Skipping companion file with suspicious name: {FileName}", companion.FileName);
+                    continue;
+                }
+
+                var tempFileName = FileNameSanitizer.SanitizeTempFileName(itemId.ToString(), companionFileName);
                 var tempFilePath = Path.Combine(tempPath, tempFileName);
-                var targetPath = Path.Combine(targetDir, companion.FileName);
+                var targetPath = Path.Combine(targetDir, companionFileName);
+
+                // Verify the resolved target path is still within the target directory
+                var resolvedTargetPath = Path.GetFullPath(targetPath);
+                var resolvedTargetDir = Path.GetFullPath(targetDir);
+                if (!resolvedTargetPath.StartsWith(resolvedTargetDir, StringComparison.Ordinal))
+                {
+                    _logger.LogWarning("Companion file path traversal blocked: {FileName} resolved to {Resolved}", companion.FileName, resolvedTargetPath);
+                    continue;
+                }
 
                 try
                 {
@@ -286,9 +303,9 @@ public class DownloadService
             {
                 File.Delete(tempFilePath);
             }
-            catch
+            catch (IOException)
             {
-                // Ignore cleanup errors
+                // Ignore cleanup errors - temp file will be cleaned up by OS
             }
         }
     }

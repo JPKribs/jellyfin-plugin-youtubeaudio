@@ -1,0 +1,531 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using Jellyfin.Plugin.ServerSync.Models;
+using Jellyfin.Plugin.ServerSync.Models.Configuration;
+using Jellyfin.Plugin.ServerSync.Models.ContentSync;
+using Jellyfin.Plugin.ServerSync.Models.ContentSync.Configuration;
+using Jellyfin.Plugin.ServerSync.Services;
+using Jellyfin.Plugin.ServerSync.Utilities;
+using MediaBrowser.Model.Tasks;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+
+namespace Jellyfin.Plugin.ServerSync.Controllers;
+
+/// <summary>
+/// Content sync endpoints for Server Sync plugin.
+/// </summary>
+public partial class ConfigurationController
+{
+    /// <summary>
+    /// GetSyncItems
+    /// Gets paginated sync items from the database with optional search and filter.
+    /// </summary>
+    /// <param name="search">Optional search term.</param>
+    /// <param name="status">Optional status filter.</param>
+    /// <param name="pendingType">Optional pending type filter.</param>
+    /// <param name="skip">Number of items to skip (default 0).</param>
+    /// <param name="take">Maximum items to return (default 50, max 200).</param>
+    /// <returns>Paginated result of sync item DTOs.</returns>
+    [HttpGet("Items")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<PaginatedResult<SyncItemDto>> GetSyncItems(
+        [FromQuery] string? search = null,
+        [FromQuery] string? status = null,
+        [FromQuery] string? pendingType = null,
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 50)
+    {
+        var config = _configManager.Configuration;
+
+        // Clamp pagination values to reasonable limits
+        take = Math.Clamp(take, 1, 200);
+        skip = Math.Max(0, skip);
+
+        // Parse status filter
+        SyncStatus? statusFilter = null;
+        if (!string.IsNullOrEmpty(status) && Enum.TryParse<SyncStatus>(status, out var parsedStatus))
+        {
+            statusFilter = parsedStatus;
+        }
+
+        // Parse pending type filter
+        PendingType? pendingTypeFilter = null;
+        if (!string.IsNullOrEmpty(pendingType) && Enum.TryParse<PendingType>(pendingType, out var parsedPendingType))
+        {
+            pendingTypeFilter = parsedPendingType;
+        }
+
+        // Get paginated results
+        var (items, totalCount) = _databaseProvider.Database.SearchPaginated(search, statusFilter, pendingTypeFilter, skip, take);
+
+        // Build lookup for library names from mappings
+        var libraryMappings = config.LibraryMappings ?? new List<LibraryMapping>();
+        var libraryNameLookup = libraryMappings.ToDictionary(
+            m => m.SourceLibraryId,
+            m => (SourceName: m.SourceLibraryName, LocalName: m.LocalLibraryName));
+
+        return Ok(new PaginatedResult<SyncItemDto>
+        {
+            Items = items.Select(i =>
+            {
+                libraryNameLookup.TryGetValue(i.SourceLibraryId, out var libraryNames);
+                return new SyncItemDto
+                {
+                    Id = i.Id,
+                    SourceItemId = i.SourceItemId,
+                    SourceLibraryId = i.SourceLibraryId,
+                    SourceLibraryName = libraryNames.SourceName,
+                    LocalLibraryId = i.LocalLibraryId,
+                    LocalLibraryName = libraryNames.LocalName,
+                    SourcePath = i.SourcePath,
+                    LocalPath = i.LocalPath,
+                    SourceSize = i.SourceSize,
+                    SourceSizeFormatted = FormatUtilities.FormatBytes(i.SourceSize),
+                    SourceCreateDate = i.SourceCreateDate,
+                    LocalItemId = i.LocalItemId,
+                    Status = i.Status.ToString(),
+                    PendingType = i.PendingType?.ToString(),
+                    StatusDate = i.StatusDate,
+                    LastSyncTime = i.LastSyncTime,
+                    ErrorMessage = i.ErrorMessage,
+                    RetryCount = i.RetryCount,
+                    SourceServerUrl = config.SourceServerUrl,
+                    SourceServerId = config.SourceServerId,
+                    CompanionFiles = i.CompanionFiles
+                };
+            }).ToList(),
+            TotalCount = totalCount,
+            Skip = skip,
+            Take = take
+        });
+    }
+
+    /// <summary>
+    /// GetSyncStatus
+    /// Gets sync status counts.
+    /// </summary>
+    /// <returns>Sync status response with counts.</returns>
+    [HttpGet("Status")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<SyncStatusResponse> GetSyncStatus()
+    {
+        var counts = _databaseProvider.Database.GetStatusCounts();
+        var pendingCounts = _databaseProvider.Database.GetPendingCounts();
+
+        return Ok(new SyncStatusResponse
+        {
+            Pending = counts.GetValueOrDefault(SyncStatus.Pending, 0),
+            PendingDownload = pendingCounts.GetValueOrDefault(PendingType.Download, 0),
+            PendingReplacement = pendingCounts.GetValueOrDefault(PendingType.Replacement, 0),
+            PendingDeletion = pendingCounts.GetValueOrDefault(PendingType.Deletion, 0),
+            Queued = counts.GetValueOrDefault(SyncStatus.Queued, 0),
+            Synced = counts.GetValueOrDefault(SyncStatus.Synced, 0),
+            Errored = counts.GetValueOrDefault(SyncStatus.Errored, 0),
+            Ignored = counts.GetValueOrDefault(SyncStatus.Ignored, 0),
+            Deleting = counts.GetValueOrDefault(SyncStatus.Deleting, 0)
+        });
+    }
+
+    /// <summary>
+    /// GetSyncStats
+    /// Gets detailed sync statistics for health dashboard.
+    /// </summary>
+    /// <returns>Sync stats response.</returns>
+    [HttpGet("Stats")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public ActionResult<SyncStatsResponse> GetSyncStats()
+    {
+        try
+        {
+            var config = _configManager.Configuration;
+            var stats = _databaseProvider.Database.GetSyncStats();
+            var pendingCounts = _databaseProvider.Database.GetPendingCounts();
+            var diskInfo = DiskSpaceService.GetMinimumDiskSpaceInfo(config);
+
+            return Ok(new SyncStatsResponse
+            {
+                TotalItems = stats.StatusCounts.Values.Sum(),
+                SyncedItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Synced, 0),
+                QueuedItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Queued, 0),
+                ErroredItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Errored, 0),
+                PendingItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Pending, 0),
+                PendingDownloadItems = pendingCounts.GetValueOrDefault(PendingType.Download, 0),
+                PendingReplacementItems = pendingCounts.GetValueOrDefault(PendingType.Replacement, 0),
+                PendingDeletionItems = pendingCounts.GetValueOrDefault(PendingType.Deletion, 0),
+                IgnoredItems = stats.StatusCounts.GetValueOrDefault(SyncStatus.Ignored, 0),
+                TotalSyncedBytes = stats.TotalSyncedBytes,
+                TotalQueuedBytes = stats.TotalQueuedBytes,
+                LastSyncTime = stats.LastSyncTime,
+                LastSyncStartTime = config.LastSyncStartTime,
+                LastSyncEndTime = config.LastSyncEndTime,
+                FreeDiskSpaceBytes = diskInfo?.FreeBytes ?? 0,
+                MinimumRequiredBytes = (long)config.MinimumFreeDiskSpaceGb * 1024 * 1024 * 1024,
+                HasSufficientDiskSpace = diskInfo?.IsSufficient ?? true
+            });
+        }
+        catch (ObjectDisposedException)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, "Database is not available");
+        }
+    }
+
+    /// <summary>
+    /// GetPendingSize
+    /// Gets the total size of pending items to be synced.
+    /// Calculates: PendingDownload + PendingReplacement + Queued - PendingDeletion
+    /// </summary>
+    /// <returns>Pending size response with breakdown.</returns>
+    [HttpGet("PendingSize")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<PendingSizeResponse> GetPendingSize()
+    {
+        var sizes = _databaseProvider.Database.GetPendingSizes();
+
+        return Ok(new PendingSizeResponse
+        {
+            PendingDownloadBytes = sizes.GetValueOrDefault("PendingDownload", 0),
+            PendingReplacementBytes = sizes.GetValueOrDefault("PendingReplacement", 0),
+            PendingDeletionBytes = sizes.GetValueOrDefault("PendingDeletion", 0),
+            QueuedBytes = sizes.GetValueOrDefault("Queued", 0),
+            TotalPendingBytes = sizes.GetValueOrDefault("Total", 0)
+        });
+    }
+
+    /// <summary>
+    /// GetDiskSpace
+    /// Gets disk space information for configured library paths.
+    /// </summary>
+    /// <returns>List of disk space info.</returns>
+    [HttpGet("DiskSpace")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<List<DiskSpaceInfo>> GetDiskSpace()
+    {
+        return Ok(DiskSpaceService.GetDiskSpaceInfo(_configManager.Configuration));
+    }
+
+    /// <summary>
+    /// TriggerSync
+    /// Manually triggers the sync task.
+    /// </summary>
+    /// <returns>Action result with status message.</returns>
+    [HttpPost("TriggerSync")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult TriggerSync()
+    {
+        var downloadTask = _taskManager.ScheduledTasks
+            .FirstOrDefault(t => t.ScheduledTask.Key == "ServerSyncDownloadContent");
+
+        if (downloadTask == null)
+        {
+            return NotFound("Download task not found");
+        }
+
+        _taskManager.Execute(downloadTask, new TaskOptions());
+
+        return Ok(new { Message = "Sync task started" });
+    }
+
+    /// <summary>
+    /// TriggerRefresh
+    /// Manually triggers the refresh sync table task.
+    /// </summary>
+    /// <returns>Action result with status message.</returns>
+    [HttpPost("TriggerRefresh")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult TriggerRefresh()
+    {
+        var refreshTask = _taskManager.ScheduledTasks
+            .FirstOrDefault(t => t.ScheduledTask.Key == "ServerSyncUpdateTables");
+
+        if (refreshTask == null)
+        {
+            return NotFound("Refresh task not found");
+        }
+
+        _taskManager.Execute(refreshTask, new TaskOptions());
+
+        return Ok(new { Message = "Refresh task started" });
+    }
+
+    /// <summary>
+    /// RetryErroredItems
+    /// Resets errored items for retry.
+    /// </summary>
+    /// <param name="request">Optional request with specific item IDs.</param>
+    /// <returns>Action result with success status.</returns>
+    [HttpPost("RetryErroredItems")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult RetryErroredItems([FromBody] BulkItemsRequest? request = null)
+    {
+        if (request?.SourceItemIds?.Count > 0)
+        {
+            foreach (var itemId in request.SourceItemIds)
+            {
+                _databaseProvider.Database.UpdateStatus(itemId, SyncStatus.Queued);
+            }
+        }
+        else
+        {
+            var erroredItems = _databaseProvider.Database.GetByStatus(SyncStatus.Errored);
+            foreach (var item in erroredItems)
+            {
+                _databaseProvider.Database.UpdateStatus(item.SourceItemId, SyncStatus.Queued);
+            }
+        }
+
+        return Ok(new { Success = true });
+    }
+
+    /// <summary>
+    /// UpdateItemStatus
+    /// Updates the status of a sync item.
+    /// </summary>
+    /// <param name="request">Status update request.</param>
+    /// <returns>Action result with success status.</returns>
+    [HttpPost("UpdateItemStatus")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult UpdateItemStatus([FromBody] UpdateItemStatusRequest request)
+    {
+        if (!Enum.TryParse<SyncStatus>(request.Status, out var status))
+        {
+            return BadRequest("Invalid status value");
+        }
+
+        _databaseProvider.Database.UpdateStatus(request.SourceItemId, status);
+        return Ok(new { Success = true });
+    }
+
+    /// <summary>
+    /// IgnoreItems
+    /// Marks multiple items as ignored.
+    /// </summary>
+    /// <param name="request">Bulk items request.</param>
+    /// <returns>Action result with updated count.</returns>
+    [HttpPost("IgnoreItems")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public ActionResult IgnoreItems([FromBody] BulkItemsRequest request)
+    {
+        if (request?.SourceItemIds == null || request.SourceItemIds.Count == 0)
+        {
+            return BadRequest("No items specified");
+        }
+
+        var successCount = 0;
+        foreach (var itemId in request.SourceItemIds)
+        {
+            try
+            {
+                _databaseProvider.Database.UpdateStatus(itemId, SyncStatus.Ignored);
+                successCount++;
+            }
+            catch (Exception ex)
+            {
+                var sanitizedId = SanitizeForLog(itemId);
+                _logger.LogWarning(ex, "Failed to update status for item {ItemId}", sanitizedId);
+            }
+        }
+
+        return Ok(new { Updated = successCount });
+    }
+
+    /// <summary>
+    /// QueueItems
+    /// Moves items to Queued status (works for Pending, Ignored, Errored, and Synced items).
+    /// </summary>
+    /// <param name="request">Bulk items request.</param>
+    /// <returns>Action result with updated count.</returns>
+    [HttpPost("QueueItems")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public ActionResult QueueItems([FromBody] BulkItemsRequest request)
+    {
+        if (request?.SourceItemIds == null || request.SourceItemIds.Count == 0)
+        {
+            return BadRequest("No items specified");
+        }
+
+        var successCount = 0;
+        foreach (var itemId in request.SourceItemIds)
+        {
+            try
+            {
+                _databaseProvider.Database.UpdateStatus(itemId, SyncStatus.Queued);
+                successCount++;
+            }
+            catch (Exception ex)
+            {
+                var sanitizedId = SanitizeForLog(itemId);
+                _logger.LogWarning(ex, "Failed to update status for item {ItemId}", sanitizedId);
+            }
+        }
+
+        return Ok(new { Updated = successCount });
+    }
+
+    /// <summary>
+    /// DeleteLocalItems
+    /// Deletes items from the LOCAL server only using the Jellyfin API.
+    /// </summary>
+    /// <param name="request">Bulk items request.</param>
+    /// <returns>Action result with deletion counts.</returns>
+    [HttpPost("DeleteLocalItems")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public ActionResult DeleteLocalItems([FromBody] BulkItemsRequest request)
+    {
+        if (request?.SourceItemIds == null || request.SourceItemIds.Count == 0)
+        {
+            return BadRequest("No items specified");
+        }
+
+        var config = _configManager.Configuration;
+        var deletedCount = 0;
+        var failedCount = 0;
+        var skippedCount = 0;
+
+        _logger.LogInformation("Starting deletion of {Count} items from local server", request.SourceItemIds.Count);
+
+        foreach (var sourceItemId in request.SourceItemIds)
+        {
+            var item = _databaseProvider.Database.GetBySourceItemId(sourceItemId);
+            if (item == null)
+            {
+                var sanitizedSourceId = SanitizeForLog(sourceItemId);
+                _logger.LogWarning("SKIPPED DELETE: Item {SourceItemId} not found in tracking database", sanitizedSourceId);
+                skippedCount++;
+                continue;
+            }
+
+            var fileName = Path.GetFileName(item.LocalPath);
+            var sanitizedFileName = SanitizeForLog(fileName);
+            var sanitizedLocalPath = SanitizeForLog(item.LocalPath);
+
+            // Validate path is within configured library directories (safety check)
+            if (!string.IsNullOrEmpty(item.LocalPath) && !FileValidationService.IsPathWithinLibrary(item.LocalPath, config))
+            {
+                _logger.LogWarning(
+                    "SKIPPED DELETE: {FileName} - Path is outside configured library directories. Local path: {LocalPath}",
+                    sanitizedFileName,
+                    sanitizedLocalPath);
+                skippedCount++;
+                continue;
+            }
+
+            // Try to find the local item - first by stored ID, then by path
+            MediaBrowser.Controller.Entities.BaseItem? localItem = null;
+
+            if (!string.IsNullOrEmpty(item.LocalItemId) && Guid.TryParse(item.LocalItemId, out var localItemGuid))
+            {
+                localItem = _libraryManager.GetItemById(localItemGuid);
+            }
+
+            // If not found by ID, try to find by path (handles case where LocalItemId was never set)
+            if (localItem == null && !string.IsNullOrEmpty(item.LocalPath))
+            {
+                localItem = _libraryManager.FindByPath(item.LocalPath, isFolder: false);
+            }
+
+            // Check if file exists anywhere
+            var fileExists = localItem != null || (!string.IsNullOrEmpty(item.LocalPath) && System.IO.File.Exists(item.LocalPath));
+
+            if (!fileExists)
+            {
+                // File doesn't exist anywhere - remove from tracking since there's nothing to delete
+                var sanitizedSourcePath = SanitizeForLog(item.SourcePath);
+                _logger.LogWarning(
+                    "SKIPPED DELETE: {FileName} - File not found in Jellyfin library or on disk, removing from tracking. Source path: {SourcePath}",
+                    sanitizedFileName,
+                    sanitizedSourcePath);
+                _databaseProvider.Database.Delete(sourceItemId);
+                skippedCount++;
+                continue;
+            }
+
+            // Use FileDeletionService to handle the deletion
+            var result = FileDeletionService.DeleteLocalFile(item.LocalPath, localItem, _libraryManager, config, _logger);
+
+            if (result.Success)
+            {
+                var useRecyclingBin = config.EnableRecyclingBin && !string.IsNullOrEmpty(config.RecyclingBinPath);
+                var action = useRecyclingBin ? "RECYCLED" : "DELETED";
+                var suffix = localItem == null ? " (direct)" : string.Empty;
+                _logger.LogInformation("{Action}{Suffix}: {FileName} - Local path: {LocalPath}", action, suffix, sanitizedFileName, sanitizedLocalPath);
+                _databaseProvider.Database.Delete(sourceItemId);
+                deletedCount++;
+            }
+            else
+            {
+                // Check if file still exists after failed deletion attempt
+                // It may have been deleted externally (manually or by another process)
+                var stillExists = !string.IsNullOrEmpty(item.LocalPath) && System.IO.File.Exists(item.LocalPath);
+                if (!stillExists)
+                {
+                    // File is gone (deleted elsewhere) - remove from tracking
+                    _logger.LogInformation(
+                        "DELETE (external): {FileName} - File no longer exists after deletion attempt, removing from tracking. Local path: {LocalPath}",
+                        sanitizedFileName,
+                        sanitizedLocalPath);
+                    _databaseProvider.Database.Delete(sourceItemId);
+                    deletedCount++;
+                }
+                else
+                {
+                    var sanitizedError = SanitizeForLog(result.ErrorMessage);
+                    _logger.LogError("FAILED DELETE: {FileName} - {Error}. Local path: {LocalPath}", sanitizedFileName, sanitizedError, sanitizedLocalPath);
+                    failedCount++;
+                }
+            }
+        }
+
+        _logger.LogInformation(
+            "Deletion task complete: {Deleted} deleted, {Failed} failed, {Skipped} skipped out of {Total} items",
+            deletedCount,
+            failedCount,
+            skippedCount,
+            request.SourceItemIds.Count);
+
+        return Ok(new { Deleted = deletedCount, Failed = failedCount, Skipped = skippedCount });
+    }
+
+    /// <summary>
+    /// RemoveFromTracking
+    /// Removes items from the sync tracking database without deleting the actual files.
+    /// </summary>
+    /// <param name="request">Bulk items request.</param>
+    /// <returns>Action result with removed count.</returns>
+    [HttpPost("RemoveFromTracking")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public ActionResult RemoveFromTracking([FromBody] BulkItemsRequest request)
+    {
+        if (request?.SourceItemIds == null || request.SourceItemIds.Count == 0)
+        {
+            return BadRequest("No items specified");
+        }
+
+        var successCount = 0;
+        foreach (var sourceItemId in request.SourceItemIds)
+        {
+            try
+            {
+                _databaseProvider.Database.Delete(sourceItemId);
+                successCount++;
+            }
+            catch (Exception ex)
+            {
+                var sanitizedId = SanitizeForLog(sourceItemId);
+                _logger.LogWarning(ex, "Failed to remove tracking for item {ItemId}", sanitizedId);
+            }
+        }
+
+        return Ok(new { Removed = successCount });
+    }
+}

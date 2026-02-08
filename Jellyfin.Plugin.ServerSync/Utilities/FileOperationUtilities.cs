@@ -156,16 +156,16 @@ public static class FileOperationUtilities
             if (DateTime.TryParseExact(
                 timestampPart,
                 "yyyy-MM-dd_HH-mm-ss",
-                null,
-                System.Globalization.DateTimeStyles.AssumeUniversal,
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal,
                 out var timestamp))
             {
                 return timestamp;
             }
         }
-        catch
+        catch (ArgumentOutOfRangeException)
         {
-            // Ignore parsing errors
+            // Filename doesn't contain the expected timestamp pattern
         }
 
         return null;
@@ -196,9 +196,9 @@ public static class FileOperationUtilities
                 var files = Directory.GetFiles(directory, pattern);
                 companions.AddRange(files);
             }
-            catch
+            catch (IOException)
             {
-                // Ignore pattern match errors
+                // Directory access error during companion file search
             }
         }
 
@@ -241,14 +241,18 @@ public static class FileOperationUtilities
                     {
                         File.Delete(testFile);
                     }
-                    catch
+                    catch (IOException)
                     {
-                        // Ignore cleanup errors
+                        // Test file cleanup failed; DeleteOnClose should handle it
                     }
                 }
             }
         }
-        catch
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+        catch (IOException)
         {
             return false;
         }

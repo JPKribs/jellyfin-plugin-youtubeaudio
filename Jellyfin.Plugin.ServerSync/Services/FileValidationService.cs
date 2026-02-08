@@ -32,19 +32,11 @@ public static class FileValidationService
             return new PathValidationResult(false, "No local path configured");
         }
 
-        // Check for path traversal
+        // Normalize and verify the path is within an allowed library boundary
         var normalizedPath = Path.GetFullPath(localPath);
-        if (!normalizedPath.Equals(localPath, StringComparison.OrdinalIgnoreCase))
+        if (!IsPathWithinLibrary(normalizedPath, config))
         {
-            // Path was normalized, check if it's still within allowed boundaries
-            var isWithinLibrary = config.LibraryMappings
-                .Where(m => m.IsEnabled && !string.IsNullOrEmpty(m.LocalRootPath))
-                .Any(m => normalizedPath.StartsWith(m.LocalRootPath, StringComparison.OrdinalIgnoreCase));
-
-            if (!isWithinLibrary)
-            {
-                return new PathValidationResult(false, "Path traversal detected - path escapes library boundaries");
-            }
+            return new PathValidationResult(false, "Path traversal detected - path escapes library boundaries");
         }
 
         // Check for path collision
@@ -58,6 +50,8 @@ public static class FileValidationService
 
     /// <summary>
     /// Validates that a path is within one of the configured library paths.
+    /// Uses <see cref="Path.GetRelativePath"/> to ensure proper path boundary checking
+    /// (prevents "/media/videos_evil" from matching library root "/media/videos").
     /// </summary>
     /// <param name="path">Path to validate.</param>
     /// <param name="config">Plugin configuration containing library mappings.</param>
@@ -74,7 +68,15 @@ public static class FileValidationService
         foreach (var mapping in config.LibraryMappings.Where(m => m.IsEnabled && !string.IsNullOrEmpty(m.LocalRootPath)))
         {
             var normalizedLibraryPath = Path.GetFullPath(mapping.LocalRootPath);
-            if (normalizedPath.StartsWith(normalizedLibraryPath, StringComparison.OrdinalIgnoreCase))
+
+            // Use GetRelativePath to safely check containment.
+            // If the path is within the library, the relative path will NOT start with ".."
+            // This correctly handles "/media/videos_evil" vs "/media/videos" —
+            // GetRelativePath("/media/videos", "/media/videos_evil") => "../videos_evil" (starts with "..")
+            // GetRelativePath("/media/videos", "/media/videos/movie.mkv") => "movie.mkv" (no "..")
+            var relativePath = Path.GetRelativePath(normalizedLibraryPath, normalizedPath);
+            if (!relativePath.StartsWith("..", StringComparison.Ordinal)
+                && !Path.IsPathRooted(relativePath))
             {
                 return true;
             }
@@ -117,7 +119,11 @@ public static class FileValidationService
             // Size mismatch - needs re-download
             return false;
         }
-        catch
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
         {
             return false;
         }

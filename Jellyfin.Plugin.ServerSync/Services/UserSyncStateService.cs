@@ -359,8 +359,9 @@ public class UserSyncStateService
                 return false;
             }
 
-            // Save to a temp file first
-            var tempPath = Path.GetTempFileName() + ".jpg";
+            // Save to a temp file first (avoid Path.GetTempFileName() which creates a 0-byte file
+            // that gets orphaned when we append .jpg)
+            var tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".jpg");
             try
             {
                 using (var fileStream = File.Create(tempPath))
@@ -437,9 +438,9 @@ public class UserSyncStateService
                         File.Delete(tempPath);
                     }
                 }
-                catch
+                catch (IOException)
                 {
-                    // Ignore cleanup errors
+                    // Ignore cleanup errors - temp file will be cleaned up by OS
                 }
             }
         }

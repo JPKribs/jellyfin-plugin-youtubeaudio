@@ -64,18 +64,36 @@ public static class FileDeletionService
     /// <summary>
     /// Attempts to remove empty parent folders after file deletion.
     /// Only removes folders that are completely empty.
+    /// Stops at the library root to prevent deleting folders outside the library boundary.
     /// </summary>
     /// <param name="directoryPath">Starting directory to check.</param>
     /// <param name="logger">Logger for operation output.</param>
-    public static void TryRemoveEmptyFolders(string directoryPath, ILogger logger)
+    /// <param name="libraryRootPath">Optional library root path to prevent walking above the library boundary.</param>
+    public static void TryRemoveEmptyFolders(string directoryPath, ILogger logger, string? libraryRootPath = null)
     {
         try
         {
+            // Normalize the boundary path for comparison
+            var normalizedRoot = !string.IsNullOrEmpty(libraryRootPath)
+                ? Path.GetFullPath(libraryRootPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                : null;
+
             // Walk up the directory tree and remove empty folders
             var currentDir = directoryPath;
 
             while (!string.IsNullOrEmpty(currentDir) && Directory.Exists(currentDir))
             {
+                // Stop if we've reached or gone above the library root
+                if (normalizedRoot != null)
+                {
+                    var normalizedCurrent = Path.GetFullPath(currentDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    if (string.Equals(normalizedCurrent, normalizedRoot, StringComparison.OrdinalIgnoreCase)
+                        || !normalizedCurrent.StartsWith(normalizedRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                    {
+                        break;
+                    }
+                }
+
                 // Check if directory is empty (no files and no subdirectories)
                 var hasFiles = Directory.EnumerateFiles(currentDir).Any();
                 var hasSubDirs = Directory.EnumerateDirectories(currentDir).Any();

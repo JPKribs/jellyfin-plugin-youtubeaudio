@@ -43,7 +43,7 @@ public static class DiskSpaceService
                     IsSufficient = driveInfo.AvailableFreeSpace >= requiredBytes
                 });
             }
-            catch
+            catch (IOException)
             {
                 results.Add(new DiskSpaceInfo
                 {
@@ -92,9 +92,11 @@ public static class DiskSpaceService
                     return false;
                 }
             }
-            catch
+            catch (IOException)
             {
-                // Skip paths that can't be accessed
+                // Cannot determine disk space — treat as insufficient to prevent filling the disk
+                insufficientPath = mapping.LocalRootPath;
+                return false;
             }
         }
 
@@ -128,9 +130,10 @@ public static class DiskSpaceService
 
             return driveInfo.AvailableFreeSpace >= fileSize + requiredBytes;
         }
-        catch
+        catch (IOException)
         {
-            return true;
+            // Cannot determine disk space — assume insufficient to prevent filling the disk
+            return false;
         }
     }
 

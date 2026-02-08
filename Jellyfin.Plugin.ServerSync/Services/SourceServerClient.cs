@@ -18,6 +18,7 @@ namespace Jellyfin.Plugin.ServerSync.Services;
 /// <summary>
 /// SourceServerClient
 /// Client for communicating with the source Jellyfin server using the official SDK.
+/// The HttpClient is externally owned (via IHttpClientFactory) and must NOT be disposed by this class.
 /// </summary>
 public class SourceServerClient : IDisposable
 {
@@ -25,20 +26,19 @@ public class SourceServerClient : IDisposable
     private const string DefaultClientName = "Server Sync";
     private static readonly string DefaultDeviceId = "serversync-plugin-" + Environment.MachineName.ToLowerInvariant();
 
-    // Default timeout for API operations (connection, authentication, etc.)
-    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
-
     /// <summary>
-    /// Gets the plugin version string.
+    /// Named HttpClient identifier for IHttpClientFactory.
     /// </summary>
-    private static string PluginVersion => Plugin.Instance?.Version.ToString() ?? "1.0.0";
+    public const string HttpClientName = "ServerSyncSource";
 
     private readonly ILogger<SourceServerClient> _logger;
     private readonly string _serverUrl;
     private readonly string _apiKey;
     private readonly string _localServerName;
+    private readonly string _pluginVersion;
     private readonly HttpClient _httpClient;
     private readonly JellyfinSdkSettings _sdkSettings;
+    private readonly object _apiClientLock = new();
     private JellyfinApiClient? _apiClient;
     private bool _disposed;
 
@@ -46,25 +46,31 @@ public class SourceServerClient : IDisposable
     /// Initializes a new instance of the <see cref="SourceServerClient"/> class.
     /// </summary>
     /// <param name="logger">Logger instance.</param>
+    /// <param name="httpClient">HttpClient instance (externally owned, e.g. from IHttpClientFactory).</param>
     /// <param name="serverUrl">Source server URL.</param>
     /// <param name="apiKey">API key for authentication.</param>
-    /// <param name="localServerName">Optional local server name for client identification. Defaults to Plugin.LocalServerName.</param>
-    public SourceServerClient(ILogger<SourceServerClient> logger, string serverUrl, string apiKey, string? localServerName = null)
+    /// <param name="localServerName">Local server name for client identification.</param>
+    /// <param name="pluginVersion">Plugin version string for client identification.</param>
+    public SourceServerClient(
+        ILogger<SourceServerClient> logger,
+        HttpClient httpClient,
+        string serverUrl,
+        string apiKey,
+        string localServerName,
+        string pluginVersion)
     {
         _logger = logger;
         _serverUrl = serverUrl.TrimEnd('/');
         _apiKey = apiKey;
-        _localServerName = localServerName ?? Plugin.Instance?.LocalServerName ?? Environment.MachineName;
-        _httpClient = new HttpClient
-        {
-            Timeout = DefaultTimeout
-        };
+        _localServerName = localServerName;
+        _pluginVersion = pluginVersion;
+        _httpClient = httpClient;
 
         _sdkSettings = new JellyfinSdkSettings();
         _sdkSettings.SetServerUrl(_serverUrl);
         _sdkSettings.Initialize(
             clientName: DefaultClientName,
-            clientVersion: PluginVersion,
+            clientVersion: _pluginVersion,
             deviceName: _localServerName,
             deviceId: DefaultDeviceId);
         _sdkSettings.SetAccessToken(_apiKey);
@@ -89,42 +95,51 @@ public class SourceServerClient : IDisposable
             {
                 Success = true,
                 ServerName = info?.ServerName,
-                ServerId = info?.Id
+                ServerId = info?.Id,
+                Message = "Connection successful"
             };
         }
         catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
         {
+            var errorMsg = "Connection timed out - server may be unreachable or slow to respond";
             _logger.LogWarning("Connection to source server timed out");
             return new ConnectionTestResult
             {
                 Success = false,
-                ErrorMessage = "Connection timed out - server may be unreachable or slow to respond"
+                ErrorMessage = errorMsg,
+                Message = errorMsg
             };
         }
         catch (OperationCanceledException)
         {
+            var errorMsg = "Connection test was cancelled";
             return new ConnectionTestResult
             {
                 Success = false,
-                ErrorMessage = "Connection test was cancelled"
+                ErrorMessage = errorMsg,
+                Message = errorMsg
             };
         }
         catch (HttpRequestException ex)
         {
+            var errorMsg = $"HTTP error: {ex.Message}";
             _logger.LogError(ex, "HTTP error connecting to source server");
             return new ConnectionTestResult
             {
                 Success = false,
-                ErrorMessage = $"HTTP error: {ex.Message}"
+                ErrorMessage = errorMsg,
+                Message = errorMsg
             };
         }
         catch (Exception ex)
         {
+            var errorMsg = $"Connection failed: {ex.Message}";
             _logger.LogError(ex, "Failed to connect to source server");
             return new ConnectionTestResult
             {
                 Success = false,
-                ErrorMessage = $"Connection failed: {ex.Message}"
+                ErrorMessage = errorMsg,
+                Message = errorMsg
             };
         }
     }
@@ -134,20 +149,26 @@ public class SourceServerClient : IDisposable
     /// Returns an access token that can be used for subsequent API calls.
     /// This is a static method that doesn't require an existing client instance.
     /// </summary>
+    /// <param name="httpClientFactory">HTTP client factory for creating clients.</param>
     /// <param name="serverUrl">Server URL.</param>
     /// <param name="username">Username.</param>
     /// <param name="password">Password.</param>
+    /// <param name="localServerName">Local server name for client identification.</param>
+    /// <param name="pluginVersion">Plugin version string for client identification.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Authentication result with access token if successful.</returns>
-    public static async Task<TokenAuthenticationResult> AuthenticateAsync(
+    public static async Task<AuthenticateResponse> AuthenticateAsync(
+        IHttpClientFactory httpClientFactory,
         string serverUrl,
         string username,
         string password,
+        string localServerName,
+        string pluginVersion,
         CancellationToken cancellationToken = default)
     {
         serverUrl = serverUrl.TrimEnd('/');
 
-        using var httpClient = new HttpClient { Timeout = DefaultTimeout };
+        var httpClient = httpClientFactory.CreateClient(HttpClientName);
 
         // Build the authentication request
         var authRequest = new
@@ -160,13 +181,12 @@ public class SourceServerClient : IDisposable
         using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
 
         // Add the required MediaBrowser authorization header (without token for auth request)
-        var deviceName = Plugin.Instance?.LocalServerName ?? Environment.MachineName;
-        var authHeader = $"MediaBrowser Client=\"{DefaultClientName}\", Device=\"{deviceName}\", DeviceId=\"{DefaultDeviceId}\", Version=\"{PluginVersion}\"";
+        var authHeader = $"MediaBrowser Client=\"{DefaultClientName}\", Device=\"{localServerName}\", DeviceId=\"{DefaultDeviceId}\", Version=\"{pluginVersion}\"";
         content.Headers.Add("X-Emby-Authorization", authHeader);
 
         try
         {
-            var response = await httpClient.PostAsync(
+            using var response = await httpClient.PostAsync(
                 $"{serverUrl}/Users/AuthenticateByName",
                 content,
                 cancellationToken).ConfigureAwait(false);
@@ -174,12 +194,12 @@ public class SourceServerClient : IDisposable
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                return new TokenAuthenticationResult
+                return new AuthenticateResponse
                 {
                     Success = false,
-                    ErrorMessage = response.StatusCode == System.Net.HttpStatusCode.Unauthorized
+                    Message = response.StatusCode == System.Net.HttpStatusCode.Unauthorized
                         ? "Invalid username or password"
-                        : $"Authentication failed: {response.StatusCode} - {errorContent}"
+                        : $"Authentication failed: {response.StatusCode}"
                 };
             }
 
@@ -201,7 +221,7 @@ public class SourceServerClient : IDisposable
                 }
             }
 
-            return new TokenAuthenticationResult
+            return new AuthenticateResponse
             {
                 Success = true,
                 AccessToken = accessToken,
@@ -211,26 +231,26 @@ public class SourceServerClient : IDisposable
         }
         catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
         {
-            return new TokenAuthenticationResult
+            return new AuthenticateResponse
             {
                 Success = false,
-                ErrorMessage = "Connection timed out - server may be unreachable"
+                Message = "Connection timed out - server may be unreachable"
             };
         }
         catch (HttpRequestException ex)
         {
-            return new TokenAuthenticationResult
+            return new AuthenticateResponse
             {
                 Success = false,
-                ErrorMessage = $"Connection error: {ex.Message}"
+                Message = $"Connection error: {ex.Message}"
             };
         }
         catch (Exception ex)
         {
-            return new TokenAuthenticationResult
+            return new AuthenticateResponse
             {
                 Success = false,
-                ErrorMessage = $"Authentication failed: {ex.Message}"
+                Message = $"Authentication failed: {ex.Message}"
             };
         }
     }
@@ -588,29 +608,33 @@ public class SourceServerClient : IDisposable
     /// <returns>Image stream or null if not found.</returns>
     public async Task<Stream?> GetUserImageAsync(Guid userId, CancellationToken cancellationToken = default)
     {
+        HttpResponseMessage? response = null;
         try
         {
             var url = $"{_serverUrl}/Users/{userId}/Images/Primary";
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             AddAuthorizationHeader(request);
 
-            var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
             {
                 if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
                     // User has no profile image
+                    response.Dispose();
                     return null;
                 }
 
                 response.EnsureSuccessStatusCode();
             }
 
-            return await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+            var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+            return new ResponseDisposingStream(stream, response);
         }
         catch (Exception ex)
         {
+            response?.Dispose();
             _logger.LogError(ex, "Failed to get profile image for user {UserId}", userId);
             return null;
         }
@@ -630,7 +654,7 @@ public class SourceServerClient : IDisposable
             using var request = new HttpRequestMessage(HttpMethod.Head, url);
             AddAuthorizationHeader(request);
 
-            var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -875,7 +899,7 @@ public class SourceServerClient : IDisposable
     /// <param name="request">HTTP request message.</param>
     private void AddAuthorizationHeader(HttpRequestMessage request)
     {
-        var authValue = $"MediaBrowser Client=\"{DefaultClientName}\", Device=\"{_localServerName}\", DeviceId=\"{DefaultDeviceId}\", Version=\"{PluginVersion}\", Token=\"{_apiKey}\"";
+        var authValue = $"MediaBrowser Client=\"{DefaultClientName}\", Device=\"{_localServerName}\", DeviceId=\"{DefaultDeviceId}\", Version=\"{_pluginVersion}\", Token=\"{_apiKey}\"";
         request.Headers.Authorization = new AuthenticationHeaderValue("MediaBrowser", authValue);
     }
 
@@ -886,14 +910,22 @@ public class SourceServerClient : IDisposable
     /// <returns>Jellyfin API client instance.</returns>
     private JellyfinApiClient GetApiClient()
     {
-        if (_apiClient == null)
+        if (_apiClient != null)
         {
-            var authProvider = new JellyfinAuthenticationProvider(_sdkSettings);
-            var adapter = new JellyfinRequestAdapter(authProvider, _sdkSettings, _httpClient);
-            _apiClient = new JellyfinApiClient(adapter);
+            return _apiClient;
         }
 
-        return _apiClient;
+        lock (_apiClientLock)
+        {
+            if (_apiClient == null)
+            {
+                var authProvider = new JellyfinAuthenticationProvider(_sdkSettings);
+                var adapter = new JellyfinRequestAdapter(authProvider, _sdkSettings, _httpClient);
+                _apiClient = new JellyfinApiClient(adapter);
+            }
+
+            return _apiClient;
+        }
     }
 
     public void Dispose()
@@ -906,7 +938,10 @@ public class SourceServerClient : IDisposable
     {
         if (!_disposed && disposing)
         {
-            _httpClient.Dispose();
+            // Do NOT dispose _httpClient — it is externally owned (from IHttpClientFactory).
+            // Dispose the API client wrapper if it was created.
+            (_apiClient as IDisposable)?.Dispose();
+            _apiClient = null;
             _disposed = true;
         }
     }

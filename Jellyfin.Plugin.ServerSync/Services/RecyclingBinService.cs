@@ -107,15 +107,15 @@ public static class RecyclingBinService
                         MoveToRecyclingBin(companionFile, recyclingBinPath, logger);
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Ignore pattern match errors
+                    logger.LogDebug(ex, "Error searching for companion files with extension {Extension}", ext);
                 }
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Ignore companion file errors - main file was handled
+            logger.LogDebug(ex, "Error processing companion files for {FilePath}", filePath);
         }
 
         return mainSuccess;

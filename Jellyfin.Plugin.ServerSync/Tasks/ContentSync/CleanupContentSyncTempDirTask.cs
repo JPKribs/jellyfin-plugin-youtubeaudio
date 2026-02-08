@@ -18,15 +18,17 @@ namespace Jellyfin.Plugin.ServerSync.Tasks;
 public class CleanupTempFilesTask : IScheduledTask
 {
     private readonly ILogger<CleanupTempFilesTask> _logger;
+    private readonly IPluginConfigurationManager _configManager;
 
     /// <summary>
     /// Maximum age in hours before a temp file is considered orphaned.
     /// </summary>
     private const int MaxTempFileAgeHours = 24;
 
-    public CleanupTempFilesTask(ILogger<CleanupTempFilesTask> logger)
+    public CleanupTempFilesTask(ILogger<CleanupTempFilesTask> logger, IPluginConfigurationManager configManager)
     {
         _logger = logger;
+        _configManager = configManager;
     }
 
     public string Name => "Clean Temporary Directory";
@@ -39,19 +41,13 @@ public class CleanupTempFilesTask : IScheduledTask
 
     public Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        var plugin = Plugin.Instance;
-        if (plugin == null)
-        {
-            return Task.CompletedTask;
-        }
-
-        var config = plugin.Configuration;
+        var config = _configManager.Configuration;
         if (!config.EnableContentSync)
         {
             return Task.CompletedTask;
         }
 
-        var tempPath = plugin.GetTempDownloadPath();
+        var tempPath = _configManager.GetTempDownloadPath();
 
         if (!Directory.Exists(tempPath))
         {

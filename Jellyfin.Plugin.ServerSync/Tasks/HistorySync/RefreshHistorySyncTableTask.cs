@@ -5,7 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.ServerSync.Models.Configuration;
 using Jellyfin.Plugin.ServerSync.Services;
-using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -17,23 +16,26 @@ namespace Jellyfin.Plugin.ServerSync.Tasks;
 public class RefreshHistorySyncTableTask : IScheduledTask
 {
     private readonly ILogger<RefreshHistorySyncTableTask> _logger;
-    private readonly ILibraryManager _libraryManager;
-    private readonly IUserManager _userManager;
-    private readonly IUserDataManager _userDataManager;
+    private readonly IPluginConfigurationManager _configManager;
+    private readonly ISyncDatabaseProvider _databaseProvider;
+    private readonly ISourceServerClientFactory _clientFactory;
+    private readonly HistorySyncTableService _historyService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RefreshHistorySyncTableTask"/> class.
     /// </summary>
     public RefreshHistorySyncTableTask(
         ILogger<RefreshHistorySyncTableTask> logger,
-        ILibraryManager libraryManager,
-        IUserManager userManager,
-        IUserDataManager userDataManager)
+        IPluginConfigurationManager configManager,
+        ISyncDatabaseProvider databaseProvider,
+        ISourceServerClientFactory clientFactory,
+        HistorySyncTableService historyService)
     {
         _logger = logger;
-        _libraryManager = libraryManager;
-        _userManager = userManager;
-        _userDataManager = userDataManager;
+        _configManager = configManager;
+        _databaseProvider = databaseProvider;
+        _clientFactory = clientFactory;
+        _historyService = historyService;
     }
 
     /// <inheritdoc />
@@ -51,13 +53,7 @@ public class RefreshHistorySyncTableTask : IScheduledTask
     /// <inheritdoc />
     public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        var plugin = Plugin.Instance;
-        if (plugin == null)
-        {
-            return;
-        }
-
-        var config = plugin.Configuration;
+        var config = _configManager.Configuration;
 
         // Check if history sync is enabled
         if (!config.EnableHistorySync)
@@ -96,10 +92,7 @@ public class RefreshHistorySyncTableTask : IScheduledTask
 
         _logger.LogInformation("Starting history sync table refresh from {SourceUrl}", config.SourceServerUrl);
 
-        using var client = new SourceServerClient(
-            plugin.LoggerFactory.CreateLogger<SourceServerClient>(),
-            config.SourceServerUrl,
-            config.SourceServerApiKey);
+        using var client = _clientFactory.Create(config.SourceServerUrl, config.SourceServerApiKey);
 
         // Test connection
         var connectionResult = await client.TestConnectionAsync(cancellationToken).ConfigureAwait(false);
@@ -110,8 +103,7 @@ public class RefreshHistorySyncTableTask : IScheduledTask
             return;
         }
 
-        var database = plugin.Database;
-        var historyService = new HistorySyncTableService(_logger, _libraryManager, _userManager, _userDataManager);
+        var database = _databaseProvider.Database;
 
         // Progress tracking
         const double InitProgress = 10.0;
@@ -120,7 +112,7 @@ public class RefreshHistorySyncTableTask : IScheduledTask
         progress.Report(0);
 
         // Get total item count for progress tracking
-        var totalItems = await historyService.GetTotalItemCountAsync(
+        var totalItems = await _historyService.GetTotalItemCountAsync(
             client,
             enabledUserMappings,
             enabledLibraryMappings,
@@ -145,7 +137,7 @@ public class RefreshHistorySyncTableTask : IScheduledTask
                     break;
                 }
 
-                await historyService.ProcessUserLibraryAsync(
+                await _historyService.ProcessUserLibraryAsync(
                     client,
                     database,
                     userMapping,
@@ -167,7 +159,7 @@ public class RefreshHistorySyncTableTask : IScheduledTask
 
         // Update last sync time
         config.LastHistorySyncTime = DateTime.UtcNow;
-        plugin.SaveConfiguration();
+        _configManager.SaveConfiguration();
 
         _logger.LogInformation("History sync table refresh completed");
     }

@@ -23,17 +23,14 @@ namespace Jellyfin.Plugin.ServerSync.Services;
 /// </summary>
 public class MetadataSyncTableService
 {
-    private readonly ILogger _logger;
+    private readonly ILogger<MetadataSyncTableService> _logger;
     private readonly ILibraryManager _libraryManager;
-
-    private const int DefaultBatchSize = 100;
-    private const int MaxConsecutiveErrors = 3;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MetadataSyncTableService"/> class.
     /// </summary>
     public MetadataSyncTableService(
-        ILogger logger,
+        ILogger<MetadataSyncTableService> logger,
         ILibraryManager libraryManager)
     {
         _logger = logger;
@@ -67,9 +64,7 @@ public class MetadataSyncTableService
     {
         var sourceLibraryId = Guid.Parse(libraryMapping.SourceLibraryId);
 
-        var startIndex = 0;
         var processedItems = 0;
-        var consecutiveErrors = 0;
 
         // Load existing metadata items for this library (one record per item now)
         var existingItems = new Dictionary<string, MetadataSyncItem>();
@@ -91,14 +86,21 @@ public class MetadataSyncTableService
         // Remove existing metadata records for items under newly-ignored paths
         if (libraryMapping.IgnoredPaths?.Count > 0)
         {
+            var keysToRemove = new List<string>();
             foreach (var kvp in existingItems)
             {
                 if (!string.IsNullOrEmpty(kvp.Value.SourcePath)
                     && PathUtilities.IsPathIgnored(kvp.Value.SourcePath, libraryMapping.SourceRootPath, libraryMapping.IgnoredPaths))
                 {
                     database.DeleteMetadataSyncItemsBySourceItem(kvp.Key);
+                    keysToRemove.Add(kvp.Key);
                     _logger.LogInformation("Removed metadata record for {Path} (path matches ignored folder)", kvp.Value.SourcePath);
                 }
+            }
+
+            foreach (var key in keysToRemove)
+            {
+                existingItems.Remove(key);
             }
         }
 
@@ -106,110 +108,30 @@ public class MetadataSyncTableService
             "Processing metadata for library {Library} (Metadata: {Metadata}, Images: {Images}, People: {People}, Studios: {Studios}, Mode: {Mode})",
             libraryMapping.SourceLibraryName, syncMetadata, syncImages, syncPeople, syncStudios, refreshMode);
 
-        while (true)
-        {
-            if (cancellationToken.IsCancellationRequested)
+        processedItems = await PaginatedFetchUtility.FetchAllPagesAsync(
+            fetchPage: (startIndex, batchSize, ct) => client.GetLibraryItemsWithMetadataAsync(sourceLibraryId, startIndex, batchSize, ct),
+            processItem: async (sourceItem, ct) =>
             {
-                break;
-            }
-
-            BaseItemDtoQueryResult? result;
-            try
-            {
-                // Get items with metadata from source server
-                result = await client.GetLibraryItemsWithMetadataAsync(
-                    sourceLibraryId,
-                    startIndex,
-                    DefaultBatchSize,
-                    cancellationToken).ConfigureAwait(false);
-
-                consecutiveErrors = 0;
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-            catch (Exception ex)
-            {
-                consecutiveErrors++;
-                _logger.LogWarning(ex,
-                    "Failed to fetch items from library {Library} at index {Index} (attempt {Attempt}/{Max})",
-                    libraryMapping.SourceLibraryName, startIndex, consecutiveErrors, MaxConsecutiveErrors);
-
-                if (consecutiveErrors >= MaxConsecutiveErrors)
-                {
-                    _logger.LogError("Too many consecutive errors fetching from {Library}, stopping sync",
-                        libraryMapping.SourceLibraryName);
-                    break;
-                }
-
-                try
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(consecutiveErrors * 2), cancellationToken).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-
-                continue;
-            }
-
-            if (result?.Items == null || result.Items.Count == 0)
-            {
-                break;
-            }
-
-            foreach (var sourceItem in result.Items)
-            {
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    break;
-                }
-
-                if (sourceItem.Id == null || string.IsNullOrEmpty(sourceItem.Path))
-                {
-                    continue;
-                }
-
-                // Skip items under ignored folder paths
-                if (PathUtilities.IsPathIgnored(sourceItem.Path, libraryMapping.SourceRootPath, libraryMapping.IgnoredPaths))
-                {
-                    continue;
-                }
-
-                try
-                {
-                    await ProcessMetadataItemAsync(
-                        client,
-                        database,
-                        libraryMapping,
-                        sourceItem,
-                        syncMetadata,
-                        syncImages,
-                        syncPeople,
-                        syncStudios,
-                        refreshMode,
-                        existingItems,
-                        cancellationToken).ConfigureAwait(false);
-
-                    processedItems++;
-                    onItemProcessed?.Invoke();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to process metadata item {ItemId} ({Name})",
-                        sourceItem.Id, sourceItem.Name);
-                }
-            }
-
-            startIndex += DefaultBatchSize;
-
-            if (result.Items.Count < DefaultBatchSize)
-            {
-                break;
-            }
-        }
+                await ProcessMetadataItemAsync(
+                    client,
+                    database,
+                    libraryMapping,
+                    sourceItem,
+                    syncMetadata,
+                    syncImages,
+                    syncPeople,
+                    syncStudios,
+                    refreshMode,
+                    existingItems,
+                    ct).ConfigureAwait(false);
+                return true;
+            },
+            libraryName: libraryMapping.SourceLibraryName,
+            sourceRootPath: libraryMapping.SourceRootPath,
+            ignoredPaths: libraryMapping.IgnoredPaths,
+            logger: _logger,
+            cancellationToken: cancellationToken,
+            onItemProcessed: onItemProcessed).ConfigureAwait(false);
 
         _logger.LogInformation(
             "Processed {Count} metadata items for library {Library}",
@@ -697,9 +619,9 @@ public class MetadataSyncTableService
                                 var fileInfo = new System.IO.FileInfo(img.Path);
                                 fileSize = fileInfo.Length;
                             }
-                            catch
+                            catch (System.IO.IOException)
                             {
-                                // Ignore file access errors
+                                // Ignore file access errors - file size will remain 0
                             }
                         }
 

@@ -27,6 +27,9 @@ public class SyncMissingMetadataTask : IScheduledTask
     private readonly ILogger<SyncMissingMetadataTask> _logger;
     private readonly ILibraryManager _libraryManager;
     private readonly IProviderManager _providerManager;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IPluginConfigurationManager _configManager;
+    private readonly ISyncDatabaseProvider _databaseProvider;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SyncMissingMetadataTask"/> class.
@@ -34,11 +37,17 @@ public class SyncMissingMetadataTask : IScheduledTask
     public SyncMissingMetadataTask(
         ILogger<SyncMissingMetadataTask> logger,
         ILibraryManager libraryManager,
-        IProviderManager providerManager)
+        IProviderManager providerManager,
+        IHttpClientFactory httpClientFactory,
+        IPluginConfigurationManager configManager,
+        ISyncDatabaseProvider databaseProvider)
     {
         _logger = logger;
         _libraryManager = libraryManager;
         _providerManager = providerManager;
+        _httpClientFactory = httpClientFactory;
+        _configManager = configManager;
+        _databaseProvider = databaseProvider;
     }
 
     /// <inheritdoc />
@@ -56,13 +65,7 @@ public class SyncMissingMetadataTask : IScheduledTask
     /// <inheritdoc />
     public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        var plugin = Plugin.Instance;
-        if (plugin == null)
-        {
-            return;
-        }
-
-        var config = plugin.Configuration;
+        var config = _configManager.Configuration;
 
         // Check if metadata sync is enabled
         if (!config.EnableMetadataSync)
@@ -103,7 +106,7 @@ public class SyncMissingMetadataTask : IScheduledTask
 
         _logger.LogInformation("Starting metadata sync");
 
-        var database = plugin.Database;
+        var database = _databaseProvider.Database;
 
         // Apply queued changes
         _logger.LogInformation("Applying queued metadata changes");
@@ -118,7 +121,7 @@ public class SyncMissingMetadataTask : IScheduledTask
 
             // Update last sync time
             config.LastMetadataSyncTime = DateTime.UtcNow;
-            plugin.SaveConfiguration();
+            _configManager.SaveConfiguration();
 
             progress.Report(100);
             return;
@@ -127,7 +130,7 @@ public class SyncMissingMetadataTask : IScheduledTask
         _logger.LogInformation("Processing {Count} queued metadata items", totalItems);
 
         // Create a shared HttpClient for image downloads (reused across all items to avoid socket exhaustion)
-        using var imageHttpClient = syncImages ? CreateImageHttpClient(config) : null;
+        var imageHttpClient = syncImages ? CreateImageHttpClient(_httpClientFactory, config) : null;
 
         var processedCount = 0;
         var successCount = 0;
@@ -169,7 +172,7 @@ public class SyncMissingMetadataTask : IScheduledTask
 
         // Update last sync time
         config.LastMetadataSyncTime = DateTime.UtcNow;
-        plugin.SaveConfiguration();
+        _configManager.SaveConfiguration();
 
         _logger.LogInformation(
             "Metadata sync completed: {Success} succeeded, {Error} failed out of {Total}",
@@ -713,13 +716,7 @@ public class SyncMissingMetadataTask : IScheduledTask
         HttpClient? httpClient,
         CancellationToken cancellationToken)
     {
-        var plugin = Plugin.Instance;
-        if (plugin == null)
-        {
-            return false;
-        }
-
-        var config = plugin.Configuration;
+        var config = _configManager.Configuration;
         if (string.IsNullOrEmpty(config.SourceServerUrl) || string.IsNullOrEmpty(config.SourceServerApiKey))
         {
             _logger.LogWarning("Source server not configured, cannot sync images");
@@ -761,31 +758,113 @@ public class SyncMissingMetadataTask : IScheduledTask
                     continue;
                 }
 
-                // Delete all existing local images of this type
-                var existingImages = localItem.GetImages(imageType).ToList();
-                foreach (var existingImage in existingImages)
+                // Download all images for this type into memory FIRST,
+                // before deleting existing ones (prevents data loss on download failure)
+                var downloadedImages = new List<(int Index, MemoryStream Data, string ContentType)>();
+                try
                 {
-                    try
+                    var allDownloadsSucceeded = true;
+
+                    for (int i = 0; i < sourceImages.Count; i++)
                     {
-                        localItem.RemoveImage(existingImage);
-                        _logger.LogDebug("Removed existing {ImageType} image for {ItemName}", imageTypeName, localItem.Name);
+                        var imageUrl = $"{baseUrl}/Items/{sourceItemId}/Images/{imageTypeName}";
+                        if (imageType == ImageType.Backdrop || sourceImages.Count > 1)
+                        {
+                            imageUrl = $"{baseUrl}/Items/{sourceItemId}/Images/{imageTypeName}/{i}";
+                        }
+
+                        MemoryStream? memoryStream = null;
+                        try
+                        {
+                            using var response = await httpClient.GetAsync(imageUrl, cancellationToken).ConfigureAwait(false);
+                            if (!response.IsSuccessStatusCode)
+                            {
+                                _logger.LogWarning("Failed to download image {ImageType}/{Index} for {ItemName}: {StatusCode}",
+                                    imageTypeName, i, localItem.Name, response.StatusCode);
+                                allDownloadsSucceeded = false;
+                                continue;
+                            }
+
+                            var contentType = response.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
+                            memoryStream = new MemoryStream();
+                            using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                            await stream.CopyToAsync(memoryStream, cancellationToken).ConfigureAwait(false);
+                            memoryStream.Position = 0;
+                            downloadedImages.Add((i, memoryStream, contentType));
+                            memoryStream = null; // Ownership transferred to list
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            if (memoryStream != null)
+                            {
+                                await memoryStream.DisposeAsync().ConfigureAwait(false);
+                            }
+
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            if (memoryStream != null)
+                            {
+                                await memoryStream.DisposeAsync().ConfigureAwait(false);
+                            }
+                            _logger.LogWarning(ex, "Error downloading {ImageType}/{Index} image for {ItemName}",
+                                imageTypeName, i, localItem.Name);
+                            allDownloadsSucceeded = false;
+                        }
                     }
-                    catch (Exception ex)
+
+                    // Only replace existing images if we successfully downloaded at least some replacements
+                    if (downloadedImages.Count == 0 && !allDownloadsSucceeded)
                     {
-                        _logger.LogWarning(ex, "Failed to remove existing {ImageType} image for {ItemName}", imageTypeName, localItem.Name);
+                        _logger.LogWarning("All downloads failed for {ImageType} on {ItemName}, keeping existing images",
+                            imageTypeName, localItem.Name);
+                        continue;
+                    }
+
+                    // Now safe to delete existing images and apply downloaded ones
+                    var existingImages = localItem.GetImages(imageType).ToList();
+                    foreach (var existingImage in existingImages)
+                    {
+                        try
+                        {
+                            localItem.RemoveImage(existingImage);
+                            _logger.LogDebug("Removed existing {ImageType} image for {ItemName}", imageTypeName, localItem.Name);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to remove existing {ImageType} image for {ItemName}", imageTypeName, localItem.Name);
+                        }
+                    }
+
+                    // Save downloaded images
+                    foreach (var (index, data, contentType) in downloadedImages)
+                    {
+                        try
+                        {
+                            await _providerManager.SaveImage(
+                                localItem,
+                                data,
+                                contentType,
+                                imageType,
+                                index,
+                                cancellationToken).ConfigureAwait(false);
+                            _logger.LogDebug("Saved {ImageType} image for {ItemName}", imageTypeName, localItem.Name);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Error saving {ImageType}/{Index} image for {ItemName}",
+                                imageTypeName, index, localItem.Name);
+                        }
                     }
                 }
-
-                // Download and save each image from source
-                for (int i = 0; i < sourceImages.Count; i++)
+                finally
                 {
-                    var imageUrl = $"{baseUrl}/Items/{sourceItemId}/Images/{imageTypeName}";
-                    if (imageType == ImageType.Backdrop || sourceImages.Count > 1)
+                    // Ensure all downloaded streams are disposed even on exception
+                    foreach (var (_, data, _) in downloadedImages)
                     {
-                        imageUrl = $"{baseUrl}/Items/{sourceItemId}/Images/{imageTypeName}/{i}";
+                        await data.DisposeAsync().ConfigureAwait(false);
                     }
-
-                    await DownloadAndSaveImageAsync(httpClient, imageUrl, localItem, imageTypeName, i, cancellationToken).ConfigureAwait(false);
                 }
             }
 
@@ -798,64 +877,6 @@ public class SyncMissingMetadataTask : IScheduledTask
         {
             _logger.LogError(ex, "Failed to apply images for {ItemName}", item.ItemName);
             return false;
-        }
-    }
-
-    /// <summary>
-    /// Downloads an image from the source server and saves it to the local item.
-    /// </summary>
-    private async Task DownloadAndSaveImageAsync(
-        HttpClient httpClient,
-        string imageUrl,
-        MediaBrowser.Controller.Entities.BaseItem localItem,
-        string imageTypeName,
-        int imageIndex,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            if (!Enum.TryParse<ImageType>(imageTypeName, out var imageType))
-            {
-                _logger.LogWarning("Unknown image type: {ImageType}", imageTypeName);
-                return;
-            }
-
-            _logger.LogDebug("Downloading {ImageType} image for {ItemName} from {Url}",
-                imageTypeName, localItem.Name, imageUrl);
-
-            using var response = await httpClient.GetAsync(imageUrl, cancellationToken).ConfigureAwait(false);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogWarning("Failed to download image {ImageType} for {ItemName}: {StatusCode}",
-                    imageTypeName, localItem.Name, response.StatusCode);
-                return;
-            }
-
-            var contentType = response.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
-
-            using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-
-            // Read into memory stream so we can use it
-            using var memoryStream = new MemoryStream();
-            await stream.CopyToAsync(memoryStream, cancellationToken).ConfigureAwait(false);
-            memoryStream.Position = 0;
-
-            // Save the image using the provider manager
-            await _providerManager.SaveImage(
-                localItem,
-                memoryStream,
-                contentType,
-                imageType,
-                imageIndex,
-                cancellationToken).ConfigureAwait(false);
-
-            _logger.LogDebug("Saved {ImageType} image for {ItemName}", imageTypeName, localItem.Name);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Error downloading/saving {ImageType} image for {ItemName}",
-                imageTypeName, localItem.Name);
         }
     }
 
@@ -955,15 +976,15 @@ public class SyncMissingMetadataTask : IScheduledTask
     /// <summary>
     /// Creates a shared HttpClient configured for image downloading from the source server.
     /// </summary>
-    private static HttpClient? CreateImageHttpClient(Configuration.PluginConfiguration config)
+    private static HttpClient? CreateImageHttpClient(IHttpClientFactory httpClientFactory, Configuration.PluginConfiguration config)
     {
         if (string.IsNullOrWhiteSpace(config.SourceServerUrl) || string.IsNullOrWhiteSpace(config.SourceServerApiKey))
         {
             return null;
         }
 
-        var client = new HttpClient();
-        client.DefaultRequestHeaders.Add("X-Emby-Token", config.SourceServerApiKey);
+        var client = httpClientFactory.CreateClient(SourceServerClient.HttpClientName);
+        client.DefaultRequestHeaders.TryAddWithoutValidation("X-Emby-Token", config.SourceServerApiKey);
         return client;
     }
 

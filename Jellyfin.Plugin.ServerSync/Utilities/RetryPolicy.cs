@@ -158,8 +158,12 @@ public static class RetryPolicy
             return true;
         }
 
-        // IO exceptions are often transient
-        if (ex is System.IO.IOException)
+        // IO exceptions are often transient, but exclude non-transient subtypes
+        if (ex is System.IO.IOException
+            and not System.IO.FileNotFoundException
+            and not System.IO.DirectoryNotFoundException
+            and not System.IO.PathTooLongException
+            and not System.IO.DriveNotFoundException)
         {
             return true;
         }

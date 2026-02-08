@@ -3,9 +3,6 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.ServerSync.Services;
-using MediaBrowser.Controller.Configuration;
-using MediaBrowser.Controller.Library;
-using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -18,26 +15,23 @@ namespace Jellyfin.Plugin.ServerSync.Tasks;
 public class SyncMissingUserDataTask : IScheduledTask
 {
     private readonly ILogger<SyncMissingUserDataTask> _logger;
-    private readonly ILoggerFactory _loggerFactory;
-    private readonly IUserManager _userManager;
-    private readonly IProviderManager _providerManager;
-    private readonly IServerConfigurationManager _serverConfigurationManager;
+    private readonly IPluginConfigurationManager _configManager;
+    private readonly ISourceServerClientFactory _clientFactory;
+    private readonly UserSyncStateService _stateService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SyncMissingUserDataTask"/> class.
     /// </summary>
     public SyncMissingUserDataTask(
         ILogger<SyncMissingUserDataTask> logger,
-        ILoggerFactory loggerFactory,
-        IUserManager userManager,
-        IProviderManager providerManager,
-        IServerConfigurationManager serverConfigurationManager)
+        IPluginConfigurationManager configManager,
+        ISourceServerClientFactory clientFactory,
+        UserSyncStateService stateService)
     {
         _logger = logger;
-        _loggerFactory = loggerFactory;
-        _userManager = userManager;
-        _providerManager = providerManager;
-        _serverConfigurationManager = serverConfigurationManager;
+        _configManager = configManager;
+        _clientFactory = clientFactory;
+        _stateService = stateService;
     }
 
     /// <inheritdoc />
@@ -55,13 +49,7 @@ public class SyncMissingUserDataTask : IScheduledTask
     /// <inheritdoc />
     public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        var plugin = Plugin.Instance;
-        if (plugin == null)
-        {
-            return;
-        }
-
-        var config = plugin.Configuration;
+        var config = _configManager.Configuration;
 
         // Check if user sync is enabled
         if (!config.EnableUserSync)
@@ -87,10 +75,7 @@ public class SyncMissingUserDataTask : IScheduledTask
 
         _logger.LogInformation("Starting user data sync from {SourceUrl}", config.SourceServerUrl);
 
-        using var sourceClient = new SourceServerClient(
-            _loggerFactory.CreateLogger<SourceServerClient>(),
-            config.SourceServerUrl,
-            config.SourceServerApiKey);
+        using var sourceClient = _clientFactory.Create(config.SourceServerUrl, config.SourceServerApiKey);
 
         // Test connection (needed for profile image downloads)
         var connectionResult = await sourceClient.TestConnectionAsync(cancellationToken).ConfigureAwait(false);
@@ -103,22 +88,14 @@ public class SyncMissingUserDataTask : IScheduledTask
         // Apply queued changes
         _logger.LogInformation("Applying queued user changes");
 
-        // Create state service and apply changes
-        var stateService = new UserSyncStateService(
-            _loggerFactory.CreateLogger<UserSyncStateService>(),
-            plugin.Database,
-            _userManager,
-            _providerManager,
-            _serverConfigurationManager);
-
-        var itemsSynced = await stateService.ApplyQueuedChangesAsync(
+        var itemsSynced = await _stateService.ApplyQueuedChangesAsync(
             sourceClient,
             progress,
             cancellationToken).ConfigureAwait(false);
 
         // Update last sync time
         config.LastUserSyncTime = DateTime.UtcNow;
-        plugin.SaveConfiguration();
+        _configManager.SaveConfiguration();
 
         _logger.LogInformation("User data sync complete. {Count} items synced", itemsSynced);
         progress.Report(100);

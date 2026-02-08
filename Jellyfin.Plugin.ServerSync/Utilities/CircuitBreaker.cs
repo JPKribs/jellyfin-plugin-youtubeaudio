@@ -36,10 +36,7 @@ public class CircuitBreaker
                 // Check if cooldown period has elapsed
                 if (DateTime.UtcNow - _circuitOpenedAt.Value >= _cooldownPeriod)
                 {
-                    // Reset circuit to half-open (allow one attempt)
-                    _logger.LogInformation(
-                        "Circuit breaker for {Service} cooldown elapsed, allowing retry attempt",
-                        _serviceName);
+                    // Half-open state: allow one retry attempt
                     return false;
                 }
 
@@ -135,7 +132,7 @@ public class CircuitBreaker
         {
             _consecutiveFailures++;
 
-            if (_consecutiveFailures >= _failureThreshold && _circuitOpenedAt == null)
+            if (_consecutiveFailures >= _failureThreshold)
             {
                 _circuitOpenedAt = DateTime.UtcNow;
                 _logger.LogWarning(
