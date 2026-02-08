@@ -801,7 +801,7 @@ public class SyncMissingMetadataTask : IScheduledTask
                             }
                             catch
                             {
-                                await memoryStream.DisposeAsync().ConfigureAwait(false);
+                                memoryStream.Dispose();
                                 throw;
                             }
                         }
