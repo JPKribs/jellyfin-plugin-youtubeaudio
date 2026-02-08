@@ -22,20 +22,20 @@ namespace Jellyfin.Plugin.ServerSync.Services;
 public class UserSyncStateService
 {
     private readonly ILogger<UserSyncStateService> _logger;
-    private readonly SyncDatabase _database;
+    private readonly ISyncDatabaseProvider _databaseProvider;
     private readonly IUserManager _userManager;
     private readonly IProviderManager _providerManager;
     private readonly IServerConfigurationManager _serverConfigurationManager;
 
     public UserSyncStateService(
         ILogger<UserSyncStateService> logger,
-        SyncDatabase database,
+        ISyncDatabaseProvider databaseProvider,
         IUserManager userManager,
         IProviderManager providerManager,
         IServerConfigurationManager serverConfigurationManager)
     {
         _logger = logger;
-        _database = database;
+        _databaseProvider = databaseProvider;
         _userManager = userManager;
         _providerManager = providerManager;
         _serverConfigurationManager = serverConfigurationManager;
@@ -53,7 +53,7 @@ public class UserSyncStateService
         IProgress<double> progress,
         CancellationToken cancellationToken)
     {
-        var queuedItems = _database.GetUserSyncItemsByStatus(BaseSyncStatus.Queued);
+        var queuedItems = _databaseProvider.Database.GetUserSyncItemsByStatus(BaseSyncStatus.Queued);
         if (queuedItems.Count == 0)
         {
             _logger.LogInformation("No queued user sync items to process");
@@ -82,7 +82,7 @@ public class UserSyncStateService
                 {
                     var errorMsg = $"Local user not found: {item.LocalUserName ?? item.LocalUserId} (ID: {item.LocalUserId})";
                     _logger.LogWarning("{Context}: {Error}", syncContext, errorMsg);
-                    _database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Errored, errorMsg);
+                    _databaseProvider.Database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Errored, errorMsg);
                     errorCount++;
                     continue;
                 }
@@ -107,7 +107,7 @@ public class UserSyncStateService
                     default:
                         var errorMsg = $"Unknown property category: {item.PropertyCategory}";
                         _logger.LogWarning("{Context}: {Error}", syncContext, errorMsg);
-                        _database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Errored, errorMsg);
+                        _databaseProvider.Database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Errored, errorMsg);
                         errorCount++;
                         continue;
                 }
@@ -126,11 +126,15 @@ public class UserSyncStateService
                 current++;
                 progress.Report((double)current / queuedItems.Count * 100);
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 var errorMsg = $"Unexpected error: {ex.Message}";
                 _logger.LogError(ex, "{Context}: {Error}", syncContext, errorMsg);
-                _database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Errored, errorMsg);
+                _databaseProvider.Database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Errored, errorMsg);
                 errorCount++;
             }
         }
@@ -147,7 +151,7 @@ public class UserSyncStateService
             if (string.IsNullOrEmpty(item.MergedValue))
             {
                 _logger.LogDebug("{Context}: No policy changes to apply (empty merged value)", syncContext);
-                _database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Synced);
+                _databaseProvider.Database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Synced);
                 return true;
             }
 
@@ -158,7 +162,7 @@ public class UserSyncStateService
             {
                 var errorMsg = $"Could not retrieve current policy for user {localUser.Username}";
                 _logger.LogError("{Context}: {Error}", syncContext, errorMsg);
-                _database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Errored, errorMsg);
+                _databaseProvider.Database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Errored, errorMsg);
                 return false;
             }
 
@@ -167,7 +171,7 @@ public class UserSyncStateService
             if (mergedProps == null)
             {
                 _logger.LogDebug("{Context}: No policy properties to apply (null after deserialize)", syncContext);
-                _database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Synced);
+                _databaseProvider.Database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Synced);
                 return true;
             }
 
@@ -207,14 +211,14 @@ public class UserSyncStateService
 
             // Update LocalValue to match MergedValue so HasChanges becomes false
             UpdateLocalValueAfterSync(item.Id, item.MergedValue);
-            _database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Synced);
+            _databaseProvider.Database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Synced);
             return true;
         }
         catch (Exception ex)
         {
             var errorMsg = $"Failed to save policy changes: {ex.Message}";
             _logger.LogError(ex, "{Context}: {Error}", syncContext, errorMsg);
-            _database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Errored, errorMsg);
+            _databaseProvider.Database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Errored, errorMsg);
             return false;
         }
     }
@@ -226,7 +230,7 @@ public class UserSyncStateService
             if (string.IsNullOrEmpty(item.MergedValue))
             {
                 _logger.LogDebug("{Context}: No configuration changes to apply (empty merged value)", syncContext);
-                _database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Synced);
+                _databaseProvider.Database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Synced);
                 return true;
             }
 
@@ -237,7 +241,7 @@ public class UserSyncStateService
             {
                 var errorMsg = $"Could not retrieve current configuration for user {localUser.Username}";
                 _logger.LogError("{Context}: {Error}", syncContext, errorMsg);
-                _database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Errored, errorMsg);
+                _databaseProvider.Database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Errored, errorMsg);
                 return false;
             }
 
@@ -246,7 +250,7 @@ public class UserSyncStateService
             if (mergedProps == null)
             {
                 _logger.LogDebug("{Context}: No configuration properties to apply (null after deserialize)", syncContext);
-                _database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Synced);
+                _databaseProvider.Database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Synced);
                 return true;
             }
 
@@ -286,14 +290,14 @@ public class UserSyncStateService
 
             // Update LocalValue to match MergedValue so HasChanges becomes false
             UpdateLocalValueAfterSync(item.Id, item.MergedValue);
-            _database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Synced);
+            _databaseProvider.Database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Synced);
             return true;
         }
         catch (Exception ex)
         {
             var errorMsg = $"Failed to save configuration changes: {ex.Message}";
             _logger.LogError(ex, "{Context}: {Error}", syncContext, errorMsg);
-            _database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Errored, errorMsg);
+            _databaseProvider.Database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Errored, errorMsg);
             return false;
         }
     }
@@ -313,7 +317,7 @@ public class UserSyncStateService
                 if (string.Equals(item.SourceImageHash, item.LocalImageHash, StringComparison.OrdinalIgnoreCase))
                 {
                     _logger.LogDebug("{Context}: Images already in sync (hash: {Hash})", syncContext, item.SourceImageHash);
-                    _database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Synced);
+                    _databaseProvider.Database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Synced);
                     return true;
                 }
             }
@@ -322,7 +326,7 @@ public class UserSyncStateService
             {
                 // Fallback to size comparison if hashes not available
                 _logger.LogDebug("{Context}: Images already in sync (size: {Size} bytes)", syncContext, item.SourceImageSize);
-                _database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Synced);
+                _databaseProvider.Database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Synced);
                 return true;
             }
 
@@ -341,7 +345,7 @@ public class UserSyncStateService
 
                 // Update synced hash/size to indicate no image, and clear local hash so HasChanges becomes false
                 UpdateSyncedImageData(item.Id, null, 0, updateLocalHash: true);
-                _database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Synced);
+                _databaseProvider.Database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Synced);
                 return true;
             }
 
@@ -355,7 +359,7 @@ public class UserSyncStateService
             {
                 var errorMsg = $"Failed to download profile image from source server (user: {item.SourceUserName ?? item.SourceUserId})";
                 _logger.LogError("{Context}: {Error}", syncContext, errorMsg);
-                _database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Errored, errorMsg);
+                _databaseProvider.Database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Errored, errorMsg);
                 return false;
             }
 
@@ -390,7 +394,7 @@ public class UserSyncStateService
                     {
                         var errorMsg = "User disappeared after clearing profile image";
                         _logger.LogError("{Context}: {Error}", syncContext, errorMsg);
-                        _database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Errored, errorMsg);
+                        _databaseProvider.Database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Errored, errorMsg);
                         return false;
                     }
 
@@ -425,7 +429,7 @@ public class UserSyncStateService
 
                 _logger.LogInformation("{Context}: Updated profile image (hash: {Hash}, size: {Size} bytes)",
                     syncContext, downloadedHash, downloadedSize);
-                _database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Synced);
+                _databaseProvider.Database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Synced);
                 return true;
             }
             finally
@@ -448,7 +452,7 @@ public class UserSyncStateService
         {
             var errorMsg = $"Failed to apply profile image: {ex.Message}";
             _logger.LogError(ex, "{Context}: {Error}", syncContext, errorMsg);
-            _database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Errored, errorMsg);
+            _databaseProvider.Database.UpdateUserSyncItemStatusById(item.Id, BaseSyncStatus.Errored, errorMsg);
             return false;
         }
     }
@@ -464,7 +468,7 @@ public class UserSyncStateService
     {
         try
         {
-            var item = _database.GetUserSyncItemById(itemId);
+            var item = _databaseProvider.Database.GetUserSyncItemById(itemId);
             if (item != null)
             {
                 item.SyncedImageHash = imageHash;
@@ -480,7 +484,7 @@ public class UserSyncStateService
                     item.LocalValue = item.SourceValue;
                 }
 
-                _database.UpsertUserSyncItem(item);
+                _databaseProvider.Database.UpsertUserSyncItem(item);
             }
         }
         catch (Exception ex)
@@ -497,12 +501,12 @@ public class UserSyncStateService
     {
         try
         {
-            var item = _database.GetUserSyncItemById(itemId);
+            var item = _databaseProvider.Database.GetUserSyncItemById(itemId);
             if (item != null)
             {
                 item.LocalValue = mergedValue;
                 item.LastSyncTime = DateTime.UtcNow;
-                _database.UpsertUserSyncItem(item);
+                _databaseProvider.Database.UpsertUserSyncItem(item);
             }
         }
         catch (Exception ex)

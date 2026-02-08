@@ -129,6 +129,10 @@ public class SyncMissingHistoryTask : IScheduledTask
                     errorCount++;
                 }
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to sync history item {ItemName}", item.ItemName);

@@ -40,7 +40,7 @@ public class SourceServerClient : IDisposable
     private readonly JellyfinSdkSettings _sdkSettings;
     private readonly object _apiClientLock = new();
     private JellyfinApiClient? _apiClient;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SourceServerClient"/> class.
@@ -465,22 +465,25 @@ public class SourceServerClient : IDisposable
     public async Task<Stream?> DownloadFileAsync(Guid itemId, CancellationToken cancellationToken = default)
     {
         HttpResponseMessage? response = null;
+        HttpRequestMessage? request = null;
         try
         {
             var url = $"{_serverUrl}/Items/{itemId}/Download";
-            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request = new HttpRequestMessage(HttpMethod.Get, url);
             AddAuthorizationHeader(request);
 
             response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-            request.Dispose();
             response.EnsureSuccessStatusCode();
 
             var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-            return new ResponseDisposingStream(stream, response);
+
+            // Transfer ownership of request and response to the stream wrapper
+            return new ResponseDisposingStream(stream, response, request);
         }
         catch (Exception ex)
         {
             response?.Dispose();
+            request?.Dispose();
             _logger.LogError(ex, "Failed to download item {ItemId}", itemId);
             return null;
         }
@@ -543,36 +546,40 @@ public class SourceServerClient : IDisposable
     public async Task<Stream?> DownloadCompanionFileAsync(Guid itemId, string filePath, CancellationToken cancellationToken = default)
     {
         HttpResponseMessage? response = null;
+        HttpRequestMessage? activeRequest = null;
         try
         {
             var encodedPath = Uri.EscapeDataString(filePath);
             var url = $"{_serverUrl}/Videos/{itemId}/Subtitles/Stream?mediaSourceId={itemId}&path={encodedPath}";
 
-            var request = new HttpRequestMessage(HttpMethod.Get, url);
-            AddAuthorizationHeader(request);
+            activeRequest = new HttpRequestMessage(HttpMethod.Get, url);
+            AddAuthorizationHeader(activeRequest);
 
-            response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-            request.Dispose();
+            response = await _httpClient.SendAsync(activeRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
             {
-                response.Dispose(); // Dispose the failed response before making the fallback request
+                // Dispose the failed response and request before making the fallback request
+                response.Dispose();
+                activeRequest.Dispose();
 
                 var directUrl = $"{_serverUrl}/Items/{itemId}/File?path={encodedPath}";
-                var directRequest = new HttpRequestMessage(HttpMethod.Get, directUrl);
-                AddAuthorizationHeader(directRequest);
+                activeRequest = new HttpRequestMessage(HttpMethod.Get, directUrl);
+                AddAuthorizationHeader(activeRequest);
 
-                response = await _httpClient.SendAsync(directRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-                directRequest.Dispose();
+                response = await _httpClient.SendAsync(activeRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
             }
 
             response.EnsureSuccessStatusCode();
             var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-            return new ResponseDisposingStream(stream, response);
+
+            // Transfer ownership of request and response to the stream wrapper
+            return new ResponseDisposingStream(stream, response, activeRequest);
         }
         catch (Exception ex)
         {
             response?.Dispose();
+            activeRequest?.Dispose();
             _logger.LogError(ex, "Failed to download companion file {FilePath} for {ItemId}", filePath, itemId);
             return null;
         }
@@ -641,58 +648,46 @@ public class SourceServerClient : IDisposable
     }
 
     /// <summary>
-    /// Gets the content length of a user's profile image without downloading.
+    /// Gets both the SHA256 hash and content length of a user's profile image in a single download.
+    /// This avoids the overhead of separate GET (for hash) and HEAD (for size) requests.
     /// </summary>
     /// <param name="userId">User ID on the source server.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Image size in bytes, or null if no image.</returns>
-    public async Task<long?> GetUserImageSizeAsync(Guid userId, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var url = $"{_serverUrl}/Users/{userId}/Images/Primary";
-            using var request = new HttpRequestMessage(HttpMethod.Head, url);
-            AddAuthorizationHeader(request);
-
-            using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                return null;
-            }
-
-            return response.Content.Headers.ContentLength;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "Failed to get profile image size for user {UserId}", userId);
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// Gets the SHA256 hash of a user's profile image.
-    /// Downloads the image to compute hash, then disposes of the data.
-    /// </summary>
-    /// <param name="userId">User ID on the source server.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>SHA256 hash (truncated) as hex string, or null if no image.</returns>
-    public async Task<string?> GetUserImageHashAsync(Guid userId, CancellationToken cancellationToken = default)
+    /// <returns>A tuple of (hash, size), or (null, null) if no image or on error.</returns>
+    public async Task<(string? Hash, long? Size)> GetUserImageHashAndSizeAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         try
         {
             using var imageStream = await GetUserImageAsync(userId, cancellationToken).ConfigureAwait(false);
             if (imageStream == null)
             {
-                return null;
+                return (null, null);
             }
 
-            return HashUtilities.ComputeSha256Hash(imageStream);
+            // Read the stream to compute hash and count bytes simultaneously
+            using var sha256 = System.Security.Cryptography.SHA256.Create();
+            var buffer = new byte[8192];
+            long totalBytes = 0;
+            int bytesRead;
+            while ((bytesRead = await imageStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+            {
+                sha256.TransformBlock(buffer, 0, bytesRead, null, 0);
+                totalBytes += bytesRead;
+            }
+
+            sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+            var hash = Convert.ToHexString(sha256.Hash!).ToLowerInvariant()[..32];
+
+            return (hash, totalBytes);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Failed to get profile image hash for user {UserId}", userId);
-            return null;
+            _logger.LogDebug(ex, "Failed to get profile image hash and size for user {UserId}", userId);
+            return (null, null);
         }
     }
 
@@ -910,13 +905,19 @@ public class SourceServerClient : IDisposable
     /// <returns>Jellyfin API client instance.</returns>
     private JellyfinApiClient GetApiClient()
     {
-        if (_apiClient != null)
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        // Fast path: client already created
+        var client = _apiClient;
+        if (client != null)
         {
-            return _apiClient;
+            return client;
         }
 
         lock (_apiClientLock)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
             if (_apiClient == null)
             {
                 var authProvider = new JellyfinAuthenticationProvider(_sdkSettings);
@@ -938,27 +939,36 @@ public class SourceServerClient : IDisposable
     {
         if (!_disposed && disposing)
         {
-            // Do NOT dispose _httpClient — it is externally owned (from IHttpClientFactory).
-            // Dispose the API client wrapper if it was created.
-            (_apiClient as IDisposable)?.Dispose();
-            _apiClient = null;
-            _disposed = true;
+            lock (_apiClientLock)
+            {
+                if (!_disposed)
+                {
+                    _disposed = true;
+
+                    // Do NOT dispose _httpClient — it is externally owned (from IHttpClientFactory).
+                    // Dispose the API client wrapper if it was created.
+                    (_apiClient as IDisposable)?.Dispose();
+                    _apiClient = null;
+                }
+            }
         }
     }
 
     /// <summary>
-    /// A stream wrapper that disposes the underlying HttpResponseMessage when the stream is closed.
+    /// A stream wrapper that disposes the underlying HttpResponseMessage and HttpRequestMessage when the stream is closed.
     /// This ensures the HTTP connection is properly released when the caller is done reading.
     /// </summary>
     private sealed class ResponseDisposingStream : Stream
     {
         private readonly Stream _inner;
         private readonly HttpResponseMessage _response;
+        private readonly HttpRequestMessage? _request;
 
-        public ResponseDisposingStream(Stream inner, HttpResponseMessage response)
+        public ResponseDisposingStream(Stream inner, HttpResponseMessage response, HttpRequestMessage? request = null)
         {
             _inner = inner;
             _response = response;
+            _request = request;
         }
 
         protected override void Dispose(bool disposing)
@@ -967,9 +977,19 @@ public class SourceServerClient : IDisposable
             {
                 _inner.Dispose();
                 _response.Dispose();
+                _request?.Dispose();
             }
 
             base.Dispose(disposing);
+        }
+
+        public override async ValueTask DisposeAsync()
+        {
+            await _inner.DisposeAsync().ConfigureAwait(false);
+            _response.Dispose();
+            _request?.Dispose();
+
+            await base.DisposeAsync().ConfigureAwait(false);
         }
 
         public override bool CanRead => _inner.CanRead;

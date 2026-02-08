@@ -1,10 +1,13 @@
+using System;
 using System.Net.Http;
+using Jellyfin.Plugin.ServerSync.Utilities;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.ServerSync.Services;
 
 /// <summary>
 /// Factory for creating <see cref="SourceServerClient"/> instances using DI-provided dependencies.
+/// Validates the server URL for SSRF protection before creating the client.
 /// </summary>
 public class SourceServerClientFactory : ISourceServerClientFactory
 {
@@ -25,6 +28,13 @@ public class SourceServerClientFactory : ISourceServerClientFactory
     /// <inheritdoc />
     public SourceServerClient Create(string serverUrl, string apiKey)
     {
+        // Validate URL for SSRF protection (same checks as the controller endpoint)
+        var ssrfError = ConfigurationUtilities.ValidateServerUrlForSsrf(serverUrl);
+        if (ssrfError != null)
+        {
+            throw new ArgumentException($"Invalid source server URL: {ssrfError}", nameof(serverUrl));
+        }
+
         var httpClient = _httpClientFactory.CreateClient(SourceServerClient.HttpClientName);
         var logger = _loggerFactory.CreateLogger<SourceServerClient>();
         return new SourceServerClient(

@@ -34,7 +34,7 @@ public class RefreshUserSyncTableTask : IScheduledTask
     }
 
     /// <inheritdoc />
-    public string Name => "Refresh Sync Table";
+    public string Name => "Refresh User Sync Table";
 
     /// <inheritdoc />
     public string Key => "ServerSyncRefreshUserTable";

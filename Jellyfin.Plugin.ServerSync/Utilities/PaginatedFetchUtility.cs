@@ -77,7 +77,6 @@ public static class PaginatedFetchUtility
             try
             {
                 result = await fetchPage(startIndex, DefaultBatchSize, cancellationToken).ConfigureAwait(false);
-                consecutiveErrors = 0;
             }
             catch (OperationCanceledException)
             {
@@ -110,10 +109,42 @@ public static class PaginatedFetchUtility
                 continue;
             }
 
-            if (result?.Items == null || result.Items.Count == 0)
+            // Distinguish between "no more items" (empty result) and "error" (null result)
+            if (result == null)
+            {
+                // fetchPage returned null — treat as a transient error
+                consecutiveErrors++;
+                logger.LogWarning(
+                    "Fetch returned null for library {LibraryName} at index {Index} (attempt {Attempt}/{Max})",
+                    libraryName, startIndex, consecutiveErrors, MaxConsecutiveErrors);
+
+                if (consecutiveErrors >= MaxConsecutiveErrors)
+                {
+                    logger.LogError(
+                        "Too many consecutive null results fetching from {LibraryName}, stopping sync for this library",
+                        libraryName);
+                    break;
+                }
+
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(consecutiveErrors * 2), cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+
+                continue;
+            }
+
+            if (result.Items == null || result.Items.Count == 0)
             {
                 break;
             }
+
+            // Got a valid result with items — reset the consecutive error counter
+            consecutiveErrors = 0;
 
             foreach (var item in result.Items)
             {
@@ -142,6 +173,10 @@ public static class PaginatedFetchUtility
                     }
 
                     onItemProcessed?.Invoke();
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {

@@ -30,6 +30,10 @@ public class PluginConfigurationManager : IPluginConfigurationManager
     public void SaveConfiguration()
     {
         var plugin = Plugin.Instance ?? throw new InvalidOperationException("Plugin is not initialized");
+
+        // Sanitize values before saving to prevent invalid configuration from persisting
+        plugin.Configuration.SanitizeValues();
+
         plugin.SaveConfiguration();
     }
 

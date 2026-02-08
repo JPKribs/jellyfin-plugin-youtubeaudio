@@ -375,6 +375,20 @@ public class PluginConfiguration : BasePluginConfiguration
             errors.Add("Max download speed cannot be negative");
         }
 
+        // Validate speed units
+        var validUnits = new[] { "KB", "MB", "GB" };
+        if (!string.IsNullOrEmpty(DownloadSpeedUnit) &&
+            !Array.Exists(validUnits, u => u.Equals(DownloadSpeedUnit, StringComparison.OrdinalIgnoreCase)))
+        {
+            errors.Add("Download speed unit must be KB, MB, or GB");
+        }
+
+        if (!string.IsNullOrEmpty(ScheduledDownloadSpeedUnit) &&
+            !Array.Exists(validUnits, u => u.Equals(ScheduledDownloadSpeedUnit, StringComparison.OrdinalIgnoreCase)))
+        {
+            errors.Add("Scheduled download speed unit must be KB, MB, or GB");
+        }
+
         if (MinimumFreeDiskSpaceGb < 0 || MinimumFreeDiskSpaceGb > 1000)
         {
             errors.Add("Minimum free disk space must be between 0 and 1000 GB");
@@ -411,6 +425,10 @@ public class PluginConfiguration : BasePluginConfiguration
             {
                 errors.Add($"Library mapping '{mapping.SourceLibraryName}' is missing local root path");
             }
+            else if (mapping.LocalRootPath.Contains("..", StringComparison.Ordinal))
+            {
+                errors.Add($"Library mapping '{mapping.SourceLibraryName}' local root path must not contain path traversal sequences (..)");
+            }
         }
 
         // Validate user mappings
@@ -427,12 +445,30 @@ public class PluginConfiguration : BasePluginConfiguration
             }
         }
 
+        // Validate path safety
+        if (!string.IsNullOrWhiteSpace(TempDownloadPath))
+        {
+            var normalizedTemp = System.IO.Path.GetFullPath(TempDownloadPath);
+            if (normalizedTemp != TempDownloadPath && TempDownloadPath.Contains("..", StringComparison.Ordinal))
+            {
+                errors.Add("Temp download path must not contain path traversal sequences (..)");
+            }
+        }
+
         // Validate recycling bin settings
         if (EnableRecyclingBin)
         {
             if (string.IsNullOrWhiteSpace(RecyclingBinPath))
             {
                 errors.Add("Recycling bin path is required when recycling bin is enabled");
+            }
+            else
+            {
+                var normalizedBin = System.IO.Path.GetFullPath(RecyclingBinPath);
+                if (normalizedBin != RecyclingBinPath && RecyclingBinPath.Contains("..", StringComparison.Ordinal))
+                {
+                    errors.Add("Recycling bin path must not contain path traversal sequences (..)");
+                }
             }
 
             if (RecyclingBinRetentionDays < 1 || RecyclingBinRetentionDays > 365)
@@ -550,5 +586,44 @@ public class PluginConfiguration : BasePluginConfiguration
         {
             SourceServerUrl = SourceServerUrl.TrimEnd('/');
         }
+
+        // Normalize and validate speed units
+        DownloadSpeedUnit = NormalizeSpeedUnit(DownloadSpeedUnit);
+        ScheduledDownloadSpeedUnit = NormalizeSpeedUnit(ScheduledDownloadSpeedUnit);
+
+        // Normalize filesystem paths to remove traversal sequences
+        if (!string.IsNullOrWhiteSpace(TempDownloadPath))
+        {
+            TempDownloadPath = System.IO.Path.GetFullPath(TempDownloadPath);
+        }
+
+        if (!string.IsNullOrWhiteSpace(RecyclingBinPath))
+        {
+            RecyclingBinPath = System.IO.Path.GetFullPath(RecyclingBinPath);
+        }
+
+        // Normalize library mapping local root paths
+        foreach (var mapping in LibraryMappings)
+        {
+            if (!string.IsNullOrWhiteSpace(mapping.LocalRootPath))
+            {
+                mapping.LocalRootPath = System.IO.Path.GetFullPath(mapping.LocalRootPath);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Normalizes a speed unit string to one of the valid values (KB, MB, GB).
+    /// Returns "MB" for unrecognized values.
+    /// </summary>
+    private static string NormalizeSpeedUnit(string unit)
+    {
+        return unit?.Trim().ToUpperInvariant() switch
+        {
+            "KB" => "KB",
+            "MB" => "MB",
+            "GB" => "GB",
+            _ => "MB"
+        };
     }
 }

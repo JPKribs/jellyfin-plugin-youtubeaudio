@@ -93,6 +93,10 @@ public partial class ConfigurationController
 
             return Ok(result);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception)
         {
             // Return empty list on error

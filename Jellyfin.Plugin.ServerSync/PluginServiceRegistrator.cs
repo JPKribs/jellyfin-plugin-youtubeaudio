@@ -18,9 +18,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<IPluginConfigurationManager, PluginConfigurationManager>();
         serviceCollection.AddSingleton<ISourceServerClientFactory, SourceServerClientFactory>();
 
-        // Expose SyncDatabase from the provider for services that inject it directly
-        serviceCollection.AddSingleton(sp => sp.GetRequiredService<ISyncDatabaseProvider>().Database);
-
         // Services (transient — stateless, created per use)
         serviceCollection.AddTransient<DownloadService>();
         serviceCollection.AddTransient<SyncTableService>();

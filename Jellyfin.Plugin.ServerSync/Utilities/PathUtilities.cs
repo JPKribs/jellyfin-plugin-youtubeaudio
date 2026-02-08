@@ -38,7 +38,23 @@ public static class PathUtilities
                 var result = localRoot;
                 foreach (var part in pathParts)
                 {
+                    // Block path traversal from untrusted source paths
+                    if (part == ".." || part == ".")
+                    {
+                        continue;
+                    }
+
                     result = Path.Combine(result, part);
+                }
+
+                // Final safety check: ensure the result is still under localRoot
+                var normalizedResult = Path.GetFullPath(result);
+                var normalizedRoot = Path.GetFullPath(localRoot + Path.DirectorySeparatorChar);
+                if (!normalizedResult.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(normalizedResult, Path.GetFullPath(localRoot), StringComparison.OrdinalIgnoreCase))
+                {
+                    // Path escaped the local root — return safe fallback
+                    return Path.Combine(localRoot, Path.GetFileName(sourcePath));
                 }
 
                 return result;

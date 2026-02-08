@@ -387,8 +387,7 @@ public partial class SyncDatabase
                     sourceUserIdParam.Value = sourceUserId;
                     sourceItemIdParam.Value = sourceItemId;
                     statusDateParam.Value = DateTime.UtcNow.ToString("o");
-                    command.ExecuteNonQuery();
-                    count++;
+                    count += command.ExecuteNonQuery();
                 }
 
                 transaction.Commit();

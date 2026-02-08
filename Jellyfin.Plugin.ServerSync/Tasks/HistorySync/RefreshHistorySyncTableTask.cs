@@ -39,7 +39,7 @@ public class RefreshHistorySyncTableTask : IScheduledTask
     }
 
     /// <inheritdoc />
-    public string Name => "Refresh Sync Table";
+    public string Name => "Refresh History Sync Table";
 
     /// <inheritdoc />
     public string Key => "ServerSyncRefreshHistoryTable";
@@ -105,9 +105,9 @@ public class RefreshHistorySyncTableTask : IScheduledTask
 
         var database = _databaseProvider.Database;
 
-        // Progress tracking
-        const double InitProgress = 10.0;
-        const double ProcessingProgress = 80.0;
+        // Progress tracking: 5% for init, 90% for processing items, 5% for finalization
+        const double InitProgress = 5.0;
+        const double ProcessingProgress = 90.0;
 
         progress.Report(0);
 

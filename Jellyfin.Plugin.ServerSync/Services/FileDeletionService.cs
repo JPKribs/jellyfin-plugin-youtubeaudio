@@ -24,7 +24,7 @@ public static class FileDeletionService
     /// <param name="logger">Logger for operation output.</param>
     /// <param name="removeEmptyFolders">Whether to remove parent folders if they become empty.</param>
     /// <returns>True if main file was deleted successfully.</returns>
-    public static bool DeleteWithCompanions(string filePath, ILogger logger, bool removeEmptyFolders = false)
+    public static bool DeleteWithCompanions(string filePath, ILogger logger, bool removeEmptyFolders = false, string? libraryRootPath = null)
     {
         if (string.IsNullOrEmpty(filePath))
         {
@@ -52,10 +52,10 @@ public static class FileDeletionService
         // Delete companion files
         DeleteCompanionFiles(filePath, logger);
 
-        // Remove empty parent folders if enabled
+        // Remove empty parent folders if enabled, bounded by library root
         if (removeEmptyFolders && mainDeleted && !string.IsNullOrEmpty(parentDirectory))
         {
-            TryRemoveEmptyFolders(parentDirectory, logger);
+            TryRemoveEmptyFolders(parentDirectory, logger, libraryRootPath);
         }
 
         return mainDeleted;
@@ -290,6 +290,12 @@ public static class FileDeletionService
 
         logger.LogInformation("Processing {Count} items marked for deletion", itemsToDelete.Count);
 
+        // Build lookup for library root paths to bound empty folder cleanup
+        var libraryRootLookup = config.LibraryMappings
+            .Where(m => !string.IsNullOrEmpty(m.SourceLibraryId) && !string.IsNullOrEmpty(m.LocalRootPath))
+            .GroupBy(m => m.SourceLibraryId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().LocalRootPath, StringComparer.OrdinalIgnoreCase);
+
         var successfulDeletes = new List<string>();
         var failedItems = new List<(string SourceItemId, string Error)>();
 
@@ -314,7 +320,8 @@ public static class FileDeletionService
                 }
                 else
                 {
-                    result = new DeletionResult(DeleteWithCompanions(localPath, logger, config.RemoveEmptyFoldersOnDelete));
+                    libraryRootLookup.TryGetValue(item.SourceLibraryId, out var libraryRoot);
+                    result = new DeletionResult(DeleteWithCompanions(localPath, logger, config.RemoveEmptyFoldersOnDelete, libraryRoot));
                 }
 
                 if (result.Success)

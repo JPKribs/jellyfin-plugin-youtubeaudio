@@ -156,6 +156,10 @@ public class SyncMissingMetadataTask : IScheduledTask
                     errorCount++;
                 }
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to sync metadata item {ItemName}", item.ItemName);
@@ -776,7 +780,9 @@ public class SyncMissingMetadataTask : IScheduledTask
                         MemoryStream? memoryStream = null;
                         try
                         {
-                            using var response = await httpClient.GetAsync(imageUrl, cancellationToken).ConfigureAwait(false);
+                            using var request = new HttpRequestMessage(HttpMethod.Get, imageUrl);
+                            request.Headers.TryAddWithoutValidation("X-Emby-Token", config.SourceServerApiKey);
+                            using var response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
                             if (!response.IsSuccessStatusCode)
                             {
                                 _logger.LogWarning("Failed to download image {ImageType}/{Index} for {ItemName}: {StatusCode}",
@@ -814,11 +820,19 @@ public class SyncMissingMetadataTask : IScheduledTask
                         }
                     }
 
-                    // Only replace existing images if we successfully downloaded at least some replacements
-                    if (downloadedImages.Count == 0 && !allDownloadsSucceeded)
+                    // Only replace existing images if ALL downloads succeeded for this type.
+                    // Partial success would delete existing images and replace with fewer — data loss.
+                    if (!allDownloadsSucceeded)
                     {
-                        _logger.LogWarning("All downloads failed for {ImageType} on {ItemName}, keeping existing images",
-                            imageTypeName, localItem.Name);
+                        _logger.LogWarning(
+                            "Not all {ImageType} downloads succeeded for {ItemName} ({Downloaded}/{Total}), keeping existing images",
+                            imageTypeName, localItem.Name, downloadedImages.Count, sourceImages.Count);
+                        continue;
+                    }
+
+                    if (downloadedImages.Count == 0)
+                    {
+                        // No source images and all "downloads" succeeded (vacuously) — nothing to do
                         continue;
                     }
 
@@ -974,7 +988,9 @@ public class SyncMissingMetadataTask : IScheduledTask
     }
 
     /// <summary>
-    /// Creates a shared HttpClient configured for image downloading from the source server.
+    /// Creates a shared HttpClient for image downloading from the source server.
+    /// Does not set DefaultRequestHeaders to avoid polluting the shared named client.
+    /// Auth headers are set per-request in ApplyImagesAsync.
     /// </summary>
     private static HttpClient? CreateImageHttpClient(IHttpClientFactory httpClientFactory, Configuration.PluginConfiguration config)
     {
@@ -983,9 +999,7 @@ public class SyncMissingMetadataTask : IScheduledTask
             return null;
         }
 
-        var client = httpClientFactory.CreateClient(SourceServerClient.HttpClientName);
-        client.DefaultRequestHeaders.TryAddWithoutValidation("X-Emby-Token", config.SourceServerApiKey);
-        return client;
+        return httpClientFactory.CreateClient(SourceServerClient.HttpClientName);
     }
 
     /// <inheritdoc />

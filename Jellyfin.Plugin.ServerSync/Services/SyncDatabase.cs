@@ -531,8 +531,7 @@ public partial class SyncDatabase : IDisposable
             {
                 foreach (var sourceItemId in sourceItemIds)
                 {
-                    DeleteInternal(sourceItemId, transaction);
-                    count++;
+                    count += DeleteInternal(sourceItemId, transaction);
                 }
 
                 transaction.Commit();
@@ -595,8 +594,7 @@ public partial class SyncDatabase : IDisposable
                 {
                     sourceItemIdParam.Value = sourceItemId;
                     statusDateParam.Value = DateTime.UtcNow.ToString("o");
-                    command.ExecuteNonQuery();
-                    count++;
+                    count += command.ExecuteNonQuery();
                 }
 
                 transaction.Commit();

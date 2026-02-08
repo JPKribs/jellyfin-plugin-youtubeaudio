@@ -494,7 +494,7 @@ public partial class SyncDatabase
         command.Parameters.AddWithValue("@sourcePath", item.SourcePath);
         command.Parameters.AddWithValue("@sourceSize", item.SourceSize);
         command.Parameters.AddWithValue("@sourceCreateDate", item.SourceCreateDate.ToString("o"));
-        command.Parameters.AddWithValue("@sourceModifyDate", item.SourceCreateDate.ToString("o")); // Deprecated column: SourceModifyDate no longer tracked separately
+        command.Parameters.AddWithValue("@sourceModifyDate", DBNull.Value); // Deprecated column: SourceModifyDate no longer tracked separately
         command.Parameters.AddWithValue("@sourceETag", item.SourceETag ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@localItemId", item.LocalItemId ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@localPath", item.LocalPath ?? (object)DBNull.Value);
@@ -649,7 +649,7 @@ public partial class SyncDatabase
         }
     }
 
-    private void DeleteInternal(string sourceItemId, SqliteTransaction? transaction)
+    private int DeleteInternal(string sourceItemId, SqliteTransaction? transaction)
     {
         EnsureConnection();
 
@@ -657,7 +657,7 @@ public partial class SyncDatabase
         command.Transaction = transaction;
         command.CommandText = "DELETE FROM SyncItems WHERE SourceItemId = @sourceItemId";
         command.Parameters.AddWithValue("@sourceItemId", sourceItemId);
-        command.ExecuteNonQuery();
+        return command.ExecuteNonQuery();
     }
 
     /// <summary>

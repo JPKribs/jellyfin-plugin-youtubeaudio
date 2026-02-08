@@ -64,9 +64,12 @@ public partial class ConfigurationController
 
         // Build lookup for library names from mappings
         var libraryMappings = config.LibraryMappings ?? new List<LibraryMapping>();
-        var libraryNameLookup = libraryMappings.ToDictionary(
-            m => m.SourceLibraryId,
-            m => (SourceName: m.SourceLibraryName, LocalName: m.LocalLibraryName));
+        var libraryNameLookup = libraryMappings
+            .GroupBy(m => m.SourceLibraryId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                g => g.Key,
+                g => (SourceName: g.First().SourceLibraryName, LocalName: g.First().LocalLibraryName),
+                StringComparer.OrdinalIgnoreCase);
 
         return Ok(new PaginatedResult<SyncItemDto>
         {
@@ -404,7 +407,7 @@ public partial class ConfigurationController
                 continue;
             }
 
-            var fileName = Path.GetFileName(item.LocalPath);
+            var fileName = string.IsNullOrEmpty(item.LocalPath) ? null : Path.GetFileName(item.LocalPath);
             var sanitizedFileName = SanitizeForLog(fileName);
             var sanitizedLocalPath = SanitizeForLog(item.LocalPath);
 

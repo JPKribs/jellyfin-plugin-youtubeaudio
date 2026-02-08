@@ -20,16 +20,16 @@ namespace Jellyfin.Plugin.ServerSync.Services;
 public class UserSyncTableService
 {
     private readonly ILogger<UserSyncTableService> _logger;
-    private readonly SyncDatabase _database;
+    private readonly ISyncDatabaseProvider _databaseProvider;
     private readonly IUserManager _userManager;
 
     public UserSyncTableService(
         ILogger<UserSyncTableService> logger,
-        SyncDatabase database,
+        ISyncDatabaseProvider databaseProvider,
         IUserManager userManager)
     {
         _logger = logger;
-        _database = database;
+        _databaseProvider = databaseProvider;
         _userManager = userManager;
     }
 
@@ -96,7 +96,7 @@ public class UserSyncTableService
                         mapping, sourceUser, localUserDto, config).ConfigureAwait(false);
                     if (policyItem != null)
                     {
-                        _database.UpsertUserSyncItem(policyItem);
+                        _databaseProvider.Database.UpsertUserSyncItem(policyItem);
                         itemsProcessed++;
                     }
                 }
@@ -108,7 +108,7 @@ public class UserSyncTableService
                         mapping, sourceUser, localUserDto).ConfigureAwait(false);
                     if (configItem != null)
                     {
-                        _database.UpsertUserSyncItem(configItem);
+                        _databaseProvider.Database.UpsertUserSyncItem(configItem);
                         itemsProcessed++;
                     }
                 }
@@ -120,7 +120,7 @@ public class UserSyncTableService
                         mapping, sourceUser, localUser, sourceClient, cancellationToken).ConfigureAwait(false);
                     if (imageItem != null)
                     {
-                        _database.UpsertUserSyncItem(imageItem);
+                        _databaseProvider.Database.UpsertUserSyncItem(imageItem);
                         itemsProcessed++;
                     }
                 }
@@ -129,6 +129,10 @@ public class UserSyncTableService
                     "Processed user mapping {SourceUser} -> {LocalUser}",
                     sourceUser.Name,
                     localUserDto.Name);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -155,7 +159,7 @@ public class UserSyncTableService
         var mergedPolicy = UserSyncMergeService.ComputeMergedPolicy(sourcePolicy, config.LibraryMappings);
 
         // Get existing item to check status
-        var existingItem = _database.GetUserSyncItem(
+        var existingItem = _databaseProvider.Database.GetUserSyncItem(
             mapping.SourceUserId, mapping.LocalUserId, UserPropertyCategory.Policy);
 
         var item = new UserSyncItem
@@ -208,7 +212,7 @@ public class UserSyncTableService
         var mergedConfig = sourceConfig; // Source-wins
 
         // Get existing item to check status
-        var existingItem = _database.GetUserSyncItem(
+        var existingItem = _databaseProvider.Database.GetUserSyncItem(
             mapping.SourceUserId, mapping.LocalUserId, UserPropertyCategory.Configuration);
 
         var item = new UserSyncItem
@@ -272,8 +276,7 @@ public class UserSyncTableService
                 "ProfileImage: Fetching source image hash for user {SourceUser} ({SourceUserId})",
                 sourceUserName, sourceUserId);
 
-            sourceImageHash = await sourceClient.GetUserImageHashAsync(sourceUserId, cancellationToken).ConfigureAwait(false);
-            sourceImageSize = await sourceClient.GetUserImageSizeAsync(sourceUserId, cancellationToken).ConfigureAwait(false);
+            (sourceImageHash, sourceImageSize) = await sourceClient.GetUserImageHashAndSizeAsync(sourceUserId, cancellationToken).ConfigureAwait(false);
 
             _logger.LogDebug(
                 "ProfileImage: Source image for {SourceUser}: hash={Hash}, size={Size}",
@@ -321,7 +324,7 @@ public class UserSyncTableService
         }
 
         // Get existing item to preserve synced hash
-        var existingItem = _database.GetUserSyncItem(
+        var existingItem = _databaseProvider.Database.GetUserSyncItem(
             mapping.SourceUserId, mapping.LocalUserId, UserPropertyCategory.ProfileImage);
 
         // Determine SyncedImageHash:

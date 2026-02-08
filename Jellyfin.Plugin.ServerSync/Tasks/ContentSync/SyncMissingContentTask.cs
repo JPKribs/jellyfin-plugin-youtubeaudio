@@ -35,9 +35,9 @@ public class DownloadMissingContentTask : IScheduledTask
     private const int DefaultMaxRetries = 3;
 
     /// <summary>
-    /// Circuit breaker for source server failures.
+    /// Circuit breakers keyed by source server URL, so state resets when configuration changes.
     /// </summary>
-    private static volatile CircuitBreaker? _circuitBreaker;
+    private static readonly Dictionary<string, CircuitBreaker> _circuitBreakers = new();
     private static readonly object _circuitBreakerLock = new();
 
     public DownloadMissingContentTask(
@@ -94,21 +94,32 @@ public class DownloadMissingContentTask : IScheduledTask
         // Initialize client for all operations
         using var client = _clientFactory.Create(config.SourceServerUrl, config.SourceServerApiKey);
 
-        // Initialize or get circuit breaker (thread-safe double-checked locking)
-        if (_circuitBreaker == null)
+        // Get or create circuit breaker for this source server URL
+        CircuitBreaker circuitBreaker;
+        lock (_circuitBreakerLock)
         {
-            lock (_circuitBreakerLock)
+            if (!_circuitBreakers.TryGetValue(config.SourceServerUrl, out circuitBreaker!))
             {
-                _circuitBreaker ??= new CircuitBreaker(
+                // Evict stale entries for old server URLs to prevent unbounded growth
+                var staleKeys = _circuitBreakers.Keys
+                    .Where(k => !string.Equals(k, config.SourceServerUrl, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                foreach (var key in staleKeys)
+                {
+                    _circuitBreakers.Remove(key);
+                }
+
+                circuitBreaker = new CircuitBreaker(
                     _logger,
                     "SourceServer",
                     failureThreshold: 5,
                     cooldownPeriod: TimeSpan.FromMinutes(5));
+                _circuitBreakers[config.SourceServerUrl] = circuitBreaker;
             }
         }
 
         // Check circuit breaker before attempting connection
-        if (!_circuitBreaker.AllowOperation(out var circuitReason))
+        if (!circuitBreaker.AllowOperation(out var circuitReason))
         {
             _logger.LogWarning("Sync skipped: {Reason}", circuitReason);
             return;
@@ -117,13 +128,13 @@ public class DownloadMissingContentTask : IScheduledTask
         var connectionResult = await client.TestConnectionAsync(cancellationToken).ConfigureAwait(false);
         if (!connectionResult.Success)
         {
-            _circuitBreaker.RecordFailure(connectionResult.ErrorMessage);
+            circuitBreaker.RecordFailure(connectionResult.ErrorMessage);
             _logger.LogError("Failed to connect to source server: {Message}", connectionResult.ErrorMessage);
             return;
         }
 
         // Connection succeeded, record success
-        _circuitBreaker.RecordSuccess();
+        circuitBreaker.RecordSuccess();
 
         // Cleanup stale download entries
         var staleCount = ActiveDownloadTracker.CleanupStaleEntries();
@@ -180,6 +191,7 @@ public class DownloadMissingContentTask : IScheduledTask
             config.MaxConcurrentDownloads,
             config.GetEffectiveDownloadSpeedBytes(),
             config,
+            circuitBreaker,
             new Progress<double>(p => progress.Report(p * 0.9)),
             cancellationToken).ConfigureAwait(false);
 
@@ -228,6 +240,7 @@ public class DownloadMissingContentTask : IScheduledTask
         int maxConcurrent,
         long speedLimitBytesPerSecond,
         PluginConfiguration config,
+        CircuitBreaker circuitBreaker,
         IProgress<double> progress,
         CancellationToken cancellationToken)
     {
@@ -261,7 +274,7 @@ public class DownloadMissingContentTask : IScheduledTask
                 {
                     var result = await ProcessSingleDownloadAsync(
                         client, database, downloadService, item, tempPath,
-                        speedLimitBytesPerSecond, config, ct).ConfigureAwait(false);
+                        speedLimitBytesPerSecond, config, circuitBreaker, ct).ConfigureAwait(false);
 
                     if (result.Success)
                     {
@@ -301,6 +314,7 @@ public class DownloadMissingContentTask : IScheduledTask
         string tempPath,
         long speedLimitBytesPerSecond,
         PluginConfiguration config,
+        CircuitBreaker circuitBreaker,
         CancellationToken cancellationToken)
     {
         // Guard against null LocalPath
@@ -349,7 +363,7 @@ public class DownloadMissingContentTask : IScheduledTask
 
         if (result.Success)
         {
-            _circuitBreaker?.RecordSuccess();
+            circuitBreaker.RecordSuccess();
             database.UpdateStatus(item.SourceItemId, SyncStatus.Synced,
                 localPath: item.LocalPath, sourceETag: item.SourceETag, sourceSize: item.SourceSize,
                 companionFiles: result.CompanionFiles);
@@ -357,7 +371,7 @@ public class DownloadMissingContentTask : IScheduledTask
         }
         else
         {
-            _circuitBreaker?.RecordFailure(result.ErrorMessage);
+            circuitBreaker.RecordFailure(result.ErrorMessage);
             database.UpdateStatus(item.SourceItemId, SyncStatus.Errored, errorMessage: result.ErrorMessage);
             _logger.LogError("FAILED: {FileName} ({Size}) - {Error}. Source: {SourcePath}",
                 fileName, fileSize, result.ErrorMessage, item.SourcePath);

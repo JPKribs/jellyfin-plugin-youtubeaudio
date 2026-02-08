@@ -553,6 +553,10 @@ public class MetadataSyncTableService
                     }
                 }
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _logger.LogDebug(ex, "Failed to fetch image info for item {ItemId}, falling back to tags", sourceItem.Id);
@@ -714,28 +718,7 @@ public class MetadataSyncTableService
             }
 
             // Sort for consistent comparison (order shouldn't matter for people)
-            sourcePeople.Sort((a, b) =>
-            {
-                a.TryGetValue("Name", out var nameA);
-                b.TryGetValue("Name", out var nameB);
-                var nameCompare = string.Compare(nameA, nameB, StringComparison.OrdinalIgnoreCase);
-                if (nameCompare != 0)
-                {
-                    return nameCompare;
-                }
-
-                a.TryGetValue("Role", out var roleA);
-                b.TryGetValue("Role", out var roleB);
-                var roleCompare = string.Compare(roleA, roleB, StringComparison.OrdinalIgnoreCase);
-                if (roleCompare != 0)
-                {
-                    return roleCompare;
-                }
-
-                a.TryGetValue("Type", out var typeA);
-                b.TryGetValue("Type", out var typeB);
-                return string.Compare(typeA, typeB, StringComparison.OrdinalIgnoreCase);
-            });
+            sourcePeople.Sort(ComparePeopleDicts);
 
             item.SourcePeopleValue = JsonSerializer.Serialize(sourcePeople);
         }
@@ -773,28 +756,7 @@ public class MetadataSyncTableService
                 }
 
                 // Sort for consistent comparison (order shouldn't matter for people)
-                localPeople.Sort((a, b) =>
-                {
-                    a.TryGetValue("Name", out var nameA);
-                    b.TryGetValue("Name", out var nameB);
-                    var nameCompare = string.Compare(nameA, nameB, StringComparison.OrdinalIgnoreCase);
-                    if (nameCompare != 0)
-                    {
-                        return nameCompare;
-                    }
-
-                    a.TryGetValue("Role", out var roleA);
-                    b.TryGetValue("Role", out var roleB);
-                    var roleCompare = string.Compare(roleA, roleB, StringComparison.OrdinalIgnoreCase);
-                    if (roleCompare != 0)
-                    {
-                        return roleCompare;
-                    }
-
-                    a.TryGetValue("Type", out var typeA);
-                    b.TryGetValue("Type", out var typeB);
-                    return string.Compare(typeA, typeB, StringComparison.OrdinalIgnoreCase);
-                });
+                localPeople.Sort(ComparePeopleDicts);
 
                 item.LocalPeopleValue = JsonSerializer.Serialize(localPeople);
             }
@@ -888,5 +850,31 @@ public class MetadataSyncTableService
         }
 
         return totalCount;
+    }
+
+    /// <summary>
+    /// Compares two people dictionaries by Name, then Role, then Type for consistent sorting.
+    /// </summary>
+    private static int ComparePeopleDicts(Dictionary<string, string> a, Dictionary<string, string> b)
+    {
+        a.TryGetValue("Name", out var nameA);
+        b.TryGetValue("Name", out var nameB);
+        var nameCompare = string.Compare(nameA, nameB, StringComparison.OrdinalIgnoreCase);
+        if (nameCompare != 0)
+        {
+            return nameCompare;
+        }
+
+        a.TryGetValue("Role", out var roleA);
+        b.TryGetValue("Role", out var roleB);
+        var roleCompare = string.Compare(roleA, roleB, StringComparison.OrdinalIgnoreCase);
+        if (roleCompare != 0)
+        {
+            return roleCompare;
+        }
+
+        a.TryGetValue("Type", out var typeA);
+        b.TryGetValue("Type", out var typeB);
+        return string.Compare(typeA, typeB, StringComparison.OrdinalIgnoreCase);
     }
 }

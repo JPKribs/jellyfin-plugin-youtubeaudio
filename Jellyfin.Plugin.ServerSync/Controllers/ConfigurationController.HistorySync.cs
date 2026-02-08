@@ -101,9 +101,13 @@ public partial class ConfigurationController
         {
             _databaseProvider.Database.UpdateHistoryItemStatusById(request.Id.Value, status);
         }
-        else
+        else if (!string.IsNullOrEmpty(request.SourceUserId) && !string.IsNullOrEmpty(request.SourceItemId))
         {
             _databaseProvider.Database.UpdateHistoryItemStatus(request.SourceUserId, request.SourceItemId, status);
+        }
+        else
+        {
+            return BadRequest("Either Id or both SourceUserId and SourceItemId must be provided");
         }
 
         return Ok(new { Success = true });
