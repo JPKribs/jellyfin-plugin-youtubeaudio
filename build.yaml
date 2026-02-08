@@ -34,6 +34,12 @@ changelog:
   - Replace Parallel.ForEachAsync with bounded concurrency in place of unbounded Task.WhenAll+Select
   - Add SSRF protection with URL and IP validation on source server connection endpoints
   - Suppress internal exception details from API error responses to prevent information leakage
+  - Split SyncDatabase into partial classes by sync module (ContentSync, HistorySync, UserSync, MetadataSync)
+  - Split ConfigurationController into partial classes by sync module (Configuration, ContentSync, HistorySync, UserSync, MetadataSync)
+  - Extract shared paginated fetch/retry logic into PaginatedFetchUtility, eliminating duplication across 3 table services
+  - Consolidate duplicate connection test models (TestConnectionResponse merged into ConnectionTestResult)
+  - Consolidate duplicate authentication models (TokenAuthenticationResult merged into AuthenticateResponse)
+  - Extract ComputeOverallStatus helper to replace duplicated status-aggregation logic in user sync mapping
   fixes:
   - Fix SQL ORDER BY MIN() without GROUP BY causing incorrect user sync pagination
   - Fix HistorySyncItem.HasChanges not detecting MergedLastPlayedDate changes
