@@ -236,6 +236,10 @@ public class SourceServerClient : IDisposable
                 Message = "Connection timed out - server may be unreachable"
             };
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (HttpRequestException ex)
         {
             return new AuthenticateResponse
@@ -479,6 +483,12 @@ public class SourceServerClient : IDisposable
             // Transfer ownership of request and response to the stream wrapper
             return new ResponseDisposingStream(stream, response, request);
         }
+        catch (OperationCanceledException)
+        {
+            response?.Dispose();
+            request?.Dispose();
+            throw;
+        }
         catch (Exception ex)
         {
             response?.Dispose();
@@ -574,6 +584,12 @@ public class SourceServerClient : IDisposable
 
             // Transfer ownership of request and response to the stream wrapper
             return new ResponseDisposingStream(stream, response, activeRequest);
+        }
+        catch (OperationCanceledException)
+        {
+            response?.Dispose();
+            activeRequest?.Dispose();
+            throw;
         }
         catch (Exception ex)
         {

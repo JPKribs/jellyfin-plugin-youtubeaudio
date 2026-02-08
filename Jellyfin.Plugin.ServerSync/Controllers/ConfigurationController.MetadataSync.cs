@@ -97,9 +97,9 @@ public partial class ConfigurationController
         {
             throw;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Return empty list on error
+            _logger.LogWarning(ex, "Failed to fetch image info for metadata item {Id}", id);
             return Ok(new List<ImageInfoDto>());
         }
     }

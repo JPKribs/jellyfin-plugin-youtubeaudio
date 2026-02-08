@@ -86,9 +86,9 @@ public class UpdateSyncTablesTask : IScheduledTask
 
         var database = _databaseProvider.Database;
 
-        // Progress tracking: 5% for init, 90% for processing items, 5% for finalization
-        const double InitProgress = 5.0;
-        const double ProcessingProgress = 90.0;
+        // Progress tracking: 1% for init, 98% for processing items, 1% for finalization
+        const double InitProgress = 1.0;
+        const double ProcessingProgress = 98.0;
 
         progress.Report(0);
 

@@ -750,7 +750,10 @@ public class SyncMissingMetadataTask : IScheduledTask
             var baseUrl = config.SourceServerUrl.TrimEnd('/');
             var sourceItemId = item.SourceItemId;
 
-            // Process each image type from source
+            // Process each image type from source.
+            // Two-pass approach: first download all images to temp files to verify success,
+            // then apply them. This prevents data loss (deleting existing images before
+            // confirming all downloads succeed) while avoiding holding all image data in memory.
             foreach (var kvp in sourceImagesByType)
             {
                 var imageTypeName = kvp.Key;
@@ -762,9 +765,8 @@ public class SyncMissingMetadataTask : IScheduledTask
                     continue;
                 }
 
-                // Download all images for this type into memory FIRST,
-                // before deleting existing ones (prevents data loss on download failure)
-                var downloadedImages = new List<(int Index, MemoryStream Data, string ContentType)>();
+                // Pass 1: Download all images for this type to temp files
+                var tempFiles = new List<(int Index, string TempPath, string ContentType)>();
                 try
                 {
                     var allDownloadsSucceeded = true;
@@ -781,7 +783,7 @@ public class SyncMissingMetadataTask : IScheduledTask
                         {
                             using var request = new HttpRequestMessage(HttpMethod.Get, imageUrl);
                             request.Headers.TryAddWithoutValidation("X-Emby-Token", config.SourceServerApiKey);
-                            using var response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+                            using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
                             if (!response.IsSuccessStatusCode)
                             {
                                 _logger.LogWarning("Failed to download image {ImageType}/{Index} for {ItemName}: {StatusCode}",
@@ -791,17 +793,17 @@ public class SyncMissingMetadataTask : IScheduledTask
                             }
 
                             var contentType = response.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
-                            var memoryStream = new MemoryStream();
+                            var tempPath = Path.GetTempFileName();
                             try
                             {
-                                using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-                                await stream.CopyToAsync(memoryStream, cancellationToken).ConfigureAwait(false);
-                                memoryStream.Position = 0;
-                                downloadedImages.Add((i, memoryStream, contentType));
+                                using var networkStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                                using var fileStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 81920);
+                                await networkStream.CopyToAsync(fileStream, cancellationToken).ConfigureAwait(false);
+                                tempFiles.Add((i, tempPath, contentType));
                             }
                             catch
                             {
-                                await memoryStream.DisposeAsync().ConfigureAwait(false);
+                                try { File.Delete(tempPath); } catch (IOException) { }
                                 throw;
                             }
                         }
@@ -823,17 +825,17 @@ public class SyncMissingMetadataTask : IScheduledTask
                     {
                         _logger.LogWarning(
                             "Not all {ImageType} downloads succeeded for {ItemName} ({Downloaded}/{Total}), keeping existing images",
-                            imageTypeName, localItem.Name, downloadedImages.Count, sourceImages.Count);
+                            imageTypeName, localItem.Name, tempFiles.Count, sourceImages.Count);
                         continue;
                     }
 
-                    if (downloadedImages.Count == 0)
+                    if (tempFiles.Count == 0)
                     {
                         // No source images and all "downloads" succeeded (vacuously) — nothing to do
                         continue;
                     }
 
-                    // Now safe to delete existing images and apply downloaded ones
+                    // Pass 2: All downloads succeeded — safe to delete existing images and apply
                     var existingImages = localItem.GetImages(imageType).ToList();
                     foreach (var existingImage in existingImages)
                     {
@@ -848,14 +850,15 @@ public class SyncMissingMetadataTask : IScheduledTask
                         }
                     }
 
-                    // Save downloaded images
-                    foreach (var (index, data, contentType) in downloadedImages)
+                    // Stream each temp file into the provider manager one at a time
+                    foreach (var (index, tempPath, contentType) in tempFiles)
                     {
                         try
                         {
+                            using var fileStream = new FileStream(tempPath, FileMode.Open, FileAccess.Read, FileShare.Read);
                             await _providerManager.SaveImage(
                                 localItem,
-                                data,
+                                fileStream,
                                 contentType,
                                 imageType,
                                 index,
@@ -871,10 +874,10 @@ public class SyncMissingMetadataTask : IScheduledTask
                 }
                 finally
                 {
-                    // Ensure all downloaded streams are sed even on exception
-                    foreach (var (_, data, _) in downloadedImages)
+                    // Clean up all temp files even on exception
+                    foreach (var (_, tempPath, _) in tempFiles)
                     {
-                        await data.DisposeAsync().ConfigureAwait(false);
+                        try { File.Delete(tempPath); } catch (IOException) { }
                     }
                 }
             }

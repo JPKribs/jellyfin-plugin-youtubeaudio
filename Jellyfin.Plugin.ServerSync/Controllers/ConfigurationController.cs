@@ -149,9 +149,9 @@ public partial class ConfigurationController : ControllerBase
                 SupportsBandwidthScheduling = true
             });
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Return safe defaults if anything fails
+            _logger.LogWarning(ex, "Error retrieving capabilities, returning safe defaults");
             return Ok(new CapabilitiesResponse
             {
                 CanDeleteItems = false,

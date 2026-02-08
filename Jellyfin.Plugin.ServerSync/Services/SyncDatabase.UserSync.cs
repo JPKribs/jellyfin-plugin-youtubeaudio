@@ -555,45 +555,18 @@ public partial class SyncDatabase
             ? $"WHERE {string.Join(" AND ", conditions)}"
             : string.Empty;
 
-        // For status filtering, we need to get distinct user mappings that have at least one record matching the status
-        // For non-status filtering, just get distinct user mappings
-        string countQuery;
-        string dataQuery;
+        var countQuery = $@"
+            SELECT COUNT(DISTINCT SourceUserId || '|' || LocalUserId)
+            FROM UserSyncItems
+            {whereClause}";
 
-        if (status.HasValue)
-        {
-            // Count distinct user mappings that have at least one record with this status
-            countQuery = $@"
-                SELECT COUNT(DISTINCT SourceUserId || '|' || LocalUserId)
-                FROM UserSyncItems
-                {whereClause}";
-
-            // Get paginated distinct user mappings
-            dataQuery = $@"
-                SELECT SourceUserId, LocalUserId, MIN(SourceUserName) as SourceUserName, MIN(LocalUserName) as LocalUserName
-                FROM UserSyncItems
-                {whereClause}
-                GROUP BY SourceUserId, LocalUserId
-                ORDER BY MIN(SourceUserName), MIN(LocalUserName)
-                LIMIT @take OFFSET @skip";
-        }
-        else
-        {
-            // Count distinct user mappings
-            countQuery = $@"
-                SELECT COUNT(DISTINCT SourceUserId || '|' || LocalUserId)
-                FROM UserSyncItems
-                {whereClause}";
-
-            // Get paginated distinct user mappings
-            dataQuery = $@"
-                SELECT SourceUserId, LocalUserId, MIN(SourceUserName) as SourceUserName, MIN(LocalUserName) as LocalUserName
-                FROM UserSyncItems
-                {whereClause}
-                GROUP BY SourceUserId, LocalUserId
-                ORDER BY MIN(SourceUserName), MIN(LocalUserName)
-                LIMIT @take OFFSET @skip";
-        }
+        var dataQuery = $@"
+            SELECT SourceUserId, LocalUserId, MIN(SourceUserName) as SourceUserName, MIN(LocalUserName) as LocalUserName
+            FROM UserSyncItems
+            {whereClause}
+            GROUP BY SourceUserId, LocalUserId
+            ORDER BY MIN(SourceUserName), MIN(LocalUserName)
+            LIMIT @take OFFSET @skip";
 
         // Get total count of distinct user mappings
         int totalCount;

@@ -25,4 +25,7 @@ artifacts:
 - "Std.UriTemplate.dll"
 changelog:
   fixes:
-  - CodeQL fixes
+  - "Metadata image sync: use temp files instead of MemoryStreams to prevent memory growth during sync"
+  - "OperationCanceledException now properly rethrown in AuthenticateAsync, DownloadFileAsync, DownloadCompanionFileAsync"
+  - "Silent exception catches in controllers now log warnings for debuggability"
+  - "Deduplicated identical SQL branches in GetUserSyncUsersPaginated"
