@@ -24,36 +24,5 @@ artifacts:
 - "Microsoft.Kiota.Serialization.Text.dll"
 - "Std.UriTemplate.dll"
 changelog:
-  improvements:
-  - Replace all direct HttpClient usage with IHttpClientFactory to prevent socket exhaustion and memory leaks
-  - Introduce full dependency injection across all tasks and controllers, removing Plugin.Instance singleton dependencies
-  - Add proper disposal of all HttpResponseMessage objects via ResponseDisposingStream pattern
-  - Add CancellationToken support to TestConnection, Authenticate, and GetMetadataItemImageInfo API endpoints
-  - Reuse SqliteCommand objects in batch database operations instead of recreating per iteration
-  - Use thread-safe double-checked locking for lazy SyncDatabase and JellyfinApiClient initialization
-  - Replace Parallel.ForEachAsync with bounded concurrency in place of unbounded Task.WhenAll+Select
-  - Add SSRF protection with URL and IP validation on source server connection endpoints
-  - Suppress internal exception details from API error responses to prevent information leakage
-  - Split SyncDatabase into partial classes by sync module (ContentSync, HistorySync, UserSync, MetadataSync)
-  - Split ConfigurationController into partial classes by sync module (Configuration, ContentSync, HistorySync, UserSync, MetadataSync)
-  - Extract shared paginated fetch/retry logic into PaginatedFetchUtility, eliminating duplication across 3 table services
-  - Consolidate duplicate connection test models (TestConnectionResponse merged into ConnectionTestResult)
-  - Consolidate duplicate authentication models (TokenAuthenticationResult merged into AuthenticateResponse)
-  - Extract ComputeOverallStatus helper to replace duplicated status-aggregation logic in user sync mapping
   fixes:
-  - Fix SQL ORDER BY MIN() without GROUP BY causing incorrect user sync pagination
-  - Fix HistorySyncItem.HasChanges not detecting MergedLastPlayedDate changes
-  - Fix SyncStatusResponse.Total double-counting the Deleting status
-  - Fix BaseSyncStatus enum mapping bug where Ignored (4) was incorrectly mapped as Synced (2)
-  - Fix UTC/Local datetime mismatch in recycling bin timestamp parsing
-  - Fix integer overflow in stream speed-limiting delay calculation
-  - Fix OverallStatus returning Ignored for empty item lists due to vacuous truth in LINQ All()
-  - Fix GetPendingSizes returning negative Total values
-  - Fix temp file leak in UserSyncStateService using incorrect Path.GetTempFileName pattern
-  - Fix stale dictionary entries in History and Metadata sync table services
-  - Fix CircuitBreaker half-open state check incorrectly requiring null _circuitOpenedAt
-  - Fix DiskSpaceService returning false-on-error instead of properly handling IOException
-  - Replace bare catch blocks with specific exception types across 5 service files
-  - Add InvariantCulture and RoundtripKind to all database datetime parsing
-  - Remove dead DownloadAndSaveImageAsync method and unused BeginTransaction from SyncDatabase
-  - Fix RetryPolicy retrying non-transient IOException subtypes (FileNotFoundException, DirectoryNotFoundException)
+  - CodeQL fixes

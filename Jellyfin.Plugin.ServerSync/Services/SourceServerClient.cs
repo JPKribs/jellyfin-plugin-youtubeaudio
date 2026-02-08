@@ -193,7 +193,6 @@ public class SourceServerClient : IDisposable
 
             if (!response.IsSuccessStatusCode)
             {
-                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
                 return new AuthenticateResponse
                 {
                     Success = false,

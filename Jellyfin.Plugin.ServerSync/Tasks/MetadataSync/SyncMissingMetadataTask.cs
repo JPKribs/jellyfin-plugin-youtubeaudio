@@ -777,7 +777,6 @@ public class SyncMissingMetadataTask : IScheduledTask
                             imageUrl = $"{baseUrl}/Items/{sourceItemId}/Images/{imageTypeName}/{i}";
                         }
 
-                        MemoryStream? memoryStream = null;
                         try
                         {
                             using var request = new HttpRequestMessage(HttpMethod.Get, imageUrl);
@@ -792,28 +791,26 @@ public class SyncMissingMetadataTask : IScheduledTask
                             }
 
                             var contentType = response.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
-                            memoryStream = new MemoryStream();
-                            using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-                            await stream.CopyToAsync(memoryStream, cancellationToken).ConfigureAwait(false);
-                            memoryStream.Position = 0;
-                            downloadedImages.Add((i, memoryStream, contentType));
-                            memoryStream = null; // Ownership transferred to list
+                            var memoryStream = new MemoryStream();
+                            try
+                            {
+                                using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                                await stream.CopyToAsync(memoryStream, cancellationToken).ConfigureAwait(false);
+                                memoryStream.Position = 0;
+                                downloadedImages.Add((i, memoryStream, contentType));
+                            }
+                            catch
+                            {
+                                await memoryStream.DisposeAsync().ConfigureAwait(false);
+                                throw;
+                            }
                         }
                         catch (OperationCanceledException)
                         {
-                            if (memoryStream != null)
-                            {
-                                await memoryStream.DisposeAsync().ConfigureAwait(false);
-                            }
-
                             throw;
                         }
                         catch (Exception ex)
                         {
-                            if (memoryStream != null)
-                            {
-                                await memoryStream.DisposeAsync().ConfigureAwait(false);
-                            }
                             _logger.LogWarning(ex, "Error downloading {ImageType}/{Index} image for {ItemName}",
                                 imageTypeName, i, localItem.Name);
                             allDownloadsSucceeded = false;
