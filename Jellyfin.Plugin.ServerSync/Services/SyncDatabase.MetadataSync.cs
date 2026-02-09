@@ -362,6 +362,18 @@ public partial class SyncDatabase
                         ErrorMessage = NULL
                     WHERE Id = @id";
             }
+            else if (status == BaseSyncStatus.Queued)
+            {
+                // Clear SyncedImagesHash so HasImagesChanges returns true and images are re-synced
+                command.CommandText = @"
+                    UPDATE MetadataSyncItems
+                    SET Status = @status,
+                        StatusDate = @statusDate,
+                        ErrorMessage = @errorMessage,
+                        SyncedImagesHash = NULL
+                    WHERE Id = @id";
+                command.Parameters.AddWithValue("@errorMessage", errorMessage ?? (object)DBNull.Value);
+            }
             else
             {
                 command.CommandText = @"
@@ -397,11 +409,24 @@ public partial class SyncDatabase
             {
                 using var command = _connection!.CreateCommand();
                 command.Transaction = transaction;
-                command.CommandText = @"
-                    UPDATE MetadataSyncItems
-                    SET Status = @status,
-                        StatusDate = @statusDate
-                    WHERE Id = @id";
+                // When queueing, clear SyncedImagesHash so images are re-synced
+                if (status == BaseSyncStatus.Queued)
+                {
+                    command.CommandText = @"
+                        UPDATE MetadataSyncItems
+                        SET Status = @status,
+                            StatusDate = @statusDate,
+                            SyncedImagesHash = NULL
+                        WHERE Id = @id";
+                }
+                else
+                {
+                    command.CommandText = @"
+                        UPDATE MetadataSyncItems
+                        SET Status = @status,
+                            StatusDate = @statusDate
+                        WHERE Id = @id";
+                }
 
                 var idParam = new SqliteParameter("@id", 0L);
                 var statusDateParam = new SqliteParameter("@statusDate", DateTime.UtcNow.ToString("o"));

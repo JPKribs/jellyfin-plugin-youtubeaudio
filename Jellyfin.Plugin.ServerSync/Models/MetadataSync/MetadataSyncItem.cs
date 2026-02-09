@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Jellyfin.Plugin.ServerSync.Models.Common;
 using Jellyfin.Plugin.ServerSync.Utilities;
 
@@ -159,23 +160,72 @@ public class MetadataSyncItem
 
     /// <summary>
     /// Gets a value indicating whether images have changes.
+    /// Compares source images against local images by type count and file size.
     /// </summary>
     public bool HasImagesChanges
     {
         get
         {
-            if (string.IsNullOrEmpty(LocalItemId) || string.IsNullOrEmpty(SourceImagesHash))
+            if (string.IsNullOrEmpty(LocalItemId) || string.IsNullOrEmpty(SourceImagesValue))
             {
                 return false;
             }
 
-            // If we've never synced images, there are changes
-            if (string.IsNullOrEmpty(SyncedImagesHash))
+            // No local images but source has images — needs sync
+            if (string.IsNullOrEmpty(LocalImagesValue))
             {
                 return true;
             }
 
-            return !string.Equals(SourceImagesHash, SyncedImagesHash, StringComparison.OrdinalIgnoreCase);
+            return !ImagesMatch(SourceImagesValue, LocalImagesValue);
+        }
+    }
+
+    /// <summary>
+    /// Compares source and local image collections by type, count, and file size.
+    /// </summary>
+    private static bool ImagesMatch(string sourceJson, string localJson)
+    {
+        try
+        {
+            var source = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, List<ImageInfoDto>>>(sourceJson);
+            var local = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, List<ImageInfoDto>>>(localJson);
+
+            if (source == null || local == null)
+            {
+                return source == null && local == null;
+            }
+
+            // Check that local has every image type that source has
+            foreach (var kvp in source)
+            {
+                if (!local.TryGetValue(kvp.Key, out var localImages))
+                {
+                    return false; // Missing image type locally
+                }
+
+                if (kvp.Value.Count != localImages.Count)
+                {
+                    return false; // Different number of images for this type
+                }
+
+                // Compare by size — if local file size doesn't match source, needs re-sync
+                for (int i = 0; i < kvp.Value.Count; i++)
+                {
+                    if (kvp.Value[i].Size > 0 && localImages[i].Size > 0
+                        && kvp.Value[i].Size != localImages[i].Size)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+        catch
+        {
+            // If we can't parse, assume changes exist
+            return false;
         }
     }
 
