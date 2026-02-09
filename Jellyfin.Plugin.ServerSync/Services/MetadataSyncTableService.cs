@@ -108,10 +108,16 @@ public class MetadataSyncTableService
             "Processing metadata for library {Library} (Metadata: {Metadata}, Images: {Images}, People: {People}, Studios: {Studios}, Mode: {Mode})",
             libraryMapping.SourceLibraryName, syncMetadata, syncImages, syncPeople, syncStudios, refreshMode);
 
+        // Track which source items are still present on the source server
+        var seenSourceItemIds = new HashSet<string>();
+
         processedItems = await PaginatedFetchUtility.FetchAllPagesAsync(
             fetchPage: (startIndex, batchSize, ct) => client.GetLibraryItemsWithMetadataAsync(sourceLibraryId, startIndex, batchSize, ct),
             processItem: async (sourceItem, ct) =>
             {
+                var sid = sourceItem.Id!.Value.ToString("N", CultureInfo.InvariantCulture);
+                seenSourceItemIds.Add(sid);
+
                 await ProcessMetadataItemAsync(
                     client,
                     database,
@@ -133,6 +139,23 @@ public class MetadataSyncTableService
             logger: _logger,
             cancellationToken: cancellationToken,
             onItemProcessed: onItemProcessed).ConfigureAwait(false);
+
+        // Remove metadata records for items no longer present on the source server
+        var staleCount = 0;
+        foreach (var kvp in existingItems)
+        {
+            if (!seenSourceItemIds.Contains(kvp.Key))
+            {
+                database.DeleteMetadataSyncItemsBySourceItem(kvp.Key);
+                staleCount++;
+                _logger.LogDebug("Removed stale metadata record for {ItemName} (no longer on source)", kvp.Value.ItemName);
+            }
+        }
+
+        if (staleCount > 0)
+        {
+            _logger.LogInformation("Removed {Count} stale metadata records from library {Library}", staleCount, libraryMapping.SourceLibraryName);
+        }
 
         _logger.LogInformation(
             "Processed {Count} metadata items for library {Library}",

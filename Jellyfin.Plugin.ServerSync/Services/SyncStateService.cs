@@ -238,7 +238,15 @@ public static class SyncStateService
             return new TransitionResult(true, "Removed from tracking (not synced)");
         }
 
-        // Mark for deletion based on approval mode
+        // If the local file is also gone, just remove from tracking — nothing left to delete
+        if (!string.IsNullOrEmpty(item.LocalPath) && !File.Exists(item.LocalPath))
+        {
+            database.Delete(item.SourceItemId);
+            logger.LogInformation("Removed tracking for {FileName} (gone from both source and local)", Path.GetFileName(item.LocalPath));
+            return new TransitionResult(true, "Removed from tracking (no longer on source or local)");
+        }
+
+        // Mark for deletion based on approval mode (local file still exists)
         if (deleteMode == ApprovalMode.RequireApproval)
         {
             item.Status = SyncStatus.Pending;

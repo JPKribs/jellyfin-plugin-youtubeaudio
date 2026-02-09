@@ -729,35 +729,6 @@ public partial class SyncDatabase
     }
 
     /// <summary>
-    /// ClearStaleErrors
-    /// Resets error status for items older than specified days.
-    /// </summary>
-    /// <param name="olderThanDays">Age threshold in days.</param>
-    /// <returns>Number of items reset.</returns>
-    public int ClearStaleErrors(int olderThanDays)
-    {
-        ThrowIfDisposed();
-        lock (_writeLock)
-        {
-            EnsureConnection();
-
-            var cutoffDate = DateTime.UtcNow.AddDays(-olderThanDays).ToString("o");
-
-            using var command = _connection!.CreateCommand();
-            command.CommandText = @"
-                UPDATE SyncItems
-                SET Status = @newStatus, RetryCount = 0, ErrorMessage = NULL
-                WHERE Status = @errorStatus AND StatusDate < @cutoffDate
-            ";
-            command.Parameters.AddWithValue("@newStatus", (int)SyncStatus.Queued);
-            command.Parameters.AddWithValue("@errorStatus", (int)SyncStatus.Errored);
-            command.Parameters.AddWithValue("@cutoffDate", cutoffDate);
-
-            return command.ExecuteNonQuery();
-        }
-    }
-
-    /// <summary>
     /// ReadSyncItem
     /// Reads a SyncItem from the database reader.
     /// </summary>

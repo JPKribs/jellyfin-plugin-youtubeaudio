@@ -660,18 +660,24 @@
     align-items: center;
 }
 .pt-row-thumb {
-    flex: 0 0 54px;
-    width: 54px;
-    height: 80px;
+    height: 60px;
     border-radius: 4px;
     object-fit: cover;
     background: rgba(255, 255, 255, 0.05);
     margin-right: 10px;
 }
+.pt-row-thumb-portrait {
+    width: 40px;
+    flex: 0 0 40px;
+}
+.pt-row-thumb-landscape {
+    width: 106px;
+    flex: 0 0 106px;
+}
 .pt-row-thumb-placeholder {
-    flex: 0 0 54px;
-    width: 54px;
-    height: 80px;
+    flex: 0 0 40px;
+    width: 40px;
+    height: 60px;
     border-radius: 4px;
     background: rgba(255, 255, 255, 0.05);
     margin-right: 10px;

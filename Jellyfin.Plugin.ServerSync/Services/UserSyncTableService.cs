@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -58,6 +59,9 @@ public class UserSyncTableService
         var itemsProcessed = 0;
         var currentMapping = 0;
 
+        // Track which (SourceUserId, LocalUserId) pairs are still valid
+        var activeUserMappings = new HashSet<(string SourceUserId, string LocalUserId)>();
+
         foreach (var mapping in enabledMappings)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -74,7 +78,13 @@ public class UserSyncTableService
                 var sourceUser = await sourceClient.GetUserAsync(sourceUserId, cancellationToken).ConfigureAwait(false);
                 if (sourceUser == null)
                 {
-                    _logger.LogWarning("Source user {UserId} not found, skipping", mapping.SourceUserId);
+                    _logger.LogWarning("Source user {UserId} not found, removing stale user sync records", mapping.SourceUserId);
+                    var removed = _databaseProvider.Database.DeleteUserSyncItemsByUserMapping(mapping.SourceUserId, mapping.LocalUserId);
+                    if (removed > 0)
+                    {
+                        _logger.LogInformation("Removed {Count} stale user sync records for missing source user {User}", removed, mapping.SourceUserName);
+                    }
+
                     continue;
                 }
 
@@ -82,9 +92,17 @@ public class UserSyncTableService
                 var localUser = _userManager.GetUserById(localUserId);
                 if (localUser == null)
                 {
-                    _logger.LogWarning("Local user {UserId} not found, skipping", mapping.LocalUserId);
+                    _logger.LogWarning("Local user {UserId} not found, removing stale user sync records", mapping.LocalUserId);
+                    var removed = _databaseProvider.Database.DeleteUserSyncItemsByUserMapping(mapping.SourceUserId, mapping.LocalUserId);
+                    if (removed > 0)
+                    {
+                        _logger.LogInformation("Removed {Count} stale user sync records for missing local user {User}", removed, mapping.LocalUserName);
+                    }
+
                     continue;
                 }
+
+                activeUserMappings.Add((mapping.SourceUserId, mapping.LocalUserId));
 
                 // Get local user DTO to access Policy and Configuration
                 var localUserDto = _userManager.GetUserDto(localUser);
@@ -141,6 +159,32 @@ public class UserSyncTableService
             }
 
             currentMapping++;
+        }
+
+        // Remove orphaned user sync records that don't belong to any active mapping
+        try
+        {
+            var allItems = _databaseProvider.Database.GetAllUserSyncItems();
+            var orphanedMappings = new HashSet<(string SourceUserId, string LocalUserId)>();
+
+            foreach (var item in allItems)
+            {
+                var key = (item.SourceUserId, item.LocalUserId);
+                if (!activeUserMappings.Contains(key) && !orphanedMappings.Contains(key))
+                {
+                    orphanedMappings.Add(key);
+                }
+            }
+
+            foreach (var (sourceUserId, localUserId) in orphanedMappings)
+            {
+                var removed = _databaseProvider.Database.DeleteUserSyncItemsByUserMapping(sourceUserId, localUserId);
+                _logger.LogInformation("Removed {Count} orphaned user sync records for mapping {Source} -> {Local}", removed, sourceUserId, localUserId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to clean up orphaned user sync records");
         }
 
         progress.Report(100);

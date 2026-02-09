@@ -118,10 +118,16 @@ public class HistorySyncTableService
             "Processing history for user {SourceUser} -> {LocalUser} in library {Library}",
             userMapping.SourceUserName, userMapping.LocalUserName, libraryMapping.SourceLibraryName);
 
+        // Track which source items are still present on the source server
+        var seenSourceItemIds = new HashSet<string>();
+
         processedItems = await PaginatedFetchUtility.FetchAllPagesAsync(
             fetchPage: (startIndex, batchSize, ct) => client.GetUserLibraryItemsAsync(sourceUserId, sourceLibraryId, startIndex, batchSize, ct),
             processItem: (sourceItem, _) =>
             {
+                var sid = sourceItem.Id!.Value.ToString("N", CultureInfo.InvariantCulture);
+                seenSourceItemIds.Add(sid);
+
                 var wasProcessed = ProcessHistoryItem(
                     database,
                     userMapping,
@@ -138,6 +144,25 @@ public class HistorySyncTableService
             logger: _logger,
             cancellationToken: cancellationToken,
             onItemProcessed: onItemProcessed).ConfigureAwait(false);
+
+        // Remove history records for items no longer present on the source server
+        var staleCount = 0;
+        foreach (var kvp in existingItems)
+        {
+            if (!seenSourceItemIds.Contains(kvp.Key))
+            {
+                database.DeleteHistoryItem(kvp.Value.Id);
+                staleCount++;
+                _logger.LogDebug("Removed stale history record for {ItemName} (no longer on source)", kvp.Value.ItemName);
+            }
+        }
+
+        if (staleCount > 0)
+        {
+            _logger.LogInformation(
+                "Removed {Count} stale history records for user {User} in library {Library}",
+                staleCount, userMapping.SourceUserName, libraryMapping.SourceLibraryName);
+        }
 
         _logger.LogInformation(
             "Processed {Count} history items for user {User} in library {Library}",

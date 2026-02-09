@@ -272,6 +272,10 @@ public class SourceServerClient : IDisposable
             var folders = await client.Library.VirtualFolders.GetAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
             return folders ?? new List<VirtualFolderInfo>();
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to get libraries from source server");
@@ -292,6 +296,10 @@ public class SourceServerClient : IDisposable
             var client = GetApiClient();
             var users = await client.Users.GetAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
             return users ?? new List<UserDto>();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -329,6 +337,10 @@ public class SourceServerClient : IDisposable
                     config.QueryParameters.Limit = limit;
                 },
                 cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

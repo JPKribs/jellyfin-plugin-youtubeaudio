@@ -75,14 +75,18 @@ export function createServerSyncShared(view) {
                 '?maxHeight=' + maxHeight + '&api_key=' + encodeURIComponent(apiKey);
         },
 
-        // Render a thumbnail image with fallback placeholder for item images
+        // Render a thumbnail image with fallback placeholder for item images.
+        // Starts as portrait (40×60); on load, if the image is landscape
+        // (width > height), it swaps to the landscape class (106×60).
         renderItemThumb: function(serverUrl, apiKey, itemId) {
             var imgUrl = this.buildSourceImageUrl(serverUrl, apiKey, itemId, 'Primary', 80);
             if (!imgUrl) {
                 return '<div class="pt-row-thumb-placeholder"><span class="material-icons">movie</span></div>';
             }
-            return '<img class="pt-row-thumb" src="' + this.escapeHtml(imgUrl) +
-                '" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" />' +
+            return '<img class="pt-row-thumb pt-row-thumb-portrait" src="' + this.escapeHtml(imgUrl) +
+                '" loading="lazy"' +
+                ' onload="if(this.naturalWidth>this.naturalHeight){this.classList.remove(\'pt-row-thumb-portrait\');this.classList.add(\'pt-row-thumb-landscape\')}"' +
+                ' onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" />' +
                 '<div class="pt-row-thumb-placeholder" style="display:none"><span class="material-icons">movie</span></div>';
         },
 
