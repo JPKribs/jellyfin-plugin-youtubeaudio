@@ -40,7 +40,8 @@ public partial class ConfigurationController
             return NotFound();
         }
 
-        return Ok(MapToMetadataSyncItemDto(item, _configManager.Configuration.LibraryMappings));
+        var config = _configManager.Configuration;
+        return Ok(MapToMetadataSyncItemDto(item, config.LibraryMappings, config.SourceServerUrl, config.SourceServerApiKey));
     }
 
     /// <summary>
@@ -139,11 +140,11 @@ public partial class ConfigurationController
         var (items, totalCount) = _databaseProvider.Database.SearchMetadataSyncItemsPaginated(
             search, statusFilter, sourceLibraryId, skip, take);
 
-        var libraryMappings = _configManager.Configuration.LibraryMappings;
+        var config = _configManager.Configuration;
 
         return Ok(new PaginatedResult<MetadataSyncItemDto>
         {
-            Items = items.Select(i => MapToMetadataSyncItemDto(i, libraryMappings)).ToList(),
+            Items = items.Select(i => MapToMetadataSyncItemDto(i, config.LibraryMappings, config.SourceServerUrl, config.SourceServerApiKey)).ToList(),
             TotalCount = totalCount,
             Skip = skip,
             Take = take
@@ -324,7 +325,7 @@ public partial class ConfigurationController
     /// <summary>
     /// Maps a MetadataSyncItem to a DTO.
     /// </summary>
-    private static MetadataSyncItemDto MapToMetadataSyncItemDto(MetadataSyncItem item, List<LibraryMapping>? libraryMappings)
+    private static MetadataSyncItemDto MapToMetadataSyncItemDto(MetadataSyncItem item, List<LibraryMapping>? libraryMappings, string? sourceServerUrl, string? sourceServerApiKey)
     {
         // Look up library names
         string? sourceLibraryName = null;
@@ -363,6 +364,8 @@ public partial class ConfigurationController
             HasStudiosChanges = item.HasStudiosChanges,
             HasChanges = item.HasChanges,
             ChangesSummary = item.ChangesSummary,
+            SourceServerUrl = sourceServerUrl,
+            SourceServerApiKey = sourceServerApiKey,
             Status = item.Status.ToString(),
             StatusDate = item.StatusDate,
             LastSyncTime = item.LastSyncTime,

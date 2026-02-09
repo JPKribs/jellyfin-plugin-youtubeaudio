@@ -287,6 +287,7 @@ export default function (view) {
                         key: 'name',
                         label: 'Item',
                         type: 'custom',
+                        className: 'pt-cell-with-thumb',
                         render: function(item) {
                             var sourcePath = item.SourcePath || '';
                             var sourceLibrary = item.SourceLibraryName || 'Unknown';
@@ -300,7 +301,8 @@ export default function (view) {
                                     ServerSyncShared.escapeHtml(item.ErrorMessage) + '</div>';
                             }
 
-                            return '<div class="syncItemInfo">' +
+                            return ServerSyncShared.renderItemThumb(item.SourceServerUrl, item.SourceServerApiKey, item.SourceItemId) +
+                                '<div class="syncItemInfo">' +
                                 '<div class="syncItemName" title="' +
                                     ServerSyncShared.escapeHtml(sourcePath) + '">' +
                                     ServerSyncShared.escapeHtml(ServerSyncShared.getFileName(sourcePath)) + '</div>' +
@@ -414,7 +416,7 @@ export default function (view) {
 
             bulkContainer.innerHTML =
                 '<button is="emby-button" type="button" id="btnBulkIgnore" class="raised pt-bulk-icon-btn" title="Ignore" disabled><span class="material-icons">block</span></button>' +
-                '<button is="emby-button" type="button" id="btnBulkMarkSynced" class="raised pt-bulk-icon-btn" title="Mark Synced (verifies local file exists)" disabled><span class="material-icons">check_circle</span></button>' +
+                '<button is="emby-button" type="button" id="btnBulkMarkSynced" class="raised pt-bulk-icon-btn" title="Mark Synced" disabled><span class="material-icons">check_circle</span></button>' +
                 '<button is="emby-button" type="button" id="btnBulkQueue" class="raised button-primary pt-bulk-icon-btn" title="Queue" disabled><span class="material-icons">playlist_add</span></button>' +
                 '<button is="emby-button" type="button" id="btnBulkDelete" class="raised button-destructive pt-bulk-icon-btn" title="Delete from local server only" disabled><span class="material-icons">delete</span></button>';
 
@@ -1021,6 +1023,7 @@ export default function (view) {
                         key: 'name',
                         label: 'Item',
                         type: 'custom',
+                        className: 'pt-cell-with-thumb',
                         render: function(item) {
                             var itemName = item.ItemName || 'Unknown';
                             var userMapping = self.findUserMapping(item.SourceUserId, item.LocalUserId);
@@ -1035,7 +1038,8 @@ export default function (view) {
                                     ServerSyncShared.escapeHtml(item.ErrorMessage) + '</div>';
                             }
 
-                            return '<div class="syncItemInfo">' +
+                            return ServerSyncShared.renderItemThumb(item.SourceServerUrl, item.SourceServerApiKey, item.SourceItemId) +
+                                '<div class="syncItemInfo">' +
                                 '<div class="syncItemName" title="' + ServerSyncShared.escapeHtml(itemName) + '">' +
                                 ServerSyncShared.escapeHtml(itemName) + '</div>' +
                                 '<div class="syncItemPath">' + ServerSyncShared.escapeHtml(userDisplay) + '</div>' +
@@ -1556,6 +1560,7 @@ export default function (view) {
                         key: 'item',
                         label: 'Item',
                         type: 'custom',
+                        className: 'pt-cell-with-thumb',
                         render: function(item) {
                             var itemName = item.ItemName || 'Unknown';
                             var sourceLib = item.SourceLibraryName || 'Unknown';
@@ -1569,7 +1574,8 @@ export default function (view) {
                                     ServerSyncShared.escapeHtml(item.ErrorMessage) + '</div>';
                             }
 
-                            return '<div class="syncItemInfo">' +
+                            return ServerSyncShared.renderItemThumb(item.SourceServerUrl, item.SourceServerApiKey, item.SourceItemId) +
+                                '<div class="syncItemInfo">' +
                                 '<div class="syncItemName" title="' + ServerSyncShared.escapeHtml(itemName) + '">' +
                                 ServerSyncShared.escapeHtml(itemName) + '</div>' +
                                 '<div class="syncItemPath">' + ServerSyncShared.escapeHtml(libraryDisplay) + '</div>' +
@@ -2436,6 +2442,7 @@ export default function (view) {
                         key: 'user',
                         label: 'User',
                         type: 'custom',
+                        className: 'pt-cell-with-thumb',
                         render: function(item) {
                             var sourceUserName = item.SourceUserName || 'Unknown';
                             var localUserName = item.LocalUserName || 'Unknown';
@@ -2449,7 +2456,8 @@ export default function (view) {
                                     ServerSyncShared.escapeHtml(item.ErrorMessage) + '</div>';
                             }
 
-                            return '<div class="syncItemInfo">' +
+                            return ServerSyncShared.renderUserThumb(item.SourceServerUrl, item.SourceServerApiKey, item.SourceUserId) +
+                                '<div class="syncItemInfo">' +
                                 '<div class="syncItemName">' + ServerSyncShared.escapeHtml(sourceUserName) + ' \u2192 ' + ServerSyncShared.escapeHtml(localUserName) + '</div>' +
                                 '<div class="syncItemPath">' + ServerSyncShared.escapeHtml(sourceServerName) + ' \u2192 ' + ServerSyncShared.escapeHtml(localServerName) + '</div>' +
                                 errorPreview +

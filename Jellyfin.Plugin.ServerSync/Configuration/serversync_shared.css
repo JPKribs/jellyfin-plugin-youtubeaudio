@@ -653,3 +653,53 @@
     text-overflow: ellipsis;
     max-width: 200px;
 }
+
+/* ===== Sync Row Thumbnails ===== */
+.pt-cell.pt-cell-with-thumb {
+    display: flex;
+    align-items: center;
+}
+.pt-row-thumb {
+    flex: 0 0 54px;
+    width: 54px;
+    height: 80px;
+    border-radius: 4px;
+    object-fit: cover;
+    background: rgba(255, 255, 255, 0.05);
+    margin-right: 10px;
+}
+.pt-row-thumb-placeholder {
+    flex: 0 0 54px;
+    width: 54px;
+    height: 80px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    margin-right: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.2);
+    font-size: 24px;
+}
+.pt-row-thumb-user {
+    flex: 0 0 48px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: rgba(255, 255, 255, 0.05);
+    margin-right: 10px;
+}
+.pt-row-thumb-user-placeholder {
+    flex: 0 0 48px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    margin-right: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.2);
+    font-size: 20px;
+}

@@ -338,6 +338,72 @@ public class SourceServerClient : IDisposable
     }
 
     /// <summary>
+    /// Gets top-level items from a library (non-recursive) for browsing/filtering UI.
+    /// Returns series, movies, or top-level folders depending on library type.
+    /// </summary>
+    /// <param name="libraryId">Library ID.</param>
+    /// <param name="searchTerm">Optional search term to filter results.</param>
+    /// <param name="startIndex">Starting index for pagination.</param>
+    /// <param name="limit">Maximum items to return.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Query result with top-level items.</returns>
+    public async Task<BaseItemDtoQueryResult?> GetTopLevelLibraryItemsAsync(
+        Guid libraryId,
+        string? searchTerm = null,
+        int startIndex = 0,
+        int limit = 50,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var client = GetApiClient();
+            return await client.Items.GetAsync(
+                config =>
+                {
+                    config.QueryParameters.ParentId = libraryId;
+                    config.QueryParameters.Fields = new[] { ItemFields.Path, ItemFields.Overview, ItemFields.DateCreated };
+                    config.QueryParameters.SortBy = new[] { ItemSortBy.SortName };
+                    config.QueryParameters.SortOrder = new[] { SortOrder.Ascending };
+                    config.QueryParameters.StartIndex = startIndex;
+                    config.QueryParameters.Limit = limit;
+                    config.QueryParameters.EnableImageTypes = new[] { ImageType.Primary };
+                    config.QueryParameters.ImageTypeLimit = 1;
+
+                    if (!string.IsNullOrWhiteSpace(searchTerm))
+                    {
+                        // When searching, use recursive so Jellyfin's search engine works,
+                        // but restrict to top-level container types only (no episodes/seasons/tracks)
+                        config.QueryParameters.SearchTerm = searchTerm;
+                        config.QueryParameters.Recursive = true;
+                        config.QueryParameters.IncludeItemTypes = new[]
+                        {
+                            BaseItemKind.Movie, BaseItemKind.Series, BaseItemKind.BoxSet,
+                            BaseItemKind.MusicAlbum, BaseItemKind.MusicArtist
+                        };
+                    }
+                    else
+                    {
+                        // Non-recursive browse — include standalone files too (Audio, Video)
+                        // since they appear at the top level in some library types
+                        config.QueryParameters.Recursive = false;
+                        config.QueryParameters.IncludeItemTypes = new[]
+                        {
+                            BaseItemKind.Movie, BaseItemKind.Series, BaseItemKind.BoxSet,
+                            BaseItemKind.MusicAlbum, BaseItemKind.MusicArtist,
+                            BaseItemKind.Audio, BaseItemKind.Video
+                        };
+                    }
+                },
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get top-level items from library {LibraryId}", libraryId);
+            return null;
+        }
+    }
+
+    /// <summary>
     /// GetLibraryItemsWithMetadataAsync
     /// Gets items from a library with extended metadata fields for metadata sync.
     /// </summary>
@@ -723,6 +789,63 @@ public class SourceServerClient : IDisposable
         {
             _logger.LogDebug(ex, "Failed to get image info for item {ItemId}", itemId);
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Downloads an item image from the source server as a stream.
+    /// </summary>
+    /// <param name="itemId">Item ID on the source server.</param>
+    /// <param name="imageType">Image type name (e.g., "Primary", "Backdrop").</param>
+    /// <param name="imageIndex">Image index (for multi-image types like Backdrop). Null for single images.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Tuple of (stream, contentType) or (null, null) on failure.</returns>
+    public async Task<(Stream? Stream, string? ContentType)> DownloadItemImageAsync(
+        Guid itemId,
+        string imageType,
+        int? imageIndex,
+        CancellationToken cancellationToken = default)
+    {
+        HttpResponseMessage? response = null;
+        HttpRequestMessage? request = null;
+        try
+        {
+            var url = imageIndex.HasValue
+                ? $"{_serverUrl}/Items/{itemId}/Images/{imageType}/{imageIndex.Value}"
+                : $"{_serverUrl}/Items/{itemId}/Images/{imageType}";
+
+            request = new HttpRequestMessage(HttpMethod.Get, url);
+            AddAuthorizationHeader(request);
+
+            response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Failed to download image {ImageType}/{Index} for item {ItemId}: {StatusCode}",
+                    imageType, imageIndex, itemId, response.StatusCode);
+                response.Dispose();
+                request.Dispose();
+                return (null, null);
+            }
+
+            var contentType = response.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
+            var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+
+            // Transfer ownership of request and response to the stream wrapper
+            return (new ResponseDisposingStream(stream, response, request), contentType);
+        }
+        catch (OperationCanceledException)
+        {
+            response?.Dispose();
+            request?.Dispose();
+            throw;
+        }
+        catch (Exception ex)
+        {
+            response?.Dispose();
+            request?.Dispose();
+            _logger.LogDebug(ex, "Failed to download image {ImageType}/{Index} for item {ItemId}", imageType, imageIndex, itemId);
+            return (null, null);
         }
     }
 

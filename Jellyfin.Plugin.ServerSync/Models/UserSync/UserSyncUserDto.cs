@@ -96,6 +96,18 @@ public class UserSyncUserDto
     /// </summary>
     public string? ProfileImageChangesSummary { get; set; }
 
+    // ===== Source Server =====
+
+    /// <summary>
+    /// Gets or sets the source server URL (for image display).
+    /// </summary>
+    public string? SourceServerUrl { get; set; }
+
+    /// <summary>
+    /// Gets or sets the source server API key (for authenticated image URLs).
+    /// </summary>
+    public string? SourceServerApiKey { get; set; }
+
     // ===== Computed Aggregate Fields =====
 
     /// <summary>

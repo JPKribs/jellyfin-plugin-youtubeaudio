@@ -97,6 +97,7 @@ public partial class ConfigurationController
                     ErrorMessage = i.ErrorMessage,
                     RetryCount = i.RetryCount,
                     SourceServerUrl = config.SourceServerUrl,
+                    SourceServerApiKey = config.SourceServerApiKey,
                     SourceServerId = config.SourceServerId,
                     CompanionFiles = i.CompanionFiles
                 };

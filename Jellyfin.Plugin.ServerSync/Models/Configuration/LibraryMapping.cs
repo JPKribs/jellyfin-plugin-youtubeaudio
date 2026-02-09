@@ -44,10 +44,15 @@ public class LibraryMapping
     public bool IsEnabled { get; set; } = true;
 
     /// <summary>
-    /// Source-relative folder paths to ignore during sync.
-    /// Each entry is relative to <see cref="SourceRootPath"/> (e.g., "The Simpsons" or "The Simpsons/Season 2").
-    /// A trailing <c>*</c> wildcard matches any folder starting with the prefix (e.g., "Star Wars*").
-    /// Items whose source path falls under any ignored path are skipped across Content, Metadata, and History sync.
+    /// The filter mode for this library mapping.
+    /// AllowAll = no filtering, Whitelist = only listed items, Blacklist = exclude listed items.
     /// </summary>
-    public List<string> IgnoredPaths { get; set; } = new();
+    public LibraryFilterMode FilterMode { get; set; } = LibraryFilterMode.AllowAll;
+
+    /// <summary>
+    /// Items selected for whitelist/blacklist filtering.
+    /// Only used when <see cref="FilterMode"/> is Whitelist or Blacklist.
+    /// Each item's path is used for child matching — selecting a series filters all its episodes.
+    /// </summary>
+    public List<FilteredItem> FilteredItems { get; set; } = new();
 }

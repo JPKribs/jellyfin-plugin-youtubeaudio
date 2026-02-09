@@ -766,50 +766,146 @@
             flex-direction: column;
         }
 
-        /* ===== Ignored Paths ===== */
-        .ignoredPathsSection {
+        /* ===== Library Filter ===== */
+        .filterSection {
             margin-top: 1em;
             padding-top: 0.75em;
             border-top: 1px solid rgba(85, 85, 85, 0.3);
         }
-        .ignoredPathsLabel {
-            font-weight: bold;
-            margin-bottom: 0.25em;
-        }
-        .ignoredPathsSection .fieldDescription {
-            margin-bottom: 0.5em;
-            font-size: 0.85em;
-            color: rgba(255, 255, 255, 0.5);
-        }
-        .ignoredPathsList {
-            margin-bottom: 0.5em;
-        }
-        .ignoredPathPrefix {
-            flex-shrink: 0;
-            font-family: var(--font-mono);
-            font-size: 0.9em;
-            color: rgba(255, 255, 255, 0.4);
-            white-space: nowrap;
-        }
-        .ignoredPathRow {
+        .filterSection .filterHeader {
             display: flex;
             align-items: center;
+            gap: 12px;
+            margin-bottom: 0.5em;
+        }
+        .filterSection .filterHeader label {
+            font-weight: bold;
+            white-space: nowrap;
+        }
+        .filterSection .filterModeSelect {
+            max-width: 200px;
+        }
+        .filterItemBrowser {
+            border: 1px solid rgba(85, 85, 85, 0.4);
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.15);
+        }
+        .filterSearchRow {
+            display: flex;
             gap: 8px;
-            margin-bottom: 6px;
+            padding: 8px;
+            border-bottom: 1px solid rgba(85, 85, 85, 0.3);
+            position: sticky;
+            top: 0;
+            background: rgba(20, 20, 20, 0.95);
+            z-index: 1;
         }
-        .ignoredPathRow .ignoredPathInput {
+        .filterSearchRow input {
             flex: 1;
-            font-family: var(--font-mono);
-            font-size: 0.9em;
         }
-        .ignoredPathRow .btnRemoveIgnoredPath {
-            flex-shrink: 0;
-            min-width: auto;
-            padding: 0.2em 0.6em;
-            font-size: 1.1em;
-            line-height: 1;
+        .filterSearchSpinner {
+            flex: 0 0 auto;
+            font-size: 20px;
+            color: rgba(255, 255, 255, 0.5);
+            animation: filterSpin 0.8s linear infinite;
+            align-self: center;
         }
-        .btnAddIgnoredPath {
+        @keyframes filterSpin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .filterItemsList {
+            padding: 0;
+            transition: opacity 0.15s;
+        }
+        .filterItemsList.filterItemsLoading {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+        .filterItem {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border-bottom: 1px solid rgba(85, 85, 85, 0.15);
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .filterItem:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .filterItem.selected {
+            background: rgba(82, 181, 219, 0.12);
+        }
+        .filterItemThumb {
+            flex: 0 0 40px;
+            width: 40px;
+            height: 60px;
+            border-radius: 3px;
+            object-fit: cover;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .filterItemThumbPlaceholder {
+            flex: 0 0 40px;
+            width: 40px;
+            height: 60px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255, 255, 255, 0.2);
+            font-size: 18px;
+        }
+        .filterItemInfo {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+        }
+        .filterItemName {
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .filterItemMeta {
+            font-size: 0.8em;
+            color: rgba(255, 255, 255, 0.5);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .filterItemOverview {
+            font-size: 0.75em;
+            color: rgba(255, 255, 255, 0.35);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-top: 2px;
+        }
+        .filterItemCheck {
+            flex: 0 0 auto;
+        }
+        .filterLoadMore {
+            display: block;
+            width: 100%;
+            padding: 8px;
+            text-align: center;
+            border: none;
+            background: rgba(255, 255, 255, 0.03);
+            color: rgba(255, 255, 255, 0.6);
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+        .filterLoadMore:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+        .filterBrowserStatus {
+            padding: 12px;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.4);
             font-size: 0.85em;
         }
 

@@ -38,7 +38,8 @@ public partial class ConfigurationController
             return NotFound("User sync item not found");
         }
 
-        return Ok(MapToUserSyncItemDto(item));
+        var config = _configManager.Configuration;
+        return Ok(MapToUserSyncItemDto(item, config.SourceServerUrl, config.SourceServerApiKey));
     }
 
     /// <summary>
@@ -77,10 +78,11 @@ public partial class ConfigurationController
         // Get paginated results
         var (items, totalCount) = _databaseProvider.Database.SearchUserSyncItemsPaginated(
             search, statusFilter, sourceUserId, propertyCategory, skip, take);
+        var config = _configManager.Configuration;
 
         return Ok(new PaginatedResult<UserSyncItemDto>
         {
-            Items = items.Select(i => MapToUserSyncItemDto(i)).ToList(),
+            Items = items.Select(i => MapToUserSyncItemDto(i, config.SourceServerUrl, config.SourceServerApiKey)).ToList(),
             TotalCount = totalCount,
             Skip = skip,
             Take = take
@@ -258,7 +260,7 @@ public partial class ConfigurationController
     /// <summary>
     /// Maps a UserSyncItem to a DTO.
     /// </summary>
-    private static UserSyncItemDto MapToUserSyncItemDto(UserSyncItem item)
+    private static UserSyncItemDto MapToUserSyncItemDto(UserSyncItem item, string? sourceServerUrl = null, string? sourceServerApiKey = null)
     {
         return new UserSyncItemDto
         {
@@ -277,6 +279,8 @@ public partial class ConfigurationController
             LocalImageSizeFormatted = item.LocalImageSize.HasValue ? FormatUtilities.FormatBytes(item.LocalImageSize.Value) : null,
             HasChanges = item.HasChanges,
             ChangesSummary = item.ChangesSummary,
+            SourceServerUrl = sourceServerUrl,
+            SourceServerApiKey = sourceServerApiKey,
             Status = item.Status.ToString(),
             StatusDate = item.StatusDate,
             LastSyncTime = item.LastSyncTime,
@@ -427,6 +431,10 @@ public partial class ConfigurationController
             LocalUserId = localUserId,
             SourceUserName = sourceUserName ?? items.FirstOrDefault()?.SourceUserName,
             LocalUserName = localUserName ?? items.FirstOrDefault()?.LocalUserName,
+
+            // Source server info
+            SourceServerUrl = config.SourceServerUrl,
+            SourceServerApiKey = config.SourceServerApiKey,
 
             // Record IDs
             PolicyId = policyItem?.Id,

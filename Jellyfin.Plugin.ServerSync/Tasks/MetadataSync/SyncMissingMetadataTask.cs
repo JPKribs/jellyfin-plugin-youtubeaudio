@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,7 +26,7 @@ public class SyncMissingMetadataTask : IScheduledTask
     private readonly ILogger<SyncMissingMetadataTask> _logger;
     private readonly ILibraryManager _libraryManager;
     private readonly IProviderManager _providerManager;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ISourceServerClientFactory _clientFactory;
     private readonly IPluginConfigurationManager _configManager;
     private readonly ISyncDatabaseProvider _databaseProvider;
 
@@ -38,14 +37,14 @@ public class SyncMissingMetadataTask : IScheduledTask
         ILogger<SyncMissingMetadataTask> logger,
         ILibraryManager libraryManager,
         IProviderManager providerManager,
-        IHttpClientFactory httpClientFactory,
+        ISourceServerClientFactory clientFactory,
         IPluginConfigurationManager configManager,
         ISyncDatabaseProvider databaseProvider)
     {
         _logger = logger;
         _libraryManager = libraryManager;
         _providerManager = providerManager;
-        _httpClientFactory = httpClientFactory;
+        _clientFactory = clientFactory;
         _configManager = configManager;
         _databaseProvider = databaseProvider;
     }
@@ -129,8 +128,8 @@ public class SyncMissingMetadataTask : IScheduledTask
 
         _logger.LogInformation("Processing {Count} queued metadata items", totalItems);
 
-        // Create a shared HttpClient for image downloads (reused across all items to avoid socket exhaustion)
-        var imageHttpClient = syncImages ? CreateImageHttpClient(_httpClientFactory, config) : null;
+        // Create a shared SourceServerClient for image downloads (reused across all items)
+        using var imageClient = syncImages ? _clientFactory.Create(config.SourceServerUrl, config.SourceServerApiKey) : null;
 
         var processedCount = 0;
         var successCount = 0;
@@ -145,7 +144,7 @@ public class SyncMissingMetadataTask : IScheduledTask
 
             try
             {
-                var success = await SyncMetadataItemAsync(item, database, syncMetadata, syncGenres, syncTags, syncImages, syncPeople, syncStudios, imageHttpClient, cancellationToken).ConfigureAwait(false);
+                var success = await SyncMetadataItemAsync(item, database, syncMetadata, syncGenres, syncTags, syncImages, syncPeople, syncStudios, imageClient, cancellationToken).ConfigureAwait(false);
 
                 if (success)
                 {
@@ -197,7 +196,7 @@ public class SyncMissingMetadataTask : IScheduledTask
         bool syncImages,
         bool syncPeople,
         bool syncStudios,
-        HttpClient? imageHttpClient,
+        SourceServerClient? sourceClient,
         CancellationToken cancellationToken)
     {
         // Validate we have a local item ID
@@ -257,7 +256,7 @@ public class SyncMissingMetadataTask : IScheduledTask
         // Sync images if enabled and has changes
         if (syncImages && item.HasImagesChanges)
         {
-            var success = await ApplyImagesAsync(localItem, item, imageHttpClient, cancellationToken).ConfigureAwait(false);
+            var success = await ApplyImagesAsync(localItem, item, sourceClient, cancellationToken).ConfigureAwait(false);
             if (success)
             {
                 // Track what source hash we synced - used for comparison on refresh
@@ -717,13 +716,12 @@ public class SyncMissingMetadataTask : IScheduledTask
     private async Task<bool> ApplyImagesAsync(
         MediaBrowser.Controller.Entities.BaseItem localItem,
         MetadataSyncItem item,
-        HttpClient? httpClient,
+        SourceServerClient? sourceClient,
         CancellationToken cancellationToken)
     {
-        var config = _configManager.Configuration;
-        if (string.IsNullOrEmpty(config.SourceServerUrl) || string.IsNullOrEmpty(config.SourceServerApiKey))
+        if (sourceClient == null)
         {
-            _logger.LogWarning("Source server not configured, cannot sync images");
+            _logger.LogWarning("No source server client available for image sync");
             return false;
         }
 
@@ -741,14 +739,11 @@ public class SyncMissingMetadataTask : IScheduledTask
                 return true;
             }
 
-            if (httpClient == null)
+            if (!Guid.TryParse(item.SourceItemId, out var sourceItemGuid))
             {
-                _logger.LogWarning("No HTTP client available for image sync");
+                _logger.LogWarning("Invalid source item ID for image sync: {SourceItemId}", item.SourceItemId);
                 return false;
             }
-
-            var baseUrl = config.SourceServerUrl.TrimEnd('/');
-            var sourceItemId = item.SourceItemId;
 
             // Process each image type from source.
             // Two-pass approach: first download all images to temp files to verify success,
@@ -773,33 +768,31 @@ public class SyncMissingMetadataTask : IScheduledTask
 
                     for (int i = 0; i < sourceImages.Count; i++)
                     {
-                        var imageUrl = $"{baseUrl}/Items/{sourceItemId}/Images/{imageTypeName}";
-                        if (imageType == ImageType.Backdrop || sourceImages.Count > 1)
-                        {
-                            imageUrl = $"{baseUrl}/Items/{sourceItemId}/Images/{imageTypeName}/{i}";
-                        }
+                        int? imageIndex = (imageType == ImageType.Backdrop || sourceImages.Count > 1) ? i : null;
 
                         try
                         {
-                            using var request = new HttpRequestMessage(HttpMethod.Get, imageUrl);
-                            request.Headers.TryAddWithoutValidation("X-Emby-Token", config.SourceServerApiKey);
-                            using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-                            if (!response.IsSuccessStatusCode)
+                            var (imageStream, contentType) = await sourceClient.DownloadItemImageAsync(
+                                sourceItemGuid, imageTypeName, imageIndex, cancellationToken).ConfigureAwait(false);
+
+                            if (imageStream == null)
                             {
-                                _logger.LogWarning("Failed to download image {ImageType}/{Index} for {ItemName}: {StatusCode}",
-                                    imageTypeName, i, localItem.Name, response.StatusCode);
+                                _logger.LogWarning("Failed to download image {ImageType}/{Index} for {ItemName}",
+                                    imageTypeName, i, localItem.Name);
                                 allDownloadsSucceeded = false;
                                 continue;
                             }
 
-                            var contentType = response.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
                             var tempPath = Path.GetTempFileName();
                             try
                             {
-                                using var networkStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-                                using var fileStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 81920);
-                                await networkStream.CopyToAsync(fileStream, cancellationToken).ConfigureAwait(false);
-                                tempFiles.Add((i, tempPath, contentType));
+                                using (imageStream)
+                                {
+                                    using var fileStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 81920);
+                                    await imageStream.CopyToAsync(fileStream, cancellationToken).ConfigureAwait(false);
+                                }
+
+                                tempFiles.Add((i, tempPath, contentType ?? "image/jpeg"));
                             }
                             catch
                             {
@@ -985,21 +978,6 @@ public class SyncMissingMetadataTask : IScheduledTask
             _logger.LogError(ex, "Failed to apply studios for {ItemName}", item.ItemName);
             return false;
         }
-    }
-
-    /// <summary>
-    /// Creates a shared HttpClient for image downloading from the source server.
-    /// Does not set DefaultRequestHeaders to avoid polluting the shared named client.
-    /// Auth headers are set per-request in ApplyImagesAsync.
-    /// </summary>
-    private static HttpClient? CreateImageHttpClient(IHttpClientFactory httpClientFactory, Configuration.PluginConfiguration config)
-    {
-        if (string.IsNullOrWhiteSpace(config.SourceServerUrl) || string.IsNullOrWhiteSpace(config.SourceServerApiKey))
-        {
-            return null;
-        }
-
-        return httpClientFactory.CreateClient(SourceServerClient.HttpClientName);
     }
 
     /// <inheritdoc />

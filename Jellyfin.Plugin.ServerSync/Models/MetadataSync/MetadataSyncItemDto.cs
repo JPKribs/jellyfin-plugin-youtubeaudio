@@ -134,6 +134,18 @@ public class MetadataSyncItemDto
     /// </summary>
     public string? ChangesSummary { get; set; }
 
+    // ===== Source Server =====
+
+    /// <summary>
+    /// Gets or sets the source server URL (for image display).
+    /// </summary>
+    public string? SourceServerUrl { get; set; }
+
+    /// <summary>
+    /// Gets or sets the source server API key (for authenticated image URLs).
+    /// </summary>
+    public string? SourceServerApiKey { get; set; }
+
     // ===== Sync Status =====
 
     /// <summary>

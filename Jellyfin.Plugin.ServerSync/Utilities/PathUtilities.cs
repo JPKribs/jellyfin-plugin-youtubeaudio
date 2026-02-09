@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Jellyfin.Plugin.ServerSync.Models.Configuration;
 
 namespace Jellyfin.Plugin.ServerSync.Utilities;
 
@@ -69,69 +70,72 @@ public static class PathUtilities
     }
 
     /// <summary>
-    /// Checks whether a source path falls under any of the ignored path prefixes.
-    /// Each ignored path is relative to the source root (e.g., "The Simpsons" or "The Simpsons/Season 2").
-    /// A trailing <c>*</c> wildcard matches any folder name that starts with the given prefix
-    /// (e.g., "Star Wars*" matches "Star Wars", "Star Wars Episode IV", etc.).
+    /// Determines whether an item should be filtered (skipped) based on the library's filter mode
+    /// and filtered items list.
     /// </summary>
     /// <param name="sourcePath">The full source server path of the item.</param>
     /// <param name="sourceRootPath">The root path of the library on the source server.</param>
-    /// <param name="ignoredPaths">List of source-relative folder paths to ignore.</param>
-    /// <returns>True if the source path matches any ignored path prefix.</returns>
-    public static bool IsPathIgnored(string sourcePath, string sourceRootPath, List<string>? ignoredPaths)
+    /// <param name="filterMode">The filter mode (AllowAll, Whitelist, Blacklist).</param>
+    /// <param name="filteredItems">List of filtered items with paths.</param>
+    /// <returns>True if the item should be SKIPPED (filtered out).</returns>
+    public static bool IsItemFiltered(
+        string sourcePath,
+        string sourceRootPath,
+        LibraryFilterMode filterMode,
+        List<FilteredItem>? filteredItems)
     {
-        if (ignoredPaths == null || ignoredPaths.Count == 0)
+        if (filterMode == LibraryFilterMode.AllowAll || filteredItems == null || filteredItems.Count == 0)
         {
             return false;
         }
 
         if (string.IsNullOrEmpty(sourcePath))
         {
-            return false;
+            // No path to match — in whitelist mode this means skip (not in list), in blacklist mode allow
+            return filterMode == LibraryFilterMode.Whitelist;
         }
 
-        // Normalize source path separators to forward slash for consistent comparison
         var normalizedSourcePath = sourcePath.Replace('\\', '/').TrimEnd('/');
         var normalizedRoot = sourceRootPath.TrimEnd(PathSeparators).Replace('\\', '/');
 
-        foreach (var ignoredPath in ignoredPaths)
+        bool matchesAny = false;
+        foreach (var fi in filteredItems)
         {
-            if (string.IsNullOrWhiteSpace(ignoredPath))
+            if (string.IsNullOrEmpty(fi.Path))
             {
                 continue;
             }
 
-            var trimmed = ignoredPath.Trim().TrimStart(PathSeparators).Replace('\\', '/');
-            var isWildcard = trimmed.EndsWith('*');
+            var normalizedFilterPath = fi.Path.Replace('\\', '/').TrimEnd('/');
 
-            if (isWildcard)
+            // Build the full path to compare against
+            string fullFilterPrefix;
+            if (normalizedFilterPath.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
             {
-                // Wildcard mode: "Star Wars*" matches any folder starting with "Star Wars"
-                var pattern = trimmed.TrimEnd('*').TrimEnd(PathSeparators);
-                var fullWildcardPrefix = normalizedRoot + "/" + pattern;
-
-                // Match if the source path starts with the prefix (the folder name can continue with any characters)
-                if (normalizedSourcePath.StartsWith(fullWildcardPrefix, StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
+                // Path is already absolute — use as-is
+                fullFilterPrefix = normalizedFilterPath;
             }
             else
             {
-                // Exact folder mode: "The Simpsons" matches only that exact folder and its children
-                var normalizedIgnored = trimmed.TrimEnd(PathSeparators);
-                var fullIgnoredPrefix = normalizedRoot + "/" + normalizedIgnored;
+                // Path is relative to root
+                fullFilterPrefix = normalizedRoot + "/" + normalizedFilterPath.TrimStart('/');
+            }
 
-                // Check if source path starts with the ignored prefix (exact folder match or deeper)
-                if (normalizedSourcePath.StartsWith(fullIgnoredPrefix, StringComparison.OrdinalIgnoreCase)
-                    && (normalizedSourcePath.Length == fullIgnoredPrefix.Length
-                        || normalizedSourcePath[fullIgnoredPrefix.Length] == '/'))
-                {
-                    return true;
-                }
+            // Check if the source path is this item or a child of this item
+            if (normalizedSourcePath.StartsWith(fullFilterPrefix, StringComparison.OrdinalIgnoreCase)
+                && (normalizedSourcePath.Length == fullFilterPrefix.Length
+                    || normalizedSourcePath[fullFilterPrefix.Length] == '/'))
+            {
+                matchesAny = true;
+                break;
             }
         }
 
-        return false;
+        return filterMode switch
+        {
+            LibraryFilterMode.Whitelist => !matchesAny, // Skip if NOT in whitelist
+            LibraryFilterMode.Blacklist => matchesAny,  // Skip if IN blacklist
+            _ => false
+        };
     }
 }

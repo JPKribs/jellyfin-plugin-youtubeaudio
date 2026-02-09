@@ -83,18 +83,18 @@ public class MetadataSyncTableService
             return 0;
         }
 
-        // Remove existing metadata records for items under newly-ignored paths
-        if (libraryMapping.IgnoredPaths?.Count > 0)
+        // Remove existing metadata records for items matching the library filter
+        if (libraryMapping.FilterMode != LibraryFilterMode.AllowAll && libraryMapping.FilteredItems?.Count > 0)
         {
             var keysToRemove = new List<string>();
             foreach (var kvp in existingItems)
             {
                 if (!string.IsNullOrEmpty(kvp.Value.SourcePath)
-                    && PathUtilities.IsPathIgnored(kvp.Value.SourcePath, libraryMapping.SourceRootPath, libraryMapping.IgnoredPaths))
+                    && PathUtilities.IsItemFiltered(kvp.Value.SourcePath, libraryMapping.SourceRootPath, libraryMapping.FilterMode, libraryMapping.FilteredItems))
                 {
                     database.DeleteMetadataSyncItemsBySourceItem(kvp.Key);
                     keysToRemove.Add(kvp.Key);
-                    _logger.LogInformation("Removed metadata record for {Path} (path matches ignored folder)", kvp.Value.SourcePath);
+                    _logger.LogInformation("Removed metadata record for {Path} (filtered by library filter)", kvp.Value.SourcePath);
                 }
             }
 
@@ -128,7 +128,8 @@ public class MetadataSyncTableService
             },
             libraryName: libraryMapping.SourceLibraryName,
             sourceRootPath: libraryMapping.SourceRootPath,
-            ignoredPaths: libraryMapping.IgnoredPaths,
+            filterMode: libraryMapping.FilterMode,
+            filteredItems: libraryMapping.FilteredItems,
             logger: _logger,
             cancellationToken: cancellationToken,
             onItemProcessed: onItemProcessed).ConfigureAwait(false);

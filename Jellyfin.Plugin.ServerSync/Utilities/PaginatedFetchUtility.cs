@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Plugin.ServerSync.Models.Configuration;
 using Jellyfin.Sdk.Generated.Models;
 using Microsoft.Extensions.Logging;
 
@@ -46,8 +47,9 @@ public static class PaginatedFetchUtility
     /// <param name="fetchPage">Delegate that fetches a page of items.</param>
     /// <param name="processItem">Delegate that processes a single item. Returns true if the item was successfully processed.</param>
     /// <param name="libraryName">Library name for logging.</param>
-    /// <param name="sourceRootPath">Source root path for ignored-path filtering.</param>
-    /// <param name="ignoredPaths">List of ignored paths, or null.</param>
+    /// <param name="sourceRootPath">Source root path for filter path matching.</param>
+    /// <param name="filterMode">The filter mode for this library.</param>
+    /// <param name="filteredItems">List of filtered items, or null.</param>
     /// <param name="logger">Logger instance.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <param name="onItemProcessed">Optional callback invoked after each item is visited (regardless of processing outcome).</param>
@@ -57,7 +59,8 @@ public static class PaginatedFetchUtility
         ProcessItemAsync processItem,
         string libraryName,
         string? sourceRootPath,
-        List<string>? ignoredPaths,
+        LibraryFilterMode filterMode,
+        List<FilteredItem>? filteredItems,
         ILogger logger,
         CancellationToken cancellationToken,
         Action? onItemProcessed = null)
@@ -158,8 +161,8 @@ public static class PaginatedFetchUtility
                     continue;
                 }
 
-                // Skip items under ignored folder paths
-                if (PathUtilities.IsPathIgnored(item.Path, sourceRootPath ?? string.Empty, ignoredPaths))
+                // Skip items matching the library filter
+                if (PathUtilities.IsItemFiltered(item.Path, sourceRootPath ?? string.Empty, filterMode, filteredItems))
                 {
                     continue;
                 }

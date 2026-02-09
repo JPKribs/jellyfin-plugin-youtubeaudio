@@ -346,50 +346,214 @@ export default function (view) {
                     '<div class="inputContainer"><label class="inputLabel">Local Root Path</label><input is="emby-input" type="text" class="localRootPath" value="' + escapeHtml(mapping.LocalRootPath || '') + '" /></div>' +
                 '</div>' +
             '</div>' +
-            '<div class="ignoredPathsSection">' +
-                '<label class="inputLabel ignoredPathsLabel">Ignored Paths</label>' +
-                '<div class="fieldDescription">Folder paths to skip during sync (relative to source root). Use * as a wildcard (e.g. Star Wars*). Applies to Content, Metadata, and History sync.</div>' +
-                '<div class="ignoredPathsList"></div>' +
-                '<button is="emby-button" type="button" class="btnAddIgnoredPath raised button-secondary button-small">' +
-                    '<span>+ Add Ignored Path</span>' +
-                '</button>' +
+            '<div class="filterSection">' +
+                '<div class="filterHeader">' +
+                    '<label>Filter Mode</label>' +
+                    '<select is="emby-select" class="filterModeSelect">' +
+                        '<option value="AllowAll">Allow All</option>' +
+                        '<option value="Whitelist">Whitelist</option>' +
+                        '<option value="Blacklist">Blacklist</option>' +
+                    '</select>' +
+                '</div>' +
+                '<div class="filterBrowserContainer" style="display:none;">' +
+                    '<div class="filterItemBrowser">' +
+                        '<div class="filterSearchRow">' +
+                            '<input is="emby-input" type="text" class="filterSearchInput" placeholder="Search items..." />' +
+                            '<span class="filterSearchSpinner material-icons" style="display:none;">autorenew</span>' +
+                        '</div>' +
+                        '<div class="filterItemsList"></div>' +
+                    '</div>' +
+                '</div>' +
             '</div>';
 
         container.appendChild(div);
 
-        // Wire up ignored paths add/remove
-        var ignoredList = div.querySelector('.ignoredPathsList');
-        var sourceRootInput = div.querySelector('.sourceRootPath');
+        // --- Filter Mode + Item Picker ---
+        var filterModeSelect = div.querySelector('.filterModeSelect');
+        var filterBrowserContainer = div.querySelector('.filterBrowserContainer');
+        var filterItemsList = div.querySelector('.filterItemsList');
+        var filterSearchInput = div.querySelector('.filterSearchInput');
+        var filterSearchSpinner = div.querySelector('.filterSearchSpinner');
 
-        function getSourceRootPrefix() {
-            var root = (sourceRootInput ? sourceRootInput.value : '').replace(/\\/g, '/').replace(/\/+$/, '');
-            return root ? root + '/' : '';
+        // State for this mapping's filter
+        var selectedFilterItems = {};
+        var filterSearchTimeout = null;
+        var filterStartIndex = 0;
+        var filterCurrentLibraryId = mapping.SourceLibraryId || '';
+        var filterRequestId = 0;
+
+        // Initialize filter mode (config returns enum name string)
+        var savedFilterMode = mapping.FilterMode || 'AllowAll';
+        // Handle both numeric (legacy) and string enum values
+        if (savedFilterMode === 0 || savedFilterMode === '0') savedFilterMode = 'AllowAll';
+        else if (savedFilterMode === 1 || savedFilterMode === '1') savedFilterMode = 'Whitelist';
+        else if (savedFilterMode === 2 || savedFilterMode === '2') savedFilterMode = 'Blacklist';
+        filterModeSelect.value = String(savedFilterMode);
+        updateFilterVisibility();
+
+        // Load existing filtered items as selected
+        (mapping.FilteredItems || []).forEach(function(fi) {
+            if (fi.ItemId) {
+                selectedFilterItems[fi.ItemId] = { ItemId: fi.ItemId, Name: fi.Name || '', Year: fi.Year, Path: fi.Path || '' };
+            }
+        });
+
+        function updateFilterVisibility() {
+            var mode = filterModeSelect.value;
+            filterBrowserContainer.style.display = (mode === 'AllowAll') ? 'none' : '';
+            if (mode !== 'AllowAll' && filterCurrentLibraryId) {
+                loadFilterItems('');
+            }
         }
 
-        function updateAllIgnoredPrefixes() {
-            var prefix = getSourceRootPrefix();
-            div.querySelectorAll('.ignoredPathPrefix').forEach(function(span) {
-                span.textContent = prefix;
+        filterModeSelect.addEventListener('change', updateFilterVisibility);
+
+        function showFilterLoading(isNewSearch) {
+            filterSearchSpinner.style.display = '';
+            if (isNewSearch) {
+                filterItemsList.classList.add('filterItemsLoading');
+            }
+        }
+
+        function hideFilterLoading() {
+            filterSearchSpinner.style.display = 'none';
+            filterItemsList.classList.remove('filterItemsLoading');
+        }
+
+        function loadFilterItems(searchTerm) {
+            filterStartIndex = 0;
+            filterRequestId++;
+            var isFirstLoad = filterItemsList.children.length === 0;
+            if (isFirstLoad) {
+                filterItemsList.innerHTML = '<div class="filterBrowserStatus">Loading...</div>';
+            }
+            showFilterLoading(true);
+            fetchFilterItems(searchTerm, 0, filterRequestId);
+        }
+
+        function fetchFilterItems(searchTerm, startIdx, reqId) {
+            var libraryId = filterCurrentLibraryId;
+            if (!libraryId) {
+                hideFilterLoading();
+                filterItemsList.innerHTML = '<div class="filterBrowserStatus">Select a source library first</div>';
+                return;
+            }
+
+            var isAppending = startIdx > 0;
+            if (isAppending) {
+                showFilterLoading(false);
+            }
+
+            var params = 'libraryId=' + encodeURIComponent(libraryId) + '&startIndex=' + startIdx + '&limit=50';
+            if (searchTerm) params += '&search=' + encodeURIComponent(searchTerm);
+
+            apiRequest('SourceLibraryItems?' + params, 'GET').then(function(response) {
+                // Ignore stale responses from superseded searches
+                if (reqId !== filterRequestId) return;
+                hideFilterLoading();
+
+                if (startIdx === 0) {
+                    filterItemsList.innerHTML = '';
+                } else {
+                    var existingMore = filterItemsList.querySelector('.filterLoadMore');
+                    if (existingMore) existingMore.remove();
+                }
+
+                if (!response || !response.Items || response.Items.length === 0) {
+                    if (startIdx === 0) {
+                        filterItemsList.innerHTML = '<div class="filterBrowserStatus">No items found</div>';
+                    }
+                    return;
+                }
+
+                var serverUrl = currentConfig ? currentConfig.SourceServerUrl : '';
+                var apiKey = currentConfig ? currentConfig.SourceServerApiKey : '';
+
+                response.Items.forEach(function(item) {
+                    var itemEl = document.createElement('div');
+                    itemEl.className = 'filterItem' + (selectedFilterItems[item.Id] ? ' selected' : '');
+                    itemEl.dataset.itemId = item.Id;
+
+                    var thumbHtml;
+                    if (serverUrl && apiKey && item.Id) {
+                        thumbHtml = '<img class="filterItemThumb" src="' +
+                            escapeHtml(serverUrl) + '/Items/' + escapeHtml(item.Id) + '/Images/Primary?maxHeight=120&api_key=' + escapeHtml(apiKey) +
+                            '" onerror="this.outerHTML=\'<div class=filterItemThumbPlaceholder><span class=material-icons>movie</span></div>\'" />';
+                    } else {
+                        thumbHtml = '<div class="filterItemThumbPlaceholder"><span class="material-icons">movie</span></div>';
+                    }
+
+                    var metaParts = [];
+                    if (item.Year) metaParts.push(item.Year);
+                    if (item.Type) metaParts.push(item.Type);
+
+                    var overviewHtml = '';
+                    if (item.Overview) {
+                        var overviewSnippet = item.Overview.substring(0, 120);
+                        if (item.Overview.length > 120) overviewSnippet += '...';
+                        overviewHtml = '<div class="filterItemOverview">' + escapeHtml(overviewSnippet) + '</div>';
+                    }
+
+                    itemEl.innerHTML = thumbHtml +
+                        '<div class="filterItemInfo">' +
+                            '<div class="filterItemName">' + escapeHtml(item.Name || '') + '</div>' +
+                            '<div class="filterItemMeta">' + escapeHtml(metaParts.join(' \u2022 ')) + '</div>' +
+                            overviewHtml +
+                        '</div>' +
+                        '<div class="filterItemCheck"><span class="material-icons">' + (selectedFilterItems[item.Id] ? 'check_box' : 'check_box_outline_blank') + '</span></div>';
+
+                    itemEl.addEventListener('click', function() {
+                        toggleFilterItem(item, itemEl);
+                    });
+
+                    filterItemsList.appendChild(itemEl);
+                });
+
+                filterStartIndex = startIdx + response.Items.length;
+                var hasMore = filterStartIndex < (response.TotalCount || 0);
+
+                if (hasMore) {
+                    var loadMoreBtn = document.createElement('button');
+                    loadMoreBtn.className = 'filterLoadMore';
+                    loadMoreBtn.textContent = 'Load More (' + filterStartIndex + ' / ' + response.TotalCount + ')';
+                    var capturedStartIndex = filterStartIndex;
+                    loadMoreBtn.addEventListener('click', function() {
+                        fetchFilterItems(filterSearchInput.value.trim(), capturedStartIndex, filterRequestId);
+                    });
+                    filterItemsList.appendChild(loadMoreBtn);
+                }
+            }).catch(function() {
+                if (reqId !== filterRequestId) return;
+                hideFilterLoading();
+                if (startIdx === 0) {
+                    filterItemsList.innerHTML = '<div class="filterBrowserStatus">Failed to load items</div>';
+                }
             });
         }
 
-        function addIgnoredPathRow(pathValue) {
-            var row = document.createElement('div');
-            row.className = 'ignoredPathRow';
-            row.innerHTML =
-                '<span class="ignoredPathPrefix">' + escapeHtml(getSourceRootPrefix()) + '</span>' +
-                '<input is="emby-input" type="text" class="ignoredPathInput" placeholder="e.g. The Simpsons or Star Wars*" value="' + escapeHtml(pathValue || '') + '" />' +
-                '<button is="emby-button" type="button" class="btnRemoveIgnoredPath raised button-destructive button-small" title="Remove"><span class="material-icons">delete</span></button>';
-            ignoredList.appendChild(row);
-            row.querySelector('.btnRemoveIgnoredPath').addEventListener('click', function() { row.remove(); });
+        function toggleFilterItem(item, itemEl) {
+            if (selectedFilterItems[item.Id]) {
+                delete selectedFilterItems[item.Id];
+                itemEl.classList.remove('selected');
+                itemEl.querySelector('.filterItemCheck .material-icons').textContent = 'check_box_outline_blank';
+            } else {
+                selectedFilterItems[item.Id] = { ItemId: item.Id, Name: item.Name || '', Year: item.Year, Path: item.Path || '' };
+                itemEl.classList.add('selected');
+                itemEl.querySelector('.filterItemCheck .material-icons').textContent = 'check_box';
+            }
         }
-        (mapping.IgnoredPaths || []).forEach(function(p) { addIgnoredPathRow(p); });
-        div.querySelector('.btnAddIgnoredPath').addEventListener('click', function() { addIgnoredPathRow(''); });
 
-        // Keep prefix in sync when source root path changes
-        if (sourceRootInput) {
-            sourceRootInput.addEventListener('input', updateAllIgnoredPrefixes);
-        }
+        // Search with debounce
+        filterSearchInput.addEventListener('input', function() {
+            clearTimeout(filterSearchTimeout);
+            filterSearchTimeout = setTimeout(function() {
+                loadFilterItems(filterSearchInput.value.trim());
+            }, 300);
+        });
+
+        // Store references for collectLibraryMappings
+        div._filterModeSelect = filterModeSelect;
+        div._selectedFilterItems = selectedFilterItems;
 
         // Populate source library select
         var sourceSelect = div.querySelector('.sourceLibrarySelect');
@@ -409,7 +573,13 @@ export default function (view) {
                 var locations = JSON.parse(option.dataset.locations);
                 if (locations.length > 0) div.querySelector('.sourceRootPath').value = locations[0];
             }
-            updateAllIgnoredPrefixes();
+            // Update filter browser for new library
+            filterCurrentLibraryId = this.value;
+            selectedFilterItems = {};
+            div._selectedFilterItems = selectedFilterItems;
+            if (filterModeSelect.value !== 'AllowAll' && filterCurrentLibraryId) {
+                loadFilterItems('');
+            }
         });
 
         // Populate local library select
@@ -440,11 +610,21 @@ export default function (view) {
         view.querySelectorAll('.libraryMapping').forEach(function(row) {
             var sourceSelect = row.querySelector('.sourceLibrarySelect');
             var localSelect = row.querySelector('.localLibrarySelect');
-            var ignoredPaths = [];
-            row.querySelectorAll('.ignoredPathInput').forEach(function(input) {
-                var val = input.value.trim();
-                if (val.length > 0) { ignoredPaths.push(val); }
+
+            // Collect filter data
+            var filterMode = row._filterModeSelect ? row._filterModeSelect.value : 'AllowAll';
+            var filteredItems = [];
+            var selectedItems = row._selectedFilterItems || {};
+            Object.keys(selectedItems).forEach(function(id) {
+                var fi = selectedItems[id];
+                filteredItems.push({
+                    ItemId: fi.ItemId,
+                    Name: fi.Name || '',
+                    Year: fi.Year || null,
+                    Path: fi.Path || ''
+                });
             });
+
             mappings.push({
                 IsEnabled: row.querySelector('.mappingEnabled').checked,
                 SourceLibraryId: sourceSelect.value,
@@ -453,7 +633,8 @@ export default function (view) {
                 LocalLibraryId: localSelect.value,
                 LocalLibraryName: localSelect.options[localSelect.selectedIndex] ? localSelect.options[localSelect.selectedIndex].textContent : '',
                 LocalRootPath: row.querySelector('.localRootPath').value,
-                IgnoredPaths: ignoredPaths
+                FilterMode: filterMode,
+                FilteredItems: filteredItems
             });
         });
         return mappings;

@@ -74,14 +74,14 @@ public class SyncTableService
 
         var seenSourceItemIds = new HashSet<string>();
 
-        // Mark existing items under ignored paths as Ignored and exclude them from missing-item processing
-        if (mapping.IgnoredPaths?.Count > 0)
+        // Mark existing items matching the filter as Ignored and exclude them from missing-item processing
+        if (mapping.FilterMode != LibraryFilterMode.AllowAll && mapping.FilteredItems?.Count > 0)
         {
             foreach (var kvp in existingItems)
             {
-                if (PathUtilities.IsPathIgnored(kvp.Value.SourcePath, mapping.SourceRootPath, mapping.IgnoredPaths))
+                if (PathUtilities.IsItemFiltered(kvp.Value.SourcePath, mapping.SourceRootPath, mapping.FilterMode, mapping.FilteredItems))
                 {
-                    // Prevent ProcessMissingItems from treating ignored items as deleted
+                    // Prevent ProcessMissingItems from treating filtered items as deleted
                     seenSourceItemIds.Add(kvp.Key);
 
                     if (kvp.Value.Status != SyncStatus.Ignored)
@@ -90,7 +90,7 @@ public class SyncTableService
                         kvp.Value.PendingType = null;
                         kvp.Value.StatusDate = DateTime.UtcNow;
                         database.Upsert(kvp.Value);
-                        _logger.LogInformation("Marked {FileName} as ignored (path matches ignored folder)", System.IO.Path.GetFileName(kvp.Value.SourcePath));
+                        _logger.LogInformation("Marked {FileName} as ignored (filtered by library filter)", System.IO.Path.GetFileName(kvp.Value.SourcePath));
                     }
                 }
             }
@@ -109,7 +109,8 @@ public class SyncTableService
             },
             libraryName: mapping.SourceLibraryName,
             sourceRootPath: mapping.SourceRootPath,
-            ignoredPaths: mapping.IgnoredPaths,
+            filterMode: mapping.FilterMode,
+            filteredItems: mapping.FilteredItems,
             logger: _logger,
             cancellationToken: cancellationToken,
             onItemProcessed: onItemProcessed).ConfigureAwait(false);

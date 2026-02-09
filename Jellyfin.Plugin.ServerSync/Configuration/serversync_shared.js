@@ -58,6 +58,45 @@ export function createServerSyncShared(view) {
             return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         },
 
+        // Build an authenticated image URL for an item on the source server
+        buildSourceImageUrl: function(serverUrl, apiKey, itemId, imageType, maxHeight) {
+            if (!serverUrl || !apiKey || !itemId) return null;
+            imageType = imageType || 'Primary';
+            maxHeight = maxHeight || 80;
+            return serverUrl + '/Items/' + encodeURIComponent(itemId) + '/Images/' + imageType +
+                '?maxHeight=' + maxHeight + '&api_key=' + encodeURIComponent(apiKey);
+        },
+
+        // Build an authenticated image URL for a user on the source server
+        buildSourceUserImageUrl: function(serverUrl, apiKey, userId, maxHeight) {
+            if (!serverUrl || !apiKey || !userId) return null;
+            maxHeight = maxHeight || 80;
+            return serverUrl + '/Users/' + encodeURIComponent(userId) + '/Images/Primary' +
+                '?maxHeight=' + maxHeight + '&api_key=' + encodeURIComponent(apiKey);
+        },
+
+        // Render a thumbnail image with fallback placeholder for item images
+        renderItemThumb: function(serverUrl, apiKey, itemId) {
+            var imgUrl = this.buildSourceImageUrl(serverUrl, apiKey, itemId, 'Primary', 80);
+            if (!imgUrl) {
+                return '<div class="pt-row-thumb-placeholder"><span class="material-icons">movie</span></div>';
+            }
+            return '<img class="pt-row-thumb" src="' + this.escapeHtml(imgUrl) +
+                '" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" />' +
+                '<div class="pt-row-thumb-placeholder" style="display:none"><span class="material-icons">movie</span></div>';
+        },
+
+        // Render a circular user avatar with fallback placeholder
+        renderUserThumb: function(serverUrl, apiKey, userId) {
+            var imgUrl = this.buildSourceUserImageUrl(serverUrl, apiKey, userId, 80);
+            if (!imgUrl) {
+                return '<div class="pt-row-thumb-user-placeholder"><span class="material-icons">person</span></div>';
+            }
+            return '<img class="pt-row-thumb-user" src="' + this.escapeHtml(imgUrl) +
+                '" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" />' +
+                '<div class="pt-row-thumb-user-placeholder" style="display:none"><span class="material-icons">person</span></div>';
+        },
+
         // Show alert using Dashboard
         showAlert: function(message) {
             Dashboard.alert(message);

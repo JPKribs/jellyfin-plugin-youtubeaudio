@@ -233,6 +233,84 @@ public partial class ConfigurationController
     }
 
     /// <summary>
+    /// GetSourceLibraryItems
+    /// Gets top-level items from a source server library for browsing/filtering.
+    /// </summary>
+    /// <param name="libraryId">Source library ID.</param>
+    /// <param name="search">Optional search term.</param>
+    /// <param name="startIndex">Starting index for pagination.</param>
+    /// <param name="limit">Maximum items to return.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>List of source library items.</returns>
+    [HttpGet("SourceLibraryItems")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<SourceLibraryItemsResponse>> GetSourceLibraryItems(
+        [FromQuery] string libraryId,
+        [FromQuery] string? search = null,
+        [FromQuery] int startIndex = 0,
+        [FromQuery] int limit = 50,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(libraryId))
+        {
+            return BadRequest("Library ID is required");
+        }
+
+        var config = _configManager.Configuration;
+        if (string.IsNullOrWhiteSpace(config.SourceServerUrl) || string.IsNullOrWhiteSpace(config.SourceServerApiKey))
+        {
+            return BadRequest("Source server is not configured");
+        }
+
+        if (!Guid.TryParse(libraryId, out var libraryGuid))
+        {
+            return BadRequest("Invalid library ID format");
+        }
+
+        try
+        {
+            using var client = _clientFactory.Create(config.SourceServerUrl, config.SourceServerApiKey);
+            var result = await client.GetTopLevelLibraryItemsAsync(
+                libraryGuid,
+                search,
+                startIndex,
+                limit,
+                cancellationToken).ConfigureAwait(false);
+
+            if (result?.Items == null)
+            {
+                return Ok(new SourceLibraryItemsResponse { Items = new List<SourceLibraryItemDto>(), TotalCount = 0 });
+            }
+
+            var items = result.Items.Select(item => new SourceLibraryItemDto
+            {
+                Id = item.Id?.ToString("N") ?? string.Empty,
+                Name = item.Name ?? string.Empty,
+                Year = item.ProductionYear,
+                Overview = item.Overview,
+                Path = item.Path ?? string.Empty,
+                Type = item.Type?.ToString()
+            }).ToList();
+
+            return Ok(new SourceLibraryItemsResponse
+            {
+                Items = items,
+                TotalCount = result.TotalRecordCount ?? items.Count
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to get source library items for library {LibraryId}", libraryId);
+            return BadRequest("Failed to fetch items from source server");
+        }
+    }
+
+    /// <summary>
     /// ValidateServerUrl
     /// Validates and normalizes a server URL.
     /// </summary>

@@ -50,10 +50,11 @@ public partial class ConfigurationController
 
         // Get paginated results
         var (items, totalCount) = _databaseProvider.Database.SearchHistoryItemsPaginated(search, statusFilter, sourceUserId, skip, take);
+        var config = _configManager.Configuration;
 
         return Ok(new PaginatedResult<HistorySyncItemDto>
         {
-            Items = items.Select(i => MapToHistorySyncItemDto(i)).ToList(),
+            Items = items.Select(i => MapToHistorySyncItemDto(i, config.SourceServerUrl, config.SourceServerApiKey)).ToList(),
             TotalCount = totalCount,
             Skip = skip,
             Take = take
@@ -272,7 +273,7 @@ public partial class ConfigurationController
     /// <summary>
     /// Maps a HistorySyncItem to a DTO.
     /// </summary>
-    private static HistorySyncItemDto MapToHistorySyncItemDto(HistorySyncItem item)
+    private static HistorySyncItemDto MapToHistorySyncItemDto(HistorySyncItem item, string? sourceServerUrl, string? sourceServerApiKey)
     {
         return new HistorySyncItemDto
         {
@@ -301,6 +302,8 @@ public partial class ConfigurationController
             MergedPlaybackPositionTicks = item.MergedPlaybackPositionTicks,
             MergedLastPlayedDate = item.MergedLastPlayedDate,
             MergedIsFavorite = item.MergedIsFavorite,
+            SourceServerUrl = sourceServerUrl,
+            SourceServerApiKey = sourceServerApiKey,
             Status = item.Status.ToString(),
             StatusDate = item.StatusDate,
             LastSyncTime = item.LastSyncTime,
