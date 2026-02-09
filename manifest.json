@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "10.11.33",
+        "changelog": "## Features\r\n- Add per-library whitelist/blacklist filtering with visual item picker, replacing manual Ignored Paths\r\n- Add source server thumbnail previews in all sync table rows (content, history, metadata, user)\r\n- Add searchable item browser for filter selection with debounced search and pagination\r\n- Consolidate image download methods into SourceServerClient for consistent auth handling\r\n\r\n## Improvements\r\n- Filter item browser shows Series, Movies, BoxSets, and Music instead of raw folders\r\n- Search within filter browser uses recursive lookup for accurate results\r\n- Loading spinner and dimmed overlay during filter searches instead of jarring content replacement\r\n- Stale search responses are discarded to prevent race conditions from fast typing\r\n- Filter item display shows Name, Year/Type, and description on separate lines\r\n- Filter mode dropdown uses clean labels (Allow All, Whitelist, Blacklist)\r\n- Image downloads in metadata sync use temp files instead of memory streams\r\n\r\n## Fixes\r\n- Fix filter mode not restoring correctly when re-entering library mapping configuration\r\n- Fix library mapping save errors caused by enum serialization mismatch\r\n- Fix search not functioning in filter item browser due to non-recursive API query",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-serversync/releases/download/v10.11.33/jellyfin-plugin-serversync-10.11.33.zip",
+        "checksum": "75d8771f34a3b0d41aab13a2caa4a137",
+        "timestamp": "2026-02-09T20:33:56Z"
+      },
+      {
         "version": "10.11.32",
         "changelog": "## Fixes\r\n- Cleanup button layouts",
         "targetAbi": "10.11.0.0",
