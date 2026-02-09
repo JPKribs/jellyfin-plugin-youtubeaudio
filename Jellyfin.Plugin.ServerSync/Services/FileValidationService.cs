@@ -109,10 +109,12 @@ public static class FileValidationService
         {
             var localInfo = new FileInfo(item.LocalPath);
 
-            // If sizes match, the file is likely valid
-            if (item.SourceSize > 0 && localInfo.Length == item.SourceSize)
+            // If source size is unknown or sizes match, the file is likely valid
+            if (item.SourceSize == 0 || localInfo.Length == item.SourceSize)
             {
-                skipReason = $"Local file already exists with matching size ({FormatUtilities.FormatBytes(localInfo.Length)})";
+                skipReason = item.SourceSize == 0
+                    ? $"Local file already exists (source size unknown, local size: {FormatUtilities.FormatBytes(localInfo.Length)})"
+                    : $"Local file already exists with matching size ({FormatUtilities.FormatBytes(localInfo.Length)})";
                 return true;
             }
 

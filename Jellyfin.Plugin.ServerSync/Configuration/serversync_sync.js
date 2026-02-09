@@ -401,6 +401,7 @@ export default function (view) {
             // Modal action buttons
             bind('btnModalIgnore', function() { self.modalIgnore(); });
             bind('btnModalQueue', function() { self.modalQueue(); });
+            bind('btnModalMarkSynced', function() { self.modalMarkSynced(); });
             bind('btnModalDelete', function() { self.modalDelete(); });
             bind('btnModalClose', function() { self.closeModal(); });
         },
@@ -414,10 +415,12 @@ export default function (view) {
             bulkContainer.innerHTML =
                 '<button is="emby-button" type="button" id="btnBulkIgnore" class="raised pt-bulk-icon-btn" title="Ignore" disabled><span class="material-icons">block</span></button>' +
                 '<button is="emby-button" type="button" id="btnBulkQueue" class="raised button-primary pt-bulk-icon-btn" title="Queue" disabled><span class="material-icons">playlist_add</span></button>' +
+                '<button is="emby-button" type="button" id="btnBulkMarkSynced" class="raised pt-bulk-icon-btn" title="Mark Synced (verifies local file exists)" disabled><span class="material-icons">check_circle</span></button>' +
                 '<button is="emby-button" type="button" id="btnBulkDelete" class="raised button-destructive pt-bulk-icon-btn" title="Delete from local server only" disabled><span class="material-icons">delete</span></button>';
 
             bulkContainer.querySelector('#btnBulkIgnore').addEventListener('click', function() { self.bulkIgnore(); });
             bulkContainer.querySelector('#btnBulkQueue').addEventListener('click', function() { self.bulkQueue(); });
+            bulkContainer.querySelector('#btnBulkMarkSynced').addEventListener('click', function() { self.bulkMarkSynced(); });
             bulkContainer.querySelector('#btnBulkDelete').addEventListener('click', function() { self.bulkDelete(); });
         },
 
@@ -600,10 +603,12 @@ export default function (view) {
             var hasSelection = count > 0;
             var ignoreBtn = view.querySelector('#btnBulkIgnore');
             var queueBtn = view.querySelector('#btnBulkQueue');
+            var markSyncedBtn = view.querySelector('#btnBulkMarkSynced');
             var deleteBtn = view.querySelector('#btnBulkDelete');
 
             if (ignoreBtn) ignoreBtn.disabled = !hasSelection;
             if (queueBtn) queueBtn.disabled = !hasSelection;
+            if (markSyncedBtn) markSyncedBtn.disabled = !hasSelection;
             if (deleteBtn) deleteBtn.disabled = !hasSelection;
         },
 
@@ -640,6 +645,27 @@ export default function (view) {
             }).catch(function(err) {
                 console.error('Bulk queue failed:', err);
                 ServerSyncShared.showAlert('Failed to queue items');
+            });
+        },
+
+        // Bulk mark selected items as synced (verifies local files exist on server)
+        bulkMarkSynced: function() {
+            var self = this;
+            var ids = this.table.getSelectedIds();
+            if (ids.length === 0) return;
+
+            ServerSyncShared.apiRequest('MarkSynced', 'POST', { SourceItemIds: ids }).then(function(result) {
+                self.table.clearSelection();
+                self.loadSyncStatus();
+                self.loadSyncItems();
+                var msg = (result.Synced || 0) + ' item(s) marked as synced';
+                if (result.NotFound > 0) {
+                    msg += ', ' + result.NotFound + ' local file(s) not found';
+                }
+                ServerSyncShared.showAlert(msg);
+            }).catch(function(err) {
+                console.error('Bulk mark synced failed:', err);
+                ServerSyncShared.showAlert('Failed to mark items as synced');
             });
         },
 
@@ -797,10 +823,12 @@ export default function (view) {
 
             var btnQueue = view.querySelector('#btnModalQueue');
             var btnIgnore = view.querySelector('#btnModalIgnore');
+            var btnMarkSynced = view.querySelector('#btnModalMarkSynced');
             var modalDeleteRow = view.querySelector('#modalDeleteRow');
             var isPendingDeletion = item.Status === 'Pending' && item.PendingType === 'Deletion';
             var isPendingDownloadOrReplacement = item.Status === 'Pending' && (item.PendingType === 'Download' || item.PendingType === 'Replacement');
             var isSynced = item.Status === 'Synced';
+            var isQueuedOrErrored = item.Status === 'Queued' || item.Status === 'Errored';
 
             var queueBtnSpan = btnQueue.querySelector('span');
             if (isSynced) {
@@ -808,6 +836,9 @@ export default function (view) {
             } else {
                 queueBtnSpan.textContent = 'Queue';
             }
+
+            // Show Mark Synced only for Queued/Errored items
+            btnMarkSynced.style.display = isQueuedOrErrored ? 'inline-block' : 'none';
 
             if (isPendingDeletion) {
                 btnQueue.style.display = 'none';
@@ -850,6 +881,25 @@ export default function (view) {
                 }
                 this.updateItemStatus(this.currentModalItem.SourceItemId, 'Queued');
             }
+        },
+
+        // Mark the current modal item as synced (verifies local file exists on server)
+        modalMarkSynced: function() {
+            var self = this;
+            if (!this.currentModalItem) return;
+
+            ServerSyncShared.apiRequest('MarkSynced', 'POST', { SourceItemIds: [this.currentModalItem.SourceItemId] }).then(function(result) {
+                self.closeModal();
+                self.loadSyncStatus();
+                self.loadSyncItems();
+                if (result && result.Synced > 0) {
+                    ServerSyncShared.showAlert('Item marked as synced');
+                } else {
+                    ServerSyncShared.showAlert('Local file not found - cannot mark as synced');
+                }
+            }).catch(function() {
+                ServerSyncShared.showAlert('Failed to mark item as synced');
+            });
         },
 
         // Delete the current modal item from the local server (requires confirmation)

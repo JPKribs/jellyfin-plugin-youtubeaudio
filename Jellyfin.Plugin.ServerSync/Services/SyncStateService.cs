@@ -63,7 +63,7 @@ public static class SyncStateService
         if (File.Exists(localPath))
         {
             var localInfo = new FileInfo(localPath);
-            if (localInfo.Length == sourceSize)
+            if (sourceSize == 0 || localInfo.Length == sourceSize)
             {
                 syncItem.Status = SyncStatus.Synced;
                 syncItem.PendingType = null;
@@ -150,7 +150,7 @@ public static class SyncStateService
                 if (File.Exists(localPath))
                 {
                     var localInfo = new FileInfo(localPath);
-                    if (localInfo.Length == sourceSize)
+                    if (sourceSize == 0 || localInfo.Length == sourceSize)
                     {
                         existingItem.Status = SyncStatus.Synced;
                         existingItem.PendingType = null;
@@ -160,6 +160,21 @@ public static class SyncStateService
                         logger.LogInformation("Marked {FileName} as synced (local file found with matching size)", Path.GetFileName(localPath));
                         return new TransitionResult(true, "Synced (local file found)");
                     }
+
+                    logger.LogDebug(
+                        "File exists but size mismatch for {FileName}: local={LocalSize}, source={SourceSize}, path={LocalPath}",
+                        Path.GetFileName(localPath),
+                        localInfo.Length,
+                        sourceSize,
+                        localPath);
+                }
+                else
+                {
+                    logger.LogDebug(
+                        "Local file not found for {Status} item {FileName}: path={LocalPath}",
+                        existingItem.Status,
+                        Path.GetFileName(localPath),
+                        localPath);
                 }
             }
             catch (Exception ex)
@@ -308,7 +323,7 @@ public static class SyncStateService
             if (File.Exists(localPath))
             {
                 var localInfo = new FileInfo(localPath);
-                if (localInfo.Length != sourceSize)
+                if (sourceSize > 0 && localInfo.Length != sourceSize)
                 {
                     // If replace is disabled, don't queue
                     if (replaceMode == ApprovalMode.Disabled)

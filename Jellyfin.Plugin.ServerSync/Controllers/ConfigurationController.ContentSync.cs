@@ -374,6 +374,67 @@ public partial class ConfigurationController
     }
 
     /// <summary>
+    /// MarkSynced
+    /// Marks items as synced after verifying the local file exists.
+    /// Use this to resolve items that are stuck in Queued/Errored status
+    /// when the local file is already present.
+    /// </summary>
+    /// <param name="request">Bulk items request.</param>
+    /// <returns>Action result with synced and not-found counts.</returns>
+    [HttpPost("MarkSynced")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public ActionResult MarkSynced([FromBody] BulkItemsRequest request)
+    {
+        if (request?.SourceItemIds == null || request.SourceItemIds.Count == 0)
+        {
+            return BadRequest("No items specified");
+        }
+
+        var syncedCount = 0;
+        var notFoundCount = 0;
+
+        foreach (var itemId in request.SourceItemIds)
+        {
+            try
+            {
+                var item = _databaseProvider.Database.GetBySourceItemId(itemId);
+                if (item == null)
+                {
+                    notFoundCount++;
+                    continue;
+                }
+
+                if (!string.IsNullOrEmpty(item.LocalPath) && System.IO.File.Exists(item.LocalPath))
+                {
+                    _databaseProvider.Database.UpdateStatus(itemId, SyncStatus.Synced);
+                    syncedCount++;
+                    _logger.LogInformation(
+                        "Manually marked {FileName} as synced (local file verified at {LocalPath})",
+                        SanitizeForLog(Path.GetFileName(item.LocalPath)),
+                        SanitizeForLog(item.LocalPath));
+                }
+                else
+                {
+                    notFoundCount++;
+                    _logger.LogWarning(
+                        "Cannot mark {ItemId} as synced: local file not found at {LocalPath}",
+                        SanitizeForLog(itemId),
+                        SanitizeForLog(item.LocalPath));
+                }
+            }
+            catch (Exception ex)
+            {
+                var sanitizedId = SanitizeForLog(itemId);
+                _logger.LogWarning(ex, "Failed to mark item {ItemId} as synced", sanitizedId);
+                notFoundCount++;
+            }
+        }
+
+        return Ok(new { Synced = syncedCount, NotFound = notFoundCount });
+    }
+
+    /// <summary>
     /// DeleteLocalItems
     /// Deletes items from the LOCAL server only using the Jellyfin API.
     /// </summary>
