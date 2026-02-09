@@ -96,7 +96,7 @@ public partial class ConfigurationController
                     LastSyncTime = i.LastSyncTime,
                     ErrorMessage = i.ErrorMessage,
                     RetryCount = i.RetryCount,
-                    SourceServerUrl = config.SourceServerUrl,
+                    SourceServerUrl = !string.IsNullOrEmpty(config.SourceServerExternalUrl) ? config.SourceServerExternalUrl : config.SourceServerUrl,
                     SourceServerApiKey = config.SourceServerApiKey,
                     SourceServerId = config.SourceServerId,
                     CompanionFiles = i.CompanionFiles

@@ -19,6 +19,14 @@ public class PluginConfiguration : BasePluginConfiguration
     public string SourceServerUrl { get; set; } = string.Empty;
 
     /// <summary>
+    /// Optional external URL for the source server, used only for image display in the UI.
+    /// When set, image thumbnails in sync tables and filter browsers use this URL instead
+    /// of SourceServerUrl. Useful when the sync connection uses an internal/VPN address
+    /// but the browser needs a public URL to load images.
+    /// </summary>
+    public string SourceServerExternalUrl { get; set; } = string.Empty;
+
+    /// <summary>
     /// API key or access token for authenticating with the source server.
     /// Can be either a manually entered API key or a token generated from username/password.
     /// </summary>
@@ -581,10 +589,15 @@ public class PluginConfiguration : BasePluginConfiguration
         RecyclingBinRetentionDays = Math.Clamp(RecyclingBinRetentionDays, 1, 365);
         MaxRetryCount = Math.Clamp(MaxRetryCount, 1, 10);
 
-        // Normalize URL
+        // Normalize URLs
         if (!string.IsNullOrWhiteSpace(SourceServerUrl))
         {
             SourceServerUrl = SourceServerUrl.TrimEnd('/');
+        }
+
+        if (!string.IsNullOrWhiteSpace(SourceServerExternalUrl))
+        {
+            SourceServerExternalUrl = SourceServerExternalUrl.TrimEnd('/');
         }
 
         // Normalize and validate speed units

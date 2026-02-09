@@ -39,7 +39,7 @@ public partial class ConfigurationController
         }
 
         var config = _configManager.Configuration;
-        return Ok(MapToUserSyncItemDto(item, config.SourceServerUrl, config.SourceServerApiKey));
+        return Ok(MapToUserSyncItemDto(item, !string.IsNullOrEmpty(config.SourceServerExternalUrl) ? config.SourceServerExternalUrl : config.SourceServerUrl, config.SourceServerApiKey));
     }
 
     /// <summary>
@@ -82,7 +82,7 @@ public partial class ConfigurationController
 
         return Ok(new PaginatedResult<UserSyncItemDto>
         {
-            Items = items.Select(i => MapToUserSyncItemDto(i, config.SourceServerUrl, config.SourceServerApiKey)).ToList(),
+            Items = items.Select(i => MapToUserSyncItemDto(i, !string.IsNullOrEmpty(config.SourceServerExternalUrl) ? config.SourceServerExternalUrl : config.SourceServerUrl, config.SourceServerApiKey)).ToList(),
             TotalCount = totalCount,
             Skip = skip,
             Take = take
@@ -433,7 +433,7 @@ public partial class ConfigurationController
             LocalUserName = localUserName ?? items.FirstOrDefault()?.LocalUserName,
 
             // Source server info
-            SourceServerUrl = config.SourceServerUrl,
+            SourceServerUrl = !string.IsNullOrEmpty(config.SourceServerExternalUrl) ? config.SourceServerExternalUrl : config.SourceServerUrl,
             SourceServerApiKey = config.SourceServerApiKey,
 
             // Record IDs

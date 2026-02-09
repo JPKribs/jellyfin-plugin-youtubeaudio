@@ -94,8 +94,10 @@ export default function (view) {
     function loadServerConfig(config) {
         var urlEl = view.querySelector('#txtSourceServerUrl');
         var apiKeyEl = view.querySelector('#txtSourceServerApiKey');
+        var externalUrlEl = view.querySelector('#txtSourceServerExternalUrl');
         if (urlEl) urlEl.value = config.SourceServerUrl || '';
         if (apiKeyEl) apiKeyEl.value = config.SourceServerApiKey || '';
+        if (externalUrlEl) externalUrlEl.value = config.SourceServerExternalUrl || '';
 
         if (config.SourceServerName || config.SourceServerId) {
             var nameEl = view.querySelector('#txtSourceServerName');
@@ -162,8 +164,10 @@ export default function (view) {
         var config = currentConfig || {};
         var urlEl = view.querySelector('#txtSourceServerUrl');
         var apiKeyEl = view.querySelector('#txtSourceServerApiKey');
+        var externalUrlEl = view.querySelector('#txtSourceServerExternalUrl');
         config.SourceServerUrl = urlEl ? urlEl.value : '';
         config.SourceServerApiKey = apiKeyEl ? apiKeyEl.value : '';
+        config.SourceServerExternalUrl = externalUrlEl ? externalUrlEl.value : '';
 
         // Note: SourceServerAuthenticatedUser is set by generateToken, not here
         // If the API key was manually changed, clear the authenticated user

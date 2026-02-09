@@ -1,7 +1,7 @@
 ---
 name: "Server Sync"
 guid: "ebd650b5-6f4c-4ccb-b10d-23dffb3a7286"
-version: "10.11.33"
+version: "10.11.34"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
 overview: "Sync media content from a source Jellyfin server to this server."
@@ -24,20 +24,5 @@ artifacts:
 - "Microsoft.Kiota.Serialization.Text.dll"
 - "Std.UriTemplate.dll"
 changelog:
-  features:
-  - Add per-library whitelist/blacklist filtering with visual item picker, replacing manual Ignored Paths
-  - Add source server thumbnail previews in all sync table rows (content, history, metadata, user)
-  - Add searchable item browser for filter selection with debounced search and pagination
-  - Consolidate image download methods into SourceServerClient for consistent auth handling
   improvements:
-  - Filter item browser shows Series, Movies, BoxSets, and Music instead of raw folders
-  - Search within filter browser uses recursive lookup for accurate results
-  - Loading spinner and dimmed overlay during filter searches instead of jarring content replacement
-  - Stale search responses are discarded to prevent race conditions from fast typing
-  - Filter item display shows Name, Year/Type, and description on separate lines
-  - Filter mode dropdown uses clean labels (Allow All, Whitelist, Blacklist)
-  - Image downloads in metadata sync use temp files instead of memory streams
-  fixes:
-  - Fix filter mode not restoring correctly when re-entering library mapping configuration
-  - Fix library mapping save errors caused by enum serialization mismatch
-  - Fix search not functioning in filter item browser due to non-recursive API query
+  -  Allow external URL mapping for Sync Table images

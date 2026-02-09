@@ -41,7 +41,7 @@ public partial class ConfigurationController
         }
 
         var config = _configManager.Configuration;
-        return Ok(MapToMetadataSyncItemDto(item, config.LibraryMappings, config.SourceServerUrl, config.SourceServerApiKey));
+        return Ok(MapToMetadataSyncItemDto(item, config.LibraryMappings, !string.IsNullOrEmpty(config.SourceServerExternalUrl) ? config.SourceServerExternalUrl : config.SourceServerUrl, config.SourceServerApiKey));
     }
 
     /// <summary>
@@ -144,7 +144,7 @@ public partial class ConfigurationController
 
         return Ok(new PaginatedResult<MetadataSyncItemDto>
         {
-            Items = items.Select(i => MapToMetadataSyncItemDto(i, config.LibraryMappings, config.SourceServerUrl, config.SourceServerApiKey)).ToList(),
+            Items = items.Select(i => MapToMetadataSyncItemDto(i, config.LibraryMappings, !string.IsNullOrEmpty(config.SourceServerExternalUrl) ? config.SourceServerExternalUrl : config.SourceServerUrl, config.SourceServerApiKey)).ToList(),
             TotalCount = totalCount,
             Skip = skip,
             Take = take

@@ -30,6 +30,13 @@
                                 <div class="fieldDescription">URL of the source Jellyfin server to sync from.</div>
                             </div>
 
+                            <!-- External URL Input -->
+                            <div class="inputContainer">
+                                <label for="txtSourceServerExternalUrl">External URL (optional):</label>
+                                <input is="emby-input" type="text" id="txtSourceServerExternalUrl" placeholder="https://media.example.com" />
+                                <div class="fieldDescription">Public URL used for loading image thumbnails in the browser. If empty, the Server URL above is used. Useful when syncing over a VPN/internal address that your browser can't reach.</div>
+                            </div>
+
                             <!-- API Key Input -->
                             <div class="inputContainer">
                                 <label for="txtSourceServerApiKey">API Key:</label>

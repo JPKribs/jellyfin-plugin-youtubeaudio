@@ -54,7 +54,7 @@ public partial class ConfigurationController
 
         return Ok(new PaginatedResult<HistorySyncItemDto>
         {
-            Items = items.Select(i => MapToHistorySyncItemDto(i, config.SourceServerUrl, config.SourceServerApiKey)).ToList(),
+            Items = items.Select(i => MapToHistorySyncItemDto(i, !string.IsNullOrEmpty(config.SourceServerExternalUrl) ? config.SourceServerExternalUrl : config.SourceServerUrl, config.SourceServerApiKey)).ToList(),
             TotalCount = totalCount,
             Skip = skip,
             Take = take
