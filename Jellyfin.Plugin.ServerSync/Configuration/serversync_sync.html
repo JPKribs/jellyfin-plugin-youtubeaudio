@@ -186,15 +186,13 @@
                                     <button is="emby-button" type="button" id="btnModalIgnore" class="raised modalButton">
                                         <span>Ignore</span>
                                     </button>
+                                    <button is="emby-button" type="button" id="btnModalMarkSynced" class="raised modalButton" title="Mark as synced (verifies local file exists)">
+                                        <span>Mark Synced</span>
+                                    </button>
                                     <button is="emby-button" type="button" id="btnModalQueue" class="raised button-primary modalButton">
                                         <span>Queue</span>
                                     </button>
-                                    <button is="emby-button" type="button" id="btnModalMarkSynced" class="raised button-primary modalButton" title="Mark as synced (verifies local file exists)">
-                                        <span>Mark Synced</span>
-                                    </button>
-                                </div>
-                                <div id="modalDeleteRow" class="modalDeleteRow">
-                                    <button is="emby-button" type="button" id="btnModalDelete" class="raised button-destructive modalDeleteButton" title="Delete from local server only">
+                                    <button is="emby-button" type="button" id="btnModalDelete" class="raised button-destructive modalButton" title="Delete from local server only">
                                         <span>Delete</span>
                                     </button>
                                 </div>
@@ -730,8 +728,7 @@
         .contentModal-pathMetaValue {
             font-family: var(--font-mono);
         }
-        .modalDeleteRow { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.1); }
-        .modalDeleteButton { width: 100%; text-align: center; justify-content: center; }
+
 
         /* ===== History Modal Specifics ===== */
         .historyModal-userSection { margin-bottom: 16px; }

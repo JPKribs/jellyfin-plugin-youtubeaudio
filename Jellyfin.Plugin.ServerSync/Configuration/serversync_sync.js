@@ -414,8 +414,8 @@ export default function (view) {
 
             bulkContainer.innerHTML =
                 '<button is="emby-button" type="button" id="btnBulkIgnore" class="raised pt-bulk-icon-btn" title="Ignore" disabled><span class="material-icons">block</span></button>' +
-                '<button is="emby-button" type="button" id="btnBulkQueue" class="raised button-primary pt-bulk-icon-btn" title="Queue" disabled><span class="material-icons">playlist_add</span></button>' +
                 '<button is="emby-button" type="button" id="btnBulkMarkSynced" class="raised pt-bulk-icon-btn" title="Mark Synced (verifies local file exists)" disabled><span class="material-icons">check_circle</span></button>' +
+                '<button is="emby-button" type="button" id="btnBulkQueue" class="raised button-primary pt-bulk-icon-btn" title="Queue" disabled><span class="material-icons">playlist_add</span></button>' +
                 '<button is="emby-button" type="button" id="btnBulkDelete" class="raised button-destructive pt-bulk-icon-btn" title="Delete from local server only" disabled><span class="material-icons">delete</span></button>';
 
             bulkContainer.querySelector('#btnBulkIgnore').addEventListener('click', function() { self.bulkIgnore(); });
@@ -439,13 +439,13 @@ export default function (view) {
         // Show or hide delete buttons based on server capability
         updateDeleteCapabilityVisibility: function(canDelete) {
             var bulkDeleteBtn = view.querySelector('#btnBulkDelete');
-            var modalDeleteRow = view.querySelector('#modalDeleteRow');
+            var modalDeleteBtn = view.querySelector('#btnModalDelete');
 
             if (bulkDeleteBtn) {
                 bulkDeleteBtn.style.display = canDelete ? 'inline-block' : 'none';
             }
-            if (modalDeleteRow) {
-                modalDeleteRow.style.display = canDelete ? 'block' : 'none';
+            if (modalDeleteBtn) {
+                modalDeleteBtn.style.display = canDelete ? 'inline-block' : 'none';
             }
         },
 
@@ -824,7 +824,7 @@ export default function (view) {
             var btnQueue = view.querySelector('#btnModalQueue');
             var btnIgnore = view.querySelector('#btnModalIgnore');
             var btnMarkSynced = view.querySelector('#btnModalMarkSynced');
-            var modalDeleteRow = view.querySelector('#modalDeleteRow');
+            var modalDeleteBtn = view.querySelector('#btnModalDelete');
             var isPendingDeletion = item.Status === 'Pending' && item.PendingType === 'Deletion';
             var isPendingDownloadOrReplacement = item.Status === 'Pending' && (item.PendingType === 'Download' || item.PendingType === 'Replacement');
             var isSynced = item.Status === 'Synced';
@@ -843,15 +843,15 @@ export default function (view) {
             if (isPendingDeletion) {
                 btnQueue.style.display = 'none';
                 if (self.capabilities && self.capabilities.CanDeleteItems) {
-                    modalDeleteRow.style.display = 'block';
+                    modalDeleteBtn.style.display = 'inline-block';
                 }
             } else if (isPendingDownloadOrReplacement) {
                 btnQueue.style.display = 'inline-block';
-                modalDeleteRow.style.display = 'none';
+                modalDeleteBtn.style.display = 'none';
             } else {
                 btnQueue.style.display = 'inline-block';
                 if (self.capabilities && self.capabilities.CanDeleteItems) {
-                    modalDeleteRow.style.display = 'block';
+                    modalDeleteBtn.style.display = 'inline-block';
                 }
             }
 
