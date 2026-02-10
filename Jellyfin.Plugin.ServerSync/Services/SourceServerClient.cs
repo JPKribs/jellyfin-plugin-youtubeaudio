@@ -87,15 +87,38 @@ public class SourceServerClient : IDisposable
         try
         {
             var client = GetApiClient();
-            // Use the authenticated /System/Info endpoint (not /System/Info/Public)
-            // This validates that the API key/token is actually valid
-            var info = await client.System.Info.GetAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+
+            // Try the authenticated /System/Info endpoint first (validates token and gets full info).
+            // If the token belongs to a non-admin user, this may return 403 — fall back to /System/Info/Public.
+            try
+            {
+                var info = await client.System.Info.GetAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+
+                return new ConnectionTestResult
+                {
+                    Success = true,
+                    ServerName = info?.ServerName,
+                    ServerId = info?.Id,
+                    Message = "Connection successful"
+                };
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Authenticated /System/Info failed, falling back to /System/Info/Public");
+            }
+
+            // Fallback: use /System/Info/Public (available to all authenticated users)
+            var publicInfo = await client.System.Info.Public.GetAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
 
             return new ConnectionTestResult
             {
                 Success = true,
-                ServerName = info?.ServerName,
-                ServerId = info?.Id,
+                ServerName = publicInfo?.ServerName,
+                ServerId = publicInfo?.Id,
                 Message = "Connection successful"
             };
         }
@@ -212,11 +235,17 @@ public class SourceServerClient : IDisposable
 
             // Get user info
             string? authenticatedUsername = null;
+            string? authenticatedUserId = null;
             if (authResponse.RootElement.TryGetProperty("User", out var userProp))
             {
                 if (userProp.TryGetProperty("Name", out var nameProp))
                 {
                     authenticatedUsername = nameProp.GetString();
+                }
+
+                if (userProp.TryGetProperty("Id", out var idProp))
+                {
+                    authenticatedUserId = idProp.GetString();
                 }
             }
 
@@ -225,6 +254,7 @@ public class SourceServerClient : IDisposable
                 Success = true,
                 AccessToken = accessToken,
                 Username = authenticatedUsername ?? username,
+                UserId = authenticatedUserId,
                 ServerId = serverName
             };
         }
@@ -261,16 +291,41 @@ public class SourceServerClient : IDisposable
     /// <summary>
     /// GetLibrariesAsync
     /// Gets all libraries from the source server.
+    /// Tries the admin /Library/VirtualFolders endpoint first.
+    /// If that fails (e.g. non-admin user token), falls back to /Users/{userId}/Views.
     /// </summary>
+    /// <param name="authenticatedUserId">Optional authenticated user ID for fallback to user-scoped endpoint.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of virtual folder info.</returns>
-    public async Task<List<VirtualFolderInfo>> GetLibrariesAsync(CancellationToken cancellationToken = default)
+    public async Task<List<VirtualFolderInfo>> GetLibrariesAsync(string? authenticatedUserId = null, CancellationToken cancellationToken = default)
     {
         try
         {
             var client = GetApiClient();
-            var folders = await client.Library.VirtualFolders.GetAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
-            return folders ?? new List<VirtualFolderInfo>();
+
+            // Try admin endpoint first (returns libraries with file-system Locations)
+            try
+            {
+                var folders = await client.Library.VirtualFolders.GetAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+                return folders ?? new List<VirtualFolderInfo>();
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Admin /Library/VirtualFolders failed, attempting user-scoped fallback");
+            }
+
+            // Fallback: use /Users/{userId}/Views (available to non-admin users)
+            if (!string.IsNullOrEmpty(authenticatedUserId))
+            {
+                return await GetUserViewsAsLibrariesAsync(authenticatedUserId, cancellationToken).ConfigureAwait(false);
+            }
+
+            _logger.LogWarning("Cannot fall back to user views — no authenticated user ID available");
+            return new List<VirtualFolderInfo>();
         }
         catch (OperationCanceledException)
         {
@@ -284,18 +339,91 @@ public class SourceServerClient : IDisposable
     }
 
     /// <summary>
+    /// Gets user-accessible libraries via /Users/{userId}/Views and maps them to VirtualFolderInfo.
+    /// This endpoint works for non-admin users but does not include file-system Locations.
+    /// </summary>
+    private async Task<List<VirtualFolderInfo>> GetUserViewsAsLibrariesAsync(string userId, CancellationToken cancellationToken)
+    {
+        var url = $"{_serverUrl}/Users/{Uri.EscapeDataString(userId)}/Views";
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        AddAuthorizationHeader(request);
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+
+        var libraries = new List<VirtualFolderInfo>();
+
+        if (doc.RootElement.TryGetProperty("Items", out var items))
+        {
+            foreach (var item in items.EnumerateArray())
+            {
+                var collectionType = item.TryGetProperty("CollectionType", out var ctProp) ? ctProp.GetString() : null;
+
+                // Only include media libraries (skip non-library views like playlists, live TV)
+                if (string.Equals(collectionType, "playlists", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(collectionType, "livetv", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(collectionType, "boxsets", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var id = item.TryGetProperty("Id", out var idProp) ? idProp.GetString() : null;
+                var name = item.TryGetProperty("Name", out var nameProp) ? nameProp.GetString() : null;
+
+                if (!string.IsNullOrEmpty(id) && !string.IsNullOrEmpty(name))
+                {
+                    libraries.Add(new VirtualFolderInfo
+                    {
+                        ItemId = id,
+                        Name = name,
+                        Locations = new List<string>()
+                    });
+                }
+            }
+        }
+
+        _logger.LogInformation("Fetched {Count} libraries via user views fallback for user {UserId}", libraries.Count, userId);
+        return libraries;
+    }
+
+    /// <summary>
     /// GetUsersAsync
     /// Gets all users from the source server.
+    /// Falls back to fetching only the authenticated user if the admin endpoint is forbidden.
     /// </summary>
+    /// <param name="authenticatedUserId">Optional authenticated user ID for non-admin fallback.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of user DTOs.</returns>
-    public async Task<List<UserDto>> GetUsersAsync(CancellationToken cancellationToken = default)
+    public async Task<List<UserDto>> GetUsersAsync(string? authenticatedUserId = null, CancellationToken cancellationToken = default)
     {
         try
         {
-            var client = GetApiClient();
-            var users = await client.Users.GetAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
-            return users ?? new List<UserDto>();
+            try
+            {
+                var client = GetApiClient();
+                var users = await client.Users.GetAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+                return users ?? new List<UserDto>();
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Admin /Users endpoint failed, attempting user-scoped fallback");
+            }
+
+            // Fallback: fetch just the authenticated user via /Users/{userId}
+            if (!string.IsNullOrEmpty(authenticatedUserId))
+            {
+                return await GetSingleUserAsync(authenticatedUserId, cancellationToken).ConfigureAwait(false);
+            }
+
+            _logger.LogWarning("Cannot fall back to single user — no authenticated user ID available");
+            return new List<UserDto>();
         }
         catch (OperationCanceledException)
         {
@@ -306,6 +434,43 @@ public class SourceServerClient : IDisposable
             _logger.LogError(ex, "Failed to get users from source server");
             return new List<UserDto>();
         }
+    }
+
+    /// <summary>
+    /// Gets a single user by ID via /Users/{userId}.
+    /// This endpoint is accessible to the authenticated user themselves.
+    /// </summary>
+    private async Task<List<UserDto>> GetSingleUserAsync(string userId, CancellationToken cancellationToken)
+    {
+        var url = $"{_serverUrl}/Users/{Uri.EscapeDataString(userId)}";
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        AddAuthorizationHeader(request);
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+
+        var root = doc.RootElement;
+        var id = root.TryGetProperty("Id", out var idProp) ? idProp.GetString() : null;
+        var name = root.TryGetProperty("Name", out var nameProp) ? nameProp.GetString() : null;
+
+        if (!string.IsNullOrEmpty(id) && Guid.TryParse(id, out var parsedId))
+        {
+            _logger.LogInformation("Fetched single user via fallback: {UserName} ({UserId})", name, id);
+            return new List<UserDto>
+            {
+                new UserDto
+                {
+                    Id = parsedId,
+                    Name = name
+                }
+            };
+        }
+
+        _logger.LogWarning("Failed to parse user from /Users/{UserId} response", userId);
+        return new List<UserDto>();
     }
 
     /// <summary>

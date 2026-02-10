@@ -165,7 +165,12 @@ public partial class ConfigurationController
         try
         {
             using var client = _clientFactory.Create(urlValidation.NormalizedUrl!, request.ApiKey);
-            var libraries = await client.GetLibrariesAsync(cancellationToken).ConfigureAwait(false);
+
+            // Pass authenticated user ID for non-admin fallback
+            var config = Plugin.Instance?.Configuration;
+            var authenticatedUserId = config?.SourceServerAuthenticatedUserId;
+
+            var libraries = await client.GetLibrariesAsync(authenticatedUserId, cancellationToken).ConfigureAwait(false);
 
             return Ok(libraries.Select(l => new LibraryDto
             {
@@ -213,7 +218,12 @@ public partial class ConfigurationController
         try
         {
             using var client = _clientFactory.Create(urlValidation.NormalizedUrl!, request.ApiKey);
-            var users = await client.GetUsersAsync(cancellationToken).ConfigureAwait(false);
+
+            // Pass authenticated user ID for non-admin fallback
+            var config = Plugin.Instance?.Configuration;
+            var authenticatedUserId = config?.SourceServerAuthenticatedUserId;
+
+            var users = await client.GetUsersAsync(authenticatedUserId, cancellationToken).ConfigureAwait(false);
 
             return Ok(users.Select(u => new UserInfoDto
             {

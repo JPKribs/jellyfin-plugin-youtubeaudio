@@ -18,6 +18,11 @@ public class AuthenticateResponse
     public string? Username { get; set; }
 
     /// <summary>
+    /// The user ID of the authenticated user.
+    /// </summary>
+    public string? UserId { get; set; }
+
+    /// <summary>
     /// Server name returned from the authentication.
     /// </summary>
     public string? ServerName { get; set; }

@@ -233,6 +233,7 @@ export default function (view) {
                 if (currentConfig) {
                     currentConfig.SourceServerApiKey = response.AccessToken;
                     currentConfig.SourceServerAuthenticatedUser = response.Username || username;
+                    currentConfig.SourceServerAuthenticatedUserId = response.UserId || '';
                     currentConfig.SourceServerName = response.ServerName;
                     currentConfig.SourceServerId = response.ServerId;
                 }
@@ -242,6 +243,7 @@ export default function (view) {
                 config.SourceServerUrl = serverUrl;
                 config.SourceServerApiKey = response.AccessToken;
                 config.SourceServerAuthenticatedUser = response.Username || username;
+                config.SourceServerAuthenticatedUserId = response.UserId || '';
                 config.SourceServerName = response.ServerName;
                 config.SourceServerId = response.ServerId;
 
@@ -470,7 +472,7 @@ export default function (view) {
                     return;
                 }
 
-                var serverUrl = currentConfig ? currentConfig.SourceServerUrl : '';
+                var serverUrl = currentConfig ? (currentConfig.SourceServerExternalUrl || currentConfig.SourceServerUrl) : '';
                 var apiKey = currentConfig ? currentConfig.SourceServerApiKey : '';
 
                 response.Items.forEach(function(item) {

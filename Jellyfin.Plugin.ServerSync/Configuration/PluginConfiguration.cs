@@ -38,6 +38,13 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public string SourceServerAuthenticatedUser { get; set; } = string.Empty;
 
+    /// <summary>
+    /// User ID of the authenticated user on the source server.
+    /// Used for user-scoped API fallbacks when the user is not an admin.
+    /// Empty if using a manually entered API key.
+    /// </summary>
+    public string SourceServerAuthenticatedUserId { get; set; } = string.Empty;
+
     public string SourceServerName { get; set; } = string.Empty;
 
     public string SourceServerId { get; set; } = string.Empty;

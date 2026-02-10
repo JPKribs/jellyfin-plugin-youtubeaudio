@@ -316,6 +316,7 @@ export default function (view) {
                         key: 'details',
                         label: 'Details',
                         type: 'custom',
+                        className: 'pt-cell-details',
                         render: function(item) {
                             if (item.Status === 'Synced') {
                                 return '<span style="opacity: 0.5;">No changes</span>';
@@ -1051,6 +1052,7 @@ export default function (view) {
                         key: 'details',
                         label: 'Changes',
                         type: 'custom',
+                        className: 'pt-cell-details',
                         render: function(item) {
                             if (!item.HasChanges) {
                                 return '<span style="opacity: 0.5;">No changes</span>';
@@ -1587,6 +1589,7 @@ export default function (view) {
                         key: 'changes',
                         label: 'Changes',
                         type: 'custom',
+                        className: 'pt-cell-details',
                         render: function(item) {
                             if (!item.HasChanges) {
                                 return '<span style="opacity: 0.5;">No changes</span>';
@@ -2468,6 +2471,7 @@ export default function (view) {
                         key: 'changes',
                         label: 'Changes',
                         type: 'custom',
+                        className: 'pt-cell-details',
                         render: function(item) {
                             if (!item.HasChanges) {
                                 return '<span style="opacity: 0.5;">No Changes</span>';

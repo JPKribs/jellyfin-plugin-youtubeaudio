@@ -709,3 +709,115 @@
     color: rgba(255, 255, 255, 0.2);
     font-size: 20px;
 }
+
+/* ===== Mobile Responsive ===== */
+@media (max-width: 600px) {
+    /* Hide the details/changes column on mobile */
+    .pt-cell.pt-cell-details {
+        display: none;
+    }
+
+    /* Shrink status badge column */
+    .pt-cell.pt-cell-status {
+        flex: 0 0 auto;
+    }
+
+    /* Compact row padding */
+    .pt-row {
+        padding: 8px;
+    }
+
+    /* Smaller thumbnails */
+    .pt-row-thumb {
+        height: 48px;
+    }
+    .pt-row-thumb-portrait {
+        width: 32px;
+        flex: 0 0 32px;
+    }
+    .pt-row-thumb-landscape {
+        width: 85px;
+        flex: 0 0 85px;
+    }
+    .pt-row-thumb-placeholder {
+        flex: 0 0 32px;
+        width: 32px;
+        height: 48px;
+    }
+    .pt-row-thumb-user {
+        flex: 0 0 40px;
+        width: 40px;
+        height: 40px;
+    }
+    .pt-row-thumb-user-placeholder {
+        flex: 0 0 40px;
+        width: 40px;
+        height: 40px;
+    }
+
+    /* Tighter item info text */
+    .pt-cell .syncItemName {
+        font-size: 0.9em;
+    }
+    .pt-cell .syncItemPath {
+        font-size: 0.8em;
+    }
+    .pt-cell .syncItemError {
+        font-size: 0.7em;
+        max-width: 140px;
+    }
+
+    /* Compact status badge */
+    .pt-status-badge {
+        padding: 3px 8px;
+        font-size: 0.8em;
+    }
+
+    /* Stack controls vertically */
+    .pt-controls {
+        flex-direction: column;
+        gap: 8px;
+    }
+    .pt-search {
+        min-width: 0;
+        width: 100%;
+    }
+    .pt-filter-wrapper {
+        width: 100%;
+    }
+
+    /* Wrap selection header */
+    .pt-selection-header {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 8px;
+    }
+
+    /* Compact status cards */
+    .statusCards {
+        gap: 6px;
+    }
+    .statusCard {
+        min-width: 60px;
+        padding: 8px 6px;
+    }
+    .statusCard-count {
+        font-size: 1.2em;
+    }
+    .statusCard-label {
+        font-size: 0.75em;
+    }
+
+    /* Compact action buttons */
+    .syncActionButtonRow {
+        flex-wrap: wrap;
+    }
+
+    /* Health dashboard */
+    .healthRow {
+        flex-wrap: wrap;
+    }
+    .healthCard {
+        min-width: calc(50% - 8px);
+    }
+}
