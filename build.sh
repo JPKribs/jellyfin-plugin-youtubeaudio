@@ -5,8 +5,8 @@ set -e
 # Configuration
 CONFIGURATION="${1:-Release}"
 OUTPUT_DIR="dist"
-PROJECT_DIR="Jellyfin.Plugin.ServerSync"
-PROJECT_FILE="$PROJECT_DIR/Jellyfin.Plugin.ServerSync.csproj"
+PROJECT_DIR="Jellyfin.Plugin.YouTubeAudio"
+PROJECT_FILE="$PROJECT_DIR/Jellyfin.Plugin.YouTubeAudio.csproj"
 
 # Colors
 RED='\033[0;31m'
@@ -47,8 +47,8 @@ get_plugin_version() {
 # Get plugin info from build.yaml
 get_plugin_info() {
     local build_file="build.yaml"
-    local name="Server Sync"
-    local guid="ebd650b5-6f4c-4ccb-b10d-23dffb3a7286"
+    local name="YouTube Audio"
+    local guid="7323ea64-a200-4265-ab8f-e7ae27d06c38"
 
     if [[ -f "$build_file" ]]; then
         local extracted_name=$(grep '^name:' "$build_file" | cut -d':' -f2 | tr -d ' "')
@@ -64,17 +64,19 @@ get_plugin_info() {
 # Validate embedded resources exist
 validate_resources() {
     log "INFO" "Validating embedded resources exist"
-    
+
     local missing_files=()
     local config_files=(
-        "$PROJECT_DIR/Configuration/serversync_sync.html"
-        "$PROJECT_DIR/Configuration/serversync_sync.js"
-        "$PROJECT_DIR/Configuration/serversync_settings.html"
-        "$PROJECT_DIR/Configuration/serversync_settings.js"
-        "$PROJECT_DIR/Configuration/serversync_shared.css"
-        "$PROJECT_DIR/Configuration/serversync_shared.js"
+        "$PROJECT_DIR/Configuration/youtubeaudio_download.html"
+        "$PROJECT_DIR/Configuration/youtubeaudio_download.js"
+        "$PROJECT_DIR/Configuration/youtubeaudio_import.html"
+        "$PROJECT_DIR/Configuration/youtubeaudio_import.js"
+        "$PROJECT_DIR/Configuration/youtubeaudio_settings.html"
+        "$PROJECT_DIR/Configuration/youtubeaudio_settings.js"
+        "$PROJECT_DIR/Configuration/youtubeaudio_shared.css"
+        "$PROJECT_DIR/Configuration/youtubeaudio_shared.js"
     )
-    
+
     for file in "${config_files[@]}"; do
         if [[ ! -f "$file" ]]; then
             missing_files+=("$file")
@@ -82,7 +84,7 @@ validate_resources() {
             log "SUCCESS" "Found: $file"
         fi
     done
-    
+
     if [[ ${#missing_files[@]} -gt 0 ]]; then
         log "ERROR" "Missing embedded resource files:"
         for file in "${missing_files[@]}"; do
@@ -91,41 +93,41 @@ validate_resources() {
         log "ERROR" "These files are required for the configuration page to work"
         return 1
     fi
-    
+
     log "SUCCESS" "All embedded resources found"
     return 0
 }
 
 # Main build process
 main() {
-    log "INFO" "Starting Server Sync Plugin build"
-    
+    log "INFO" "Starting YouTube Audio Plugin build"
+
     # Get version and plugin info once at the start
     log "INFO" "Reading version from build.yaml"
     VERSION=$(get_plugin_version)
     log "SUCCESS" "Version: $VERSION"
-    
+
     log "INFO" "Reading plugin info from build.yaml"
     PLUGIN_INFO=$(get_plugin_info)
     PLUGIN_NAME=$(echo "$PLUGIN_INFO" | cut -d'|' -f1)
     PLUGIN_GUID=$(echo "$PLUGIN_INFO" | cut -d'|' -f2)
     log "SUCCESS" "Plugin: $PLUGIN_NAME"
     log "SUCCESS" "GUID: $PLUGIN_GUID"
-    
+
     log "INFO" "Build configuration: $CONFIGURATION"
     log "INFO" "Project file: $PROJECT_FILE"
-    
+
     # Check if project file exists
     if [[ ! -f "$PROJECT_FILE" ]]; then
         log "ERROR" "Project file not found: $PROJECT_FILE"
         exit 1
     fi
-    
+
     # Validate embedded resources
     if ! validate_resources; then
         exit 1
     fi
-    
+
     # Clean previous builds
     if [[ "$2" == "--clean" ]] || [[ -d "$OUTPUT_DIR" ]]; then
         log "INFO" "Cleaning previous builds"
@@ -133,11 +135,11 @@ main() {
         log "INFO" "Running dotnet clean"
         dotnet clean "$PROJECT_FILE" --configuration "$CONFIGURATION" --verbosity quiet
     fi
-    
+
     # Create output directory
     log "INFO" "Creating output directory: $OUTPUT_DIR"
     mkdir -p "$OUTPUT_DIR"
-    
+
     # Restore packages
     log "INFO" "Restoring NuGet packages"
     if ! dotnet restore "$PROJECT_FILE" --verbosity minimal; then
@@ -145,7 +147,7 @@ main() {
         exit 1
     fi
     log "SUCCESS" "Package restore completed"
-    
+
     # Build and publish the project with version from build.yaml
     # Using dotnet publish to ensure all dependencies are copied to output
     log "INFO" "Publishing project with configuration: $CONFIGURATION, version: $VERSION"
@@ -153,36 +155,32 @@ main() {
         log "ERROR" "Publish failed"
         exit 1
     fi
-    
+
     # Find the built DLL
-    local dll_path="$PROJECT_DIR/bin/$CONFIGURATION/net9.0/Jellyfin.Plugin.ServerSync.dll"
+    local dll_path="$PROJECT_DIR/bin/$CONFIGURATION/net9.0/Jellyfin.Plugin.YouTubeAudio.dll"
     if [[ ! -f "$dll_path" ]]; then
         log "ERROR" "Could not find built DLL at: $dll_path"
         exit 1
     fi
-    
+
     log "SUCCESS" "Build completed: $dll_path"
-    
+
     # Create ZIP package
-    local zip_name="jellyfin-plugin-serversync-$VERSION.zip"
+    local zip_name="jellyfin-plugin-youtubeaudio-$VERSION.zip"
     local zip_path="$OUTPUT_DIR/$zip_name"
-    
+
     log "INFO" "Creating package: $zip_name"
-    
+
     # Create temporary directory for packaging
     local temp_dir="$OUTPUT_DIR/temp"
     log "INFO" "Creating temporary directory: $temp_dir"
     mkdir -p "$temp_dir"
-    
+
     # Get artifacts list from build.yaml and copy all to temp directory
     log "INFO" "Copying artifacts to package directory"
     local build_dir="$PROJECT_DIR/bin/$CONFIGURATION/net9.0"
 
     # Read artifacts from build.yaml (parse YAML artifact list using grep/sed)
-    # The artifacts section looks like:
-    # artifacts:
-    # - "Jellyfin.Plugin.ServerSync.dll"
-    # - "Jellyfin.Sdk.dll"
     local in_artifacts=false
     while IFS= read -r line; do
         # Check if we hit the artifacts section
@@ -196,7 +194,7 @@ main() {
             break
         fi
 
-        # Extract artifact names from lines like "- Jellyfin.Plugin.ServerSync.dll" or '- "Jellyfin.Plugin.ServerSync.dll"'
+        # Extract artifact names
         if [[ "$in_artifacts" == true ]] && [[ "$line" =~ ^[[:space:]]*-[[:space:]]* ]]; then
             # Remove leading "- " and quotes
             local artifact=$(echo "$line" | sed 's/^[[:space:]]*-[[:space:]]*//' | tr -d '"' | tr -d "'")
@@ -232,18 +230,18 @@ with zipfile.ZipFile('$zip_path', 'w') as zf:
         log "ERROR" "No zip utility found (zip or python3 required)"
         exit 1
     fi
-    
+
     # Clean up temp directory
     log "INFO" "Cleaning up temporary directory"
     rm -rf "$temp_dir"
-    
+
     if [[ ! -f "$zip_path" ]]; then
         log "ERROR" "Failed to create ZIP package"
         exit 1
     fi
-    
+
     log "SUCCESS" "Package created: $zip_path"
-    
+
     # Calculate MD5 checksum
     log "INFO" "Calculating MD5 checksum"
     local md5_hash
@@ -255,13 +253,13 @@ with zipfile.ZipFile('$zip_path', 'w') as zf:
         log "WARN" "MD5 utility not found, skipping checksum"
         md5_hash="N/A"
     fi
-    
+
     if [[ "$md5_hash" != "N/A" ]]; then
         local checksum_file="$OUTPUT_DIR/$zip_name.md5"
         echo "$md5_hash" > "$checksum_file"
         log "SUCCESS" "Checksum file created: $checksum_file"
     fi
-    
+
     # Get file size
     local file_size
     if command -v du >/dev/null 2>&1; then
@@ -269,18 +267,18 @@ with zipfile.ZipFile('$zip_path', 'w') as zf:
     else
         file_size="Unknown"
     fi
-    
+
     # Display final results
     echo
     log "SUCCESS" "Build Summary:"
     echo "  Plugin Name: $PLUGIN_NAME"
-    echo "  Version: $VERSION" 
+    echo "  Version: $VERSION"
     echo "  GUID: $PLUGIN_GUID"
     echo "  Package: $zip_path"
     echo "  Size: $file_size"
     echo "  MD5: $md5_hash"
     [[ "$md5_hash" != "N/A" ]] && echo "  Checksum: $checksum_file"
-    
+
     echo
     log "SUCCESS" "Build completed successfully!"
     log "INFO" "Package ready for Jellyfin plugin installation"

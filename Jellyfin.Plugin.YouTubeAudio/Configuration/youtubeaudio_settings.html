@@ -1,0 +1,198 @@
+<div id="YouTubeAudioSettingsPage" data-role="page"
+     class="page type-interior pluginConfigurationPage withTabs"
+     data-require="emby-input,emby-button,emby-select,emby-checkbox"
+     data-controller="__plugin/youtubeaudio_settings.js">
+    <div data-role="content">
+        <div class="content-primary">
+            <form id="YouTubeAudioSettingsForm">
+                <div class="verticalSection verticalSection-extrabottompadding">
+
+                    <div class="sectionTitleContainer flex align-items-center">
+                        <h1 class="sectionTitle">Settings</h1>
+                    </div>
+
+                    <!-- COLLAPSIBLE SECTION: Music Library -->
+                    <div class="collapsibleSection">
+                        <button type="button" class="collapsibleHeader collapsed" aria-expanded="false" data-target="libraryContent">
+                            <span class="collapsibleTitle">Music Library</span>
+                            <span class="collapsibleIcon">&#9660;</span>
+                        </button>
+                        <div id="libraryContent" class="collapsibleContent collapsed">
+                            <div class="inputContainer">
+                                <label for="selMusicLibrary">Target Library:</label>
+                                <select is="emby-select" id="selMusicLibrary">
+                                    <option value="">-- Select a music library --</option>
+                                </select>
+                                <div class="fieldDescription">
+                                    Select the Jellyfin music library where imported files will be placed.
+                                </div>
+                            </div>
+                            <div class="inputContainer" style="margin-top: 12px;">
+                                <label for="txtLibraryPath">Library Path:</label>
+                                <input is="emby-input" type="text" id="txtLibraryPath"
+                                       placeholder="Select a library above to populate" />
+                                <div class="fieldDescription">
+                                    File path for imports. Defaults to the selected library's first path.
+                                    Override if you need a different location.
+                                    Files are organized as: Path / Artist / Album (Year) / Song.ext
+                                </div>
+                            </div>
+                            <div class="collapsibleActions">
+                                <button is="emby-button" type="button" id="btnSaveLibrary" class="raised button-submit">
+                                    <span>Save Library</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- COLLAPSIBLE SECTION: Audio Format -->
+                    <div class="collapsibleSection">
+                        <button type="button" class="collapsibleHeader collapsed" aria-expanded="false" data-target="formatContent">
+                            <span class="collapsibleTitle">Audio Format</span>
+                            <span class="collapsibleIcon">&#9660;</span>
+                        </button>
+                        <div id="formatContent" class="collapsibleContent collapsed">
+                            <div class="inputContainer">
+                                <label for="selAudioFormat">Download Format:</label>
+                                <select is="emby-select" id="selAudioFormat">
+                                    <option value="Opus">Opus (.opus)</option>
+                                    <option value="Mp3">MP3 (.mp3)</option>
+                                    <option value="M4a">M4A (.m4a)</option>
+                                </select>
+                                <div class="fieldDescription">
+                                    Opus offers the best quality at smaller file sizes. MP3 has the widest compatibility.
+                                    M4A (AAC) is well-suited for Apple devices.
+                                </div>
+                            </div>
+                            <div class="collapsibleActions">
+                                <button is="emby-button" type="button" id="btnSaveFormat" class="raised button-submit">
+                                    <span>Save Format</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- COLLAPSIBLE SECTION: Import Behavior -->
+                    <div class="collapsibleSection">
+                        <button type="button" class="collapsibleHeader collapsed" aria-expanded="false" data-target="importBehaviorContent">
+                            <span class="collapsibleTitle">Import Behavior</span>
+                            <span class="collapsibleIcon">&#9660;</span>
+                        </button>
+                        <div id="importBehaviorContent" class="collapsibleContent collapsed">
+                            <div class="checkboxContainer checkboxContainer-withDescription" style="margin-bottom: 12px;">
+                                <label class="emby-checkbox-label">
+                                    <input type="checkbox" is="emby-checkbox" id="chkReplaceDuplicates" checked />
+                                    <span class="checkboxLabel">Replace duplicate files on import</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">
+                                    When enabled, importing a file that already exists in the library will overwrite it.
+                                    When disabled, duplicate files are skipped and left in the download cache.
+                                </div>
+                            </div>
+                            <div class="collapsibleActions">
+                                <button is="emby-button" type="button" id="btnSaveImportBehavior" class="raised button-submit">
+                                    <span>Save</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- COLLAPSIBLE SECTION: Cache Directory -->
+                    <div class="collapsibleSection">
+                        <button type="button" class="collapsibleHeader collapsed" aria-expanded="false" data-target="cacheContent">
+                            <span class="collapsibleTitle">Cache Directory</span>
+                            <span class="collapsibleIcon">&#9660;</span>
+                        </button>
+                        <div id="cacheContent" class="collapsibleContent collapsed">
+                            <div class="inputContainer">
+                                <label for="txtCacheOverride">Cache Directory Override:</label>
+                                <input is="emby-input" type="text" id="txtCacheOverride"
+                                       placeholder="Leave empty to use default" />
+                                <div class="fieldDescription">
+                                    Override the default cache location. When empty, files are cached in
+                                    the Jellyfin data directory (recommended). Only change this if you need
+                                    a specific storage location.
+                                </div>
+                            </div>
+                            <div class="collapsibleActions">
+                                <button is="emby-button" type="button" id="btnSaveCache" class="raised button-submit">
+                                    <span>Save Cache</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Troubleshooting Header -->
+                    <div class="sectionTitleContainer flex align-items-center" style="margin-top: 1.5em;">
+                        <h1 class="sectionTitle">Troubleshooting</h1>
+                    </div>
+
+                    <!-- COLLAPSIBLE SECTION: yt-dlp -->
+                    <div class="collapsibleSection">
+                        <button type="button" class="collapsibleHeader collapsed" aria-expanded="false" data-target="ytdlpContent">
+                            <span class="collapsibleTitle">yt-dlp</span>
+                            <span class="collapsibleIcon">&#9660;</span>
+                        </button>
+                        <div id="ytdlpContent" class="collapsibleContent collapsed">
+                            <div class="fieldDescription" style="margin-bottom: 12px;">
+                                <a href="https://github.com/yt-dlp/yt-dlp" target="_blank" style="color: var(--yta-accent);">yt-dlp</a>
+                                is automatically downloaded on first use.
+                                Only set a path below to override the bundled version.
+                            </div>
+                            <div class="inputContainer">
+                                <label for="txtYtDlpPath">yt-dlp Path Override:</label>
+                                <input is="emby-input" type="text" id="txtYtDlpPath"
+                                       placeholder="Leave empty for auto-detection" />
+                                <div class="fieldDescription">
+                                    Absolute path to the yt-dlp binary (e.g. /opt/homebrew/bin/yt-dlp).
+                                </div>
+                            </div>
+                            <div class="collapsibleActions">
+                                <button is="emby-button" type="button" id="btnSaveYtDlp" class="raised button-submit">
+                                    <span>Save</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- COLLAPSIBLE SECTION: Reset -->
+                    <div class="collapsibleSection">
+                        <button type="button" class="collapsibleHeader collapsed" aria-expanded="false" data-target="resetContent">
+                            <span class="collapsibleTitle">Reset</span>
+                            <span class="collapsibleIcon">&#9660;</span>
+                        </button>
+                        <div id="resetContent" class="collapsibleContent collapsed">
+                            <div class="fieldDescription" style="margin-bottom: 16px;">
+                                These actions are destructive and cannot be undone.
+                            </div>
+                            <div class="resetButtonGroup">
+                                <div class="resetButtonRow">
+                                    <div class="resetButtonInfo">
+                                        <div>Reset Queue</div>
+                                        <div class="fieldDescription">Clear the download queue database. Queued and in-progress items will be removed.</div>
+                                    </div>
+                                    <button is="emby-button" type="button" id="btnResetQueue" class="raised button-destructive button-small">
+                                        <span>Reset</span>
+                                    </button>
+                                </div>
+                                <div class="resetButtonRow resetButtonRow-nuclear">
+                                    <div class="resetButtonInfo">
+                                        <div>Reset Cache</div>
+                                        <div class="fieldDescription">Delete all cached audio files and clear the download queue. This removes all downloaded files that have not been imported.</div>
+                                    </div>
+                                    <button is="emby-button" type="button" id="btnResetCache" class="raised button-destructive button-small">
+                                        <span>Reset All</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <span id="resetStatus" class="yta-status-text"></span>
+                        </div>
+                    </div>
+
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <link rel="stylesheet" href="configurationpage?name=youtubeaudio_shared.css">
+</div>

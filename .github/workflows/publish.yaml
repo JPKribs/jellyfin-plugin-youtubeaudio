@@ -29,7 +29,7 @@ jobs:
           TARGET_ABI=$(grep '^targetAbi:' build.yaml | sed 's/targetAbi: *"\?\([^"]*\)"\?.*/\1/' | tr -d '"')
 
           # Try to download the checksum file from the release assets
-          ASSET_URL="https://github.com/JPKribs/jellyfin-plugin-serversync/releases/download/${{ github.event.release.tag_name }}/jellyfin-plugin-serversync-${BUILD_VERSION}.zip.md5"
+          ASSET_URL="https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/${{ github.event.release.tag_name }}/jellyfin-plugin-youtubeaudio-${BUILD_VERSION}.zip.md5"
           echo "Trying to download checksum from: ${ASSET_URL}"
 
           CHECKSUM=$(curl -s "${ASSET_URL}")
@@ -37,7 +37,7 @@ jobs:
           # If curl failed or returned empty, calculate checksum ourselves
           if [ -z "$CHECKSUM" ]; then
             echo "Checksum download failed, calculating from ZIP file..."
-            ZIP_URL="https://github.com/JPKribs/jellyfin-plugin-serversync/releases/download/${{ github.event.release.tag_name }}/jellyfin-plugin-serversync-${BUILD_VERSION}.zip"
+            ZIP_URL="https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/${{ github.event.release.tag_name }}/jellyfin-plugin-youtubeaudio-${BUILD_VERSION}.zip"
             curl -L -o temp_plugin.zip "${ZIP_URL}"
             CHECKSUM=$(md5sum temp_plugin.zip | cut -d' ' -f1)
             rm temp_plugin.zip
@@ -64,7 +64,7 @@ jobs:
             --arg version "${{ steps.release_info.outputs.build_version }}" \
             --arg changelog "$SANITIZED_CHANGELOG" \
             --arg targetAbi "${{ steps.release_info.outputs.target_abi }}" \
-            --arg sourceUrl "https://github.com/JPKribs/jellyfin-plugin-serversync/releases/download/${{ github.event.release.tag_name }}/jellyfin-plugin-serversync-${{ steps.release_info.outputs.build_version }}.zip" \
+            --arg sourceUrl "https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/${{ github.event.release.tag_name }}/jellyfin-plugin-youtubeaudio-${{ steps.release_info.outputs.build_version }}.zip" \
             --arg checksum "${{ steps.release_info.outputs.checksum }}" \
             --arg timestamp "${{ steps.release_info.outputs.timestamp }}" \
             '{

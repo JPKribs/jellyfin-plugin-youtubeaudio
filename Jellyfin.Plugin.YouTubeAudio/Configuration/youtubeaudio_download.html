@@ -1,0 +1,81 @@
+<div id="YouTubeAudioDownloadPage" data-role="page"
+     class="page type-interior pluginConfigurationPage withTabs"
+     data-require="emby-input,emby-button,emby-select"
+     data-controller="__plugin/youtubeaudio_download.js">
+    <div data-role="content">
+        <div class="content-primary">
+            <form id="YouTubeAudioDownloadForm">
+                <div class="verticalSection verticalSection-extrabottompadding">
+
+                    <div class="sectionTitleContainer flex align-items-center">
+                        <h1 class="sectionTitle">Download</h1>
+                    </div>
+
+                    <!-- URL Input Row -->
+                    <div class="yta-queue-input">
+                        <input type="text" id="txtYouTubeUrl"
+                               placeholder="Paste a YouTube video or playlist URL..." />
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="yta-action-row">
+                        <button is="emby-button" type="button" id="btnQueue" class="raised button-submit yta-action-btn">
+                            <span>Add to Queue</span>
+                        </button>
+                        <button is="emby-button" type="button" id="btnProcess" class="raised yta-action-btn">
+                            <span>Process Queue</span>
+                        </button>
+                    </div>
+                    <span id="queueStatus" class="yta-status-text"></span>
+
+                    <!-- Queue List (PaginatedTable pattern) -->
+                    <div class="pt-wrapper" id="queueWrapper">
+
+                        <!-- Controls: Search + Filter + Reload -->
+                        <div class="pt-controls">
+                            <input type="text" class="pt-search" id="queueSearch" placeholder="Search queue..." />
+                            <div class="pt-filter-wrapper">
+                                <select class="pt-filter" id="queueFilter">
+                                    <option value="">All</option>
+                                    <option value="0">Queued</option>
+                                    <option value="1">Downloading</option>
+                                    <option value="2">Downloaded</option>
+                                    <option value="4">Error</option>
+                                </select>
+                                <span class="pt-filter-arrow material-icons">keyboard_arrow_down</span>
+                            </div>
+                            <button type="button" class="pt-reload-btn" id="btnRefreshQueue" title="Refresh">
+                                <span class="material-icons pt-reload-icon">refresh</span>
+                            </button>
+                        </div>
+
+                        <!-- Selection Header -->
+                        <div class="pt-selection-header">
+                            <label class="pt-select-all-label">
+                                <input type="checkbox" id="chkSelectAllQueue" />
+                                <span class="pt-checkbox-custom"></span>
+                                <span class="pt-select-all-text">Select All</span>
+                            </label>
+                            <span class="pt-selected-count" id="queueSelectedCount"></span>
+                            <span class="pt-header-spacer"></span>
+                            <div class="pt-bulk-actions">
+                                <button is="emby-button" type="button" id="btnDeleteSelectedQueue" class="raised button-destructive">
+                                    <span>Delete Selected</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Queue Body -->
+                        <div class="pt-body" id="queueBody"></div>
+
+                        <!-- Footer -->
+                        <div class="pt-footer" id="queueFooter"></div>
+                    </div>
+
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <link rel="stylesheet" href="configurationpage?name=youtubeaudio_shared.css">
+</div>

@@ -1,0 +1,91 @@
+<div id="YouTubeAudioImportPage" data-role="page"
+     class="page type-interior pluginConfigurationPage withTabs"
+     data-require="emby-input,emby-button"
+     data-controller="__plugin/youtubeaudio_import.js">
+    <div data-role="content">
+        <div class="content-primary">
+            <form id="YouTubeAudioImportForm">
+                <div class="verticalSection verticalSection-extrabottompadding">
+
+                    <div class="sectionTitleContainer flex align-items-center">
+                        <h1 class="sectionTitle">Import</h1>
+                    </div>
+
+                    <span id="importStatus" class="yta-status-text"></span>
+
+                    <!-- Import List (PaginatedTable pattern) -->
+                    <div class="pt-wrapper" id="importWrapper">
+
+                        <!-- Selection Header -->
+                        <div class="pt-selection-header">
+                            <label class="pt-select-all-label">
+                                <input type="checkbox" id="chkSelectAll" />
+                                <span class="pt-checkbox-custom"></span>
+                                <span class="pt-select-all-text">Select All</span>
+                            </label>
+                            <span class="pt-selected-count" id="selectedCount"></span>
+                            <span class="pt-header-spacer"></span>
+                            <div class="pt-bulk-actions">
+                                <button is="emby-button" type="button" id="btnImportSelected" class="raised button-submit">
+                                    <span>Import Selected</span>
+                                </button>
+                                <button is="emby-button" type="button" id="btnDeleteSelected" class="raised button-destructive">
+                                    <span>Delete Selected</span>
+                                </button>
+                            </div>
+                            <button type="button" class="pt-reload-btn" id="btnRefreshDownloads" title="Refresh">
+                                <span class="material-icons pt-reload-icon">refresh</span>
+                            </button>
+                        </div>
+
+                        <!-- Bulk Edit Bar (hidden until items selected) -->
+                        <div class="yta-bulk-edit-bar hidden" id="bulkEditBar">
+                            <div class="yta-bulk-edit-lines">
+                                <!-- Line 1: Artist + Feat. -->
+                                <div class="yta-bulk-edit-line">
+                                    <div class="yta-bulk-edit-field yta-bulk-edit-field-grow" id="bulkArtistCell">
+                                        <label class="yta-import-label">Artist</label>
+                                    </div>
+                                    <div class="yta-bulk-edit-field yta-bulk-edit-field-grow">
+                                        <label class="yta-import-label">Feat.</label>
+                                        <input type="text" class="yta-edit-input" id="bulkFeat" placeholder="Artist B; Artist C" />
+                                    </div>
+                                </div>
+                                <!-- Line 2: Album Artist + Album + Year + Genre -->
+                                <div class="yta-bulk-edit-line">
+                                    <div class="yta-bulk-edit-field yta-bulk-edit-field-grow">
+                                        <label class="yta-import-label">Album Artist</label>
+                                        <input type="text" class="yta-edit-input" id="bulkAlbumArtist" placeholder="Defaults to Artist" />
+                                    </div>
+                                    <div class="yta-bulk-edit-field yta-bulk-edit-field-grow" id="bulkAlbumCell">
+                                        <label class="yta-import-label">Album</label>
+                                    </div>
+                                    <div class="yta-bulk-edit-field yta-bulk-edit-field-sm">
+                                        <label class="yta-import-label">Year</label>
+                                        <input type="number" class="yta-edit-input" id="bulkYear" placeholder="Year" />
+                                    </div>
+                                    <div class="yta-bulk-edit-field yta-bulk-edit-field-med">
+                                        <label class="yta-import-label">Genre</label>
+                                        <input type="text" class="yta-edit-input" id="bulkGenre" placeholder="Rock; Pop" />
+                                    </div>
+                                </div>
+                            </div>
+                            <button is="emby-button" type="button" id="btnApplyBulk" class="raised button-submit">
+                                <span>Apply to Selected</span>
+                            </button>
+                        </div>
+
+                        <!-- Import Body -->
+                        <div class="pt-body" id="importBody"></div>
+
+                        <!-- Footer -->
+                        <div class="pt-footer" id="importFooter"></div>
+                    </div>
+
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <link rel="stylesheet" href="configurationpage?name=youtubeaudio_shared.css">
+</div>

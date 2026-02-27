@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>Jellyfin.Plugin.YouTubeAudio</RootNamespace>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Nullable>enable</Nullable>
+    <AnalysisMode>AllEnabledByDefault</AnalysisMode>
+    <CodeAnalysisRuleSet>../jellyfin.ruleset</CodeAnalysisRuleSet>
+    <NoWarn>NU1605;CA1002;CA2227;CA1305</NoWarn>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Jellyfin.Controller" Version="10.11.0">
+      <PrivateAssets>all</PrivateAssets>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+    <PackageReference Include="Jellyfin.Model" Version="10.11.0">
+      <PrivateAssets>all</PrivateAssets>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="9.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+    <PackageReference Include="YoutubeDLSharp" Version="1.2.0" />
+    <PackageReference Include="TagLibSharp" Version="2.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Download page -->
+    <EmbeddedResource Include="Configuration\youtubeaudio_download.html" />
+    <EmbeddedResource Include="Configuration\youtubeaudio_download.js" />
+    <!-- Import page -->
+    <EmbeddedResource Include="Configuration\youtubeaudio_import.html" />
+    <EmbeddedResource Include="Configuration\youtubeaudio_import.js" />
+    <!-- Settings page -->
+    <EmbeddedResource Include="Configuration\youtubeaudio_settings.html" />
+    <EmbeddedResource Include="Configuration\youtubeaudio_settings.js" />
+    <!-- Shared resources -->
+    <EmbeddedResource Include="Configuration\youtubeaudio_shared.css" />
+    <EmbeddedResource Include="Configuration\youtubeaudio_shared.js" />
+  </ItemGroup>
+
+</Project>
