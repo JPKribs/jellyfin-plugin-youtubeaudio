@@ -18,14 +18,15 @@
                             <span class="collapsibleIcon">&#9660;</span>
                         </button>
                         <div id="libraryContent" class="collapsibleContent collapsed">
-                            <div class="inputContainer">
-                                <label for="selMusicLibrary">Target Library:</label>
-                                <select is="emby-select" id="selMusicLibrary">
+                            <div class="selectContainer">
+                                <label class="selectLabel" for="selMusicLibrary">Target Library:</label>
+                                <select is="emby-select" id="selMusicLibrary" class="emby-select-withcolor">
                                     <option value="">-- Select a music library --</option>
                                 </select>
                                 <div class="fieldDescription">
                                     Select the Jellyfin music library where imported files will be placed.
                                 </div>
+                                <div class="selectArrowContainer"><div style="display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
                             </div>
                             <div class="inputContainer" style="margin-top: 12px;">
                                 <label for="txtLibraryPath">Library Path:</label>
@@ -52,9 +53,9 @@
                             <span class="collapsibleIcon">&#9660;</span>
                         </button>
                         <div id="formatContent" class="collapsibleContent collapsed">
-                            <div class="inputContainer">
-                                <label for="selAudioFormat">Download Format:</label>
-                                <select is="emby-select" id="selAudioFormat">
+                            <div class="selectContainer">
+                                <label class="selectLabel" for="selAudioFormat">Download Format:</label>
+                                <select is="emby-select" id="selAudioFormat" class="emby-select-withcolor">
                                     <option value="Opus">Opus (.opus)</option>
                                     <option value="Mp3">MP3 (.mp3)</option>
                                     <option value="M4a">M4A (.m4a)</option>
@@ -63,6 +64,7 @@
                                     Opus offers the best quality at smaller file sizes. MP3 has the widest compatibility.
                                     M4A (AAC) is well-suited for Apple devices.
                                 </div>
+                                <div class="selectArrowContainer"><div style="display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
                             </div>
                             <div class="collapsibleActions">
                                 <button is="emby-button" type="button" id="btnSaveFormat" class="raised button-submit">

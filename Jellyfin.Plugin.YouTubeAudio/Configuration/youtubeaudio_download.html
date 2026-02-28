@@ -1,6 +1,6 @@
 <div id="YouTubeAudioDownloadPage" data-role="page"
      class="page type-interior pluginConfigurationPage withTabs"
-     data-require="emby-input,emby-button,emby-select"
+     data-require="emby-input,emby-button,emby-select,emby-checkbox"
      data-controller="__plugin/youtubeaudio_download.js">
     <div data-role="content">
         <div class="content-primary">
@@ -11,56 +11,59 @@
                         <h1 class="sectionTitle">Download</h1>
                     </div>
 
-                    <!-- URL Input Row -->
-                    <div class="yta-queue-input">
-                        <input type="text" id="txtYouTubeUrl"
-                               placeholder="Paste a YouTube video or playlist URL..." />
+                    <!-- URL Input -->
+                    <div class="inputContainer">
+                        <label for="txtYouTubeUrl">YouTube URL:</label>
+                        <input is="emby-input" type="text" id="txtYouTubeUrl"
+                               placeholder="https://www.youtube.com/watch..." />
+                        <div class="fieldDescription">Provide a YouTube video or playlist URL to queue the audio for download.</div>
                     </div>
-
-                    <!-- Action Buttons -->
-                    <div class="yta-action-row">
-                        <button is="emby-button" type="button" id="btnQueue" class="raised button-submit yta-action-btn">
-                            <span>Add to Queue</span>
-                        </button>
-                        <button is="emby-button" type="button" id="btnProcess" class="raised yta-action-btn">
-                            <span>Process Queue</span>
-                        </button>
-                    </div>
-                    <span id="queueStatus" class="yta-status-text"></span>
+                    <button is="emby-button" type="button" id="btnQueue" class="raised button-submit" disabled>
+                        <span>Queue</span>
+                    </button>
 
                     <!-- Queue List (PaginatedTable pattern) -->
                     <div class="pt-wrapper" id="queueWrapper">
 
+                        <div class="sectionTitleContainer flex align-items-center">
+                            <h1 class="sectionTitle">Queue</h1>
+                        </div>
+
+                        <span id="queueStatus" class="yta-status-text"></span>
+
                         <!-- Controls: Search + Filter + Reload -->
                         <div class="pt-controls">
-                            <input type="text" class="pt-search" id="queueSearch" placeholder="Search queue..." />
-                            <div class="pt-filter-wrapper">
-                                <select class="pt-filter" id="queueFilter">
+                            <div class="pt-search-container">
+                                <input is="emby-input" type="text" id="queueSearch" placeholder="Search queue..." />
+                            </div>
+                            <div class="pt-filter-container">
+                                <select is="emby-select" id="queueFilter" class="emby-select-withcolor">
                                     <option value="">All</option>
                                     <option value="0">Queued</option>
                                     <option value="1">Downloading</option>
                                     <option value="2">Downloaded</option>
                                     <option value="4">Error</option>
                                 </select>
-                                <span class="pt-filter-arrow material-icons">keyboard_arrow_down</span>
                             </div>
-                            <button type="button" class="pt-reload-btn" id="btnRefreshQueue" title="Refresh">
-                                <span class="material-icons pt-reload-icon">refresh</span>
-                            </button>
                         </div>
 
                         <!-- Selection Header -->
                         <div class="pt-selection-header">
-                            <label class="pt-select-all-label">
-                                <input type="checkbox" id="chkSelectAllQueue" />
-                                <span class="pt-checkbox-custom"></span>
-                                <span class="pt-select-all-text">Select All</span>
+                            <label class="emby-checkbox-label">
+                                <input type="checkbox" is="emby-checkbox" id="chkSelectAllQueue" />
+                                <span class="checkboxLabel">Select all</span>
                             </label>
                             <span class="pt-selected-count" id="queueSelectedCount"></span>
                             <span class="pt-header-spacer"></span>
                             <div class="pt-bulk-actions">
-                                <button is="emby-button" type="button" id="btnDeleteSelectedQueue" class="raised button-destructive">
-                                    <span>Delete Selected</span>
+                                <button is="emby-button" type="button" id="btnProcess" class="raised button-submit" style="visibility: hidden;">
+                                    <span>Download</span>
+                                </button>
+                                <button is="emby-button" type="button" id="btnDeleteSelectedQueue" class="raised button-destructive" style="visibility: hidden;">
+                                    <span>Delete</span>
+                                </button>
+                                <button type="button" class="pt-reload-btn" id="btnRefreshQueue" title="Refresh">
+                                    <span class="material-icons pt-reload-icon">refresh</span>
                                 </button>
                             </div>
                         </div>

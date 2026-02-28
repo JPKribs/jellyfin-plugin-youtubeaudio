@@ -1,10 +1,10 @@
 ---
 name: "YouTube Audio"
 guid: "7323ea64-a200-4265-ab8f-e7ae27d06c38"
-version: "10.11.0"
+version: "10.11.1"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
-overview: "Download YouTube audio, tag it, and push to your Jellyfin music library."
+overview: "Download YouTube audio directly to a Jellyfin Music Library."
 description: >
   YouTube Audio lets you download YouTube audio (single videos or playlists) as Opus, MP3, or M4A files,
   review and edit metadata in a staging area, then push files into your Jellyfin music library.
@@ -17,4 +17,27 @@ artifacts:
 - "TagLibSharp.dll"
 changelog:
   features:
-  - Initial release
+  - Auto-download yt-dlp binary on first use
+  - Batch delete for queue and downloads
+  - Album artist metadata support
+  - Bulk album search filtered by artist
+  - Save button highlights yellow when row has unsaved changes
+  fixes:
+  - Clean YouTube titles in filenames and metadata on import
+  - Repair corrupt Opus files with ffmpeg before import
+  - Prevent info.json from overwriting user-edited metadata
+  - Fix combo-box memory leak on document click listeners
+  - Fix process resource leak in ffmpeg repair
+  - Fix duplicate file handling on import
+  - Fix stale checkbox rendering on import page
+  improvements:
+  - Settings UI matches standard Jellyfin patterns (checkboxes, dropdowns, reset buttons)
+  - Shared getTabs across all pages
+  - Moved request models to dedicated files
+  - Proper return types on API endpoints
+  - Redesigned import rows to compact 4-line card layout
+  - Consistent input styling across import rows and bulk edit bar
+  - Consistent label styling matching standard Jellyfin patterns
+  - Bulk edit bar always visible with Apply disabled when nothing selected
+  - Import and Delete buttons hidden until items are selected
+  - Download status text moved above search controls

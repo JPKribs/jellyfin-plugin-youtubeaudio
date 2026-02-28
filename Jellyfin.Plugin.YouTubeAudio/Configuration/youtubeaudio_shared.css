@@ -1,6 +1,5 @@
 /* ============================================ */
 /* YOUTUBE AUDIO PLUGIN - SHARED STYLES         */
-/* Mirrors ServerSync PaginatedTable patterns   */
 /* ============================================ */
 
 /* ===== Color Variables ===== */
@@ -8,27 +7,22 @@
     /* Status: Queued - Orange */
     --yta-status-queued-bg: rgba(240, 173, 78, 0.2);
     --yta-status-queued-color: #f0ad4e;
-    --yta-status-queued-border: rgba(240, 173, 78, 0.3);
 
     /* Status: Downloading - Purple */
     --yta-status-downloading-bg: rgba(155, 89, 182, 0.2);
     --yta-status-downloading-color: #9b59b6;
-    --yta-status-downloading-border: rgba(155, 89, 182, 0.3);
 
     /* Status: Downloaded - Green */
     --yta-status-downloaded-bg: rgba(92, 184, 92, 0.2);
     --yta-status-downloaded-color: #5cb85c;
-    --yta-status-downloaded-border: rgba(92, 184, 92, 0.3);
 
     /* Status: Imported - Blue */
     --yta-status-imported-bg: rgba(52, 152, 219, 0.2);
     --yta-status-imported-color: #3498db;
-    --yta-status-imported-border: rgba(52, 152, 219, 0.3);
 
     /* Status: Error - Red */
     --yta-status-error-bg: rgba(217, 83, 79, 0.2);
     --yta-status-error-color: #d9534f;
-    --yta-status-error-border: rgba(217, 83, 79, 0.3);
 
     /* Accent - Jellyfin Blue */
     --yta-accent: #00a4dc;
@@ -36,7 +30,6 @@
 
     /* Shared layout tokens */
     --yta-border: #555;
-    --yta-font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
 }
 
 /* ===== Animations ===== */
@@ -79,71 +72,38 @@
     display: flex;
     flex-direction: column;
 }
-.pt-wrapper.pt-loading {
-    opacity: 0.6;
-    pointer-events: none;
-}
 
 /* ===== PaginatedTable Controls ===== */
 .pt-controls {
     display: flex;
     gap: 12px;
-    align-items: center;
+    align-items: flex-end;
     margin-bottom: 12px;
 }
-.pt-search {
+.pt-search-container {
     flex: 1;
     min-width: 200px;
-    padding: 10px 14px;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-    color: inherit;
-    font-size: 1em;
-    outline: none;
 }
-.pt-search:focus {
-    border-color: rgba(255, 255, 255, 0.3);
-    background: rgba(0, 0, 0, 0.4);
-}
-.pt-search::placeholder {
-    color: rgba(255, 255, 255, 0.5);
-}
-.pt-filter-wrapper {
-    position: relative;
+.pt-filter-container {
     flex-shrink: 0;
     min-width: 140px;
 }
-.pt-filter {
-    width: 100%;
-    padding: 10px 36px 10px 14px;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-    color: inherit;
-    font-size: 1em;
-    cursor: pointer;
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    outline: none;
+
+/* Normalize emby components inside compact controls row */
+.pt-controls .pt-search-container,
+.pt-controls .pt-filter-container {
+    margin: 0;
 }
-.pt-filter:focus {
-    border-color: rgba(255, 255, 255, 0.3);
-    background: rgba(0, 0, 0, 0.4);
+.pt-controls .pt-search-container .emby-input-base,
+.pt-controls .pt-search-container .inputContainer,
+.pt-controls .pt-filter-container .selectContainer,
+.pt-controls .pt-filter-container .emby-select-base {
+    margin: 0 !important;
+    padding: 0 !important;
 }
-.pt-filter option {
-    background: var(--theme-background-primary, #1c1c1c);
-    color: #fff;
-}
-.pt-filter-arrow {
-    position: absolute;
-    right: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    pointer-events: none;
-    opacity: 0.7;
-    font-size: 0.9em;
+.pt-controls input[is="emby-input"],
+.pt-controls select[is="emby-select"] {
+    margin: 0 !important;
 }
 
 /* ===== PaginatedTable Selection Header ===== */
@@ -155,39 +115,6 @@
     padding: 10px 12px;
     background: rgba(0, 0, 0, 0.2);
     border-radius: 4px;
-}
-.pt-select-all-label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    user-select: none;
-}
-.pt-select-all-label input[type="checkbox"] {
-    display: none;
-}
-.pt-checkbox-custom {
-    width: 18px;
-    height: 18px;
-    border: 2px solid rgba(255, 255, 255, 0.5);
-    border-radius: 3px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.15s;
-}
-.pt-select-all-label input[type="checkbox"]:checked + .pt-checkbox-custom {
-    background: var(--yta-accent);
-    border-color: var(--yta-accent);
-}
-.pt-select-all-label input[type="checkbox"]:checked + .pt-checkbox-custom::after {
-    content: '\2713';
-    color: #fff;
-    font-size: 12px;
-    font-weight: bold;
-}
-.pt-select-all-text {
-    font-size: 0.95em;
 }
 .pt-selected-count {
     opacity: 0.7;
@@ -261,16 +188,6 @@
     flex: 0 0 130px;
     text-align: right;
 }
-.pt-cell.pt-cell-actions {
-    flex: 0 0 80px;
-    text-align: right;
-    white-space: nowrap;
-}
-.pt-row-checkbox {
-    cursor: pointer;
-    width: 18px;
-    height: 18px;
-}
 
 /* ===== PaginatedTable Status Badges ===== */
 .pt-status-badge {
@@ -339,30 +256,6 @@
     cursor: not-allowed;
 }
 
-/* ===== Queue Input Row ===== */
-.yta-queue-input {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 16px;
-}
-.yta-queue-input input {
-    flex: 1;
-    padding: 10px 14px;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-    color: inherit;
-    font-size: 1em;
-    outline: none;
-}
-.yta-queue-input input:focus {
-    border-color: rgba(255, 255, 255, 0.3);
-    background: rgba(0, 0, 0, 0.4);
-}
-.yta-queue-input input::placeholder {
-    color: rgba(255, 255, 255, 0.5);
-}
-
 /* ===== Reset Button Group ===== */
 .resetButtonGroup {
     margin-bottom: 16px;
@@ -421,11 +314,6 @@
     outline: none;
     background: rgba(255, 255, 255, 0.05);
 }
-.yta-edit-narrow {
-    width: 60px;
-    text-align: center;
-}
-
 /* Remove number input spinners */
 .yta-edit-input[type="number"]::-webkit-inner-spin-button,
 .yta-edit-input[type="number"]::-webkit-outer-spin-button {
@@ -457,37 +345,19 @@
 .yta-btn-save:hover {
     color: var(--yta-accent);
 }
-.yta-btn-delete:hover {
-    color: var(--yta-status-error-color);
-}
 .yta-btn-success {
     color: var(--yta-status-downloaded-color) !important;
     opacity: 1 !important;
 }
+.yta-btn-dirty {
+    color: var(--yta-status-queued-color) !important;
+    opacity: 1 !important;
+}
 
-/* ===== Combo Box Styles ===== */
+/* ===== Combo Box ===== */
 .yta-combo-box {
     position: relative;
     width: 100%;
-}
-.yta-combo-input {
-    width: 100%;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 3px;
-    padding: 0.3em 0.4em;
-    color: inherit;
-    font-size: 0.9em;
-    box-sizing: border-box;
-    transition: border-color 0.2s;
-}
-.yta-combo-input:hover {
-    border-color: rgba(255, 255, 255, 0.2);
-}
-.yta-combo-input:focus {
-    border-color: var(--yta-accent);
-    outline: none;
-    background: rgba(255, 255, 255, 0.05);
 }
 .yta-combo-dropdown {
     position: absolute;
@@ -512,7 +382,7 @@
     color: var(--yta-accent);
 }
 
-/* ===== Collapsible Sections (mirrors ServerSync) ===== */
+/* ===== Collapsible Sections ===== */
 .collapsibleSection {
     margin-bottom: 8px;
     border: 1px solid rgba(255,255,255,0.1);
@@ -557,111 +427,46 @@
     border-top: 1px solid rgba(255,255,255,0.1);
 }
 
-/* ===== Bulk Edit Bar ===== */
+/* ===== Bulk Edit Bar (Import Tab) ===== */
 .yta-bulk-edit-bar {
     display: flex;
-    gap: 12px;
-    align-items: flex-end;
-    padding: 12px;
-    margin-bottom: 8px;
-    background: rgba(0, 164, 220, 0.08);
-    border: 1px solid rgba(0, 164, 220, 0.2);
-    border-radius: 4px;
-}
-.yta-bulk-edit-lines {
-    flex: 1;
-    display: flex;
     flex-direction: column;
-    gap: 8px;
-    min-width: 0;
-}
-.yta-bulk-edit-line {
-    display: flex;
-    gap: 10px;
-    align-items: flex-end;
-}
-.yta-bulk-edit-field {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-}
-.yta-bulk-edit-field-grow {
-    flex: 1;
-    min-width: 80px;
-}
-.yta-bulk-edit-field-sm {
-    flex: 0 0 65px;
-}
-.yta-bulk-edit-field-med {
-    flex: 0 0 120px;
+    gap: 6px;
+    margin-bottom: 12px;
 }
 .yta-bulk-edit-bar > button {
-    flex-shrink: 0;
-    white-space: nowrap;
-    align-self: flex-end;
+    align-self: flex-start;
+    margin-top: 4px;
 }
 
-/* ===== Import Row (two-line card layout) ===== */
+/* ===== Import Row (Import Tab) ===== */
 .yta-import-row {
-    flex-wrap: nowrap;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 12px;
-}
-.yta-import-check {
-    flex: 0 0 30px;
-    padding-top: 4px;
-}
-.yta-import-fields {
-    flex: 1;
-    min-width: 0;
-    display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
+    padding: 12px;
 }
 .yta-import-line {
     display: flex;
     gap: 10px;
     align-items: flex-end;
+    width: 100%;
+}
+.yta-import-line-spacer {
+    flex: 1;
 }
 .yta-import-field {
     display: flex;
     flex-direction: column;
     min-width: 0;
 }
-.yta-import-field-grow {
-    flex: 1;
-    min-width: 80px;
+.yta-import-field-equal {
+    flex: 1 1 0;
 }
-.yta-import-field-sm {
-    flex: 0 0 65px;
-}
-.yta-import-field-med {
-    flex: 0 0 120px;
-}
-.yta-import-field-size {
-    flex: 0 0 65px;
-    text-align: right;
-}
-.yta-import-label {
-    font-size: 0.7em;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    opacity: 0.5;
-    margin-bottom: 2px;
-    white-space: nowrap;
-}
-.yta-import-size {
+.yta-import-secondary {
     font-size: 0.85em;
-    opacity: 0.7;
-    padding: 0.3em 0;
-}
-.yta-import-actions {
-    flex: 0 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding-top: 4px;
+    opacity: 0.5;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 /* ===== Utility ===== */
@@ -685,22 +490,9 @@
         flex-direction: column;
         gap: 8px;
     }
-    .pt-search {
-        min-width: 0;
-        width: 100%;
-    }
-    .pt-filter-wrapper {
-        width: 100%;
-    }
     .pt-selection-header {
         flex-wrap: wrap;
         gap: 8px;
         padding: 8px;
-    }
-    .yta-queue-input {
-        flex-direction: column;
-    }
-    .yta-edit-narrow {
-        width: 45px;
     }
 }

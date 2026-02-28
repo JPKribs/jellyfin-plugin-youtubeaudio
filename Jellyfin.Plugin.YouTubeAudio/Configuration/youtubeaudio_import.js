@@ -105,11 +105,14 @@ export default function (view) {
         body.querySelectorAll('.pt-row').forEach(function(row) {
             var artistCell = row.querySelector('.yta-artist-cell');
             var albumCell = row.querySelector('.yta-album-cell');
+            var saveBtn = row.querySelector('.yta-btn-save');
+            function markDirty() { if (saveBtn) saveBtn.classList.add('yta-btn-dirty'); }
 
             // Artist combo-box
             var artistCombo = Shared.createSearchableComboBox({
                 placeholder: 'Type to search artists...',
-                searchFn: _artistSearch
+                searchFn: _artistSearch,
+                onInput: markDirty
             });
             artistCombo.setValue(artistCell.getAttribute('data-value'));
             artistCell.appendChild(artistCombo.element);
@@ -122,7 +125,8 @@ export default function (view) {
             });
             var albumCombo = Shared.createSearchableComboBox({
                 placeholder: 'Type to search albums...',
-                searchFn: albumSearchFn
+                searchFn: albumSearchFn,
+                onInput: markDirty
             });
             albumCombo.setValue(albumCell.getAttribute('data-value'));
             albumCell.appendChild(albumCombo.element);
@@ -130,18 +134,21 @@ export default function (view) {
             _activeComboBoxes.push(albumCombo);
         });
 
-        // Bind save/delete handlers
-        body.querySelectorAll('.yta-btn-save').forEach(function(btn) {
-            btn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                saveRowTags(btn.closest('.pt-row'));
-            });
-        });
+        // Bind save handlers and dirty-state tracking
+        body.querySelectorAll('.pt-row').forEach(function(row) {
+            var saveBtn = row.querySelector('.yta-btn-save');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    saveRowTags(row);
+                });
+            }
 
-        body.querySelectorAll('.yta-btn-delete').forEach(function(btn) {
-            btn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                deleteRow(btn.closest('.pt-row'));
+            // Mark save button dirty on any input change
+            row.querySelectorAll('.yta-edit-input').forEach(function(input) {
+                input.addEventListener('input', function() {
+                    if (saveBtn) saveBtn.classList.add('yta-btn-dirty');
+                });
             });
         });
 
@@ -156,57 +163,51 @@ export default function (view) {
     function renderImportRow(d) {
         var esc = Shared.escapeHtml;
         return '<div class="pt-row yta-import-row" data-id="' + esc(d.Id) + '">'
-            // Checkbox
-            + '<div class="yta-import-check">'
-            + '<input type="checkbox" class="pt-row-checkbox yta-file-check" data-id="' + esc(d.Id) + '" />'
-            + '</div>'
-            // Fields area
-            + '<div class="yta-import-fields">'
-            // Row 1: Title + Artist
+            // Line 1: Checkbox | Size | spacer | Save
             + '<div class="yta-import-line">'
-            + '<div class="yta-import-field yta-import-field-grow">'
-            + '<label class="yta-import-label">Title</label>'
+            + '<label class="emby-checkbox-label"><input type="checkbox" is="emby-checkbox" class="pt-row-checkbox yta-file-check" data-id="' + esc(d.Id) + '" /><span class="checkboxLabel"></span></label>'
+            + '<span class="yta-import-secondary">' + Shared.formatSize(d.FileSize) + '</span>'
+            + '<span class="yta-import-line-spacer"></span>'
+            + '<button type="button" class="yta-btn yta-btn-save" title="Save tags"><span class="material-icons">save</span></button>'
+            + '</div>'
+            // Line 2: Title (6/7) | Track # (1/7)
+            + '<div class="yta-import-line">'
+            + '<div class="yta-import-field" style="flex:6">'
+            + '<label>Title</label>'
             + '<input type="text" class="yta-edit-input yta-field-title" value="' + esc(d.MetadataTitle) + '" placeholder="Title" />'
             + '</div>'
-            + '<div class="yta-import-field yta-import-field-grow yta-artist-cell" data-value="' + esc(d.Artist) + '">'
-            + '<label class="yta-import-label">Artist</label>'
-            + '</div>'
-            + '<div class="yta-import-field yta-import-field-grow">'
-            + '<label class="yta-import-label">Feat.</label>'
-            + '<input type="text" class="yta-edit-input yta-field-feat" value="' + esc(d.FeaturedArtist) + '" placeholder="Artist B; Artist C" />'
-            + '</div>'
-            + '</div>'
-            // Row 2: Album Artist + Album + Track # + Year + Genre
-            + '<div class="yta-import-line">'
-            + '<div class="yta-import-field yta-import-field-grow">'
-            + '<label class="yta-import-label">Album Artist</label>'
-            + '<input type="text" class="yta-edit-input yta-field-albumArtist" value="' + esc(d.AlbumArtist) + '" placeholder="Defaults to Artist" />'
-            + '</div>'
-            + '<div class="yta-import-field yta-import-field-grow yta-album-cell" data-value="' + esc(d.Album) + '">'
-            + '<label class="yta-import-label">Album</label>'
-            + '</div>'
-            + '<div class="yta-import-field yta-import-field-sm">'
-            + '<label class="yta-import-label">Track</label>'
+            + '<div class="yta-import-field" style="flex:1">'
+            + '<label>Track #</label>'
             + '<input type="number" class="yta-edit-input yta-field-trackNumber" value="' + (d.TrackNumber || '') + '" placeholder="#" />'
             + '</div>'
-            + '<div class="yta-import-field yta-import-field-sm">'
-            + '<label class="yta-import-label">Year</label>'
+            + '</div>'
+            // Line 3: Album (3/7) | Year (1/7) | Genre (3/7)
+            + '<div class="yta-import-line">'
+            + '<div class="yta-import-field yta-album-cell" style="flex:3" data-value="' + esc(d.Album) + '">'
+            + '<label>Album</label>'
+            + '</div>'
+            + '<div class="yta-import-field" style="flex:1">'
+            + '<label>Year</label>'
             + '<input type="number" class="yta-edit-input yta-field-year" value="' + (d.Year || '') + '" placeholder="Year" />'
             + '</div>'
-            + '<div class="yta-import-field yta-import-field-med">'
-            + '<label class="yta-import-label">Genre</label>'
+            + '<div class="yta-import-field" style="flex:3">'
+            + '<label>Genre</label>'
             + '<input type="text" class="yta-edit-input yta-field-genre" value="' + esc(d.Genre) + '" placeholder="Rock; Pop" />'
             + '</div>'
-            + '<div class="yta-import-field yta-import-field-size">'
-            + '<label class="yta-import-label">Size</label>'
-            + '<span class="yta-import-size">' + Shared.formatSize(d.FileSize) + '</span>'
             + '</div>'
+            // Line 4: Artist | Album Artist | Feat. Artists (equal)
+            + '<div class="yta-import-line">'
+            + '<div class="yta-import-field yta-import-field-equal yta-artist-cell" data-value="' + esc(d.Artist) + '">'
+            + '<label>Artist</label>'
             + '</div>'
+            + '<div class="yta-import-field yta-import-field-equal">'
+            + '<label>Album Artist</label>'
+            + '<input type="text" class="yta-edit-input yta-field-albumArtist" value="' + esc(d.AlbumArtist) + '" placeholder="Defaults to Artist" />'
             + '</div>'
-            // Actions
-            + '<div class="yta-import-actions">'
-            + '<button type="button" class="yta-btn yta-btn-save" title="Save tags"><span class="material-icons">save</span></button>'
-            + '<button type="button" class="yta-btn yta-btn-delete" title="Delete"><span class="material-icons">delete</span></button>'
+            + '<div class="yta-import-field yta-import-field-equal">'
+            + '<label>Feat. Artists</label>'
+            + '<input type="text" class="yta-edit-input yta-field-feat" value="' + esc(d.FeaturedArtist) + '" placeholder="Artist B; Artist C" />'
+            + '</div>'
             + '</div>'
             + '</div>';
     }
@@ -221,15 +222,17 @@ export default function (view) {
         if (countEl) {
             countEl.textContent = checked > 0 ? checked + ' selected' : '';
         }
-        // Show/hide bulk edit bar
-        var bulkBar = view.querySelector('#bulkEditBar');
-        if (bulkBar) {
-            if (checked > 0) {
-                bulkBar.classList.remove('hidden');
-            } else {
-                bulkBar.classList.add('hidden');
-            }
-        }
+
+        // Toggle Import/Delete button visibility
+        var importBtn = view.querySelector('#btnImportSelected');
+        if (importBtn) importBtn.style.visibility = checked > 0 ? '' : 'hidden';
+
+        var deleteBtn = view.querySelector('#btnDeleteSelected');
+        if (deleteBtn) deleteBtn.style.visibility = checked > 0 ? '' : 'hidden';
+
+        // Disable Apply to Selected when nothing selected
+        var applyBtn = view.querySelector('#btnApplyBulk');
+        if (applyBtn) applyBtn.disabled = checked === 0;
     }
 
     // ============================================
@@ -257,20 +260,11 @@ export default function (view) {
         Shared.apiRequest('Tags', 'POST', data)
             .then(function() {
                 var btn = row.querySelector('.yta-btn-save');
+                btn.classList.remove('yta-btn-dirty');
                 btn.classList.add('yta-btn-success');
                 setTimeout(function() { btn.classList.remove('yta-btn-success'); }, 1000);
             })
             .catch(function(err) { Dashboard.alert((err && err.Error) || 'Failed to save tags.'); });
-    }
-
-    function deleteRow(row) {
-        if (!row) return;
-        var id = row.getAttribute('data-id');
-        if (!confirm('Delete this downloaded file?')) return;
-
-        Shared.apiRequest('Downloads/' + encodeURIComponent(id), 'DELETE')
-            .then(function() { loadDownloads(); })
-            .catch(function(err) { Dashboard.alert((err && err.Error) || 'Failed to delete.'); });
     }
 
     function applyBulkEdit() {

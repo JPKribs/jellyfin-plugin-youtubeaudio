@@ -88,20 +88,12 @@ export default function (view) {
                 cb.addEventListener('change', updateQueueSelectedCount);
             });
 
-            // Bind delete buttons
-            body.querySelectorAll('.yta-btn-delete').forEach(function(btn) {
-                btn.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    var row = btn.closest('.pt-row');
-                    var id = row.getAttribute('data-id');
-                    if (confirm('Remove this item from the queue?')) {
-                        Shared.apiRequest('Queue/' + encodeURIComponent(id), 'DELETE')
-                            .then(function() { loadQueue(); })
-                            .catch(function(err) { Dashboard.alert((err && err.Error) || 'Failed to remove.'); });
-                    }
-                });
-            });
         }
+
+        // Reset selection state after re-render
+        updateQueueSelectedCount();
+        var chkAll = view.querySelector('#chkSelectAllQueue');
+        if (chkAll) chkAll.checked = false;
 
         // Auto-poll while downloads are active
         var hasActiveDownloads = _allItems.some(function(i) { return i.StatusCode === 1; });
@@ -126,7 +118,7 @@ export default function (view) {
 
         return '<div class="pt-row" data-id="' + esc(item.Id) + '">'
             + '<div class="pt-cell pt-cell-checkbox">'
-            + '<input type="checkbox" class="pt-row-checkbox yta-queue-check" data-id="' + esc(item.Id) + '" />'
+            + '<label class="emby-checkbox-label"><input type="checkbox" is="emby-checkbox" class="pt-row-checkbox yta-queue-check" data-id="' + esc(item.Id) + '" /><span class="checkboxLabel"></span></label>'
             + '</div>'
             + '<div class="pt-cell">'
             + '<div class="yta-item-info">'
@@ -134,9 +126,6 @@ export default function (view) {
             + '<div class="yta-item-url">' + esc(item.Url) + '</div>'
             + errorPreview
             + '</div>'
-            + '</div>'
-            + '<div class="pt-cell pt-cell-actions">'
-            + '<button type="button" class="yta-btn yta-btn-delete" title="Remove"><span class="material-icons">delete</span></button>'
             + '</div>'
             + '<div class="pt-cell pt-cell-status">'
             + Shared.getStatusBadge(item.StatusCode, item.Status)
@@ -153,6 +142,16 @@ export default function (view) {
         var countEl = view.querySelector('#queueSelectedCount');
         if (countEl) {
             countEl.textContent = checked > 0 ? checked + ' selected' : '';
+        }
+
+        var deleteBtn = view.querySelector('#btnDeleteSelectedQueue');
+        if (deleteBtn) {
+            deleteBtn.style.visibility = checked > 0 ? '' : 'hidden';
+        }
+
+        var downloadBtn = view.querySelector('#btnProcess');
+        if (downloadBtn) {
+            downloadBtn.style.visibility = checked > 0 ? '' : 'hidden';
         }
     }
 
@@ -202,6 +201,8 @@ export default function (view) {
                 var count = items ? items.length : 0;
                 Shared.setStatus('queueStatus', 'Added ' + count + ' item(s) to queue.', false);
                 if (input) input.value = '';
+                var qBtn = Shared.getEl('btnQueue');
+                if (qBtn) qBtn.disabled = true;
                 loadQueue();
             })
             .catch(function(err) {
@@ -210,14 +211,23 @@ export default function (view) {
     }
 
     function processQueue() {
-        Shared.setStatus('queueStatus', 'Processing queue...', false);
-        Shared.apiRequest('Queue/Process', 'POST')
+        var checkboxes = view.querySelectorAll('.yta-queue-check:checked');
+        var selectedIds = [];
+        checkboxes.forEach(function(cb) { selectedIds.push(cb.getAttribute('data-id')); });
+
+        if (selectedIds.length === 0) {
+            Shared.setStatus('queueStatus', 'Select items to download.', true);
+            return;
+        }
+
+        Shared.setStatus('queueStatus', 'Downloading ' + selectedIds.length + ' item(s)...', false);
+        Shared.apiRequest('Queue/Process', 'POST', { Ids: selectedIds })
             .then(function() {
-                Shared.setStatus('queueStatus', 'Queue processing complete.', false);
+                Shared.setStatus('queueStatus', 'Download complete.', false);
                 loadQueue();
             })
             .catch(function(err) {
-                Shared.setStatus('queueStatus', (err && err.Error) || 'Processing failed.', true);
+                Shared.setStatus('queueStatus', (err && err.Error) || 'Download failed.', true);
                 loadQueue();
             });
     }
@@ -267,6 +277,9 @@ export default function (view) {
         if (urlInput) {
             urlInput.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') { e.preventDefault(); queueUrl(); }
+            });
+            urlInput.addEventListener('input', function() {
+                if (btnQueue) btnQueue.disabled = !urlInput.value.trim();
             });
         }
 

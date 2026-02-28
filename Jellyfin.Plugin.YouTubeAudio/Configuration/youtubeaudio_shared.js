@@ -123,7 +123,7 @@ export function createShared(view) {
 
             var input = document.createElement('input');
             input.type = 'text';
-            input.className = 'yta-combo-input';
+            input.className = 'yta-edit-input';
             input.placeholder = options.placeholder || '';
 
             var dropdown = document.createElement('div');
@@ -133,6 +133,7 @@ export function createShared(view) {
             container.appendChild(dropdown);
 
             input.addEventListener('input', function() {
+                if (options.onInput) options.onInput();
                 options.searchFn(input.value, function(results) {
                     dropdown.innerHTML = '';
                     if (results.length === 0) {

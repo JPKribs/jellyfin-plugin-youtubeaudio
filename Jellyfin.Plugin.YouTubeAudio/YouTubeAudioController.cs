@@ -146,17 +146,18 @@ public class YouTubeAudioController : ControllerBase
     }
 
     /// <summary>
-    /// Processes the download queue.
+    /// Processes selected queue items by downloading them.
     /// </summary>
+    /// <param name="request">Request containing IDs to process.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Success status.</returns>
     [HttpPost("Queue/Process")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<ActionResult> ProcessQueue(CancellationToken cancellationToken)
+    public async Task<ActionResult> ProcessQueue([FromBody] ImportRequest request, CancellationToken cancellationToken)
     {
         try
         {
-            await _downloadService.ProcessQueueAsync(cancellationToken).ConfigureAwait(false);
+            await _downloadService.ProcessQueueAsync(cancellationToken, request.Ids).ConfigureAwait(false);
             return Ok(new { Success = true });
         }
         catch (OperationCanceledException)

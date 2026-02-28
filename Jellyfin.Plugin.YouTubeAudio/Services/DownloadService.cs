@@ -123,12 +123,30 @@ public sealed class DownloadService : IDisposable
     }
 
     /// <summary>
-    /// Processes all queued items by downloading them.
+    /// Processes queued items by downloading them.
+    /// When ids is provided, only those items are processed. Otherwise all queued items are processed.
     /// </summary>
-    public async Task ProcessQueueAsync(CancellationToken cancellationToken)
+    public async Task ProcessQueueAsync(CancellationToken cancellationToken, IReadOnlyList<string>? ids = null)
     {
         var db = _dbProvider.Database;
-        var queuedItems = db.GetItemsByStatus(QueueStatus.Queued);
+        List<QueueItem> queuedItems;
+
+        if (ids != null && ids.Count > 0)
+        {
+            queuedItems = new List<QueueItem>();
+            foreach (var id in ids)
+            {
+                var item = db.GetItemById(id);
+                if (item != null && item.Status == QueueStatus.Queued)
+                {
+                    queuedItems.Add(item);
+                }
+            }
+        }
+        else
+        {
+            queuedItems = db.GetItemsByStatus(QueueStatus.Queued);
+        }
 
         if (queuedItems.Count == 0)
         {
