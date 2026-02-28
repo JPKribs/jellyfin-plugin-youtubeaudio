@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "10.11.1",
+        "changelog": "## Features\r\n- Auto-download yt-dlp binary on first use\r\n- Batch delete for queue and downloads\r\n- Album artist metadata support\r\n- Bulk album search filtered by artist\r\n- Save button highlights yellow when row has unsaved changes\r\n\r\n## Fixes\r\n- Clean YouTube titles in filenames and metadata on import\r\n- Repair corrupt Opus files with ffmpeg before import\r\n- Prevent info.json from overwriting user-edited metadata\r\n- Fix combo-box memory leak on document click listeners\r\n- Fix process resource leak in ffmpeg repair\r\n- Fix duplicate file handling on import\r\n- Fix stale checkbox rendering on import page\r\n\r\n## Improvements\r\n- Settings UI matches standard Jellyfin patterns (checkboxes, dropdowns, reset buttons)\r\n- Shared getTabs across all pages\r\n- Moved request models to dedicated files\r\n- Proper return types on API endpoints\r\n- Redesigned import rows to compact 4-line card layout\r\n- Consistent input styling across import rows and bulk edit bar\r\n- Consistent label styling matching standard Jellyfin patterns\r\n- Bulk edit bar always visible with Apply disabled when nothing selected\r\n- Import and Delete buttons hidden until items are selected\r\n- Download status text moved above search controls",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/v10.11.1/jellyfin-plugin-youtubeaudio-10.11.1.zip",
+        "checksum": "Not Found",
+        "timestamp": "2026-02-28T03:30:46Z"
+      },
+      {
         "version": "10.11.0",
         "changelog": "## Features\r\n- Initial release",
         "targetAbi": "10.11.0.0",
