@@ -32,7 +32,7 @@ jobs:
           ASSET_URL="https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/${{ github.event.release.tag_name }}/jellyfin-plugin-youtubeaudio-${BUILD_VERSION}.zip.md5"
           echo "Trying to download checksum from: ${ASSET_URL}"
 
-          CHECKSUM=$(curl -s "${ASSET_URL}")
+          CHECKSUM=$(curl -sfL "${ASSET_URL}" 2>/dev/null || echo "")
 
           # If curl failed or returned empty, calculate checksum ourselves
           if [ -z "$CHECKSUM" ]; then
