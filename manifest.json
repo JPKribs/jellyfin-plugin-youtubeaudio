@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "10.11.3",
+        "changelog": "## Fixes\r\n- Fix manifest checksum always resolving to Not Found\r\n- Fix yt-dlp auto-download failing in Docker (download standalone binary instead of Python script)",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/v10.11.3/jellyfin-plugin-youtubeaudio-10.11.3.zip",
+        "checksum": "71d7fac29e165795a648273f7cf46346",
+        "timestamp": "2026-04-01T22:28:36Z"
+      },
+      {
         "version": "10.11.2",
         "changelog": "## Fixes\r\n- Publish fixes",
         "targetAbi": "10.11.0.0",
