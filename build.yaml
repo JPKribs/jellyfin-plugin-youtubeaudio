@@ -18,3 +18,4 @@ artifacts:
 changelog:
   fixes:
   - Fix manifest checksum always resolving to "Not Found"
+  - Fix yt-dlp auto-download failing in Docker (download standalone binary instead of Python script)

@@ -5,6 +5,8 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -607,6 +609,7 @@ public sealed class DownloadService : IDisposable
     /// <summary>
     /// Ensures yt-dlp is available, downloading it to the plugin directory if needed.
     /// Must be called before CreateYoutubeDL(). Safe to call under _downloadLock.
+    /// Downloads the standalone binary (not the Python script) so it works in containers without Python.
     /// </summary>
     private async Task EnsureYtDlpAsync()
     {
@@ -622,13 +625,13 @@ public sealed class DownloadService : IDisposable
                 "Could not determine the plugin directory. Set the yt-dlp path manually in Settings.");
         }
 
-        _logger.LogInformation("yt-dlp not found — downloading to plugin directory: {Dir}", pluginDir);
+        _logger.LogInformation("yt-dlp not found — downloading standalone binary to: {Dir}", pluginDir);
 
         try
         {
-            await Utils.DownloadYtDlp(pluginDir).ConfigureAwait(false);
+            await DownloadStandaloneYtDlpAsync(pluginDir).ConfigureAwait(false);
 
-            var expectedPath = Path.Combine(pluginDir, Utils.YtDlpBinaryName);
+            var expectedPath = Path.Combine(pluginDir, GetStandaloneBinaryName());
             if (!File.Exists(expectedPath))
             {
                 throw new FileNotFoundException($"Download completed but binary not found at {expectedPath}");
@@ -669,10 +672,18 @@ public sealed class DownloadService : IDisposable
             return configPath;
         }
 
-        // 2. Check plugin directory for auto-downloaded binary
+        // 2. Check plugin directory for auto-downloaded standalone binary
         var pluginDir = GetPluginDirectory();
         if (!string.IsNullOrEmpty(pluginDir))
         {
+            var standalonePath = Path.Combine(pluginDir, GetStandaloneBinaryName());
+            if (File.Exists(standalonePath))
+            {
+                _logger.LogInformation("Found standalone yt-dlp at: {Path}", standalonePath);
+                return standalonePath;
+            }
+
+            // Fallback: check for legacy YoutubeDLSharp binary name
             var bundledPath = Path.Combine(pluginDir, Utils.YtDlpBinaryName);
             if (File.Exists(bundledPath))
             {
@@ -713,6 +724,54 @@ public sealed class DownloadService : IDisposable
     {
         var assemblyLocation = typeof(Plugin).Assembly.Location;
         return string.IsNullOrEmpty(assemblyLocation) ? null : Path.GetDirectoryName(assemblyLocation);
+    }
+
+    /// <summary>
+    /// Gets the platform-specific standalone yt-dlp binary name.
+    /// Unlike the Python script version, standalone binaries don't require python3.
+    /// </summary>
+    private static string GetStandaloneBinaryName()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return "yt-dlp.exe";
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            return "yt-dlp_macos";
+        }
+
+        return RuntimeInformation.OSArchitecture == Architecture.Arm64
+            ? "yt-dlp_linux_aarch64"
+            : "yt-dlp_linux";
+    }
+
+    /// <summary>
+    /// Downloads the standalone yt-dlp binary from the official GitHub releases.
+    /// </summary>
+    [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "HttpClient is disposed by using statement.")]
+    private static async Task DownloadStandaloneYtDlpAsync(string directory)
+    {
+        var binaryName = GetStandaloneBinaryName();
+        var url = new Uri($"https://github.com/yt-dlp/yt-dlp/releases/latest/download/{binaryName}");
+        var destPath = Path.Combine(directory, binaryName);
+
+        using var httpClient = new HttpClient();
+        using var response = await httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        using var fs = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None);
+        await response.Content.CopyToAsync(fs).ConfigureAwait(false);
+
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(
+                destPath,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
+                UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+        }
     }
 
     private static string GetFileExtension(AudioFormat format)
