@@ -77,10 +77,35 @@ Successfully imported files are removed from the queue.
 
 ---
 
-## Troubleshooting
+# Installation
 
-**yt-dlp** is automatically downloaded on first use. If you need to use a specific version, set the path override in Settings under the Troubleshooting section.
+## Step 1: Add Plugin Repository
 
-**Reset Queue** — Clears the download queue database. Queued and in-progress items will be removed.
+* Open Jellyfin and navigate to Dashboard → Plugins → Repositories
+* Click Add Repository
+* Enter the following repository URL: `https://raw.githubusercontent.com/JPKribs/jellyfin-plugin-youtubeaudio/master/manifest.json`
+* Click Save
 
-**Reset Cache** — Deletes all cached audio files and clears the download queue. This removes all downloaded files that have not been imported.
+## Step 2: Install Plugin
+
+* Go to the Catalog tab in the Plugins section
+* Find YouTube Audio in the catalog
+* Click Install
+* Wait for installation to complete
+
+## Step 3: Restart Jellyfin
+
+* Restart your Jellyfin server completely
+* Wait for Jellyfin to fully start up
+
+## Verification Check
+
+* After restart, navigate to Dashboard → Plugins → Server Sync to confirm the plugin configuration page loads properly.
+
+---
+
+# AI Disclaimer
+
+Claude Code was utilized for this project to resolve issues with GitHub Actions & Build Scripts. For project code, it was used to locally to cleanup inline comments and create first drafts of documentation.
+
+**All code was written and tested by humans.**
