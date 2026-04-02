@@ -1,7 +1,7 @@
 ---
 name: "YouTube Audio"
 guid: "7323ea64-a200-4265-ab8f-e7ae27d06c38"
-version: "10.11.5"
+version: "10.11.6"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
 overview: "Download YouTube audio directly to a Jellyfin Music Library."
