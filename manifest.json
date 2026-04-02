@@ -9,6 +9,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "10.11.5",
+        "changelog": "## Chores\r\n- Set category to Music",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/v10.11.5/jellyfin-plugin-youtubeaudio-10.11.5.zip",
+        "checksum": "560407bbab810c4b19b6ac1abb3a91ac",
+        "timestamp": "2026-04-02T03:56:37Z"
+      },
+      {
         "version": "10.11.4",
         "changelog": "## Chores\r\n- Fix missing poster\r\n- Comment cleanup\r\n- Reorganize models",
         "targetAbi": "10.11.0.0",
