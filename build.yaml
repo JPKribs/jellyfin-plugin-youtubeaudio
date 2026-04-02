@@ -16,6 +16,7 @@ artifacts:
 - "YoutubeDLSharp.dll"
 - "TagLibSharp.dll"
 changelog:
-  fixes:
-  - Fix manifest checksum always resolving to "Not Found"
-  - Fix yt-dlp auto-download failing in Docker (download standalone binary instead of Python script)
+  chores:
+  - Fix missing poster
+  - Comment cleanup
+  - Reorganize models
