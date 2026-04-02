@@ -4,6 +4,7 @@
     "name": "YouTube Audio",
     "overview": "Download YouTube audio, tag it, and push to your Jellyfin music library.",
     "description": "YouTube Audio lets you download YouTube audio (single videos or playlists) as Opus files, review and edit metadata in a staging area, then push files into your Jellyfin music library. Uses yt-dlp for downloading and TagLibSharp for Vorbis Comment tagging.",
+    "imageUrl": "https://raw.githubusercontent.com/JPKribs/jellyfin-plugin-youtubeaudio/refs/heads/master/Jellyfin.Plugin.YouTubeAudio/Assets/Logo.png",
     "owner": "JPKribs",
     "category": "General",
     "versions": [
