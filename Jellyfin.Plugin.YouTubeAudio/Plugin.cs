@@ -49,7 +49,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     {
         var ns = typeof(Plugin).Namespace;
 
-        // Download page (main entry point, shows in menu, default tab)
+        // Download page
         yield return new PluginPageInfo
         {
             Name = "youtubeaudio_download",
