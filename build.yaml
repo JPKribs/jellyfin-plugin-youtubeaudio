@@ -18,4 +18,4 @@ artifacts:
 - "TagLibSharp.dll"
 changelog:
   chores:
-  - Set category to "Music"
+  - Fix plugin image
