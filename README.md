@@ -77,6 +77,21 @@ Successfully imported files are removed from the queue.
 
 ---
 
+# Versioning
+
+Releases use a four-part version, `JJ.JJ.F.B`, that matches the supported Jellyfin version with the plugin's own feature/bug count:
+
+```
+10.11.1.2
+└───┘ └┬┘
+  │    └── 1 = Plugin feature release
+  │        2 = Plugin bug/patch release within that feature
+  │
+  └─── 10.11 = Jellyfin version this build was tested/released for
+```
+
+---
+
 # Installation
 
 ## Step 1: Add Plugin Repository
