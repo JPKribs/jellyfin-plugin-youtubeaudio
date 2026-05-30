@@ -40,7 +40,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     public override string Description => "Download YouTube audio, edit metadata, and import to your Jellyfin music library.";
 
     /// <summary>
-    /// Gets the current plugin instance.
+    /// Gets the current plugin instance
     /// </summary>
     public static Plugin? Instance { get; private set; }
 
