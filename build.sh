@@ -75,8 +75,8 @@ validate_resources() {
         "$PROJECT_DIR/Configuration/youtubeaudio_import.js"
         "$PROJECT_DIR/Configuration/youtubeaudio_settings.html"
         "$PROJECT_DIR/Configuration/youtubeaudio_settings.js"
-        "$PROJECT_DIR/Configuration/youtubeaudio_shared.css"
         "$PROJECT_DIR/Configuration/youtubeaudio_shared.js"
+        "$PROJECT_DIR/Configuration/youtubeaudio_download_public.html"
     )
 
     for file in "${config_files[@]}"; do

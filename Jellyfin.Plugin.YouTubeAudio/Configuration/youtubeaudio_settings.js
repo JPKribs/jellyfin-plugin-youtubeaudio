@@ -3,10 +3,25 @@ export default function (view) {
 
     var getTabs;
     var Shared = null;
+    var _approvedUsers = null;
     var _sharedPromise = import('/web/configurationpage?name=youtubeaudio_shared.js').then(function(mod) {
         getTabs = mod.getTabs;
         Shared = mod.createShared(view);
     });
+
+    // Approved-users picker: a base user multi-selector restricted to non-admins. Created once, reused.
+    function ensureApprovedUsers() {
+        if (_approvedUsers) return _approvedUsers;
+        var container = Shared.getEl('approvedUsersList');
+        if (!container) return null;
+        _approvedUsers = Shared.createUserMultiSelector({
+            adminFilter: 'exclude',
+            emptyMessage: 'No non-admin users exist yet.'
+        });
+        container.innerHTML = '';
+        container.appendChild(_approvedUsers.element);
+        return _approvedUsers;
+    }
 
     // ============================================
     // DATA LOADING
@@ -30,7 +45,11 @@ export default function (view) {
 
     function loadConfig() {
         _sharedPromise.then(function() {
-            Promise.all([Shared.getConfig(), loadLibraries()]).then(function(results) {
+            // Each side request is isolated: a failure in one must not blank the whole page.
+            Promise.all([
+                Shared.getConfig(),
+                loadLibraries().catch(function () { /* leave the placeholder option */ })
+            ]).then(function(results) {
                 var config = results[0];
                 Shared.getEl('selAudioFormat').value = config.AudioFormat || 'Opus';
                 Shared.getEl('selMusicLibrary').value = config.MusicLibraryId || '';
@@ -38,6 +57,8 @@ export default function (view) {
                 Shared.getEl('chkReplaceDuplicates').checked = config.ReplaceDuplicates !== false;
                 Shared.getEl('txtCacheOverride').value = config.CacheDirectoryOverride || '';
                 Shared.getEl('txtYtDlpPath').value = config.YtDlpPath || '';
+                var picker = ensureApprovedUsers();
+                if (picker) picker.setValue(config.ApprovedUserIds || []);
             });
         });
     }
@@ -115,6 +136,17 @@ export default function (view) {
         });
     }
 
+    function saveApprovedUsers() {
+        _sharedPromise.then(function() {
+            Shared.getConfig().then(function(config) {
+                config.ApprovedUserIds = _approvedUsers ? _approvedUsers.getValue() : [];
+                Shared.saveConfig(config).then(function() {
+                    Dashboard.alert('Approved users saved.');
+                });
+            });
+        });
+    }
+
     // ============================================
     // RESET ACTIONS
     // ============================================
@@ -167,6 +199,9 @@ export default function (view) {
 
         var btnSaveYtDlp = Shared.getEl('btnSaveYtDlp');
         if (btnSaveYtDlp) btnSaveYtDlp.addEventListener('click', saveYtDlp);
+
+        var btnSaveApprovedUsers = Shared.getEl('btnSaveApprovedUsers');
+        if (btnSaveApprovedUsers) btnSaveApprovedUsers.addEventListener('click', saveApprovedUsers);
 
         // Reset buttons
         var btnResetQueue = Shared.getEl('btnResetQueue');

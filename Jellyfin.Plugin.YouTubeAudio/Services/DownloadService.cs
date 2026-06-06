@@ -51,7 +51,20 @@ public sealed class DownloadService : IDisposable
     /// <summary>
     /// Queues a YouTube URL for download. If playlist, queues each video individually.
     /// </summary>
-    public async Task<List<QueueItemDto>> QueueUrlAsync(string url)
+    public Task<List<QueueItemDto>> QueueUrlAsync(string url)
+        => QueueUrlAsync(url, null, null, null, null);
+
+    /// <summary>
+    /// Queues a YouTube URL for download, applying submitted metadata.
+    /// Artist, album, and year are applied to every resulting track. The title is applied only when the URL resolves to a single track.
+    /// </summary>
+    /// <param name="url">The YouTube URL.</param>
+    /// <param name="artist">The artist to tag, or null.</param>
+    /// <param name="album">The album to tag, or null.</param>
+    /// <param name="year">The release year to tag, or null.</param>
+    /// <param name="title">The song title for a single track, or null.</param>
+    /// <returns>The created queue items.</returns>
+    public async Task<List<QueueItemDto>> QueueUrlAsync(string url, string? artist, string? album, int? year, string? title)
     {
         if (string.IsNullOrWhiteSpace(url))
         {
@@ -90,7 +103,10 @@ public sealed class DownloadService : IDisposable
                             FileName = Guid.NewGuid().ToString("N") + ext,
                             Status = QueueStatus.Queued,
                             CreatedAt = now,
-                            UpdatedAt = now
+                            UpdatedAt = now,
+                            Artist = artist,
+                            Album = album,
+                            Year = year
                         };
                         db.AddItem(item);
                         createdItems.Add(item);
@@ -101,7 +117,7 @@ public sealed class DownloadService : IDisposable
                 else
                 {
                     // Fallback: treat as single video
-                    var item = CreateSingleQueueItem(url, ext, now);
+                    var item = CreateSingleQueueItem(url, ext, now, artist, album, year, title);
                     db.AddItem(item);
                     createdItems.Add(item);
                 }
@@ -109,14 +125,14 @@ public sealed class DownloadService : IDisposable
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Failed to fetch playlist metadata, queuing as single URL");
-                var item = CreateSingleQueueItem(url, ext, now);
+                var item = CreateSingleQueueItem(url, ext, now, artist, album, year, title);
                 db.AddItem(item);
                 createdItems.Add(item);
             }
         }
         else
         {
-            var item = CreateSingleQueueItem(url, ext, now);
+            var item = CreateSingleQueueItem(url, ext, now, artist, album, year, title);
             db.AddItem(item);
             createdItems.Add(item);
         }
@@ -196,16 +212,22 @@ public sealed class DownloadService : IDisposable
 
                     if (runResult.Success)
                     {
-                        // Try to extract title from info.json
-                        var infoJsonPath = Path.Combine(cacheDir, nameWithoutExt + ".info.json");
-                        if (File.Exists(infoJsonPath))
+                        // Title from info.json fills in only when the submission did not supply one
+                        if (string.IsNullOrEmpty(item.Title))
                         {
-                            var title = ExtractTitleFromInfoJson(infoJsonPath);
-                            if (!string.IsNullOrEmpty(title))
+                            var infoJsonPath = Path.Combine(cacheDir, nameWithoutExt + ".info.json");
+                            if (File.Exists(infoJsonPath))
                             {
-                                db.UpdateTitle(item.Id, title);
+                                var title = ExtractTitleFromInfoJson(infoJsonPath);
+                                if (!string.IsNullOrEmpty(title))
+                                {
+                                    db.UpdateTitle(item.Id, title);
+                                    item.Title = title;
+                                }
                             }
                         }
+
+                        ApplyQueuedMetadata(item, cacheDir);
 
                         db.UpdateStatus(item.Id, QueueStatus.Downloaded);
                         _logger.LogInformation("Downloaded {Url} as {FileName}", SanitizeForLog(item.Url), item.FileName);
@@ -352,6 +374,63 @@ public sealed class DownloadService : IDisposable
         tagFile.Save();
 
         _logger.LogInformation("Tags saved for queue item {Id} ({FileName})", request.Id, item.FileName);
+    }
+
+    /// <summary>
+    /// Writes metadata supplied at submit time onto the downloaded file so it carries through import.
+    /// Only the submitted fields are written; auto-detected fields are left for the admin to refine.
+    /// </summary>
+    /// <param name="item">The queue item carrying the submitted metadata.</param>
+    /// <param name="cacheDir">The audio cache directory.</param>
+    private void ApplyQueuedMetadata(QueueItem item, string cacheDir)
+    {
+        var hasMetadata = !string.IsNullOrWhiteSpace(item.Artist)
+            || !string.IsNullOrWhiteSpace(item.Album)
+            || item.Year.HasValue
+            || !string.IsNullOrWhiteSpace(item.Title);
+        if (!hasMetadata)
+        {
+            return;
+        }
+
+        var filePath = Path.Combine(cacheDir, item.FileName);
+        if (!File.Exists(filePath))
+        {
+            return;
+        }
+
+        try
+        {
+            using var tagFile = TagLib.File.Create(filePath);
+
+            if (!string.IsNullOrWhiteSpace(item.Title))
+            {
+                tagFile.Tag.Title = item.Title;
+            }
+
+            if (!string.IsNullOrWhiteSpace(item.Artist))
+            {
+                tagFile.Tag.Performers = new[] { item.Artist! };
+                tagFile.Tag.AlbumArtists = new[] { item.Artist! };
+            }
+
+            if (!string.IsNullOrWhiteSpace(item.Album))
+            {
+                tagFile.Tag.Album = item.Album;
+            }
+
+            if (item.Year.HasValue)
+            {
+                tagFile.Tag.Year = (uint)item.Year.Value;
+            }
+
+            tagFile.Save();
+            _logger.LogInformation("Applied submitted metadata to {FileName}", item.FileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to apply submitted metadata to {FileName}", item.FileName);
+        }
     }
 
     // ===== Import Operations =====
@@ -577,16 +656,20 @@ public sealed class DownloadService : IDisposable
 
     // ===== Private Helpers =====
 
-    private static QueueItem CreateSingleQueueItem(string url, string ext, string now)
+    private static QueueItem CreateSingleQueueItem(string url, string ext, string now, string? artist = null, string? album = null, int? year = null, string? title = null)
     {
         return new QueueItem
         {
             Id = Guid.NewGuid().ToString("N"),
             Url = url,
+            Title = string.IsNullOrWhiteSpace(title) ? null : title,
             FileName = Guid.NewGuid().ToString("N") + ext,
             Status = QueueStatus.Queued,
             CreatedAt = now,
-            UpdatedAt = now
+            UpdatedAt = now,
+            Artist = artist,
+            Album = album,
+            Year = year
         };
     }
 
@@ -888,9 +971,10 @@ public sealed class DownloadService : IDisposable
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
-            // Prefer track name (actual track name from YouTube Music metadata)
+            // Prefer the track name (actual track name from YouTube Music metadata), but never override a
+            // title that was supplied at submit time (item.Title flows through to dto.Title) — that user value wins.
             var trackName = GetJsonString(root, "track");
-            if (!string.IsNullOrEmpty(trackName))
+            if (!string.IsNullOrEmpty(trackName) && string.IsNullOrWhiteSpace(dto.Title))
             {
                 dto.MetadataTitle = trackName;
             }

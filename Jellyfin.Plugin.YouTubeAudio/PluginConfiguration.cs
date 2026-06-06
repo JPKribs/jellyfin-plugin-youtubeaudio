@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Jellyfin.Plugin.YouTubeAudio.Models;
 using MediaBrowser.Model.Plugins;
 
@@ -34,4 +35,10 @@ public class PluginConfiguration : BasePluginConfiguration
     /// When empty, defaults to {IApplicationPaths.DataPath}/youtubeaudio.
     /// </summary>
     public string CacheDirectoryOverride { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the ids of non-admin users approved to submit download links.
+    /// Approved users can queue downloads but cannot import into the library.
+    /// </summary>
+    public List<string> ApprovedUserIds { get; set; } = new();
 }

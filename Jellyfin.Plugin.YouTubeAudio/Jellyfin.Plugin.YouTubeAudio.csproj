@@ -12,11 +12,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Jellyfin.Controller" Version="10.11.0">
+    <PackageReference Include="Jellyfin.Controller" Version="10.11.10">
       <PrivateAssets>all</PrivateAssets>
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
-    <PackageReference Include="Jellyfin.Model" Version="10.11.0">
+    <PackageReference Include="Jellyfin.Model" Version="10.11.10">
       <PrivateAssets>all</PrivateAssets>
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
@@ -26,6 +26,7 @@
     </PackageReference>
     <PackageReference Include="YoutubeDLSharp" Version="1.2.0" />
     <PackageReference Include="TagLibSharp" Version="2.3.0" />
+    <PackageReference Include="JPKribs.Jellyfin.Base" Version="2026.6.14" />
   </ItemGroup>
 
   <ItemGroup>
@@ -39,8 +40,9 @@
     <EmbeddedResource Include="Configuration\youtubeaudio_settings.html" />
     <EmbeddedResource Include="Configuration\youtubeaudio_settings.js" />
     <!-- Shared resources -->
-    <EmbeddedResource Include="Configuration\youtubeaudio_shared.css" />
     <EmbeddedResource Include="Configuration\youtubeaudio_shared.js" />
+    <!-- Public approved-user download page -->
+    <EmbeddedResource Include="Configuration\youtubeaudio_download_public.html" />
   </ItemGroup>
 
 </Project>

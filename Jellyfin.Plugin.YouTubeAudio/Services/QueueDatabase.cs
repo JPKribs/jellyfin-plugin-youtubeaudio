@@ -16,7 +16,7 @@ namespace Jellyfin.Plugin.YouTubeAudio.Services;
 /// </summary>
 public sealed class QueueDatabase : IDisposable
 {
-    private const int SchemaVersion = 1;
+    private const int SchemaVersion = 2;
 
     private readonly ILogger<QueueDatabase> _logger;
     private readonly string _dbPath;
@@ -56,8 +56,8 @@ public sealed class QueueDatabase : IDisposable
 
             using var cmd = _connection!.CreateCommand();
             cmd.CommandText = @"
-                INSERT INTO QueueItems (Id, Url, Title, FileName, Status, ErrorMessage, CreatedAt, UpdatedAt)
-                VALUES (@Id, @Url, @Title, @FileName, @Status, @ErrorMessage, @CreatedAt, @UpdatedAt)";
+                INSERT INTO QueueItems (Id, Url, Title, FileName, Status, ErrorMessage, CreatedAt, UpdatedAt, Artist, Album, Year)
+                VALUES (@Id, @Url, @Title, @FileName, @Status, @ErrorMessage, @CreatedAt, @UpdatedAt, @Artist, @Album, @Year)";
             cmd.Parameters.AddWithValue("@Id", item.Id);
             cmd.Parameters.AddWithValue("@Url", item.Url);
             cmd.Parameters.AddWithValue("@Title", (object?)item.Title ?? DBNull.Value);
@@ -66,6 +66,9 @@ public sealed class QueueDatabase : IDisposable
             cmd.Parameters.AddWithValue("@ErrorMessage", (object?)item.ErrorMessage ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@CreatedAt", item.CreatedAt);
             cmd.Parameters.AddWithValue("@UpdatedAt", item.UpdatedAt);
+            cmd.Parameters.AddWithValue("@Artist", (object?)item.Artist ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@Album", (object?)item.Album ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@Year", (object?)item.Year ?? DBNull.Value);
             cmd.ExecuteNonQuery();
         }
     }
@@ -80,7 +83,7 @@ public sealed class QueueDatabase : IDisposable
             {
                 var items = new List<QueueItem>();
                 using var cmd = _connection!.CreateCommand();
-                cmd.CommandText = "SELECT Id, Url, Title, FileName, Status, ErrorMessage, CreatedAt, UpdatedAt FROM QueueItems ORDER BY CreatedAt DESC";
+                cmd.CommandText = "SELECT Id, Url, Title, FileName, Status, ErrorMessage, CreatedAt, UpdatedAt, Artist, Album, Year FROM QueueItems ORDER BY CreatedAt DESC";
 
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
@@ -103,7 +106,7 @@ public sealed class QueueDatabase : IDisposable
             {
                 var items = new List<QueueItem>();
                 using var cmd = _connection!.CreateCommand();
-                cmd.CommandText = "SELECT Id, Url, Title, FileName, Status, ErrorMessage, CreatedAt, UpdatedAt FROM QueueItems WHERE Status = @Status ORDER BY CreatedAt ASC";
+                cmd.CommandText = "SELECT Id, Url, Title, FileName, Status, ErrorMessage, CreatedAt, UpdatedAt, Artist, Album, Year FROM QueueItems WHERE Status = @Status ORDER BY CreatedAt ASC";
                 cmd.Parameters.AddWithValue("@Status", (int)status);
 
                 using var reader = cmd.ExecuteReader();
@@ -126,7 +129,7 @@ public sealed class QueueDatabase : IDisposable
             () =>
             {
                 using var cmd = _connection!.CreateCommand();
-                cmd.CommandText = "SELECT Id, Url, Title, FileName, Status, ErrorMessage, CreatedAt, UpdatedAt FROM QueueItems WHERE Id = @Id";
+                cmd.CommandText = "SELECT Id, Url, Title, FileName, Status, ErrorMessage, CreatedAt, UpdatedAt, Artist, Album, Year FROM QueueItems WHERE Id = @Id";
                 cmd.Parameters.AddWithValue("@Id", id);
 
                 using var reader = cmd.ExecuteReader();
@@ -318,6 +321,11 @@ public sealed class QueueDatabase : IDisposable
                 CreateSchema();
                 SetSchemaVersion(SchemaVersion);
             }
+            else if (currentVersion < SchemaVersion)
+            {
+                MigrateSchema(currentVersion);
+                SetSchemaVersion(SchemaVersion);
+            }
 
             _logger.LogDebug("Queue database initialized at {DbPath} (schema v{Version})", _dbPath, SchemaVersion);
         }
@@ -348,11 +356,29 @@ public sealed class QueueDatabase : IDisposable
                 Status INTEGER NOT NULL DEFAULT 0,
                 ErrorMessage TEXT,
                 CreatedAt TEXT NOT NULL,
-                UpdatedAt TEXT NOT NULL
+                UpdatedAt TEXT NOT NULL,
+                Artist TEXT,
+                Album TEXT,
+                Year INTEGER
             );
             CREATE INDEX IF NOT EXISTS idx_queue_status ON QueueItems(Status);
         ";
         cmd.ExecuteNonQuery();
+    }
+
+    private void MigrateSchema(int fromVersion)
+    {
+        if (fromVersion < 2)
+        {
+            using var cmd = _connection!.CreateCommand();
+            cmd.CommandText = @"
+                ALTER TABLE QueueItems ADD COLUMN Artist TEXT;
+                ALTER TABLE QueueItems ADD COLUMN Album TEXT;
+                ALTER TABLE QueueItems ADD COLUMN Year INTEGER;
+            ";
+            cmd.ExecuteNonQuery();
+            _logger.LogInformation("Migrated queue database to schema v2 (added Artist, Album, Year)");
+        }
     }
 
     private int GetSchemaVersion()
@@ -425,7 +451,10 @@ public sealed class QueueDatabase : IDisposable
             Status = (QueueStatus)reader.GetInt32(4),
             ErrorMessage = reader.IsDBNull(5) ? null : reader.GetString(5),
             CreatedAt = reader.GetString(6),
-            UpdatedAt = reader.GetString(7)
+            UpdatedAt = reader.GetString(7),
+            Artist = reader.IsDBNull(8) ? null : reader.GetString(8),
+            Album = reader.IsDBNull(9) ? null : reader.GetString(9),
+            Year = reader.IsDBNull(10) ? null : reader.GetInt32(10)
         };
     }
 }

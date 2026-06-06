@@ -62,10 +62,37 @@ export default function (view) {
     }
 
     // ============================================
-    // RENDERING (ServerSync pt-row pattern)
+    // RENDERING (ServerSync jpk-table-row pattern)
     // ============================================
 
+    // renderMetrics
+    // Renders the queue status counts as stat cards from the full item set.
+    //
+    // No parameters
+    function renderMetrics() {
+        var el = view.querySelector('#queueMetrics');
+        if (!el) return;
+
+        var counts = { queued: 0, downloading: 0, downloaded: 0, error: 0 };
+        for (var i = 0; i < _allItems.length; i++) {
+            switch (_allItems[i].StatusCode) {
+                case 0: counts.queued++; break;
+                case 1: counts.downloading++; break;
+                case 2: counts.downloaded++; break;
+                case 4: counts.error++; break;
+            }
+        }
+
+        el.innerHTML =
+            '<div class="jpk-card gray"><span class="jpk-card-count">' + counts.queued + '</span><span class="jpk-card-label">Queued</span></div>' +
+            '<div class="jpk-card blue"><span class="jpk-card-count">' + counts.downloading + '</span><span class="jpk-card-label">Downloading</span></div>' +
+            '<div class="jpk-card green"><span class="jpk-card-count">' + counts.downloaded + '</span><span class="jpk-card-label">Downloaded</span></div>' +
+            '<div class="jpk-card red"><span class="jpk-card-count">' + counts.error + '</span><span class="jpk-card-label">Error</span></div>';
+    }
+
     function renderQueue() {
+        renderMetrics();
+
         var body = view.querySelector('#queueBody');
         var footer = view.querySelector('#queueFooter');
         if (!body) return;
@@ -73,7 +100,7 @@ export default function (view) {
         var items = getFilteredItems();
 
         if (items.length === 0) {
-            body.innerHTML = '<div class="pt-empty">Queue is empty. Add a URL above to get started.</div>';
+            body.innerHTML = '<div class="jpk-table-empty">Queue is empty. Add a URL above to get started.</div>';
             if (footer) footer.textContent = '';
         } else {
             var html = '';
@@ -84,7 +111,7 @@ export default function (view) {
             if (footer) footer.textContent = items.length + ' item' + (items.length !== 1 ? 's' : '');
 
             // Bind row checkboxes
-            body.querySelectorAll('.pt-row-checkbox').forEach(function(cb) {
+            body.querySelectorAll('.jpk-table-row-checkbox').forEach(function(cb) {
                 cb.addEventListener('change', updateQueueSelectedCount);
             });
 
@@ -111,23 +138,23 @@ export default function (view) {
 
         var errorPreview = '';
         if (item.StatusCode === 4 && item.ErrorMessage) {
-            errorPreview = '<div class="yta-item-error" title="' +
+            errorPreview = '<div class="jpk-table-item-error" title="' +
                 esc(item.ErrorMessage) + '">' +
                 esc(item.ErrorMessage) + '</div>';
         }
 
-        return '<div class="pt-row" data-id="' + esc(item.Id) + '">'
-            + '<div class="pt-cell pt-cell-checkbox">'
-            + '<label class="emby-checkbox-label"><input type="checkbox" is="emby-checkbox" class="pt-row-checkbox yta-queue-check" data-id="' + esc(item.Id) + '" /><span class="checkboxLabel"></span></label>'
+        return '<div class="jpk-table-row" data-id="' + esc(item.Id) + '">'
+            + '<div class="jpk-table-cell jpk-table-cell-checkbox">'
+            + '<label class="emby-checkbox-label"><input type="checkbox" is="emby-checkbox" class="jpk-table-row-checkbox yta-queue-check" data-id="' + esc(item.Id) + '" /><span class="checkboxLabel"></span></label>'
             + '</div>'
-            + '<div class="pt-cell">'
-            + '<div class="yta-item-info">'
-            + '<div class="yta-item-title" title="' + esc(item.Url) + '">' + esc(displayTitle) + '</div>'
-            + '<div class="yta-item-url">' + esc(item.Url) + '</div>'
+            + '<div class="jpk-table-cell">'
+            + '<div class="jpk-table-item-info">'
+            + '<div class="jpk-table-item-title" title="' + esc(item.Url) + '">' + esc(displayTitle) + '</div>'
+            + '<div class="jpk-table-item-sub">' + esc(item.Url) + '</div>'
             + errorPreview
             + '</div>'
             + '</div>'
-            + '<div class="pt-cell pt-cell-status">'
+            + '<div class="jpk-table-cell jpk-table-cell-status">'
             + Shared.getStatusBadge(item.StatusCode, item.Status)
             + '</div>'
             + '</div>';

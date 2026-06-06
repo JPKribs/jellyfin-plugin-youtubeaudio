@@ -10,6 +10,7 @@
                     <div class="sectionTitleContainer flex align-items-center">
                         <h1 class="sectionTitle">Download</h1>
                     </div>
+                    <div class="fieldDescription">Queue YouTube videos or playlists to download as audio, then tag and import them from the Import tab.</div>
 
                     <!-- URL Input -->
                     <div class="inputContainer">
@@ -18,61 +19,63 @@
                                placeholder="https://www.youtube.com/watch..." />
                         <div class="fieldDescription">Provide a YouTube video or playlist URL to queue the audio for download.</div>
                     </div>
-                    <button is="emby-button" type="button" id="btnQueue" class="raised button-submit" disabled>
+                    <button is="emby-button" type="button" id="btnQueue" class="raised jpk-button-submit jpk-button-small" disabled>
                         <span>Queue</span>
                     </button>
 
                     <!-- Queue List (PaginatedTable pattern) -->
-                    <div class="pt-wrapper" id="queueWrapper">
+                    <div class="jpk-table-wrapper" id="queueWrapper">
 
                         <div class="sectionTitleContainer flex align-items-center">
                             <h1 class="sectionTitle">Queue</h1>
                         </div>
 
-                        <span id="queueStatus" class="yta-status-text"></span>
+                        <!-- Status count cards -->
+                        <div id="queueMetrics" class="jpk-cards"></div>
+
+                        <span id="queueStatus" class="jpk-status-text"></span>
 
                         <!-- Controls: Search + Filter + Reload -->
-                        <div class="pt-controls">
-                            <div class="pt-search-container">
-                                <input is="emby-input" type="text" id="queueSearch" placeholder="Search queue..." />
-                            </div>
-                            <div class="pt-filter-container">
-                                <select is="emby-select" id="queueFilter" class="emby-select-withcolor">
+                        <div class="jpk-table-controls">
+                            <input type="text" id="queueSearch" class="jpk-table-search" placeholder="Search queue..." />
+                            <div class="jpk-table-filter-wrapper">
+                                <select id="queueFilter" class="jpk-table-filter">
                                     <option value="">All</option>
                                     <option value="0">Queued</option>
                                     <option value="1">Downloading</option>
                                     <option value="2">Downloaded</option>
                                     <option value="4">Error</option>
                                 </select>
+                                <span class="material-icons jpk-table-filter-arrow" aria-hidden="true">expand_more</span>
                             </div>
                         </div>
 
                         <!-- Selection Header -->
-                        <div class="pt-selection-header">
+                        <div class="jpk-table-selection-header">
                             <label class="emby-checkbox-label">
                                 <input type="checkbox" is="emby-checkbox" id="chkSelectAllQueue" />
                                 <span class="checkboxLabel">Select all</span>
                             </label>
-                            <span class="pt-selected-count" id="queueSelectedCount"></span>
-                            <span class="pt-header-spacer"></span>
-                            <div class="pt-bulk-actions">
-                                <button is="emby-button" type="button" id="btnProcess" class="raised button-submit" style="visibility: hidden;">
+                            <span class="jpk-table-selected-count" id="queueSelectedCount"></span>
+                            <span class="jpk-table-header-spacer"></span>
+                            <div class="jpk-table-bulk-actions">
+                                <button is="emby-button" type="button" id="btnProcess" class="raised jpk-button-submit" style="visibility: hidden;">
                                     <span>Download</span>
                                 </button>
-                                <button is="emby-button" type="button" id="btnDeleteSelectedQueue" class="raised button-destructive" style="visibility: hidden;">
+                                <button is="emby-button" type="button" id="btnDeleteSelectedQueue" class="raised jpk-button-destructive" style="visibility: hidden;">
                                     <span>Delete</span>
                                 </button>
-                                <button type="button" class="pt-reload-btn" id="btnRefreshQueue" title="Refresh">
-                                    <span class="material-icons pt-reload-icon">refresh</span>
+                                <button type="button" class="jpk-table-reload-btn" id="btnRefreshQueue" title="Refresh">
+                                    <span class="material-icons jpk-table-reload-icon">refresh</span>
                                 </button>
                             </div>
                         </div>
 
                         <!-- Queue Body -->
-                        <div class="pt-body" id="queueBody"></div>
+                        <div class="jpk-table-body" id="queueBody"></div>
 
                         <!-- Footer -->
-                        <div class="pt-footer" id="queueFooter"></div>
+                        <div class="jpk-table-footer" id="queueFooter"></div>
                     </div>
 
                 </div>
@@ -80,5 +83,5 @@
         </div>
     </div>
 
-    <link rel="stylesheet" href="configurationpage?name=youtubeaudio_shared.css">
+    <link rel="stylesheet" href="configurationpage?name=youtubeaudio_jpkribs_shared.css">
 </div>

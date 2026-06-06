@@ -10,73 +10,75 @@
                     <div class="sectionTitleContainer flex align-items-center">
                         <h1 class="sectionTitle">Import</h1>
                     </div>
+                    <div class="fieldDescription">Review and tag downloaded audio, then import it into your Jellyfin music library.</div>
 
-                    <span id="importStatus" class="yta-status-text"></span>
+                    <span id="importStatus" class="jpk-status-text"></span>
 
                     <!-- Import List (PaginatedTable pattern) -->
-                    <div class="pt-wrapper" id="importWrapper">
+                    <div class="jpk-table-wrapper" id="importWrapper">
 
                         <!-- Bulk Edit Fields (always visible) -->
-                        <div class="yta-bulk-edit-bar" id="bulkEditBar">
+                        <div class="jpk-bulk-edit-title">Bulk Updates</div>
+                        <div class="jpk-bulk-edit-bar" id="bulkEditBar">
                             <!-- Line 1: Artist | Album Artist | Feat. Artists (equal) -->
-                            <div class="yta-import-line">
-                                <div class="yta-import-field yta-import-field-equal" id="bulkArtistCell">
+                            <div class="jpk-edit-line">
+                                <div class="jpk-field" id="bulkArtistCell">
                                     <label>Artist</label>
                                 </div>
-                                <div class="yta-import-field yta-import-field-equal">
+                                <div class="jpk-field">
                                     <label>Album Artist</label>
-                                    <input type="text" class="yta-edit-input" id="bulkAlbumArtist" placeholder="Defaults to Artist" />
+                                    <input type="text" class="jpk-edit-input" id="bulkAlbumArtist" placeholder="Defaults to Artist" />
                                 </div>
-                                <div class="yta-import-field yta-import-field-equal">
+                                <div class="jpk-field">
                                     <label>Feat. Artists</label>
-                                    <input type="text" class="yta-edit-input" id="bulkFeat" placeholder="Artist B; Artist C" />
+                                    <input type="text" class="jpk-edit-input" id="bulkFeat" placeholder="Artist B; Artist C" />
                                 </div>
                             </div>
                             <!-- Line 2: Album (3/7) | Year (1/7) | Genre (3/7) -->
-                            <div class="yta-import-line">
-                                <div class="yta-import-field" style="flex:3" id="bulkAlbumCell">
+                            <div class="jpk-edit-line">
+                                <div class="jpk-field" style="flex:3" id="bulkAlbumCell">
                                     <label>Album</label>
                                 </div>
-                                <div class="yta-import-field" style="flex:1">
+                                <div class="jpk-field" style="flex:1">
                                     <label>Year</label>
-                                    <input type="number" class="yta-edit-input" id="bulkYear" placeholder="Year" />
+                                    <input type="number" class="jpk-edit-input" id="bulkYear" placeholder="Year" />
                                 </div>
-                                <div class="yta-import-field" style="flex:3">
+                                <div class="jpk-field" style="flex:3">
                                     <label>Genre</label>
-                                    <input type="text" class="yta-edit-input" id="bulkGenre" placeholder="Rock; Pop" />
+                                    <input type="text" class="jpk-edit-input" id="bulkGenre" placeholder="Rock; Pop" />
                                 </div>
                             </div>
-                            <button is="emby-button" type="button" id="btnApplyBulk" class="raised button-submit" disabled>
+                            <button is="emby-button" type="button" id="btnApplyBulk" class="raised jpk-button-submit jpk-button-small" disabled>
                                 <span>Apply to Selected</span>
                             </button>
                         </div>
 
                         <!-- Selection Header -->
-                        <div class="pt-selection-header">
+                        <div class="jpk-table-selection-header">
                             <label class="emby-checkbox-label">
                                 <input type="checkbox" is="emby-checkbox" id="chkSelectAll" />
                                 <span class="checkboxLabel">Select All</span>
                             </label>
-                            <span class="pt-selected-count" id="selectedCount"></span>
-                            <span class="pt-header-spacer"></span>
-                            <div class="pt-bulk-actions">
-                                <button is="emby-button" type="button" id="btnImportSelected" class="raised button-submit" style="visibility: hidden;">
+                            <span class="jpk-table-selected-count" id="selectedCount"></span>
+                            <span class="jpk-table-header-spacer"></span>
+                            <div class="jpk-table-bulk-actions">
+                                <button is="emby-button" type="button" id="btnImportSelected" class="raised jpk-button-submit" style="visibility: hidden;">
                                     <span>Import</span>
                                 </button>
-                                <button is="emby-button" type="button" id="btnDeleteSelected" class="raised button-destructive" style="visibility: hidden;">
+                                <button is="emby-button" type="button" id="btnDeleteSelected" class="raised jpk-button-destructive" style="visibility: hidden;">
                                     <span>Delete</span>
                                 </button>
                             </div>
-                            <button type="button" class="pt-reload-btn" id="btnRefreshDownloads" title="Refresh">
-                                <span class="material-icons pt-reload-icon">refresh</span>
+                            <button type="button" class="jpk-table-reload-btn" id="btnRefreshDownloads" title="Refresh">
+                                <span class="material-icons jpk-table-reload-icon">refresh</span>
                             </button>
                         </div>
 
                         <!-- Import Body -->
-                        <div class="pt-body" id="importBody"></div>
+                        <div class="jpk-table-body" id="importBody"></div>
 
                         <!-- Footer -->
-                        <div class="pt-footer" id="importFooter"></div>
+                        <div class="jpk-table-footer" id="importFooter"></div>
                     </div>
 
                 </div>
@@ -84,5 +86,18 @@
         </div>
     </div>
 
-    <link rel="stylesheet" href="configurationpage?name=youtubeaudio_shared.css">
+    <link rel="stylesheet" href="configurationpage?name=youtubeaudio_jpkribs_shared.css">
+
+    <!-- Page-local: present the bulk-edit fields as a distinct, lighter input card with the title sitting above it. -->
+    <style>
+        #YouTubeAudioImportPage .jpk-bulk-edit-title {
+            margin-bottom: 8px;
+        }
+        #YouTubeAudioImportPage .jpk-bulk-edit-bar {
+            padding: 14px;
+            border: 1px solid var(--jpk-border);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.04);
+        }
+    </style>
 </div>

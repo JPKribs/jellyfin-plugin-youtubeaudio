@@ -88,7 +88,7 @@ export default function (view) {
         destroyActiveComboBoxes();
 
         if (_downloads.length === 0) {
-            body.innerHTML = '<div class="pt-empty">No downloaded files ready for import. Download some audio first.</div>';
+            body.innerHTML = '<div class="jpk-table-empty">No downloaded files ready for import. Download some audio first.</div>';
             if (footer) footer.textContent = '';
             updateSelectedCount();
             return;
@@ -102,11 +102,11 @@ export default function (view) {
         if (footer) footer.textContent = _downloads.length + ' file' + (_downloads.length !== 1 ? 's' : '');
 
         // Initialize combo-boxes for each row
-        body.querySelectorAll('.pt-row').forEach(function(row) {
+        body.querySelectorAll('.jpk-table-row').forEach(function(row) {
             var artistCell = row.querySelector('.yta-artist-cell');
             var albumCell = row.querySelector('.yta-album-cell');
-            var saveBtn = row.querySelector('.yta-btn-save');
-            function markDirty() { if (saveBtn) saveBtn.classList.add('yta-btn-dirty'); }
+            var saveBtn = row.querySelector('.jpk-row-btn');
+            function markDirty() { if (saveBtn) saveBtn.classList.add('dirty'); }
 
             // Artist combo-box
             var artistCombo = Shared.createSearchableComboBox({
@@ -135,8 +135,8 @@ export default function (view) {
         });
 
         // Bind save handlers and dirty-state tracking
-        body.querySelectorAll('.pt-row').forEach(function(row) {
-            var saveBtn = row.querySelector('.yta-btn-save');
+        body.querySelectorAll('.jpk-table-row').forEach(function(row) {
+            var saveBtn = row.querySelector('.jpk-row-btn');
             if (saveBtn) {
                 saveBtn.addEventListener('click', function(e) {
                     e.stopPropagation();
@@ -145,15 +145,15 @@ export default function (view) {
             }
 
             // Mark save button dirty on any input change
-            row.querySelectorAll('.yta-edit-input').forEach(function(input) {
+            row.querySelectorAll('.jpk-edit-input').forEach(function(input) {
                 input.addEventListener('input', function() {
-                    if (saveBtn) saveBtn.classList.add('yta-btn-dirty');
+                    if (saveBtn) saveBtn.classList.add('dirty');
                 });
             });
         });
 
         // Bind row checkboxes
-        body.querySelectorAll('.pt-row-checkbox').forEach(function(cb) {
+        body.querySelectorAll('.jpk-table-row-checkbox').forEach(function(cb) {
             cb.addEventListener('change', updateSelectedCount);
         });
 
@@ -162,51 +162,51 @@ export default function (view) {
 
     function renderImportRow(d) {
         var esc = Shared.escapeHtml;
-        return '<div class="pt-row yta-import-row" data-id="' + esc(d.Id) + '">'
+        return '<div class="jpk-table-row jpk-edit-row" data-id="' + esc(d.Id) + '">'
             // Line 1: Checkbox | Size | spacer | Save
-            + '<div class="yta-import-line">'
-            + '<label class="emby-checkbox-label"><input type="checkbox" is="emby-checkbox" class="pt-row-checkbox yta-file-check" data-id="' + esc(d.Id) + '" /><span class="checkboxLabel"></span></label>'
-            + '<span class="yta-import-secondary">' + Shared.formatSize(d.FileSize) + '</span>'
-            + '<span class="yta-import-line-spacer"></span>'
-            + '<button type="button" class="yta-btn yta-btn-save" title="Save tags"><span class="material-icons">save</span></button>'
+            + '<div class="jpk-edit-line">'
+            + '<label class="emby-checkbox-label"><input type="checkbox" is="emby-checkbox" class="jpk-table-row-checkbox yta-file-check" data-id="' + esc(d.Id) + '" /><span class="checkboxLabel"></span></label>'
+            + '<span class="jpk-edit-secondary">' + Shared.formatSize(d.FileSize) + '</span>'
+            + '<span class="jpk-edit-line-spacer"></span>'
+            + '<button type="button" class="jpk-row-btn save" title="Save tags"><span class="material-icons">save</span></button>'
             + '</div>'
             // Line 2: Title (6/7) | Track # (1/7)
-            + '<div class="yta-import-line">'
-            + '<div class="yta-import-field" style="flex:6">'
+            + '<div class="jpk-edit-line">'
+            + '<div class="jpk-field" style="flex:6">'
             + '<label>Title</label>'
-            + '<input type="text" class="yta-edit-input yta-field-title" value="' + esc(d.MetadataTitle) + '" placeholder="Title" />'
+            + '<input type="text" class="jpk-edit-input yta-field-title" value="' + esc(d.MetadataTitle) + '" placeholder="Title" />'
             + '</div>'
-            + '<div class="yta-import-field" style="flex:1">'
+            + '<div class="jpk-field" style="flex:1">'
             + '<label>Track #</label>'
-            + '<input type="number" class="yta-edit-input yta-field-trackNumber" value="' + (d.TrackNumber || '') + '" placeholder="#" />'
+            + '<input type="number" class="jpk-edit-input yta-field-trackNumber" value="' + (d.TrackNumber || '') + '" placeholder="#" />'
             + '</div>'
             + '</div>'
-            // Line 3: Album (3/7) | Year (1/7) | Genre (3/7)
-            + '<div class="yta-import-line">'
-            + '<div class="yta-import-field yta-album-cell" style="flex:3" data-value="' + esc(d.Album) + '">'
-            + '<label>Album</label>'
-            + '</div>'
-            + '<div class="yta-import-field" style="flex:1">'
-            + '<label>Year</label>'
-            + '<input type="number" class="yta-edit-input yta-field-year" value="' + (d.Year || '') + '" placeholder="Year" />'
-            + '</div>'
-            + '<div class="yta-import-field" style="flex:3">'
-            + '<label>Genre</label>'
-            + '<input type="text" class="yta-edit-input yta-field-genre" value="' + esc(d.Genre) + '" placeholder="Rock; Pop" />'
-            + '</div>'
-            + '</div>'
-            // Line 4: Artist | Album Artist | Feat. Artists (equal)
-            + '<div class="yta-import-line">'
-            + '<div class="yta-import-field yta-import-field-equal yta-artist-cell" data-value="' + esc(d.Artist) + '">'
+            // Line 3: Artist | Album Artist | Feat. Artists (equal) — matches the bulk-edit bar order
+            + '<div class="jpk-edit-line">'
+            + '<div class="jpk-field yta-artist-cell" data-value="' + esc(d.Artist) + '">'
             + '<label>Artist</label>'
             + '</div>'
-            + '<div class="yta-import-field yta-import-field-equal">'
+            + '<div class="jpk-field">'
             + '<label>Album Artist</label>'
-            + '<input type="text" class="yta-edit-input yta-field-albumArtist" value="' + esc(d.AlbumArtist) + '" placeholder="Defaults to Artist" />'
+            + '<input type="text" class="jpk-edit-input yta-field-albumArtist" value="' + esc(d.AlbumArtist) + '" placeholder="Defaults to Artist" />'
             + '</div>'
-            + '<div class="yta-import-field yta-import-field-equal">'
+            + '<div class="jpk-field">'
             + '<label>Feat. Artists</label>'
-            + '<input type="text" class="yta-edit-input yta-field-feat" value="' + esc(d.FeaturedArtist) + '" placeholder="Artist B; Artist C" />'
+            + '<input type="text" class="jpk-edit-input yta-field-feat" value="' + esc(d.FeaturedArtist) + '" placeholder="Artist B; Artist C" />'
+            + '</div>'
+            + '</div>'
+            // Line 4: Album (3/7) | Year (1/7) | Genre (3/7)
+            + '<div class="jpk-edit-line">'
+            + '<div class="jpk-field yta-album-cell" style="flex:3" data-value="' + esc(d.Album) + '">'
+            + '<label>Album</label>'
+            + '</div>'
+            + '<div class="jpk-field" style="flex:1">'
+            + '<label>Year</label>'
+            + '<input type="number" class="jpk-edit-input yta-field-year" value="' + (d.Year || '') + '" placeholder="Year" />'
+            + '</div>'
+            + '<div class="jpk-field" style="flex:3">'
+            + '<label>Genre</label>'
+            + '<input type="text" class="jpk-edit-input yta-field-genre" value="' + esc(d.Genre) + '" placeholder="Rock; Pop" />'
             + '</div>'
             + '</div>'
             + '</div>';
@@ -259,10 +259,10 @@ export default function (view) {
 
         Shared.apiRequest('Tags', 'POST', data)
             .then(function() {
-                var btn = row.querySelector('.yta-btn-save');
-                btn.classList.remove('yta-btn-dirty');
-                btn.classList.add('yta-btn-success');
-                setTimeout(function() { btn.classList.remove('yta-btn-success'); }, 1000);
+                var btn = row.querySelector('.jpk-row-btn');
+                btn.classList.remove('dirty');
+                btn.classList.add('success');
+                setTimeout(function() { btn.classList.remove('success'); }, 1000);
             })
             .catch(function(err) { Dashboard.alert((err && err.Error) || 'Failed to save tags.'); });
     }
@@ -289,7 +289,7 @@ export default function (view) {
 
         var rows = [];
         checkboxes.forEach(function(cb) {
-            var row = cb.closest('.pt-row');
+            var row = cb.closest('.jpk-table-row');
             if (row) rows.push(row);
         });
 
@@ -353,10 +353,10 @@ export default function (view) {
             Shared.apiRequest('Tags', 'POST', data)
                 .then(function() {
                     saved++;
-                    var btn = row.querySelector('.yta-btn-save');
+                    var btn = row.querySelector('.jpk-row-btn');
                     if (btn) {
-                        btn.classList.add('yta-btn-success');
-                        setTimeout(function() { btn.classList.remove('yta-btn-success'); }, 1000);
+                        btn.classList.add('success');
+                        setTimeout(function() { btn.classList.remove('success'); }, 1000);
                     }
                     saveNext(index + 1);
                 })

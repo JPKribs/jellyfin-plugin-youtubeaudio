@@ -1,0 +1,195 @@
+<!-- Content fragment injected into the base JPKribs.Jellyfin.Base status card. -->
+<link rel="stylesheet" href="../web/configurationpage?name=youtubeaudio_jpkribs_shared.css" />
+
+<div id="signin" class="hidden">
+    <h1>Sign in required</h1>
+    <p>Sign in to your account to view this page.</p>
+    <a id="signinLink" class="jpk-btn" href="/">Sign in</a>
+</div>
+
+<div id="denied" class="hidden">
+    <h1>Not authorized</h1>
+    <p>Your account doesn't have access to this page.</p>
+    <a id="deniedLink" class="jpk-btn" href="/">Back to Jellyfin</a>
+</div>
+
+<form id="form" class="hidden" autocomplete="off">
+    <h1>Download Song(s)</h1>
+    <p>Provide a YouTube song or playlist link for download.</p>
+
+    <div class="jpk-fields">
+        <label for="url">YouTube URL</label>
+        <input type="text" id="url" placeholder="https://www.youtube.com/..." />
+
+        <label for="artist">Artist</label>
+        <div id="artistBox"></div>
+
+        <label for="album">Album</label>
+        <div id="albumBox"></div>
+
+        <div class="jpk-field-pair">
+            <div>
+                <label for="year">Year</label>
+                <input type="number" id="year" min="1500" max="3000" step="1" />
+            </div>
+            <div>
+                <label for="title">Title</label>
+                <input type="text" id="title" />
+            </div>
+        </div>
+    </div>
+
+    <button type="submit" id="submit" class="jpk-submit">Submit</button>
+    <div id="msg" style="margin-top:14px;font-size:0.9rem;min-height:1.2em"></div>
+    <div class="jpk-warn" style="margin-top:16px">Lyrics videos or videos without prologues and epilogues are preferred.</div>
+</form>
+
+<script>
+    (function () {
+        var path = location.pathname.replace(/\/+$/, '');
+        var infoUrl = path + '/Info';
+        var submitUrl = path + '/Submit';
+        // Derive the Jellyfin base path by stripping this page's own "/YouTube/Download" suffix (served at any case).
+        // Anchored to the end so it can't mis-split; if the suffix isn't found, fall back to the origin root.
+        var prefix = location.pathname.replace(/\/youtube\/download\/?$/i, '');
+        if (prefix === location.pathname) { prefix = ''; }
+        var root = prefix + '/';
+
+        var el = function (id) { return document.getElementById(id); };
+        function show(id) { el(id).classList.remove('hidden'); }
+        function hide(id) { el(id).classList.add('hidden'); }
+        function val(id) { return (el(id).value || '').trim(); }
+        function status(message, color) {
+            var m = el('msg');
+            m.textContent = message;
+            m.style.color = color || 'rgba(255,255,255,0.55)';
+        }
+
+        // Hide the base card's loading heading + spinner when leaving the loading state.
+        function leaveLoading() {
+            var h = document.querySelector('.jpk-status-card > h1');
+            var s = document.querySelector('.jpk-status-card > .jpk-spinner');
+            if (h) h.style.display = 'none';
+            if (s) s.style.display = 'none';
+        }
+
+        ['signinLink', 'deniedLink'].forEach(function (id) { var a = el(id); if (a) a.href = root; });
+
+        fetch(prefix + '/System/Info/Public', { headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.json(); })
+            .then(function (info) { if (info && info.ServerName) { document.title = info.ServerName + ' - Download'; } })
+            .catch(function () { /* keep the default title */ });
+
+        function getToken() {
+            try {
+                var raw = localStorage.getItem('jellyfin_credentials');
+                if (!raw) return null;
+                var creds = JSON.parse(raw);
+                var servers = (creds && creds.Servers) || [];
+                for (var i = 0; i < servers.length; i++) {
+                    if (servers[i] && servers[i].AccessToken) return servers[i].AccessToken;
+                }
+            } catch (e) { /* no token */ }
+            return null;
+        }
+
+        var token = getToken();
+        var authHeader = 'MediaBrowser Token="' + token + '"';
+        var artistControl = null;
+        var albumControl = null;
+
+        if (!token) { leaveLoading(); show('signin'); return; }
+
+        function lookup(kind, getArtist) {
+            var t = null;
+            return function (query, cb) {
+                if (t) clearTimeout(t);
+                if (!query || query.length < 2) { cb([]); return; }
+                t = setTimeout(function () {
+                    var u = path + '/' + kind + '?query=' + encodeURIComponent(query);
+                    if (getArtist) { var a = getArtist(); if (a) { u += '&artist=' + encodeURIComponent(a); } }
+                    fetch(u, { headers: { 'Authorization': authHeader, 'Accept': 'application/json' } })
+                        .then(function (r) { return r.ok ? r.json() : []; })
+                        .then(function (res) { cb(res || []); })
+                        .catch(function () { cb([]); });
+                }, 300);
+            };
+        }
+
+        function makeControl(boxId, placeholder, searchFn, shared) {
+            var box = el(boxId);
+            if (shared && searchFn) {
+                var combo = shared.createSearchableComboBox({ placeholder: placeholder, searchFn: searchFn });
+                box.appendChild(combo.element);
+                return combo;
+            }
+            var input = document.createElement('input');
+            input.type = 'text';
+            input.placeholder = placeholder;
+            box.appendChild(input);
+            return { getValue: function () { return input.value; }, setValue: function (v) { input.value = v || ''; } };
+        }
+
+        function buildControls(shared) {
+            artistControl = makeControl('artistBox', 'Type to search artists…', lookup('Artists'), shared);
+            albumControl = makeControl('albumBox', 'Type to search albums…', lookup('Albums', function () { return artistControl.getValue(); }), shared);
+        }
+
+        function gate(shared) {
+            fetch(infoUrl, { headers: { 'Authorization': authHeader, 'Accept': 'application/json' } })
+                .then(function (r) {
+                    if (r.status === 401) { leaveLoading(); show('signin'); return null; }
+                    return r.json();
+                })
+                .then(function (info) {
+                    if (info === null) return;
+                    leaveLoading();
+                    if (info && info.Approved) { buildControls(shared); show('form'); } else { show('denied'); }
+                })
+                .catch(function () { leaveLoading(); show('denied'); });
+        }
+
+        // createSearchableComboBox lives on the shared bag, not the module — build it from createShared.
+        import(prefix + '/web/configurationpage?name=youtubeaudio_jpkribs_shared.js')
+            .then(function (mod) { gate(mod.createShared(document, '7323ea64-a200-4265-ab8f-e7ae27d06c38', 'YouTube')); })
+            .catch(function () { gate(null); });
+
+        el('form').addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            var url = val('url');
+            var artist = (artistControl ? artistControl.getValue() : '').trim();
+            var album = (albumControl ? albumControl.getValue() : '').trim();
+            var yearRaw = val('year');
+            var title = val('title');
+
+            if (!url || !artist || !album || !yearRaw) { status('URL, artist, album, and year are required.', '#ff5252'); return; }
+            var year = parseInt(yearRaw, 10);
+            if (isNaN(year)) { status('Enter a valid year.', '#ff5252'); return; }
+
+            var btn = el('submit');
+            btn.disabled = true;
+            status('Submitting…', null);
+
+            fetch(submitUrl, {
+                method: 'POST',
+                headers: { 'Authorization': authHeader, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ Url: url, Artist: artist, Album: album, Year: year, Title: title || null })
+            })
+                .then(function (r) {
+                    return r.json().then(function (data) { return { ok: r.ok, data: data }; })
+                        .catch(function () { return { ok: r.ok, data: {} }; });
+                })
+                .then(function (res) {
+                    btn.disabled = false;
+                    if (!res.ok) { status((res.data && res.data.Error) || 'Submission failed.', '#ff5252'); return; }
+                    var n = (res.data && res.data.Queued) || 0;
+                    status('Queued ' + n + ' track' + (n === 1 ? '' : 's') + ' for download.', '#5cb85c');
+                    el('form').reset();
+                    if (artistControl && artistControl.setValue) artistControl.setValue('');
+                    if (albumControl && albumControl.setValue) albumControl.setValue('');
+                })
+                .catch(function () { btn.disabled = false; status('Network error. Please try again.', '#ff5252'); });
+        });
+    })();
+</script>

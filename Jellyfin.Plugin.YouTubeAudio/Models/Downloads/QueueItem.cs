@@ -23,6 +23,15 @@ public class QueueItem
     /// <summary>Gets or sets the error message if status is Error.</summary>
     public string? ErrorMessage { get; set; }
 
+    /// <summary>Gets or sets the artist supplied at submit time, applied as a tag after download.</summary>
+    public string? Artist { get; set; }
+
+    /// <summary>Gets or sets the album supplied at submit time, applied as a tag after download.</summary>
+    public string? Album { get; set; }
+
+    /// <summary>Gets or sets the release year supplied at submit time, applied as a tag after download.</summary>
+    public int? Year { get; set; }
+
     /// <summary>Gets or sets when this item was created (ISO 8601).</summary>
     public string CreatedAt { get; set; } = string.Empty;
 

@@ -12,12 +12,12 @@
                     </div>
 
                     <!-- COLLAPSIBLE SECTION: Music Library -->
-                    <div class="collapsibleSection">
-                        <button type="button" class="collapsibleHeader collapsed" aria-expanded="false" data-target="libraryContent">
-                            <span class="collapsibleTitle">Music Library</span>
-                            <span class="collapsibleIcon">&#9660;</span>
+                    <div class="jpk-collapsible-section">
+                        <button type="button" class="jpk-collapsible-header collapsed" aria-expanded="false" data-target="libraryContent">
+                            <span class="jpk-collapsible-title">Music Library</span>
+                            <span class="jpk-collapsible-icon">&#9660;</span>
                         </button>
-                        <div id="libraryContent" class="collapsibleContent collapsed">
+                        <div id="libraryContent" class="jpk-collapsible-content collapsed">
                             <div class="selectContainer">
                                 <label class="selectLabel" for="selMusicLibrary">Target Library:</label>
                                 <select is="emby-select" id="selMusicLibrary" class="emby-select-withcolor">
@@ -38,21 +38,21 @@
                                     Files are organized as: Path / Artist / Album (Year) / Song.ext
                                 </div>
                             </div>
-                            <div class="collapsibleActions">
-                                <button is="emby-button" type="button" id="btnSaveLibrary" class="raised button-submit">
-                                    <span>Save Library</span>
+                            <div class="jpk-collapsible-actions">
+                                <button is="emby-button" type="button" id="btnSaveLibrary" class="raised jpk-button-submit jpk-button-small">
+                                    <span>Save</span>
                                 </button>
                             </div>
                         </div>
                     </div>
 
                     <!-- COLLAPSIBLE SECTION: Audio Format -->
-                    <div class="collapsibleSection">
-                        <button type="button" class="collapsibleHeader collapsed" aria-expanded="false" data-target="formatContent">
-                            <span class="collapsibleTitle">Audio Format</span>
-                            <span class="collapsibleIcon">&#9660;</span>
+                    <div class="jpk-collapsible-section">
+                        <button type="button" class="jpk-collapsible-header collapsed" aria-expanded="false" data-target="formatContent">
+                            <span class="jpk-collapsible-title">Audio Format</span>
+                            <span class="jpk-collapsible-icon">&#9660;</span>
                         </button>
-                        <div id="formatContent" class="collapsibleContent collapsed">
+                        <div id="formatContent" class="jpk-collapsible-content collapsed">
                             <div class="selectContainer">
                                 <label class="selectLabel" for="selAudioFormat">Download Format:</label>
                                 <select is="emby-select" id="selAudioFormat" class="emby-select-withcolor">
@@ -66,21 +66,21 @@
                                 </div>
                                 <div class="selectArrowContainer"><div style="display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
                             </div>
-                            <div class="collapsibleActions">
-                                <button is="emby-button" type="button" id="btnSaveFormat" class="raised button-submit">
-                                    <span>Save Format</span>
+                            <div class="jpk-collapsible-actions">
+                                <button is="emby-button" type="button" id="btnSaveFormat" class="raised jpk-button-submit jpk-button-small">
+                                    <span>Save</span>
                                 </button>
                             </div>
                         </div>
                     </div>
 
                     <!-- COLLAPSIBLE SECTION: Import Behavior -->
-                    <div class="collapsibleSection">
-                        <button type="button" class="collapsibleHeader collapsed" aria-expanded="false" data-target="importBehaviorContent">
-                            <span class="collapsibleTitle">Import Behavior</span>
-                            <span class="collapsibleIcon">&#9660;</span>
+                    <div class="jpk-collapsible-section">
+                        <button type="button" class="jpk-collapsible-header collapsed" aria-expanded="false" data-target="importBehaviorContent">
+                            <span class="jpk-collapsible-title">Import Behavior</span>
+                            <span class="jpk-collapsible-icon">&#9660;</span>
                         </button>
-                        <div id="importBehaviorContent" class="collapsibleContent collapsed">
+                        <div id="importBehaviorContent" class="jpk-collapsible-content collapsed">
                             <div class="checkboxContainer checkboxContainer-withDescription" style="margin-bottom: 12px;">
                                 <label class="emby-checkbox-label">
                                     <input type="checkbox" is="emby-checkbox" id="chkReplaceDuplicates" checked />
@@ -91,8 +91,8 @@
                                     When disabled, duplicate files are skipped and left in the download cache.
                                 </div>
                             </div>
-                            <div class="collapsibleActions">
-                                <button is="emby-button" type="button" id="btnSaveImportBehavior" class="raised button-submit">
+                            <div class="jpk-collapsible-actions">
+                                <button is="emby-button" type="button" id="btnSaveImportBehavior" class="raised jpk-button-submit jpk-button-small">
                                     <span>Save</span>
                                 </button>
                             </div>
@@ -100,12 +100,12 @@
                     </div>
 
                     <!-- COLLAPSIBLE SECTION: Cache Directory -->
-                    <div class="collapsibleSection">
-                        <button type="button" class="collapsibleHeader collapsed" aria-expanded="false" data-target="cacheContent">
-                            <span class="collapsibleTitle">Cache Directory</span>
-                            <span class="collapsibleIcon">&#9660;</span>
+                    <div class="jpk-collapsible-section">
+                        <button type="button" class="jpk-collapsible-header collapsed" aria-expanded="false" data-target="cacheContent">
+                            <span class="jpk-collapsible-title">Cache Directory</span>
+                            <span class="jpk-collapsible-icon">&#9660;</span>
                         </button>
-                        <div id="cacheContent" class="collapsibleContent collapsed">
+                        <div id="cacheContent" class="jpk-collapsible-content collapsed">
                             <div class="inputContainer">
                                 <label for="txtCacheOverride">Cache Directory Override:</label>
                                 <input is="emby-input" type="text" id="txtCacheOverride"
@@ -116,9 +116,28 @@
                                     a specific storage location.
                                 </div>
                             </div>
-                            <div class="collapsibleActions">
-                                <button is="emby-button" type="button" id="btnSaveCache" class="raised button-submit">
-                                    <span>Save Cache</span>
+                            <div class="jpk-collapsible-actions">
+                                <button is="emby-button" type="button" id="btnSaveCache" class="raised jpk-button-submit jpk-button-small">
+                                    <span>Save</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- COLLAPSIBLE SECTION: Approved Users -->
+                    <div class="jpk-collapsible-section">
+                        <button type="button" class="jpk-collapsible-header collapsed" aria-expanded="false" data-target="approvedUsersContent">
+                            <span class="jpk-collapsible-title">Approved Users</span>
+                            <span class="jpk-collapsible-icon">&#9660;</span>
+                        </button>
+                        <div id="approvedUsersContent" class="jpk-collapsible-content collapsed">
+                            <div class="fieldDescription" style="margin-bottom: 12px;">
+                                Selected users can submit download links at /YouTube/Download without admin access. They cannot import into the library.
+                            </div>
+                            <div id="approvedUsersList"></div>
+                            <div class="jpk-collapsible-actions">
+                                <button is="emby-button" type="button" id="btnSaveApprovedUsers" class="raised jpk-button-submit jpk-button-small">
+                                    <span>Save</span>
                                 </button>
                             </div>
                         </div>
@@ -130,12 +149,12 @@
                     </div>
 
                     <!-- COLLAPSIBLE SECTION: yt-dlp -->
-                    <div class="collapsibleSection">
-                        <button type="button" class="collapsibleHeader collapsed" aria-expanded="false" data-target="ytdlpContent">
-                            <span class="collapsibleTitle">yt-dlp</span>
-                            <span class="collapsibleIcon">&#9660;</span>
+                    <div class="jpk-collapsible-section">
+                        <button type="button" class="jpk-collapsible-header collapsed" aria-expanded="false" data-target="ytdlpContent">
+                            <span class="jpk-collapsible-title">yt-dlp</span>
+                            <span class="jpk-collapsible-icon">&#9660;</span>
                         </button>
-                        <div id="ytdlpContent" class="collapsibleContent collapsed">
+                        <div id="ytdlpContent" class="jpk-collapsible-content collapsed">
                             <div class="fieldDescription" style="margin-bottom: 12px;">
                                 <a href="https://github.com/yt-dlp/yt-dlp" target="_blank" style="color: var(--yta-accent);">yt-dlp</a>
                                 is automatically downloaded on first use.
@@ -149,8 +168,8 @@
                                     Absolute path to the yt-dlp binary (e.g. /opt/homebrew/bin/yt-dlp).
                                 </div>
                             </div>
-                            <div class="collapsibleActions">
-                                <button is="emby-button" type="button" id="btnSaveYtDlp" class="raised button-submit">
+                            <div class="jpk-collapsible-actions">
+                                <button is="emby-button" type="button" id="btnSaveYtDlp" class="raised jpk-button-submit jpk-button-small">
                                     <span>Save</span>
                                 </button>
                             </div>
@@ -158,36 +177,36 @@
                     </div>
 
                     <!-- COLLAPSIBLE SECTION: Reset -->
-                    <div class="collapsibleSection">
-                        <button type="button" class="collapsibleHeader collapsed" aria-expanded="false" data-target="resetContent">
-                            <span class="collapsibleTitle">Reset</span>
-                            <span class="collapsibleIcon">&#9660;</span>
+                    <div class="jpk-collapsible-section">
+                        <button type="button" class="jpk-collapsible-header collapsed" aria-expanded="false" data-target="resetContent">
+                            <span class="jpk-collapsible-title">Reset</span>
+                            <span class="jpk-collapsible-icon">&#9660;</span>
                         </button>
-                        <div id="resetContent" class="collapsibleContent collapsed">
+                        <div id="resetContent" class="jpk-collapsible-content collapsed">
                             <div class="fieldDescription" style="margin-bottom: 16px;">
                                 These actions are destructive and cannot be undone.
                             </div>
-                            <div class="resetButtonGroup">
-                                <div class="resetButtonRow">
-                                    <div class="resetButtonInfo">
+                            <div class="jpk-reset-group">
+                                <div class="jpk-reset-row">
+                                    <div class="jpk-reset-info">
                                         <div>Reset Queue</div>
                                         <div class="fieldDescription">Clear the download queue database. Queued and in-progress items will be removed.</div>
                                     </div>
-                                    <button is="emby-button" type="button" id="btnResetQueue" class="raised button-destructive button-small">
+                                    <button is="emby-button" type="button" id="btnResetQueue" class="raised jpk-button-destructive jpk-button-small">
                                         <span>Reset</span>
                                     </button>
                                 </div>
-                                <div class="resetButtonRow resetButtonRow-nuclear">
-                                    <div class="resetButtonInfo">
+                                <div class="jpk-reset-row jpk-reset-row-nuclear">
+                                    <div class="jpk-reset-info">
                                         <div>Reset Cache</div>
                                         <div class="fieldDescription">Delete all cached audio files and clear the download queue. This removes all downloaded files that have not been imported.</div>
                                     </div>
-                                    <button is="emby-button" type="button" id="btnResetCache" class="raised button-destructive button-small">
+                                    <button is="emby-button" type="button" id="btnResetCache" class="raised jpk-button-destructive jpk-button-small">
                                         <span>Reset All</span>
                                     </button>
                                 </div>
                             </div>
-                            <span id="resetStatus" class="yta-status-text"></span>
+                            <span id="resetStatus" class="jpk-status-text"></span>
                         </div>
                     </div>
 
@@ -196,5 +215,5 @@
         </div>
     </div>
 
-    <link rel="stylesheet" href="configurationpage?name=youtubeaudio_shared.css">
+    <link rel="stylesheet" href="configurationpage?name=youtubeaudio_jpkribs_shared.css">
 </div>

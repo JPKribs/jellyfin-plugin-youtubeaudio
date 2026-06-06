@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
+using JPKribs.Jellyfin.Base;
 using MediaBrowser.Common.Configuration;
-using MediaBrowser.Common.Plugins;
 using MediaBrowser.Model.Plugins;
 using MediaBrowser.Model.Serialization;
 using Microsoft.Extensions.Logging;
@@ -11,23 +11,22 @@ namespace Jellyfin.Plugin.YouTubeAudio;
 /// <summary>
 /// Main plugin entry point for YouTube Audio.
 /// </summary>
-public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
+public class Plugin : PluginBase<Plugin, PluginConfiguration>
 {
-    private readonly ILogger<Plugin> _logger;
-
     /// <summary>
     /// Initializes a new instance of the <see cref="Plugin"/> class.
     /// </summary>
+    /// <param name="applicationPaths">The application paths.</param>
+    /// <param name="xmlSerializer">The XML serializer.</param>
+    /// <param name="logger">The logger.</param>
     public Plugin(
         IApplicationPaths applicationPaths,
         IXmlSerializer xmlSerializer,
         ILogger<Plugin> logger)
         : base(applicationPaths, xmlSerializer)
     {
-        Instance = this;
-        _logger = logger;
-
-        _logger.LogInformation("YouTube Audio plugin initialized");
+        ArgumentNullException.ThrowIfNull(logger);
+        logger.LogInformation("YouTube Audio plugin initialized");
     }
 
     /// <inheritdoc />
@@ -39,17 +38,12 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     /// <inheritdoc />
     public override string Description => "Download YouTube audio, edit metadata, and import to your Jellyfin music library.";
 
-    /// <summary>
-    /// Gets the current plugin instance
-    /// </summary>
-    public static Plugin? Instance { get; private set; }
-
     /// <inheritdoc />
-    public IEnumerable<PluginPageInfo> GetPages()
+    public override IEnumerable<PluginPageInfo> GetPages()
     {
         var ns = typeof(Plugin).Namespace;
 
-        // Download page
+        // Tab 1: Download (the dashboard menu entry).
         yield return new PluginPageInfo
         {
             Name = "youtubeaudio_download",
@@ -65,7 +59,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             EmbeddedResourcePath = $"{ns}.Configuration.youtubeaudio_download.js"
         };
 
-        // Import page
+        // Tab 2: Import.
         yield return new PluginPageInfo
         {
             Name = "youtubeaudio_import",
@@ -78,7 +72,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             EmbeddedResourcePath = $"{ns}.Configuration.youtubeaudio_import.js"
         };
 
-        // Settings page
+        // Tab 3: Settings.
         yield return new PluginPageInfo
         {
             Name = "youtubeaudio_settings",
@@ -91,17 +85,17 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             EmbeddedResourcePath = $"{ns}.Configuration.youtubeaudio_settings.js"
         };
 
-        // Shared resources
-        yield return new PluginPageInfo
-        {
-            Name = "youtubeaudio_shared.css",
-            EmbeddedResourcePath = $"{ns}.Configuration.youtubeaudio_shared.css"
-        };
-
+        // Plugin specific shared JS layered on top of the base kit (all shared CSS now lives in the base package).
         yield return new PluginPageInfo
         {
             Name = "youtubeaudio_shared.js",
             EmbeddedResourcePath = $"{ns}.Configuration.youtubeaudio_shared.js"
         };
+
+        // Shared base CSS and JS compiled in from the JPKribs.Jellyfin.Base package.
+        foreach (var page in GetSharedPages("youtubeaudio"))
+        {
+            yield return page;
+        }
     }
 }
