@@ -9,6 +9,14 @@
     "category": "Music",
     "versions": [
       {
+        "version": "10.11.7.1",
+        "changelog": "## Developer\r\n- Cleanup CSS and JS\r\n- Standardize layouts with other projects\r\n\r\n## Features\r\n- Add metrics using stat cards\r\n- Add approved users who can submit downloads without admin access\r\n- Set artist album and year when submitting a download",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/v10.11.7.1/jellyfin-plugin-youtubeaudio-10.11.7.1.zip",
+        "checksum": "48416c19d35c5380d44ccba899ad0834",
+        "timestamp": "2026-06-06T21:20:08Z"
+      },
+      {
         "version": "10.11.7.0",
         "changelog": "## Chores\r\n- Fix Images",
         "targetAbi": "10.11.0.0",
