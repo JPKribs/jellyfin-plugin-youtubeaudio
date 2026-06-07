@@ -154,6 +154,17 @@
             .then(function (mod) { gate(mod.createShared(document, '7323ea64-a200-4265-ab8f-e7ae27d06c38', 'YouTube')); })
             .catch(function () { gate(null); });
 
+        // A playlist link downloads many tracks, so a single title doesn't apply — disable the field for playlists.
+        function syncTitleForPlaylist() {
+            var isPlaylist = /\/playlist/i.test(val('url'));
+            var title = el('title');
+            title.disabled = isPlaylist;
+            if (isPlaylist) { title.value = ''; title.placeholder = 'Not used for playlists'; }
+            else { title.placeholder = ''; }
+        }
+        el('url').addEventListener('input', syncTitleForPlaylist);
+        syncTitleForPlaylist();
+
         el('form').addEventListener('submit', function (e) {
             e.preventDefault();
 

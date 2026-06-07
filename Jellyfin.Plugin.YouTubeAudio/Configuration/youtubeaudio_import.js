@@ -14,6 +14,12 @@ export default function (view) {
     var _bulkAlbumCombo = null;
     var _activeComboBoxes = []; // Track all combo-boxes for cleanup
 
+    // Tidy genre display so every ";" is followed by one space ("Rock;Pop" -> "Rock; Pop").
+    // Cosmetic only; the server splits on ";" and writes one GENRE field per genre regardless.
+    function normalizeGenre(value) {
+        return (value || '').replace(/\s*;\s*/g, '; ').replace(/;\s*$/, '').trim();
+    }
+
     // ============================================
     // DATA LOADING
     // ============================================
@@ -254,8 +260,9 @@ export default function (view) {
             Album: albumCell._combo ? albumCell._combo.getValue() : '',
             TrackNumber: parseInt(row.querySelector('.yta-field-trackNumber').value) || null,
             Year: parseInt(row.querySelector('.yta-field-year').value) || null,
-            Genre: row.querySelector('.yta-field-genre').value
+            Genre: normalizeGenre(row.querySelector('.yta-field-genre').value)
         };
+        row.querySelector('.yta-field-genre').value = data.Genre;
 
         Shared.apiRequest('Tags', 'POST', data)
             .then(function() {
@@ -278,7 +285,7 @@ export default function (view) {
         var bulkFeat = view.querySelector('#bulkFeat').value;
         var bulkAlbumArtist = view.querySelector('#bulkAlbumArtist').value;
         var bulkAlbum = _bulkAlbumCombo ? _bulkAlbumCombo.getValue() : '';
-        var bulkGenre = view.querySelector('#bulkGenre').value;
+        var bulkGenre = normalizeGenre(view.querySelector('#bulkGenre').value);
         var bulkYear = view.querySelector('#bulkYear').value;
 
         // Only apply fields that have values
@@ -347,8 +354,9 @@ export default function (view) {
                 Album: albumCell._combo ? albumCell._combo.getValue() : '',
                 TrackNumber: parseInt(row.querySelector('.yta-field-trackNumber').value) || null,
                 Year: parseInt(row.querySelector('.yta-field-year').value) || null,
-                Genre: row.querySelector('.yta-field-genre').value
+                Genre: normalizeGenre(row.querySelector('.yta-field-genre').value)
             };
+            row.querySelector('.yta-field-genre').value = data.Genre;
 
             Shared.apiRequest('Tags', 'POST', data)
                 .then(function() {

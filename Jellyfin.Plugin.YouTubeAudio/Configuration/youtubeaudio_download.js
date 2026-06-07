@@ -278,6 +278,12 @@ export default function (view) {
     });
 
     _sharedPromise.then(function() {
+        var dlLink = Shared.getEl('publicDownloadUrl');
+        if (dlLink) {
+            var origin = (window.ApiClient && ApiClient.serverAddress) ? ApiClient.serverAddress() : window.location.origin;
+            dlLink.href = origin.replace(/\/+$/, '') + '/YouTube/Download';
+        }
+
         var btnQueue = Shared.getEl('btnQueue');
         if (btnQueue) btnQueue.addEventListener('click', queueUrl);
 

@@ -26,7 +26,11 @@
     </PackageReference>
     <PackageReference Include="YoutubeDLSharp" Version="1.2.0" />
     <PackageReference Include="TagLibSharp" Version="2.3.0" />
-    <PackageReference Include="JPKribs.Jellyfin.Base" Version="2026.6.14" />
+    <PackageReference Include="JPKribs.Jellyfin.Base" Version="2026.6.15" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jellyfin.Plugin.YouTubeAudio.Tests" />
   </ItemGroup>
 
   <ItemGroup>

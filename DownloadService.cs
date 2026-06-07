@@ -212,16 +212,6 @@ public sealed class DownloadService : IDisposable
 
                     if (runResult.Success)
                     {
-                        // yt-dlp's AAC postprocessor emits an MP4 whose box header TagLib cannot
-                        // parse, so every later tag read/write would otherwise hit the reactive
-                        // remux fallback (and submitted metadata would silently fail to apply). A
-                        // one-time stream-copy remux now rewrites the container cleanly — no
-                        // re-encode, no quality loss — so the cached file is TagLib-healthy.
-                        if (Config.AudioFormat == AudioFormat.M4a)
-                        {
-                            TryRemuxContainer(outputPath);
-                        }
-
                         // Title from info.json fills in only when the submission did not supply one
                         if (string.IsNullOrEmpty(item.Title))
                         {
@@ -334,14 +324,14 @@ public sealed class DownloadService : IDisposable
         }
         catch (Exception ex) when (ex is ArgumentNullException or TagLib.CorruptFileException)
         {
-            _logger.LogWarning("TagLib failed to read {File}, attempting ffmpeg remux", item.FileName);
-            if (TryRemuxContainer(filePath))
+            _logger.LogWarning("TagLib failed to read {File}, attempting ffmpeg repair", item.FileName);
+            if (TryRepairWithFfmpeg(filePath))
             {
                 tagFile = TagLib.File.Create(filePath);
             }
             else
             {
-                throw new InvalidOperationException($"File is corrupt and remux failed: {item.FileName}", ex);
+                throw new InvalidOperationException($"File is corrupt and repair failed: {item.FileName}", ex);
             }
         }
 
@@ -488,7 +478,7 @@ public sealed class DownloadService : IDisposable
                 }
 
                 // Read tags to determine destination path.
-                // Some Opus files have corrupt Vorbis Comment headers; remux with ffmpeg if needed.
+                // Some Opus files have corrupt Vorbis Comment headers; repair with ffmpeg if needed.
                 TagLib.File? tagFile = null;
                 try
                 {
@@ -496,14 +486,14 @@ public sealed class DownloadService : IDisposable
                 }
                 catch (Exception ex) when (ex is ArgumentNullException or TagLib.CorruptFileException)
                 {
-                    _logger.LogWarning("TagLib failed to read {File}, attempting ffmpeg remux: {Msg}", item.FileName, ex.Message);
-                    if (TryRemuxContainer(sourcePath))
+                    _logger.LogWarning("TagLib failed to read {File}, attempting ffmpeg repair: {Msg}", item.FileName, ex.Message);
+                    if (TryRepairWithFfmpeg(sourcePath))
                     {
                         tagFile = TagLib.File.Create(sourcePath);
                     }
                     else
                     {
-                        result.Errors.Add($"Cannot read tags for {item.Title ?? item.Id}: file is corrupt and remux failed.");
+                        result.Errors.Add($"Cannot read tags for {item.Title ?? item.Id}: file is corrupt and repair failed.");
                         continue;
                     }
                 }
@@ -936,8 +926,8 @@ public sealed class DownloadService : IDisposable
             }
             catch (Exception ex) when (ex is ArgumentNullException or TagLib.CorruptFileException)
             {
-                _logger.LogWarning("TagLib failed to read {File}, attempting ffmpeg remux", Path.GetFileName(filePath));
-                if (TryRemuxContainer(filePath))
+                _logger.LogWarning("TagLib failed to read {File}, attempting ffmpeg repair", Path.GetFileName(filePath));
+                if (TryRepairWithFfmpeg(filePath))
                 {
                     tagFile = TagLib.File.Create(filePath);
                 }
@@ -1049,23 +1039,22 @@ public sealed class DownloadService : IDisposable
     }
 
     /// <summary>
-    /// Rewrites an audio file's container with a stream-copy remux (ffmpeg -c copy). No re-encode,
-    /// so no quality loss. Used both proactively — yt-dlp's M4a output has a box header TagLib
-    /// cannot parse — and reactively to recover files TagLib reports as corrupt.
+    /// Attempts to repair a corrupt audio file by re-muxing it with ffmpeg.
+    /// This fixes corrupt Vorbis Comment headers that TagLib cannot parse.
     /// </summary>
-    /// <returns>True if the container was remuxed successfully.</returns>
-    private bool TryRemuxContainer(string filePath)
+    /// <returns>True if the file was repaired successfully.</returns>
+    private bool TryRepairWithFfmpeg(string filePath)
     {
         try
         {
             var ffmpegPath = _mediaEncoder.EncoderPath;
             if (string.IsNullOrEmpty(ffmpegPath) || !File.Exists(ffmpegPath))
             {
-                _logger.LogWarning("Cannot remux file: ffmpeg not found");
+                _logger.LogWarning("Cannot repair file: ffmpeg not found");
                 return false;
             }
 
-            var tempPath = filePath + ".remux" + Path.GetExtension(filePath);
+            var tempPath = filePath + ".repair" + Path.GetExtension(filePath);
             using var process = new Process
             {
                 StartInfo = new ProcessStartInfo
@@ -1084,7 +1073,7 @@ public sealed class DownloadService : IDisposable
 
             if (!exited)
             {
-                _logger.LogWarning("ffmpeg remux timed out for {File}, killing process", Path.GetFileName(filePath));
+                _logger.LogWarning("ffmpeg repair timed out for {File}, killing process", Path.GetFileName(filePath));
                 try { process.Kill(entireProcessTree: true); }
                 catch (InvalidOperationException) { /* process already exited */ }
 
@@ -1099,7 +1088,7 @@ public sealed class DownloadService : IDisposable
             if (process.ExitCode == 0 && File.Exists(tempPath))
             {
                 File.Move(tempPath, filePath, overwrite: true);
-                _logger.LogInformation("Remuxed audio container: {File}", Path.GetFileName(filePath));
+                _logger.LogInformation("Repaired corrupt audio file: {File}", Path.GetFileName(filePath));
                 return true;
             }
 
@@ -1109,12 +1098,12 @@ public sealed class DownloadService : IDisposable
                 File.Delete(tempPath);
             }
 
-            _logger.LogWarning("ffmpeg remux failed with exit code {Code}", process.ExitCode);
+            _logger.LogWarning("ffmpeg repair failed with exit code {Code}", process.ExitCode);
             return false;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Exception during ffmpeg remux of {File}", Path.GetFileName(filePath));
+            _logger.LogWarning(ex, "Exception during ffmpeg repair of {File}", Path.GetFileName(filePath));
             return false;
         }
     }
