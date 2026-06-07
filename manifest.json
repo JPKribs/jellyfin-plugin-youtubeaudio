@@ -9,6 +9,14 @@
     "category": "Music",
     "versions": [
       {
+        "version": "10.11.7.2",
+        "changelog": "## Developer\r\n- Bump to base 2026.6.15\r\n- Cleanup some CSS that is non-standard\r\n- Add the public URL in the approved users setting\r\n\r\n## Fixes\r\n- Handle  as  since Jellyfin will treat them as one genre otherwise\r\n- Fix M4A creation process",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/v10.11.7.2/jellyfin-plugin-youtubeaudio-10.11.7.2.zip",
+        "checksum": "e38ec62d52c3eccbe548d859b6d105cb",
+        "timestamp": "2026-06-07T00:40:21Z"
+      },
+      {
         "version": "10.11.7.1",
         "changelog": "## Developer\r\n- Cleanup CSS and JS\r\n- Standardize layouts with other projects\r\n\r\n## Features\r\n- Add metrics using stat cards\r\n- Add approved users who can submit downloads without admin access\r\n- Set artist album and year when submitting a download",
         "targetAbi": "10.11.9.0",
