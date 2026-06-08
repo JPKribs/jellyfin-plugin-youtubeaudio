@@ -1,7 +1,7 @@
 ---
 name: "YouTube Audio"
 guid: "7323ea64-a200-4265-ab8f-e7ae27d06c38"
-version: "10.11.7.2"
+version: "10.11.7.3"
 targetAbi: "10.11.9.0"
 framework: "net9.0"
 overview: "Download YouTube audio directly to a Jellyfin Music Library."
@@ -18,9 +18,4 @@ artifacts:
 - "TagLibSharp.dll"
 changelog:
   developer:
-  - Bump to base 2026.6.15
-  - Cleanup some CSS that is non-standard
-  - Add the public URL in the approved users setting
-  fixes:
-  - Handle `Genre1;Genre2` as `Genre1; Genre2` since Jellyfin will treat them as one genre otherwise
-  - Fix M4A creation process
+  - Bump to base 2026.6.19
