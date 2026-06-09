@@ -37,8 +37,8 @@ public class DownloadServiceTests
     [InlineData(AudioFormat.Opus, ".opus")]
     [InlineData(AudioFormat.Mp3, ".mp3")]
     [InlineData(AudioFormat.M4a, ".m4a")]
-    public void GetFileExtension_MapsFormat(AudioFormat format, string expected)
-        => Assert.Equal(expected, DownloadService.GetFileExtension(format));
+    public void ToFileExtension_MapsFormat(AudioFormat format, string expected)
+        => Assert.Equal(expected, format.ToFileExtension());
 
     [Theory]
     [InlineData(AudioFormat.Opus, AudioConversionFormat.Opus)]

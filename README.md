@@ -2,23 +2,8 @@
 
 A Jellyfin plugin to download audio tracks from YouTube URLs or playlists. Once downloaded, files are tagged using internal metadata and imported into a local Jellyfin music library.
 
----
-
-**All plugins are made for my personal use cases. I've made these publicly available for anyone who has the same use cases and can benefit from this work. I have no desire to advertise or market for these plugins as these are for personal usage only.**
-
-**Thank you,**
-
-*Joe Kribs*
-
----
-
 ## How It Works
-YouTube Audio lets you paste a YouTube video or playlist URL, download the audio using [yt-dlp](https://github.com/yt-dlp/yt-dlp) (auto-downloaded on first use), tag each track with metadata, and import the files directly into your Jellyfin library. Files are organized into Jellyfin's expected directory structure automatically. You configure your target library, preferred audio format, and import behavior in the plugin settings. From there, then the Download & Import workflow handles the rest.
-
-## Use At Your Own Risk
-This plugin writes files and metadata to files in your Jellyfin library directory. While extensively tested, I cannot account for every server configuration or edge case. **Always maintain backups of your Jellyfin data and configuration.** By using this plugin, you accept full responsibility for any data loss or issues that may occur.
-
----
+YouTube Audio lets you paste a YouTube video or playlist URL, download the audio using [YT-DLP](https://github.com/yt-dlp/yt-dlp), tag each track with metadata, and import the files directly into your Jellyfin library. YT-DLP is auto-downloaded on first use or can be manually installed and referenced. Downloaded files are organized into Jellyfin's expected directory structure automatically.
 
 ## Getting Started
 
@@ -83,6 +68,18 @@ Metadata is written directly to the audio files. On import, files are copied int
 
 Successfully imported files are removed from the queue.
 
+### 4. Approved User Downloads
+
+#### Let trusted users queue downloads without giving them admin access.
+
+You can allow specific Jellyfin users to submit download links from a simple page, without access to the plugin's admin tabs or the import step.
+
+1. In **Settings**, open the **Approved Users** section, select the users you want to allow, and click **Save**.
+2. Approved users sign in to Jellyfin and visit `/YouTube/Download` on your server (for example `https://jellyfin.example.com/YouTube/Download`).
+3. They paste a YouTube link, fill in artist, album, year, and title, and submit it. The download then runs on the server and lands in your queue.
+
+Approved users can only submit links. They cannot import into the library, and they never see the admin tabs. The page is reachable by its URL, but the submit endpoint checks approval against the signed-in Jellyfin account on the server, so an unapproved or signed-out visitor cannot queue anything.
+
 ---
 
 # Versioning
@@ -97,8 +94,6 @@ Releases use a four-part version, `JJ.JJ.F.B`, that matches the supported Jellyf
   │
   └─── 10.11 = Jellyfin version this build was tested/released for
 ```
-
----
 
 # Installation
 

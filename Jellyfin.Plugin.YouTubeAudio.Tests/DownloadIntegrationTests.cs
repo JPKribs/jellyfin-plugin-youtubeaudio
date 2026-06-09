@@ -73,7 +73,7 @@ public class DownloadIntegrationTests
                 $"Download failed for {format}: {string.Join("; ", result.ErrorOutput ?? Array.Empty<string>())}");
 
             // 1. The audio file exists with the extension the plugin expects for this format.
-            var expectedExt = DownloadService.GetFileExtension(format);
+            var expectedExt = format.ToFileExtension();
             var audio = Path.Combine(dir, name + expectedExt);
             Assert.True(File.Exists(audio), $"Expected {audio} to exist for {format}.");
             Assert.True(new FileInfo(audio).Length > 0, "Audio file is empty.");

@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
-namespace Jellyfin.Plugin.YouTubeAudio;
+namespace Jellyfin.Plugin.YouTubeAudio.Controllers;
 
 /// <summary>
 /// API controller for YouTube Audio plugin operations.

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using Jellyfin.Plugin.YouTubeAudio.Models;
 using MediaBrowser.Model.Plugins;
 
-namespace Jellyfin.Plugin.YouTubeAudio;
+namespace Jellyfin.Plugin.YouTubeAudio.Configuration;
 
 /// <summary>
 /// Configuration settings for the YouTube Audio plugin.

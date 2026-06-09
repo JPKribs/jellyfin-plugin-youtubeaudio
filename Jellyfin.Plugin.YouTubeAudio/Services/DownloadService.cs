@@ -10,6 +10,7 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Plugin.YouTubeAudio.Configuration;
 using Jellyfin.Plugin.YouTubeAudio.Models;
 using MediaBrowser.Controller.MediaEncoding;
 using Microsoft.Extensions.Logging;
@@ -76,7 +77,7 @@ public sealed class DownloadService : IDisposable
             throw new ArgumentException("URL must be a valid YouTube URL.");
         }
 
-        var ext = GetFileExtension(Config.AudioFormat);
+        var ext = Config.AudioFormat.ToFileExtension();
         var db = _dbProvider.Database;
         var createdItems = new List<QueueItem>();
         var now = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
@@ -137,7 +138,7 @@ public sealed class DownloadService : IDisposable
             createdItems.Add(item);
         }
 
-        return createdItems.Select(MapToDto).ToList();
+        return createdItems.Select(item => item.ToDto()).ToList();
     }
 
     /// <summary>
@@ -273,7 +274,7 @@ public sealed class DownloadService : IDisposable
     /// </summary>
     public List<QueueItemDto> GetQueueItems()
     {
-        return _dbProvider.Database.GetAllItems().Select(MapToDto).ToList();
+        return _dbProvider.Database.GetAllItems().Select(item => item.ToDto()).ToList();
     }
 
     /// <summary>
@@ -287,7 +288,7 @@ public sealed class DownloadService : IDisposable
 
         return items.Select(item =>
         {
-            var dto = MapToDto(item);
+            var dto = item.ToDto();
             var filePath = Path.Combine(cacheDir, item.FileName);
 
             if (File.Exists(filePath))
@@ -681,21 +682,6 @@ public sealed class DownloadService : IDisposable
         };
     }
 
-    private static QueueItemDto MapToDto(QueueItem item)
-    {
-        return new QueueItemDto
-        {
-            Id = item.Id,
-            Url = item.Url,
-            Title = item.Title,
-            FileName = item.FileName,
-            Status = item.Status.ToString(),
-            StatusCode = (int)item.Status,
-            ErrorMessage = item.ErrorMessage,
-            CreatedAt = item.CreatedAt,
-            UpdatedAt = item.UpdatedAt
-        };
-    }
 
     /// <summary>
     /// Ensures yt-dlp is available, downloading it to the plugin directory if needed.
@@ -875,16 +861,6 @@ public sealed class DownloadService : IDisposable
             ? Array.Empty<string>()
             : genre.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-    internal static string GetFileExtension(AudioFormat format)
-    {
-        return format switch
-        {
-            AudioFormat.Opus => ".opus",
-            AudioFormat.Mp3 => ".mp3",
-            AudioFormat.M4a => ".m4a",
-            _ => ".opus"
-        };
-    }
 
     internal static AudioConversionFormat MapToAudioConversionFormat(AudioFormat format)
     {

@@ -17,7 +17,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
-namespace Jellyfin.Plugin.YouTubeAudio;
+namespace Jellyfin.Plugin.YouTubeAudio.Controllers;
 
 /// <summary>
 /// Public-facing surface that lets approved non-admin users submit download links.
