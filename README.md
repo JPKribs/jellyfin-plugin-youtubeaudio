@@ -35,6 +35,8 @@ YouTube Audio lets you paste a YouTube video or playlist URL, download the audio
 
 **Cache Directory** — By default, downloaded files are cached in the Jellyfin data directory. Override this if you need a specific staging location.
 
+**Approved Users** — By default, only users with access to the Admin Dashboard can download & import tracks. Enabling a user here allows select users to download tracks into your queue which you then can approve and import into your library.
+
 ### 2. Download
 
 #### Queue up audio for download.
