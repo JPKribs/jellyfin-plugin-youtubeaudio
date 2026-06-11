@@ -22,4 +22,4 @@ jobs:
   call:
     uses: jellyfin/jellyfin-meta-plugins/.github/workflows/scan-codeql.yaml@master
     with:
-      repository-name: JPKribs/jellyfin-plugin-serversync
+      repository-name: JPKribs/jellyfin-plugin-youtubeaudio
