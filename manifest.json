@@ -9,6 +9,14 @@
     "category": "Music",
     "versions": [
       {
+        "version": "10.11.7.5",
+        "changelog": "## Developer\r\n- Fix CodeQL",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/v10.11.7.5/jellyfin-plugin-youtubeaudio-10.11.7.5.zip",
+        "checksum": "f99dc8dda2b0548f25b55e1101537bab",
+        "timestamp": "2026-06-11T04:44:08Z"
+      },
+      {
         "version": "10.11.7.4",
         "changelog": "## Developer\r\n- Bump to base 2026.6.23\r\n- Update README screenshots\r\n- Add README section for user downloads\r\n- Folder cleanup",
         "targetAbi": "10.11.9.0",
