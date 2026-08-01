@@ -10,6 +10,7 @@ export default function (view) {
 
     var _allItems = [];
     var _pollInterval = null;
+    var _processingGraceUntil = 0;
 
     // ============================================
     // DATA LOADING
@@ -97,6 +98,12 @@ export default function (view) {
         var footer = view.querySelector('#queueFooter');
         if (!body) return;
 
+        // Remember checked rows so poll-driven re-renders don't wipe the selection.
+        var checkedIds = {};
+        body.querySelectorAll('.yta-queue-check:checked').forEach(function(cb) {
+            checkedIds[cb.getAttribute('data-id')] = true;
+        });
+
         var items = getFilteredItems();
 
         if (items.length === 0) {
@@ -110,23 +117,30 @@ export default function (view) {
             body.innerHTML = html;
             if (footer) footer.textContent = items.length + ' item' + (items.length !== 1 ? 's' : '');
 
-            // Bind row checkboxes
+            // Bind row checkboxes, restoring the previous selection
             body.querySelectorAll('.jpk-table-row-checkbox').forEach(function(cb) {
+                cb.checked = !!checkedIds[cb.getAttribute('data-id')];
                 cb.addEventListener('change', updateQueueSelectedCount);
             });
 
         }
 
-        // Reset selection state after re-render
         updateQueueSelectedCount();
         var chkAll = view.querySelector('#chkSelectAllQueue');
-        if (chkAll) chkAll.checked = false;
+        if (chkAll) {
+            var boxes = body.querySelectorAll('.yta-queue-check');
+            var checked = body.querySelectorAll('.yta-queue-check:checked');
+            chkAll.checked = boxes.length > 0 && checked.length === boxes.length;
+        }
 
-        // Auto-poll while downloads are active
-        var hasActiveDownloads = _allItems.some(function(i) { return i.StatusCode === 1; });
-        if (hasActiveDownloads && !_pollInterval) {
+        // Auto-poll while downloads are active, plus a grace window right after starting a
+        // batch — the background run may still be provisioning yt-dlp before anything
+        // shows as Downloading.
+        var shouldPoll = _allItems.some(function(i) { return i.StatusCode === 1; })
+            || Date.now() < _processingGraceUntil;
+        if (shouldPoll && !_pollInterval) {
             _pollInterval = setInterval(loadQueue, 3000);
-        } else if (!hasActiveDownloads && _pollInterval) {
+        } else if (!shouldPoll && _pollInterval) {
             clearInterval(_pollInterval);
             _pollInterval = null;
         }
@@ -247,14 +261,16 @@ export default function (view) {
             return;
         }
 
-        Shared.setStatus('queueStatus', 'Downloading ' + selectedIds.length + ' item(s)...', false);
+        Shared.setStatus('queueStatus', 'Starting download of ' + selectedIds.length + ' item(s)...', false);
         Shared.apiRequest('Queue/Process', 'POST', { Ids: selectedIds })
             .then(function() {
-                Shared.setStatus('queueStatus', 'Download complete.', false);
+                // The server downloads in the background; poll until progress appears.
+                _processingGraceUntil = Date.now() + 120000;
+                Shared.setStatus('queueStatus', 'Download started.', false);
                 loadQueue();
             })
             .catch(function(err) {
-                Shared.setStatus('queueStatus', (err && err.Error) || 'Download failed.', true);
+                Shared.setStatus('queueStatus', (err && err.Error) || 'Failed to start download.', true);
                 loadQueue();
             });
     }

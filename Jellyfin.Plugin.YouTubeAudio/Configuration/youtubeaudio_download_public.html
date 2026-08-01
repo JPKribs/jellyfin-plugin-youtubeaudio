@@ -86,9 +86,21 @@
                 if (!raw) return null;
                 var creds = JSON.parse(raw);
                 var servers = (creds && creds.Servers) || [];
+                var withToken = [];
                 for (var i = 0; i < servers.length; i++) {
-                    if (servers[i] && servers[i].AccessToken) return servers[i].AccessToken;
+                    if (servers[i] && servers[i].AccessToken) withToken.push(servers[i]);
                 }
+                // A browser can know several Jellyfin servers; prefer the one whose stored
+                // address matches this page's origin so we don't send a foreign token.
+                var origin = location.origin.replace(/\/+$/, '').toLowerCase();
+                for (var j = 0; j < withToken.length; j++) {
+                    var s = withToken[j];
+                    var addrs = [s.ManualAddress, s.LocalAddress, s.RemoteAddress, s.Address];
+                    for (var k = 0; k < addrs.length; k++) {
+                        if (addrs[k] && addrs[k].replace(/\/+$/, '').toLowerCase() === origin) return s.AccessToken;
+                    }
+                }
+                return withToken.length > 0 ? withToken[0].AccessToken : null;
             } catch (e) { /* no token */ }
             return null;
         }

@@ -1,8 +1,8 @@
 ---
 name: "YouTube Audio"
 guid: "7323ea64-a200-4265-ab8f-e7ae27d06c38"
-version: "10.11.7.6"
-targetAbi: "10.11.9.0"
+version: "10.11.8.0"
+targetAbi: "10.11.10.0"
 framework: "net9.0"
 overview: "Download YouTube audio directly to a Jellyfin Music Library."
 description: >
@@ -18,4 +18,19 @@ artifacts:
 - "TagLibSharp.dll"
 changelog:
   developer:
-  - Bump Base to 2026.7.12
+  - Bump Base to 2026.7.31
+  - Recover items stuck in Downloading after a server restart
+  - Fix double-download race between overlapping process requests
+  - Surface background download failures as Error instead of silently staying Queued
+  - Re-apply SQLite busy_timeout when the connection is recycled
+  - Require http/https scheme on submitted YouTube URLs
+  - Prefer the YouTube Music track name for titles, including playlist entries
+  - Stop re-cleaning admin-saved titles at import; clean titles once, when written
+  - Download queue processing now runs in the background (no more request timeouts on large batches)
+  - Preserve queue selection across auto-refresh
+  - Trigger a library scan after import so new files appear immediately
+  - Add an Update yt-dlp button under Settings -> Troubleshooting
+  - Remove queue rows once imported instead of keeping them forever
+  - Deterministic queue ordering for same-timestamp playlist items
+  - Public download page picks the credential matching the server address
+  - Target ABI 10.11.10.0

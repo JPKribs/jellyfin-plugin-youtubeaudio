@@ -31,6 +31,13 @@ public class DownloadServiceTests
     public void IsValidYouTubeUrl_RejectsOthers(string url)
         => Assert.False(DownloadService.IsValidYouTubeUrl(url));
 
+    [Theory]
+    [InlineData("file://youtube.com/watch?v=abc")]
+    [InlineData("ftp://www.youtube.com/watch?v=abc")]
+    [InlineData("javascript://youtu.be/abc")]
+    public void IsValidYouTubeUrl_RejectsNonHttpSchemes(string url)
+        => Assert.False(DownloadService.IsValidYouTubeUrl(url));
+
     // MARK: Format mapping
 
     [Theory]

@@ -16,7 +16,7 @@ namespace Jellyfin.Plugin.YouTubeAudio.Services;
 /// </summary>
 public sealed class QueueDatabase : IDisposable
 {
-    private const int SchemaVersion = 2;
+    private const int SchemaVersion = 3;
 
     private readonly ILogger<QueueDatabase> _logger;
     private readonly string _dbPath;
@@ -56,8 +56,8 @@ public sealed class QueueDatabase : IDisposable
 
             using var cmd = _connection!.CreateCommand();
             cmd.CommandText = @"
-                INSERT INTO QueueItems (Id, Url, Title, FileName, Status, ErrorMessage, CreatedAt, UpdatedAt, Artist, Album, Year)
-                VALUES (@Id, @Url, @Title, @FileName, @Status, @ErrorMessage, @CreatedAt, @UpdatedAt, @Artist, @Album, @Year)";
+                INSERT INTO QueueItems (Id, Url, Title, FileName, Status, ErrorMessage, CreatedAt, UpdatedAt, Artist, Album, Year, UserTitled)
+                VALUES (@Id, @Url, @Title, @FileName, @Status, @ErrorMessage, @CreatedAt, @UpdatedAt, @Artist, @Album, @Year, @UserTitled)";
             cmd.Parameters.AddWithValue("@Id", item.Id);
             cmd.Parameters.AddWithValue("@Url", item.Url);
             cmd.Parameters.AddWithValue("@Title", (object?)item.Title ?? DBNull.Value);
@@ -69,6 +69,7 @@ public sealed class QueueDatabase : IDisposable
             cmd.Parameters.AddWithValue("@Artist", (object?)item.Artist ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@Album", (object?)item.Album ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@Year", (object?)item.Year ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@UserTitled", item.UserTitled ? 1 : 0);
             cmd.ExecuteNonQuery();
         }
     }
@@ -83,7 +84,7 @@ public sealed class QueueDatabase : IDisposable
             {
                 var items = new List<QueueItem>();
                 using var cmd = _connection!.CreateCommand();
-                cmd.CommandText = "SELECT Id, Url, Title, FileName, Status, ErrorMessage, CreatedAt, UpdatedAt, Artist, Album, Year FROM QueueItems ORDER BY CreatedAt DESC";
+                cmd.CommandText = "SELECT Id, Url, Title, FileName, Status, ErrorMessage, CreatedAt, UpdatedAt, Artist, Album, Year, UserTitled FROM QueueItems ORDER BY CreatedAt DESC, rowid DESC";
 
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
@@ -106,7 +107,7 @@ public sealed class QueueDatabase : IDisposable
             {
                 var items = new List<QueueItem>();
                 using var cmd = _connection!.CreateCommand();
-                cmd.CommandText = "SELECT Id, Url, Title, FileName, Status, ErrorMessage, CreatedAt, UpdatedAt, Artist, Album, Year FROM QueueItems WHERE Status = @Status ORDER BY CreatedAt ASC";
+                cmd.CommandText = "SELECT Id, Url, Title, FileName, Status, ErrorMessage, CreatedAt, UpdatedAt, Artist, Album, Year, UserTitled FROM QueueItems WHERE Status = @Status ORDER BY CreatedAt ASC, rowid ASC";
                 cmd.Parameters.AddWithValue("@Status", (int)status);
 
                 using var reader = cmd.ExecuteReader();
@@ -129,7 +130,7 @@ public sealed class QueueDatabase : IDisposable
             () =>
             {
                 using var cmd = _connection!.CreateCommand();
-                cmd.CommandText = "SELECT Id, Url, Title, FileName, Status, ErrorMessage, CreatedAt, UpdatedAt, Artist, Album, Year FROM QueueItems WHERE Id = @Id";
+                cmd.CommandText = "SELECT Id, Url, Title, FileName, Status, ErrorMessage, CreatedAt, UpdatedAt, Artist, Album, Year, UserTitled FROM QueueItems WHERE Id = @Id";
                 cmd.Parameters.AddWithValue("@Id", id);
 
                 using var reader = cmd.ExecuteReader();
@@ -293,7 +294,23 @@ public sealed class QueueDatabase : IDisposable
             _connection?.Dispose();
             _connection = new SqliteConnection(BuildConnectionString());
             _connection.Open();
+            ApplyConnectionPragmas();
         }
+    }
+
+    /// <summary>
+    /// Applies per-connection pragmas. WAL mode persists in the database file, but
+    /// busy_timeout and synchronous are per-connection and must be re-applied on every open.
+    /// </summary>
+    private void ApplyConnectionPragmas()
+    {
+        using var pragmaCmd = _connection!.CreateCommand();
+        pragmaCmd.CommandText = @"
+            PRAGMA journal_mode=WAL;
+            PRAGMA busy_timeout=5000;
+            PRAGMA synchronous=NORMAL;
+        ";
+        pragmaCmd.ExecuteNonQuery();
     }
 
     private void InitializeDatabase()
@@ -302,17 +319,7 @@ public sealed class QueueDatabase : IDisposable
         {
             _connection = new SqliteConnection(BuildConnectionString());
             _connection.Open();
-
-            // Set pragmas for reliability in multi-threaded environments
-            using (var pragmaCmd = _connection.CreateCommand())
-            {
-                pragmaCmd.CommandText = @"
-                    PRAGMA journal_mode=WAL;
-                    PRAGMA busy_timeout=5000;
-                    PRAGMA synchronous=NORMAL;
-                ";
-                pragmaCmd.ExecuteNonQuery();
-            }
+            ApplyConnectionPragmas();
 
             var currentVersion = GetSchemaVersion();
 
@@ -326,6 +333,8 @@ public sealed class QueueDatabase : IDisposable
                 MigrateSchema(currentVersion);
                 SetSchemaVersion(SchemaVersion);
             }
+
+            ResetStaleDownloadingItems();
 
             _logger.LogDebug("Queue database initialized at {DbPath} (schema v{Version})", _dbPath, SchemaVersion);
         }
@@ -344,6 +353,25 @@ public sealed class QueueDatabase : IDisposable
         }
     }
 
+    /// <summary>
+    /// Resets items stuck in Downloading back to Queued. Downloading is only ever set while a
+    /// download is actively running, so any Downloading row at initialization time is a leftover
+    /// from a crash or restart mid-download and would otherwise be stuck forever.
+    /// </summary>
+    private void ResetStaleDownloadingItems()
+    {
+        using var cmd = _connection!.CreateCommand();
+        cmd.CommandText = "UPDATE QueueItems SET Status = @Queued, UpdatedAt = @UpdatedAt WHERE Status = @Downloading";
+        cmd.Parameters.AddWithValue("@Queued", (int)QueueStatus.Queued);
+        cmd.Parameters.AddWithValue("@Downloading", (int)QueueStatus.Downloading);
+        cmd.Parameters.AddWithValue("@UpdatedAt", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
+        var reset = cmd.ExecuteNonQuery();
+        if (reset > 0)
+        {
+            _logger.LogInformation("Reset {Count} stale Downloading item(s) back to Queued after restart", reset);
+        }
+    }
+
     private void CreateSchema()
     {
         using var cmd = _connection!.CreateCommand();
@@ -359,7 +387,8 @@ public sealed class QueueDatabase : IDisposable
                 UpdatedAt TEXT NOT NULL,
                 Artist TEXT,
                 Album TEXT,
-                Year INTEGER
+                Year INTEGER,
+                UserTitled INTEGER NOT NULL DEFAULT 0
             );
             CREATE INDEX IF NOT EXISTS idx_queue_status ON QueueItems(Status);
         ";
@@ -378,6 +407,14 @@ public sealed class QueueDatabase : IDisposable
             ";
             cmd.ExecuteNonQuery();
             _logger.LogInformation("Migrated queue database to schema v2 (added Artist, Album, Year)");
+        }
+
+        if (fromVersion < 3)
+        {
+            using var cmd = _connection!.CreateCommand();
+            cmd.CommandText = "ALTER TABLE QueueItems ADD COLUMN UserTitled INTEGER NOT NULL DEFAULT 0";
+            cmd.ExecuteNonQuery();
+            _logger.LogInformation("Migrated queue database to schema v3 (added UserTitled)");
         }
     }
 
@@ -423,16 +460,7 @@ public sealed class QueueDatabase : IDisposable
         // Reinitialize
         _connection = new SqliteConnection(BuildConnectionString());
         _connection.Open();
-
-        using (var pragmaCmd = _connection.CreateCommand())
-        {
-            pragmaCmd.CommandText = @"
-                PRAGMA journal_mode=WAL;
-                PRAGMA busy_timeout=5000;
-                PRAGMA synchronous=NORMAL;
-            ";
-            pragmaCmd.ExecuteNonQuery();
-        }
+        ApplyConnectionPragmas();
 
         CreateSchema();
         SetSchemaVersion(SchemaVersion);
@@ -454,7 +482,8 @@ public sealed class QueueDatabase : IDisposable
             UpdatedAt = reader.GetString(7),
             Artist = reader.IsDBNull(8) ? null : reader.GetString(8),
             Album = reader.IsDBNull(9) ? null : reader.GetString(9),
-            Year = reader.IsDBNull(10) ? null : reader.GetInt32(10)
+            Year = reader.IsDBNull(10) ? null : reader.GetInt32(10),
+            UserTitled = !reader.IsDBNull(11) && reader.GetInt32(11) != 0
         };
     }
 }

@@ -57,6 +57,22 @@ public class LibraryService
     }
 
     /// <summary>
+    /// Queues a library scan so freshly imported files appear without waiting for the
+    /// next scheduled scan. Failures are logged and swallowed — the import itself succeeded.
+    /// </summary>
+    public void QueueLibraryScan()
+    {
+        try
+        {
+            _libraryManager.QueueLibraryScan();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to queue library scan after import");
+        }
+    }
+
+    /// <summary>
     /// Searches for artists in the Jellyfin library matching the query.
     /// </summary>
     public List<string> SearchArtists(string query, int limit = 20)

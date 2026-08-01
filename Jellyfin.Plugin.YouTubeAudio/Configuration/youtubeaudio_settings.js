@@ -147,6 +147,21 @@ export default function (view) {
         });
     }
 
+    function updateYtDlp() {
+        var btn = Shared.getEl('btnUpdateYtDlp');
+        if (btn) btn.disabled = true;
+        Shared.setStatus('ytdlpStatus', 'Updating yt-dlp... this can take a minute.', false);
+        Shared.apiRequest('UpdateYtDlp', 'POST')
+            .then(function(result) {
+                if (btn) btn.disabled = false;
+                Shared.setStatus('ytdlpStatus', (result && result.Message) || 'yt-dlp updated.', false);
+            })
+            .catch(function(err) {
+                if (btn) btn.disabled = false;
+                Shared.setStatus('ytdlpStatus', (err && err.Error) || 'Failed to update yt-dlp.', true);
+            });
+    }
+
     // ============================================
     // RESET ACTIONS
     // ============================================
@@ -199,6 +214,9 @@ export default function (view) {
 
         var btnSaveYtDlp = Shared.getEl('btnSaveYtDlp');
         if (btnSaveYtDlp) btnSaveYtDlp.addEventListener('click', saveYtDlp);
+
+        var btnUpdateYtDlp = Shared.getEl('btnUpdateYtDlp');
+        if (btnUpdateYtDlp) btnUpdateYtDlp.addEventListener('click', updateYtDlp);
 
         var btnSaveApprovedUsers = Shared.getEl('btnSaveApprovedUsers');
         if (btnSaveApprovedUsers) btnSaveApprovedUsers.addEventListener('click', saveApprovedUsers);

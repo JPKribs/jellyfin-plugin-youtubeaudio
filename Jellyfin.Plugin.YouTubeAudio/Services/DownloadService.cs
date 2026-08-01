@@ -25,6 +25,11 @@ namespace Jellyfin.Plugin.YouTubeAudio.Services;
 /// </summary>
 public sealed class DownloadService : IDisposable
 {
+    private static readonly HttpClient _httpClient = new();
+    private static readonly string[] _selfUpdateArgs = ["-U"];
+    private static readonly string[] _versionArgs = ["--version"];
+    private static readonly char[] _newlineChars = ['\r', '\n'];
+
     private readonly ILogger<DownloadService> _logger;
     private readonly QueueDatabaseProvider _dbProvider;
     private readonly IMediaEncoder _mediaEncoder;
@@ -52,8 +57,8 @@ public sealed class DownloadService : IDisposable
     /// <summary>
     /// Queues a YouTube URL for download. If playlist, queues each video individually.
     /// </summary>
-    public Task<List<QueueItemDto>> QueueUrlAsync(string url)
-        => QueueUrlAsync(url, null, null, null, null);
+    public Task<List<QueueItemDto>> QueueUrlAsync(string url, CancellationToken cancellationToken = default)
+        => QueueUrlAsync(url, null, null, null, null, cancellationToken);
 
     /// <summary>
     /// Queues a YouTube URL for download, applying submitted metadata.
@@ -64,8 +69,9 @@ public sealed class DownloadService : IDisposable
     /// <param name="album">The album to tag, or null.</param>
     /// <param name="year">The release year to tag, or null.</param>
     /// <param name="title">The song title for a single track, or null.</param>
+    /// <param name="cancellationToken">Cancels the playlist metadata fetch (tied to the HTTP request).</param>
     /// <returns>The created queue items.</returns>
-    public async Task<List<QueueItemDto>> QueueUrlAsync(string url, string? artist, string? album, int? year, string? title)
+    public async Task<List<QueueItemDto>> QueueUrlAsync(string url, string? artist, string? album, int? year, string? title, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(url))
         {
@@ -89,18 +95,23 @@ public sealed class DownloadService : IDisposable
             {
                 await EnsureYtDlpAsync().ConfigureAwait(false);
                 var ytdl = CreateYoutubeDL();
-                var fetchResult = await ytdl.RunVideoDataFetch(url).ConfigureAwait(false);
+                var fetchResult = await ytdl.RunVideoDataFetch(url, cancellationToken).ConfigureAwait(false);
 
                 if (fetchResult.Success && fetchResult.Data?.Entries != null)
                 {
                     foreach (var entry in fetchResult.Data.Entries)
                     {
                         var videoUrl = entry.Url ?? entry.WebpageUrl ?? $"https://www.youtube.com/watch?v={entry.ID}";
+
+                        // Derived titles are cleaned at write time; user-supplied titles never are.
+                        var entryTitle = string.IsNullOrWhiteSpace(entry.Title)
+                            ? null
+                            : CleanYouTubeTitle(entry.Title, artist);
                         var item = new QueueItem
                         {
                             Id = Guid.NewGuid().ToString("N"),
                             Url = videoUrl,
-                            Title = entry.Title,
+                            Title = entryTitle,
                             FileName = Guid.NewGuid().ToString("N") + ext,
                             Status = QueueStatus.Queued,
                             CreatedAt = now,
@@ -122,6 +133,10 @@ public sealed class DownloadService : IDisposable
                     db.AddItem(item);
                     createdItems.Add(item);
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -183,11 +198,19 @@ public sealed class DownloadService : IDisposable
             var ytdl = CreateYoutubeDL();
             ytdl.OutputFolder = cacheDir;
 
-            foreach (var item in queuedItems)
+            foreach (var candidate in queuedItems)
             {
                 if (cancellationToken.IsCancellationRequested)
                 {
                     break;
+                }
+
+                // Re-check under the lock: another caller may have processed this item while we
+                // waited for the semaphore, and re-downloading would clobber edited tags.
+                var item = db.GetItemById(candidate.Id);
+                if (item == null || item.Status != QueueStatus.Queued)
+                {
+                    continue;
                 }
 
                 db.UpdateStatus(item.Id, QueueStatus.Downloading);
@@ -201,6 +224,9 @@ public sealed class DownloadService : IDisposable
                     {
                         WriteInfoJson = true,
                         EmbedThumbnail = false,
+                        // A queue item always means one video: playlist URLs are expanded into
+                        // individual items at queue time, so never let yt-dlp expand one here.
+                        NoPlaylist = true,
                         Output = Path.Combine(cacheDir, nameWithoutExt + ".%(ext)s")
                     };
 
@@ -223,8 +249,10 @@ public sealed class DownloadService : IDisposable
                             TryRemuxContainer(outputPath);
                         }
 
-                        // Title from info.json fills in only when the submission did not supply one
-                        if (string.IsNullOrEmpty(item.Title))
+                        // Refine the title from info.json unless the user supplied one at submit
+                        // time. Prefers the YouTube Music track name over the (cleaned) video title,
+                        // including for playlist entries, which were queued with the flat video title.
+                        if (!item.UserTitled)
                         {
                             var infoJsonPath = Path.Combine(cacheDir, nameWithoutExt + ".info.json");
                             if (File.Exists(infoJsonPath))
@@ -267,6 +295,45 @@ public sealed class DownloadService : IDisposable
         {
             _downloadLock.Release();
         }
+    }
+
+    /// <summary>
+    /// Starts processing the given queue items in the background. Nothing awaits the result, so
+    /// failures that abort the whole run (e.g. yt-dlp could not be provisioned) are surfaced by
+    /// marking the affected items as Error instead of disappearing with the discarded task.
+    /// </summary>
+    /// <param name="ids">The queue item ids to process, or null/empty for all queued items.</param>
+    public void StartProcessing(IReadOnlyList<string>? ids = null)
+    {
+        var db = _dbProvider.Database;
+        var targetIds = ids is { Count: > 0 }
+            ? ids.ToList()
+            : db.GetItemsByStatus(QueueStatus.Queued).Select(i => i.Id).ToList();
+
+        if (targetIds.Count == 0)
+        {
+            return;
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await ProcessQueueAsync(CancellationToken.None, targetIds).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Background queue processing failed");
+                foreach (var id in targetIds)
+                {
+                    var item = db.GetItemById(id);
+                    if (item != null && item.Status is QueueStatus.Queued or QueueStatus.Downloading)
+                    {
+                        db.UpdateStatus(id, QueueStatus.Error, "Processing failed: " + ex.Message);
+                    }
+                }
+            }
+        });
     }
 
     /// <summary>
@@ -517,19 +584,19 @@ public sealed class DownloadService : IDisposable
 
                 using (tagFile)
                 {
-                    // Clean the title: strip YouTube junk like "(Official Video)" etc.
-                    var rawTitle = tagFile.Tag.Title ?? Path.GetFileNameWithoutExtension(item.FileName);
-                    var artistName = tagFile.Tag.FirstAlbumArtist ?? tagFile.Tag.FirstPerformer;
-                    var cleanedTitle = CleanYouTubeTitle(rawTitle, artistName);
-
-                    // Write the cleaned title back to the file metadata
-                    tagFile.Tag.Title = cleanedTitle;
-                    tagFile.Save();
+                    // Titles are cleaned when written (queue/download time) and user edits are
+                    // saved verbatim, so trust the tag as-is here — re-cleaning would mangle a
+                    // deliberately saved title like "Song (Lyrics)".
+                    var rawTitle = tagFile.Tag.Title;
+                    if (string.IsNullOrWhiteSpace(rawTitle))
+                    {
+                        rawTitle = Path.GetFileNameWithoutExtension(item.FileName);
+                    }
 
                     var artist = SanitizePathComponent(tagFile.Tag.FirstAlbumArtist ?? tagFile.Tag.FirstPerformer ?? "Unknown Artist");
                     var album = SanitizePathComponent(tagFile.Tag.Album ?? "Unknown Album");
                     var year = tagFile.Tag.Year > 0 ? tagFile.Tag.Year.ToString(CultureInfo.InvariantCulture) : string.Empty;
-                    title = SanitizePathComponent(cleanedTitle);
+                    title = SanitizePathComponent(rawTitle);
                     ext = Path.GetExtension(item.FileName);
 
                     // Build: library/artist/album (year)/title.ext
@@ -568,7 +635,8 @@ public sealed class DownloadService : IDisposable
                     File.Delete(infoJsonPath);
                 }
 
-                db.UpdateStatus(id, QueueStatus.Imported);
+                // The file has left the cache, so the queue row has nothing left to track.
+                db.DeleteItem(id);
                 result.ImportedIds.Add(id);
                 if (isDuplicate)
                 {
@@ -667,11 +735,13 @@ public sealed class DownloadService : IDisposable
 
     private static QueueItem CreateSingleQueueItem(string url, string ext, string now, string? artist = null, string? album = null, int? year = null, string? title = null)
     {
+        var userTitle = string.IsNullOrWhiteSpace(title) ? null : title;
         return new QueueItem
         {
             Id = Guid.NewGuid().ToString("N"),
             Url = url,
-            Title = string.IsNullOrWhiteSpace(title) ? null : title,
+            Title = userTitle,
+            UserTitled = userTitle != null,
             FileName = Guid.NewGuid().ToString("N") + ext,
             Status = QueueStatus.Queued,
             CreatedAt = now,
@@ -827,15 +897,13 @@ public sealed class DownloadService : IDisposable
     /// <summary>
     /// Downloads the standalone yt-dlp binary from the official GitHub releases.
     /// </summary>
-    [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "HttpClient is disposed by using statement.")]
     private static async Task DownloadStandaloneYtDlpAsync(string directory)
     {
         var binaryName = GetStandaloneBinaryName();
         var url = new Uri($"https://github.com/yt-dlp/yt-dlp/releases/latest/download/{binaryName}");
         var destPath = Path.Combine(directory, binaryName);
 
-        using var httpClient = new HttpClient();
-        using var response = await httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+        using var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         using var fs = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None);
@@ -849,6 +917,104 @@ public sealed class DownloadService : IDisposable
                 UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
                 UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
         }
+    }
+
+    /// <summary>
+    /// Updates yt-dlp. When a custom path is configured, that binary's own self-updater is run
+    /// (yt-dlp -U); otherwise the latest standalone binary is downloaded to the plugin directory,
+    /// which takes precedence over any system-installed copy in <see cref="FindYtDlp"/>.
+    /// Serialized against downloads so the binary is never replaced mid-download.
+    /// </summary>
+    /// <returns>A human-readable result message.</returns>
+    public async Task<string> UpdateYtDlpAsync()
+    {
+        if (!await _downloadLock.WaitAsync(TimeSpan.Zero).ConfigureAwait(false))
+        {
+            throw new InvalidOperationException("Downloads are in progress. Try again after they finish.");
+        }
+
+        try
+        {
+            var configPath = Plugin.Instance?.Configuration.YtDlpPath;
+            if (!string.IsNullOrWhiteSpace(configPath))
+            {
+                if (!File.Exists(configPath))
+                {
+                    throw new InvalidOperationException($"Configured yt-dlp path does not exist: {configPath}");
+                }
+
+                _logger.LogInformation("Running self-update for configured yt-dlp at {Path}", configPath);
+                var output = await RunProcessAsync(configPath, _selfUpdateArgs, TimeSpan.FromMinutes(2)).ConfigureAwait(false);
+                return string.IsNullOrWhiteSpace(output) ? "yt-dlp self-update finished." : output;
+            }
+
+            var pluginDir = GetPluginDirectory()
+                ?? throw new InvalidOperationException("Could not determine the plugin directory.");
+
+            _logger.LogInformation("Downloading latest standalone yt-dlp to {Dir}", pluginDir);
+            await DownloadStandaloneYtDlpAsync(pluginDir).ConfigureAwait(false);
+
+            var binaryPath = Path.Combine(pluginDir, GetStandaloneBinaryName());
+            var version = await RunProcessAsync(binaryPath, _versionArgs, TimeSpan.FromSeconds(30)).ConfigureAwait(false);
+            return $"Downloaded latest yt-dlp ({version}).";
+        }
+        finally
+        {
+            _downloadLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Runs a process and returns its combined output flattened to one line, killing it after the
+    /// timeout. Used only for short yt-dlp maintenance commands (-U, --version).
+    /// </summary>
+    private static async Task<string> RunProcessAsync(string fileName, IReadOnlyList<string> args, TimeSpan timeout)
+    {
+        using var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = fileName,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            }
+        };
+
+        foreach (var arg in args)
+        {
+            process.StartInfo.ArgumentList.Add(arg);
+        }
+
+        process.Start();
+        var stdOutTask = process.StandardOutput.ReadToEndAsync();
+        var stdErrTask = process.StandardError.ReadToEndAsync();
+
+        using var cts = new CancellationTokenSource(timeout);
+        try
+        {
+            await process.WaitForExitAsync(cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch (InvalidOperationException)
+            {
+                // process already exited
+            }
+
+            throw new InvalidOperationException($"{Path.GetFileName(fileName)} timed out after {timeout.TotalSeconds:0} seconds.");
+        }
+
+        var stdout = await stdOutTask.ConfigureAwait(false);
+        var stderr = await stdErrTask.ConfigureAwait(false);
+        var lines = (stdout + "\n" + stderr).Split(_newlineChars, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var combined = string.Join(" | ", lines);
+        return combined.Length > 500 ? combined[..500] + "..." : combined;
     }
 
     /// <summary>
@@ -880,6 +1046,12 @@ public sealed class DownloadService : IDisposable
             return false;
         }
 
+        // Host alone is not enough: file://youtube.com/... parses with a matching host.
+        if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+        {
+            return false;
+        }
+
         var host = uri.Host.ToLowerInvariant();
         return host is "youtube.com" or "www.youtube.com" or "m.youtube.com"
             or "music.youtube.com" or "youtu.be";
@@ -892,7 +1064,24 @@ public sealed class DownloadService : IDisposable
             var json = File.ReadAllText(infoJsonPath);
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
-            return GetJsonString(root, "track") ?? GetJsonString(root, "title");
+
+            // The YouTube Music track name is authoritative; a raw video title is cleaned here,
+            // at write time, so it is never re-cleaned downstream.
+            var track = GetJsonString(root, "track");
+            if (!string.IsNullOrEmpty(track))
+            {
+                return track;
+            }
+
+            var videoTitle = GetJsonString(root, "title");
+            if (string.IsNullOrEmpty(videoTitle))
+            {
+                return null;
+            }
+
+            var artist = GetJsonString(root, "artist") ?? GetJsonString(root, "uploader");
+            var cleaned = CleanYouTubeTitle(videoTitle, artist);
+            return string.IsNullOrEmpty(cleaned) ? null : cleaned;
         }
         catch (Exception ex)
         {
@@ -932,8 +1121,8 @@ public sealed class DownloadService : IDisposable
                 ? string.Join("; ", performers.Skip(1))
                 : string.Empty;
 
-            // Clean up title: strip YouTube video patterns and artist prefix
-            dto.MetadataTitle = CleanYouTubeTitle(tagFile.Tag.Title ?? string.Empty, dto.Artist);
+            // The tag title is either user-saved or was cleaned when written — show it verbatim.
+            dto.MetadataTitle = tagFile.Tag.Title ?? string.Empty;
 
             // Album artist: first AlbumArtists entry, or fall back to primary artist
             var albumArtists = tagFile.Tag.AlbumArtists ?? Array.Empty<string>();
@@ -965,19 +1154,22 @@ public sealed class DownloadService : IDisposable
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
-            // Prefer the track name (actual track name from YouTube Music metadata), but never override a
-            // title that was supplied at submit time (item.Title flows through to dto.Title) — that user value wins.
-            var trackName = GetJsonString(root, "track");
-            if (!string.IsNullOrEmpty(trackName) && string.IsNullOrWhiteSpace(dto.Title))
+            // Fill the title only when the file tags had none (a user-saved or submit-time title
+            // lands in the tags and must win). Prefer the YouTube Music track name; fall back to
+            // the cleaned video title.
+            if (string.IsNullOrEmpty(dto.MetadataTitle))
             {
-                dto.MetadataTitle = trackName;
-            }
-            else if (string.IsNullOrEmpty(dto.MetadataTitle))
-            {
-                // Fall back to video title only if we have nothing
-                var videoTitle = GetJsonString(root, "title");
-                var artist = GetJsonString(root, "artist") ?? dto.Artist;
-                dto.MetadataTitle = CleanYouTubeTitle(videoTitle ?? string.Empty, artist);
+                var trackName = GetJsonString(root, "track");
+                if (!string.IsNullOrEmpty(trackName))
+                {
+                    dto.MetadataTitle = trackName;
+                }
+                else
+                {
+                    var videoTitle = GetJsonString(root, "title");
+                    var artist = GetJsonString(root, "artist") ?? dto.Artist;
+                    dto.MetadataTitle = CleanYouTubeTitle(videoTitle ?? string.Empty, artist);
+                }
             }
 
             if (string.IsNullOrEmpty(dto.Artist))

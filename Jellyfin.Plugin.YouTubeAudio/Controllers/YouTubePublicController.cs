@@ -117,11 +117,12 @@ public class YouTubePublicController : ControllerBase
 
     /// <summary>Queues a submitted URL with metadata and starts the download in the background.</summary>
     /// <param name="request">The submitted URL and metadata.</param>
+    /// <param name="cancellationToken">Cancellation token tied to the HTTP request.</param>
     /// <returns>The number of queued items, or an error.</returns>
     [HttpPost("Download/Submit")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<ActionResult> Submit([FromBody] SubmitRequest request)
+    public async Task<ActionResult> Submit([FromBody] SubmitRequest request, CancellationToken cancellationToken)
     {
         ApplyHardeningHeaders();
 
@@ -146,10 +147,11 @@ public class YouTubePublicController : ControllerBase
                 request.Artist,
                 request.Album,
                 request.Year,
-                request.Title).ConfigureAwait(false);
+                request.Title,
+                cancellationToken).ConfigureAwait(false);
 
             var ids = items.Select(i => i.Id).ToList();
-            _ = Task.Run(() => _downloadService.ProcessQueueAsync(CancellationToken.None, ids));
+            _downloadService.StartProcessing(ids);
 
             return Ok(new { Queued = ids.Count });
         }

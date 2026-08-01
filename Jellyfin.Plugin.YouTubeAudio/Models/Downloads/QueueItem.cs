@@ -14,6 +14,12 @@ public class QueueItem
     /// <summary>Gets or sets the YouTube video title.</summary>
     public string? Title { get; set; }
 
+    /// <summary>
+    /// Gets or sets a value indicating whether the title was supplied by the user at submit time.
+    /// User titles are never refined from info.json or cleaned; derived titles are.
+    /// </summary>
+    public bool UserTitled { get; set; }
+
     /// <summary>Gets or sets the GUID-based filename (e.g., "a1b2c3d4.opus").</summary>
     public string FileName { get; set; } = string.Empty;
 

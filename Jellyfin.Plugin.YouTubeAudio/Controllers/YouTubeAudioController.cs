@@ -45,15 +45,16 @@ public class YouTubeAudioController : ControllerBase
     /// Queues a YouTube URL for download.
     /// </summary>
     /// <param name="request">The request containing the YouTube URL.</param>
+    /// <param name="cancellationToken">Cancellation token tied to the HTTP request.</param>
     /// <returns>List of created queue items.</returns>
     [HttpPost("Queue")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<List<QueueItemDto>>> QueueUrl([FromBody] QueueUrlRequest request)
+    public async Task<ActionResult<List<QueueItemDto>>> QueueUrl([FromBody] QueueUrlRequest request, CancellationToken cancellationToken)
     {
         try
         {
-            var items = await _downloadService.QueueUrlAsync(request.Url).ConfigureAwait(false);
+            var items = await _downloadService.QueueUrlAsync(request.Url, cancellationToken).ConfigureAwait(false);
             return Ok(items);
         }
         catch (ArgumentException ex)
@@ -94,7 +95,6 @@ public class YouTubeAudioController : ControllerBase
     /// <returns>Success status.</returns>
     [HttpDelete("Queue/{id}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public ActionResult DeleteQueueItem(string id)
     {
         try
@@ -146,23 +146,19 @@ public class YouTubeAudioController : ControllerBase
     }
 
     /// <summary>
-    /// Processes selected queue items by downloading them.
+    /// Starts downloading the selected queue items in the background and returns immediately.
+    /// Progress is observable by polling the queue; run-level failures mark the items as Error.
     /// </summary>
     /// <param name="request">Request containing IDs to process.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Success status.</returns>
     [HttpPost("Queue/Process")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<ActionResult> ProcessQueue([FromBody] ImportRequest request, CancellationToken cancellationToken)
+    public ActionResult ProcessQueue([FromBody] ImportRequest request)
     {
         try
         {
-            await _downloadService.ProcessQueueAsync(cancellationToken, request.Ids).ConfigureAwait(false);
+            _downloadService.StartProcessing(request.Ids);
             return Ok(new { Success = true });
-        }
-        catch (OperationCanceledException)
-        {
-            return Ok(new { Success = true, Message = "Processing was cancelled." });
         }
         catch (Exception ex)
         {
@@ -237,6 +233,13 @@ public class YouTubeAudioController : ControllerBase
         try
         {
             var result = _downloadService.ImportToLibrary(request.Ids);
+
+            // Kick a scan so the imported files show up without waiting for the schedule.
+            if (result.ImportedIds.Count > 0)
+            {
+                _libraryService.QueueLibraryScan();
+            }
+
             return Ok(result);
         }
         catch (ArgumentException ex)
@@ -373,6 +376,31 @@ public class YouTubeAudioController : ControllerBase
     }
 
     // ===== Settings Endpoints =====
+
+    /// <summary>
+    /// Updates yt-dlp: re-downloads the standalone binary, or runs the configured binary's
+    /// self-updater when a custom path is set.
+    /// </summary>
+    /// <returns>Success status with a result message.</returns>
+    [HttpPost("UpdateYtDlp")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult> UpdateYtDlp()
+    {
+        try
+        {
+            var message = await _downloadService.UpdateYtDlpAsync().ConfigureAwait(false);
+            return Ok(new { Success = true, Message = message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in UpdateYtDlp endpoint");
+            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+        }
+    }
 
     /// <summary>
     /// Resets the download queue (database only).
