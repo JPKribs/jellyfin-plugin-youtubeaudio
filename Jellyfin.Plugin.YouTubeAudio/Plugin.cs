@@ -94,7 +94,6 @@ public class Plugin : PluginBase<Plugin, PluginConfiguration>
             EmbeddedResourcePath = $"{ns}.Configuration.youtubeaudio_shared.js"
         };
 
-        // Shared base CSS and JS compiled in from the JPKribs.Jellyfin.Base package.
         foreach (var page in GetSharedPages("youtubeaudio"))
         {
             yield return page;
