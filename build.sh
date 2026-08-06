@@ -53,7 +53,8 @@ get_plugin_info() {
     local guid="7323ea64-a200-4265-ab8f-e7ae27d06c38"
 
     if [[ -f "$build_file" ]]; then
-        local extracted_name=$(grep '^name:' "$build_file" | cut -d':' -f2 | tr -d ' "')
+        # Take everything after the first colon and strip one layer of quotes, so a name with spaces survives.
+        local extracted_name=$(sed -n 's/^name:[[:space:]]*//p' "$build_file" | head -n 1 | sed -e 's/[[:space:]]*$//' -e 's/^"\(.*\)"$/\1/')
         local extracted_guid=$(grep '^guid:' "$build_file" | cut -d':' -f2 | tr -d ' "')
 
         [[ -n "$extracted_name" ]] && name="$extracted_name"
@@ -213,6 +214,9 @@ main() {
         fi
     done < build.yaml
 
+    # CRITICAL: meta.json needs "name". Jellyfin 12 groups discovered plugins by
+    # name, so every nameless manifest collapses into one empty-name entry and all
+    # but one of those plugins silently fails to load.
     # Bundle the plugin image AND a meta.json inside the package so the installed
     # plugin icon (/Plugins/{id}/{ver}/Image) is served straight from disk with
     # ZERO dependency on the server downloading imageUrl at install time.
@@ -245,9 +249,12 @@ main() {
         cat > "$temp_dir/meta.json" <<EOF
 {
     "guid": "$PLUGIN_GUID",
+    "name": "$PLUGIN_NAME",
     "version": "$VERSION",
     "targetAbi": "$target_abi",
     "timestamp": "$meta_timestamp",
+    "status": "Active",
+    "autoUpdate": true,
     "imagePath": "Logo.png",
     "assemblies": [
 $assemblies_json
