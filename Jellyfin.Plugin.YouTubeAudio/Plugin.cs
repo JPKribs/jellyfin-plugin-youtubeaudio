@@ -51,7 +51,8 @@ public class Plugin : PluginBase<Plugin, PluginConfiguration>
             EmbeddedResourcePath = $"{ns}.Configuration.youtubeaudio_download.html",
             MenuSection = "server",
             DisplayName = "YouTube Audio",
-            EnableInMainMenu = true
+            EnableInMainMenu = true,
+            MenuIcon = "music_note"
         };
 
         yield return new PluginPageInfo
