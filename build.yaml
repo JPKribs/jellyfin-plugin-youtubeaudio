@@ -1,9 +1,9 @@
 ---
 name: "YouTube Audio"
 guid: "7323ea64-a200-4265-ab8f-e7ae27d06c38"
-version: "10.11.8.0"
-targetAbi: "10.11.10.0"
-framework: "net9.0"
+version: "12.0.0.0"
+targetAbi: "12.0.0.0"
+framework: "net10.0"
 overview: "Download YouTube audio directly to a Jellyfin Music Library."
 description: >
   YouTube Audio lets you download YouTube audio (single videos or playlists) as Opus, MP3, or M4A files,
@@ -33,4 +33,4 @@ changelog:
   - Remove queue rows once imported instead of keeping them forever
   - Deterministic queue ordering for same-timestamp playlist items
   - Public download page picks the credential matching the server address
-  - Target ABI 10.11.10.0
+  - Rebuilt for Jellyfin 12.0 on .NET 10, with the target ABI raised to 12.0.0.0
