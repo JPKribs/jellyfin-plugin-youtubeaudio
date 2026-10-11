@@ -9,6 +9,14 @@
     "category": "Music",
     "versions": [
       {
+        "version": "12.2.1.0",
+        "changelog": "## Features\r\n- Import Apple Music playlists (text or XML export) and whole library exports; each track is matched to a YouTube upload at download time.\r\n- Imported playlists become private Jellyfin playlists for a chosen user, filled as songs reach the library, appended to and re-ordered when one of the same name exists.\r\n- Import cleanup groups album editions (Deluxe, Remastered, Bonus Track…), moves feat. artists into tags, skips songs already in the library or queue, and upgrades library singles to the album version.\r\n- Public read-only queue page at /YouTube/Queue for signed-in users.\r\n- yt-dlp and the Deno runtime it needs for YouTube are downloaded automatically, yt-dlp is kept up to date, and downloads YouTube temporarily refuses are retried.\r\n- Failed queue items can be retried from the Download tab.",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/v12.2.1.0/jellyfin-plugin-youtubeaudio-12.2.1.0.zip",
+        "checksum": "ca50604afd406c5bfd1c68c1acebf039",
+        "timestamp": "2026-10-11T22:32:37Z"
+      },
+      {
         "version": "12.0.0.0",
         "changelog": "## Developer\r\n- Rebuilt for Jellyfin 12.0 on .NET 10, with the target ABI raised to 12.0.0.0\r\n- The dashboard menu entry now shows a icon instead of the generic folder\r\n- CI builds, tests, and CodeQL now run on .NET 10, and label sync has the token scope it needs",
         "targetAbi": "12.0.0.0",
