@@ -28,9 +28,9 @@ namespace Jellyfin.Plugin.YouTubeAudio.Tests;
 [Trait("Category", "Integration")]
 public class DownloadIntegrationTests
 {
-    // "Me at the zoo" — the first YouTube video. Short (~19s) and about as permanent as a
-    // YouTube URL gets, which makes it a stable fixture.
-    private const string TestUrl = "https://www.youtube.com/watch?v=jNQXAC9IVRw";
+    // Bach: Cello Suite No. 1, Prélude (Yo-Yo Ma), from the artist's own channel. Short (~2.5
+    // minutes) and published by the performer, which makes it a stable fixture.
+    private const string TestUrl = "https://www.youtube.com/watch?v=noW9fM9vgJs";
 
     [SkippableTheory]
     [InlineData(AudioFormat.Opus, "opus")]
@@ -87,12 +87,11 @@ public class DownloadIntegrationTests
             // 3. The info.json sidecar is written (and is what import later cleans up).
             Assert.True(File.Exists(Path.Combine(dir, name + ".info.json")), "info.json was not written.");
 
-            // 4. M4a-specific: yt-dlp's AAC output is not directly TagLib-readable, but the
-            //    plugin's one-time "-c copy" remux makes it healthy. Lock that contract in.
+            // 4. M4a-specific: older yt-dlp builds wrote AAC files TagLib could not parse (newer
+            //    ones are readable), so the plugin always does a one-time "-c copy" remux. Lock in
+            //    that the remuxed file is healthy, whichever yt-dlp produced the original.
             if (format == AudioFormat.M4a)
             {
-                Assert.Throws<TagLib.CorruptFileException>(() => TagLib.File.Create(audio));
-
                 var remuxed = Path.Combine(dir, "remuxed.m4a");
                 Remux(ffmpeg!, audio, remuxed);
                 using var tag = TagLib.File.Create(remuxed);
@@ -156,7 +155,7 @@ public class DownloadIntegrationTests
         Assert.Equal(0, proc.ExitCode);
     }
 
-    private static string? Which(string exe)
+    internal static string? Which(string exe)
     {
         foreach (var dir in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty).Split(Path.PathSeparator))
         {

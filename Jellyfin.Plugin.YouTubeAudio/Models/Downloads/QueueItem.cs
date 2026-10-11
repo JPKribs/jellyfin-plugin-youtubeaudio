@@ -8,8 +8,20 @@ public class QueueItem
     /// <summary>Gets or sets the unique identifier (GUID as string).</summary>
     public string Id { get; set; } = string.Empty;
 
-    /// <summary>Gets or sets the original YouTube URL.</summary>
+    /// <summary>
+    /// Gets or sets the original YouTube URL. Empty for a playlist-imported track until its
+    /// YouTube match is found at download time.
+    /// </summary>
     public string Url { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the playlist source ID (e.g. "applemusic") for imported tracks, otherwise null.</summary>
+    public string? Source { get; set; }
+
+    /// <summary>Gets or sets the track as read from the playlist export, for imported tracks.</summary>
+    public PlaylistTrack? SourceTrack { get; set; }
+
+    /// <summary>Gets or sets a note about a YouTube match worth reviewing, or null.</summary>
+    public string? MatchNote { get; set; }
 
     /// <summary>Gets or sets the YouTube video title.</summary>
     public string? Title { get; set; }

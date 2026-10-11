@@ -1,0 +1,1167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Major Version</key>
+	<integer>1</integer>
+	<key>Minor Version</key>
+	<integer>1</integer>
+	<key>Application Version</key>
+	<string>1.7.0.163</string>
+	<key>Features</key>
+	<integer>5</integer>
+	<key>Show Content Ratings</key>
+	<true/>
+	<key>Tracks</key>
+	<dict>
+		<key>1001</key>
+		<dict>
+			<key>Track ID</key>
+			<integer>1001</integer>
+			<key>Name</key>
+			<string>Clair de lune</string>
+			<key>Artist</key>
+			<string>Lang Lang</string>
+			<key>Album Artist</key>
+			<string>Lang Lang</string>
+			<key>Composer</key>
+			<string>Claude Debussy</string>
+			<key>Album</key>
+			<string>Piano Book</string>
+			<key>Genre</key>
+			<string>Classical</string>
+			<key>Kind</key>
+			<string>Apple Music AAC audio file</string>
+			<key>Size</key>
+			<integer>6001001</integer>
+			<key>Total Time</key>
+			<integer>408357</integer>
+			<key>Disc Number</key>
+			<integer>1</integer>
+			<key>Disc Count</key>
+			<integer>1</integer>
+			<key>Track Number</key>
+			<integer>3</integer>
+			<key>Track Count</key>
+			<integer>25</integer>
+			<key>Year</key>
+			<integer>2019</integer>
+			<key>Bit Rate</key>
+			<integer>256</integer>
+			<key>Sample Rate</key>
+			<integer>44100</integer>
+			<key>Artwork Count</key>
+			<integer>1</integer>
+			<key>Sort Album</key>
+			<string>Piano Book</string>
+			<key>Sort Artist</key>
+			<string>Lang Lang</string>
+			<key>Sort Name</key>
+			<string>Clair de lune</string>
+			<key>Track Type</key>
+			<string>Remote</string>
+			<key>Apple Music</key>
+			<true/>
+		</dict>
+		<key>1002</key>
+		<dict>
+			<key>Track ID</key>
+			<integer>1002</integer>
+			<key>Name</key>
+			<string>Für Elise</string>
+			<key>Artist</key>
+			<string>Lang Lang</string>
+			<key>Album Artist</key>
+			<string>Lang Lang</string>
+			<key>Composer</key>
+			<string>Ludwig van Beethoven</string>
+			<key>Album</key>
+			<string>Piano Book</string>
+			<key>Genre</key>
+			<string>Classical</string>
+			<key>Kind</key>
+			<string>Apple Music AAC audio file</string>
+			<key>Size</key>
+			<integer>6001002</integer>
+			<key>Total Time</key>
+			<integer>204357</integer>
+			<key>Disc Number</key>
+			<integer>1</integer>
+			<key>Disc Count</key>
+			<integer>1</integer>
+			<key>Track Number</key>
+			<integer>2</integer>
+			<key>Track Count</key>
+			<integer>25</integer>
+			<key>Year</key>
+			<integer>2019</integer>
+			<key>Bit Rate</key>
+			<integer>256</integer>
+			<key>Sample Rate</key>
+			<integer>44100</integer>
+			<key>Artwork Count</key>
+			<integer>1</integer>
+			<key>Sort Album</key>
+			<string>Piano Book</string>
+			<key>Sort Artist</key>
+			<string>Lang Lang</string>
+			<key>Sort Name</key>
+			<string>Für Elise</string>
+			<key>Track Type</key>
+			<string>Remote</string>
+			<key>Apple Music</key>
+			<true/>
+		</dict>
+		<key>1003</key>
+		<dict>
+			<key>Track ID</key>
+			<integer>1003</integer>
+			<key>Name</key>
+			<string>Gymnopédie No. 1</string>
+			<key>Artist</key>
+			<string>Lang Lang</string>
+			<key>Album Artist</key>
+			<string>Lang Lang</string>
+			<key>Composer</key>
+			<string>Erik Satie</string>
+			<key>Album</key>
+			<string>Piano Book</string>
+			<key>Genre</key>
+			<string>Classical</string>
+			<key>Kind</key>
+			<string>Apple Music AAC audio file</string>
+			<key>Size</key>
+			<integer>6001003</integer>
+			<key>Total Time</key>
+			<integer>300357</integer>
+			<key>Disc Number</key>
+			<integer>1</integer>
+			<key>Disc Count</key>
+			<integer>1</integer>
+			<key>Track Number</key>
+			<integer>9</integer>
+			<key>Track Count</key>
+			<integer>25</integer>
+			<key>Year</key>
+			<integer>2019</integer>
+			<key>Bit Rate</key>
+			<integer>256</integer>
+			<key>Sample Rate</key>
+			<integer>44100</integer>
+			<key>Artwork Count</key>
+			<integer>1</integer>
+			<key>Sort Album</key>
+			<string>Piano Book</string>
+			<key>Sort Artist</key>
+			<string>Lang Lang</string>
+			<key>Sort Name</key>
+			<string>Gymnopédie No. 1</string>
+			<key>Track Type</key>
+			<string>Remote</string>
+			<key>Apple Music</key>
+			<true/>
+		</dict>
+		<key>1004</key>
+		<dict>
+			<key>Track ID</key>
+			<integer>1004</integer>
+			<key>Name</key>
+			<string>Cello Suite No. 1 in G Major, BWV 1007: I. Prélude</string>
+			<key>Artist</key>
+			<string>Yo-Yo Ma</string>
+			<key>Album Artist</key>
+			<string>Yo-Yo Ma</string>
+			<key>Composer</key>
+			<string>Johann Sebastian Bach</string>
+			<key>Album</key>
+			<string>Six Evolutions - Bach: Cello Suites</string>
+			<key>Genre</key>
+			<string>Classical</string>
+			<key>Kind</key>
+			<string>Apple Music AAC audio file</string>
+			<key>Size</key>
+			<integer>6001004</integer>
+			<key>Total Time</key>
+			<integer>153357</integer>
+			<key>Disc Number</key>
+			<integer>1</integer>
+			<key>Disc Count</key>
+			<integer>2</integer>
+			<key>Track Number</key>
+			<integer>1</integer>
+			<key>Track Count</key>
+			<integer>36</integer>
+			<key>Year</key>
+			<integer>2018</integer>
+			<key>Bit Rate</key>
+			<integer>256</integer>
+			<key>Sample Rate</key>
+			<integer>44100</integer>
+			<key>Artwork Count</key>
+			<integer>1</integer>
+			<key>Sort Album</key>
+			<string>Six Evolutions - Bach: Cello Suites</string>
+			<key>Sort Artist</key>
+			<string>Yo-Yo Ma</string>
+			<key>Sort Name</key>
+			<string>Cello Suite No. 1 in G Major, BWV 1007: I. Prélude</string>
+			<key>Track Type</key>
+			<string>Remote</string>
+			<key>Apple Music</key>
+			<true/>
+		</dict>
+		<key>1005</key>
+		<dict>
+			<key>Track ID</key>
+			<integer>1005</integer>
+			<key>Name</key>
+			<string>Prelude in E Minor, BWV 855</string>
+			<key>Artist</key>
+			<string>Víkingur Ólafsson</string>
+			<key>Album Artist</key>
+			<string>Víkingur Ólafsson</string>
+			<key>Composer</key>
+			<string>Johann Sebastian Bach</string>
+			<key>Album</key>
+			<string>Johann Sebastian Bach</string>
+			<key>Genre</key>
+			<string>Classical</string>
+			<key>Kind</key>
+			<string>Apple Music AAC audio file</string>
+			<key>Size</key>
+			<integer>6001005</integer>
+			<key>Total Time</key>
+			<integer>181357</integer>
+			<key>Disc Number</key>
+			<integer>1</integer>
+			<key>Disc Count</key>
+			<integer>1</integer>
+			<key>Track Number</key>
+			<integer>6</integer>
+			<key>Track Count</key>
+			<integer>35</integer>
+			<key>Year</key>
+			<integer>2018</integer>
+			<key>Bit Rate</key>
+			<integer>256</integer>
+			<key>Sample Rate</key>
+			<integer>44100</integer>
+			<key>Artwork Count</key>
+			<integer>1</integer>
+			<key>Sort Album</key>
+			<string>Johann Sebastian Bach</string>
+			<key>Sort Artist</key>
+			<string>Víkingur Ólafsson</string>
+			<key>Sort Name</key>
+			<string>Prelude in E Minor, BWV 855</string>
+			<key>Track Type</key>
+			<string>Remote</string>
+			<key>Apple Music</key>
+			<true/>
+		</dict>
+		<key>1006</key>
+		<dict>
+			<key>Track ID</key>
+			<integer>1006</integer>
+			<key>Name</key>
+			<string>Liebestraum No. 3 in A-Flat Major, S. 541/3</string>
+			<key>Artist</key>
+			<string>Khatia Buniatishvili</string>
+			<key>Album Artist</key>
+			<string>Khatia Buniatishvili</string>
+			<key>Composer</key>
+			<string>Franz Liszt</string>
+			<key>Album</key>
+			<string>Liszt</string>
+			<key>Genre</key>
+			<string>Classical</string>
+			<key>Kind</key>
+			<string>Apple Music AAC audio file</string>
+			<key>Size</key>
+			<integer>6001006</integer>
+			<key>Total Time</key>
+			<integer>329357</integer>
+			<key>Disc Number</key>
+			<integer>1</integer>
+			<key>Disc Count</key>
+			<integer>1</integer>
+			<key>Track Number</key>
+			<integer>10</integer>
+			<key>Track Count</key>
+			<integer>12</integer>
+			<key>Year</key>
+			<integer>2011</integer>
+			<key>Bit Rate</key>
+			<integer>256</integer>
+			<key>Sample Rate</key>
+			<integer>44100</integer>
+			<key>Artwork Count</key>
+			<integer>1</integer>
+			<key>Sort Album</key>
+			<string>Liszt</string>
+			<key>Sort Artist</key>
+			<string>Khatia Buniatishvili</string>
+			<key>Sort Name</key>
+			<string>Liebestraum No. 3 in A-Flat Major, S. 541/3</string>
+			<key>Track Type</key>
+			<string>Remote</string>
+			<key>Apple Music</key>
+			<true/>
+		</dict>
+		<key>1007</key>
+		<dict>
+			<key>Track ID</key>
+			<integer>1007</integer>
+			<key>Name</key>
+			<string>Méditation</string>
+			<key>Artist</key>
+			<string>Itzhak Perlman</string>
+			<key>Album Artist</key>
+			<string>Itzhak Perlman</string>
+			<key>Composer</key>
+			<string>Jules Massenet</string>
+			<key>Album</key>
+			<string>Méditation - Single</string>
+			<key>Genre</key>
+			<string>Classical</string>
+			<key>Kind</key>
+			<string>Apple Music AAC audio file</string>
+			<key>Size</key>
+			<integer>6001007</integer>
+			<key>Total Time</key>
+			<integer>288357</integer>
+			<key>Disc Number</key>
+			<integer>1</integer>
+			<key>Disc Count</key>
+			<integer>1</integer>
+			<key>Track Number</key>
+			<integer>1</integer>
+			<key>Track Count</key>
+			<integer>1</integer>
+			<key>Year</key>
+			<integer>2015</integer>
+			<key>Bit Rate</key>
+			<integer>256</integer>
+			<key>Sample Rate</key>
+			<integer>44100</integer>
+			<key>Artwork Count</key>
+			<integer>1</integer>
+			<key>Sort Album</key>
+			<string>Méditation - Single</string>
+			<key>Sort Artist</key>
+			<string>Itzhak Perlman</string>
+			<key>Sort Name</key>
+			<string>Méditation</string>
+			<key>Track Type</key>
+			<string>Remote</string>
+			<key>Apple Music</key>
+			<true/>
+		</dict>
+		<key>1008</key>
+		<dict>
+			<key>Track ID</key>
+			<integer>1008</integer>
+			<key>Name</key>
+			<string>Goldberg Variations, BWV 988: Aria</string>
+			<key>Artist</key>
+			<string>Glenn Gould</string>
+			<key>Album Artist</key>
+			<string>Glenn Gould</string>
+			<key>Composer</key>
+			<string>Johann Sebastian Bach</string>
+			<key>Album</key>
+			<string>Bach: The Goldberg Variations (1981 Recording)</string>
+			<key>Genre</key>
+			<string>Classical</string>
+			<key>Kind</key>
+			<string>Apple Music AAC audio file</string>
+			<key>Size</key>
+			<integer>6001008</integer>
+			<key>Total Time</key>
+			<integer>185357</integer>
+			<key>Disc Number</key>
+			<integer>1</integer>
+			<key>Disc Count</key>
+			<integer>1</integer>
+			<key>Track Number</key>
+			<integer>1</integer>
+			<key>Track Count</key>
+			<integer>32</integer>
+			<key>Year</key>
+			<integer>1982</integer>
+			<key>Bit Rate</key>
+			<integer>256</integer>
+			<key>Sample Rate</key>
+			<integer>44100</integer>
+			<key>Artwork Count</key>
+			<integer>1</integer>
+			<key>Sort Album</key>
+			<string>Bach: The Goldberg Variations (1981 Recording)</string>
+			<key>Sort Artist</key>
+			<string>Glenn Gould</string>
+			<key>Sort Name</key>
+			<string>Goldberg Variations, BWV 988: Aria</string>
+			<key>Track Type</key>
+			<string>Remote</string>
+			<key>Apple Music</key>
+			<true/>
+		</dict>
+		<key>1009</key>
+		<dict>
+			<key>Track ID</key>
+			<integer>1009</integer>
+			<key>Name</key>
+			<string>Vocalise, Op. 34 No. 14</string>
+			<key>Artist</key>
+			<string>Daniil Trifonov</string>
+			<key>Album Artist</key>
+			<string>Daniil Trifonov</string>
+			<key>Composer</key>
+			<string>Sergei Rachmaninoff</string>
+			<key>Album</key>
+			<string>Destination Rachmaninov: Departure</string>
+			<key>Genre</key>
+			<string>Classical</string>
+			<key>Kind</key>
+			<string>Apple Music AAC audio file</string>
+			<key>Size</key>
+			<integer>6001009</integer>
+			<key>Total Time</key>
+			<integer>215357</integer>
+			<key>Disc Number</key>
+			<integer>1</integer>
+			<key>Disc Count</key>
+			<integer>2</integer>
+			<key>Track Number</key>
+			<integer>14</integer>
+			<key>Track Count</key>
+			<integer>16</integer>
+			<key>Year</key>
+			<integer>2018</integer>
+			<key>Bit Rate</key>
+			<integer>256</integer>
+			<key>Sample Rate</key>
+			<integer>44100</integer>
+			<key>Artwork Count</key>
+			<integer>1</integer>
+			<key>Sort Album</key>
+			<string>Destination Rachmaninov: Departure</string>
+			<key>Sort Artist</key>
+			<string>Daniil Trifonov</string>
+			<key>Sort Name</key>
+			<string>Vocalise, Op. 34 No. 14</string>
+			<key>Track Type</key>
+			<string>Remote</string>
+			<key>Apple Music</key>
+			<true/>
+		</dict>
+		<key>1010</key>
+		<dict>
+			<key>Track ID</key>
+			<integer>1010</integer>
+			<key>Name</key>
+			<string>The Swan</string>
+			<key>Artist</key>
+			<string>Sheku Kanneh-Mason &amp; Isata Kanneh-Mason</string>
+			<key>Album Artist</key>
+			<string>Sheku Kanneh-Mason &amp; Isata Kanneh-Mason</string>
+			<key>Composer</key>
+			<string>Camille Saint-Saëns</string>
+			<key>Album</key>
+			<string>The Swan - EP</string>
+			<key>Genre</key>
+			<string>Classical</string>
+			<key>Kind</key>
+			<string>Apple Music AAC audio file</string>
+			<key>Size</key>
+			<integer>6001010</integer>
+			<key>Total Time</key>
+			<integer>156357</integer>
+			<key>Disc Number</key>
+			<integer>1</integer>
+			<key>Disc Count</key>
+			<integer>1</integer>
+			<key>Track Number</key>
+			<integer>1</integer>
+			<key>Track Count</key>
+			<integer>4</integer>
+			<key>Year</key>
+			<integer>2018</integer>
+			<key>Bit Rate</key>
+			<integer>256</integer>
+			<key>Sample Rate</key>
+			<integer>44100</integer>
+			<key>Artwork Count</key>
+			<integer>1</integer>
+			<key>Sort Album</key>
+			<string>The Swan - EP</string>
+			<key>Sort Artist</key>
+			<string>Sheku Kanneh-Mason &amp; Isata Kanneh-Mason</string>
+			<key>Sort Name</key>
+			<string>The Swan</string>
+			<key>Track Type</key>
+			<string>Remote</string>
+			<key>Apple Music</key>
+			<true/>
+		</dict>
+		<key>1011</key>
+		<dict>
+			<key>Track ID</key>
+			<integer>1011</integer>
+			<key>Name</key>
+			<string>Violin Partita No. 3 in E Major, BWV 1006: I. Preludio</string>
+			<key>Artist</key>
+			<string>Hilary Hahn</string>
+			<key>Album Artist</key>
+			<string>Hilary Hahn</string>
+			<key>Composer</key>
+			<string>Johann Sebastian Bach</string>
+			<key>Album</key>
+			<string>Bach: Violin Sonatas &amp; Partitas, Vol. 1</string>
+			<key>Genre</key>
+			<string>Classical</string>
+			<key>Kind</key>
+			<string>Apple Music AAC audio file</string>
+			<key>Size</key>
+			<integer>6001011</integer>
+			<key>Total Time</key>
+			<integer>215357</integer>
+			<key>Disc Number</key>
+			<integer>1</integer>
+			<key>Disc Count</key>
+			<integer>1</integer>
+			<key>Track Number</key>
+			<integer>4</integer>
+			<key>Track Count</key>
+			<integer>13</integer>
+			<key>Year</key>
+			<integer>2018</integer>
+			<key>Bit Rate</key>
+			<integer>256</integer>
+			<key>Sample Rate</key>
+			<integer>44100</integer>
+			<key>Artwork Count</key>
+			<integer>1</integer>
+			<key>Sort Album</key>
+			<string>Bach: Violin Sonatas &amp; Partitas, Vol. 1</string>
+			<key>Sort Artist</key>
+			<string>Hilary Hahn</string>
+			<key>Sort Name</key>
+			<string>Violin Partita No. 3 in E Major, BWV 1006: I. Preludio</string>
+			<key>Track Type</key>
+			<string>Remote</string>
+			<key>Apple Music</key>
+			<true/>
+		</dict>
+		<key>1012</key>
+		<dict>
+			<key>Track ID</key>
+			<integer>1012</integer>
+			<key>Name</key>
+			<string>Kinderszenen, Op. 15: VII. Träumerei</string>
+			<key>Artist</key>
+			<string>Martha Argerich</string>
+			<key>Album Artist</key>
+			<string>Martha Argerich</string>
+			<key>Composer</key>
+			<string>Robert Schumann</string>
+			<key>Album</key>
+			<string>Schumann: Kinderszenen; Kreisleriana</string>
+			<key>Genre</key>
+			<string>Classical</string>
+			<key>Kind</key>
+			<string>Apple Music AAC audio file</string>
+			<key>Size</key>
+			<integer>6001012</integer>
+			<key>Total Time</key>
+			<integer>176357</integer>
+			<key>Disc Number</key>
+			<integer>1</integer>
+			<key>Disc Count</key>
+			<integer>1</integer>
+			<key>Track Number</key>
+			<integer>7</integer>
+			<key>Track Count</key>
+			<integer>21</integer>
+			<key>Year</key>
+			<integer>1984</integer>
+			<key>Bit Rate</key>
+			<integer>256</integer>
+			<key>Sample Rate</key>
+			<integer>44100</integer>
+			<key>Artwork Count</key>
+			<integer>1</integer>
+			<key>Sort Album</key>
+			<string>Schumann: Kinderszenen; Kreisleriana</string>
+			<key>Sort Artist</key>
+			<string>Martha Argerich</string>
+			<key>Sort Name</key>
+			<string>Kinderszenen, Op. 15: VII. Träumerei</string>
+			<key>Track Type</key>
+			<string>Remote</string>
+			<key>Apple Music</key>
+			<true/>
+		</dict>
+		<key>2001</key>
+		<dict>
+			<key>Track ID</key>
+			<integer>2001</integer>
+			<key>Name</key>
+			<string>Canon in D</string>
+			<key>Artist</key>
+			<string>Academy of St Martin in the Fields &amp; Sir Neville Marriner</string>
+			<key>Album Artist</key>
+			<string>Various Artists</string>
+			<key>Composer</key>
+			<string>Johann Pachelbel</string>
+			<key>Album</key>
+			<string>Classical Favourites</string>
+			<key>Genre</key>
+			<string>Classical</string>
+			<key>Kind</key>
+			<string>Apple Music AAC audio file</string>
+			<key>Size</key>
+			<integer>6002001</integer>
+			<key>Total Time</key>
+			<integer>176373</integer>
+			<key>Disc Number</key>
+			<integer>1</integer>
+			<key>Disc Count</key>
+			<integer>1</integer>
+			<key>Track Number</key>
+			<integer>3</integer>
+			<key>Track Count</key>
+			<integer>20</integer>
+			<key>Year</key>
+			<integer>2003</integer>
+			<key>Bit Rate</key>
+			<integer>256</integer>
+			<key>Sample Rate</key>
+			<integer>44100</integer>
+			<key>Artwork Count</key>
+			<integer>1</integer>
+			<key>Sort Album</key>
+			<string>Classical Favourites</string>
+			<key>Sort Artist</key>
+			<string>Academy of St Martin in the Fields &amp; Sir Neville Marriner</string>
+			<key>Sort Name</key>
+			<string>Canon in D</string>
+			<key>Compilation</key>
+			<true/>
+			<key>Track Type</key>
+			<string>Remote</string>
+			<key>Apple Music</key>
+			<true/>
+		</dict>
+		<key>2002</key>
+		<dict>
+			<key>Track ID</key>
+			<integer>2002</integer>
+			<key>Name</key>
+			<string>The Nutcracker, Op. 71: Dance of the Sugar Plum Fairy</string>
+			<key>Artist</key>
+			<string>London Symphony Orchestra &amp; André Previn</string>
+			<key>Album Artist</key>
+			<string>Various Artists</string>
+			<key>Composer</key>
+			<string>Pyotr Ilyich Tchaikovsky</string>
+			<key>Album</key>
+			<string>Essential Ballet</string>
+			<key>Genre</key>
+			<string>Classical</string>
+			<key>Kind</key>
+			<string>Apple Music AAC audio file</string>
+			<key>Size</key>
+			<integer>6002002</integer>
+			<key>Total Time</key>
+			<integer>117867</integer>
+			<key>Disc Number</key>
+			<integer>1</integer>
+			<key>Disc Count</key>
+			<integer>1</integer>
+			<key>Track Number</key>
+			<integer>8</integer>
+			<key>Track Count</key>
+			<integer>18</integer>
+			<key>Year</key>
+			<integer>2010</integer>
+			<key>Bit Rate</key>
+			<integer>256</integer>
+			<key>Sample Rate</key>
+			<integer>44100</integer>
+			<key>Artwork Count</key>
+			<integer>1</integer>
+			<key>Sort Album</key>
+			<string>Essential Ballet</string>
+			<key>Sort Artist</key>
+			<string>London Symphony Orchestra &amp; André Previn</string>
+			<key>Sort Name</key>
+			<string>The Nutcracker, Op. 71: Dance of the Sugar Plum Fairy</string>
+			<key>Track Type</key>
+			<string>Remote</string>
+			<key>Apple Music</key>
+			<true/>
+		</dict>
+		<key>2003</key>
+		<dict>
+			<key>Track ID</key>
+			<integer>2003</integer>
+			<key>Name</key>
+			<string>Hungarian Rhapsody No. 2 (feat. Yuja Wang)</string>
+			<key>Artist</key>
+			<string>Lang Lang</string>
+			<key>Album Artist</key>
+			<string>Lang Lang</string>
+			<key>Composer</key>
+			<string>Franz Liszt</string>
+			<key>Album</key>
+			<string>Hungarian Rhapsody No. 2 (feat. Yuja Wang) - Single</string>
+			<key>Genre</key>
+			<string>Classical</string>
+			<key>Kind</key>
+			<string>Apple Music AAC audio file</string>
+			<key>Size</key>
+			<integer>6002003</integer>
+			<key>Total Time</key>
+			<integer>590357</integer>
+			<key>Disc Number</key>
+			<integer>1</integer>
+			<key>Disc Count</key>
+			<integer>1</integer>
+			<key>Track Number</key>
+			<integer>1</integer>
+			<key>Track Count</key>
+			<integer>1</integer>
+			<key>Year</key>
+			<integer>2021</integer>
+			<key>Bit Rate</key>
+			<integer>256</integer>
+			<key>Sample Rate</key>
+			<integer>44100</integer>
+			<key>Artwork Count</key>
+			<integer>1</integer>
+			<key>Sort Album</key>
+			<string>Hungarian Rhapsody No. 2 (feat. Yuja Wang) - Single</string>
+			<key>Sort Artist</key>
+			<string>Lang Lang</string>
+			<key>Sort Name</key>
+			<string>Hungarian Rhapsody No. 2 (feat. Yuja Wang)</string>
+			<key>Track Type</key>
+			<string>Remote</string>
+			<key>Apple Music</key>
+			<true/>
+		</dict>
+		<key>2004</key>
+		<dict>
+			<key>Track ID</key>
+			<integer>2004</integer>
+			<key>Name</key>
+			<string>Gnossienne No. 1</string>
+			<key>Artist</key>
+			<string>Alice Sara Ott</string>
+			<key>Album Artist</key>
+			<string>Alice Sara Ott</string>
+			<key>Composer</key>
+			<string>Erik Satie</string>
+			<key>Album</key>
+			<string>Gnossienne No. 1 - Single</string>
+			<key>Genre</key>
+			<string>Classical</string>
+			<key>Kind</key>
+			<string>Apple Music AAC audio file</string>
+			<key>Size</key>
+			<integer>6002004</integer>
+			<key>Total Time</key>
+			<integer>225357</integer>
+			<key>Disc Number</key>
+			<integer>1</integer>
+			<key>Disc Count</key>
+			<integer>1</integer>
+			<key>Track Number</key>
+			<integer>1</integer>
+			<key>Track Count</key>
+			<integer>1</integer>
+			<key>Year</key>
+			<integer>2023</integer>
+			<key>Bit Rate</key>
+			<integer>256</integer>
+			<key>Sample Rate</key>
+			<integer>44100</integer>
+			<key>Artwork Count</key>
+			<integer>1</integer>
+			<key>Sort Album</key>
+			<string>Gnossienne No. 1 - Single</string>
+			<key>Sort Artist</key>
+			<string>Alice Sara Ott</string>
+			<key>Sort Name</key>
+			<string>Gnossienne No. 1</string>
+			<key>Track Type</key>
+			<string>Remote</string>
+			<key>Apple Music</key>
+			<true/>
+		</dict>
+		<key>2005</key>
+		<dict>
+			<key>Track ID</key>
+			<integer>2005</integer>
+			<key>Name</key>
+			<string>Asturias (Leyenda)</string>
+			<key>Artist</key>
+			<string>Andrés Segovia</string>
+			<key>Album Artist</key>
+			<string>Andrés Segovia</string>
+			<key>Composer</key>
+			<string>Isaac Albéniz</string>
+			<key>Album</key>
+			<string>The Art of Segovia (Remastered)</string>
+			<key>Genre</key>
+			<string>Classical</string>
+			<key>Kind</key>
+			<string>Apple Music AAC audio file</string>
+			<key>Size</key>
+			<integer>6002005</integer>
+			<key>Total Time</key>
+			<integer>419357</integer>
+			<key>Disc Number</key>
+			<integer>1</integer>
+			<key>Disc Count</key>
+			<integer>1</integer>
+			<key>Track Number</key>
+			<integer>5</integer>
+			<key>Track Count</key>
+			<integer>14</integer>
+			<key>Year</key>
+			<integer>1989</integer>
+			<key>Bit Rate</key>
+			<integer>256</integer>
+			<key>Sample Rate</key>
+			<integer>44100</integer>
+			<key>Artwork Count</key>
+			<integer>1</integer>
+			<key>Sort Album</key>
+			<string>The Art of Segovia (Remastered)</string>
+			<key>Sort Artist</key>
+			<string>Andrés Segovia</string>
+			<key>Sort Name</key>
+			<string>Asturias (Leyenda)</string>
+			<key>Track Type</key>
+			<string>Remote</string>
+			<key>Apple Music</key>
+			<true/>
+		</dict>
+	</dict>
+	<key>Playlists</key>
+	<array>
+		<dict>
+			<key>Name</key>
+			<string>Library</string>
+			<key>Description</key>
+			<string></string>
+			<key>Playlist ID</key>
+			<integer>1</integer>
+			<key>Playlist Persistent ID</key>
+			<string>00000000C1A55101</string>
+			<key>All Items</key>
+			<true/>
+			<key>Master</key>
+			<true/>
+			<key>Visible</key>
+			<false/>
+			<key>Playlist Items</key>
+			<array>
+				<dict>
+					<key>Track ID</key>
+					<integer>1001</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1002</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1003</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1004</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1005</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1006</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1007</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1008</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1009</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1010</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1011</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1012</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>2001</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>2002</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>2003</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>2004</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>2005</integer>
+				</dict>
+			</array>
+		</dict>
+		<dict>
+			<key>Name</key>
+			<string>Music</string>
+			<key>Description</key>
+			<string></string>
+			<key>Playlist ID</key>
+			<integer>2</integer>
+			<key>Playlist Persistent ID</key>
+			<string>00000000C1A55102</string>
+			<key>All Items</key>
+			<true/>
+			<key>Distinguished Kind</key>
+			<integer>4</integer>
+			<key>Music</key>
+			<true/>
+			<key>Playlist Items</key>
+			<array>
+				<dict>
+					<key>Track ID</key>
+					<integer>1001</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1002</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1003</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1004</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1005</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1006</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1007</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1008</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1009</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1010</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1011</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1012</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>2001</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>2002</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>2003</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>2004</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>2005</integer>
+				</dict>
+			</array>
+		</dict>
+		<dict>
+			<key>Name</key>
+			<string>Study Session</string>
+			<key>Description</key>
+			<string></string>
+			<key>Playlist ID</key>
+			<integer>3</integer>
+			<key>Playlist Persistent ID</key>
+			<string>00000000C1A55103</string>
+			<key>All Items</key>
+			<true/>
+			<key>Playlist Items</key>
+			<array>
+				<dict>
+					<key>Track ID</key>
+					<integer>1001</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1002</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1003</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1004</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1005</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1006</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1007</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1008</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1009</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1010</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1011</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1012</integer>
+				</dict>
+			</array>
+		</dict>
+		<dict>
+			<key>Name</key>
+			<string>Sunday Mix</string>
+			<key>Description</key>
+			<string></string>
+			<key>Playlist ID</key>
+			<integer>4</integer>
+			<key>Playlist Persistent ID</key>
+			<string>00000000C1A55104</string>
+			<key>All Items</key>
+			<true/>
+			<key>Playlist Items</key>
+			<array>
+				<dict>
+					<key>Track ID</key>
+					<integer>2001</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>2002</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>2003</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>2004</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>2005</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1007</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>1010</integer>
+				</dict>
+				<dict>
+					<key>Track ID</key>
+					<integer>999999</integer>
+				</dict>
+			</array>
+		</dict>
+		<dict>
+			<key>Name</key>
+			<string>Empty</string>
+			<key>Description</key>
+			<string></string>
+			<key>Playlist ID</key>
+			<integer>5</integer>
+			<key>Playlist Persistent ID</key>
+			<string>00000000C1A55105</string>
+			<key>All Items</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>Name</key>
+			<string>A Folder</string>
+			<key>Description</key>
+			<string></string>
+			<key>Playlist ID</key>
+			<integer>6</integer>
+			<key>Playlist Persistent ID</key>
+			<string>00000000C1A55106</string>
+			<key>All Items</key>
+			<true/>
+			<key>Folder</key>
+			<true/>
+		</dict>
+	</array>
+</dict>
+</plist>

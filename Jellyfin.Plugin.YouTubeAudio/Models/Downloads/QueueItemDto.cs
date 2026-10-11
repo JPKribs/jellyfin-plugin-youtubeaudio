@@ -14,6 +14,15 @@ public class QueueItemDto
     /// <summary>Gets or sets the video title.</summary>
     public string? Title { get; set; }
 
+    /// <summary>Gets or sets the playlist source ID for imported tracks, otherwise null.</summary>
+    public string? Source { get; set; }
+
+    /// <summary>Gets or sets a note about a YouTube match worth reviewing, or null.</summary>
+    public string? MatchNote { get; set; }
+
+    /// <summary>Gets or sets the number of library files (a lesser version of the song) this track replaces on import.</summary>
+    public int ReplacesFileCount { get; set; }
+
     /// <summary>Gets or sets the filename.</summary>
     public string FileName { get; set; } = string.Empty;
 

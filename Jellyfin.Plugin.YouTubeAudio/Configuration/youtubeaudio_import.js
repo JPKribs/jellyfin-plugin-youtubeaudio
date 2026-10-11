@@ -403,6 +403,7 @@ export default function (view) {
                     if (replaced > 0) parts.push(replaced + ' replaced');
                 }
                 if (skipped > 0) parts.push(skipped + ' skipped (duplicate)');
+                if (result && result.RemovedFiles > 0) parts.push(result.RemovedFiles + ' single(s) in the library replaced by the album version');
                 if (errCount > 0) parts.push(errCount + ' error(s)');
                 var msg = parts.length > 0 ? parts.join(', ') + '.' : 'No files imported.';
                 Shared.setStatus('importStatus', msg, errCount > 0 || skipped > 0);

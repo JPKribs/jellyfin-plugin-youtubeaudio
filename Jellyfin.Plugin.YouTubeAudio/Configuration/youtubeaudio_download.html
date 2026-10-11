@@ -13,6 +13,8 @@
                     <div class="fieldDescription">Queue YouTube videos or playlists to download as audio, then tag and import them from the Import tab.</div>
                     <div class="fieldDescription jpk-url">User URL: <a id="publicDownloadUrl" href="#" target="_blank" rel="noopener">/youtube/download</a></div>
                     <div class="fieldDescription">Share this link with the approved users selected under Settings &rarr; Approved Users. They can submit downloads here without admin access, but cannot import into the library.</div>
+                    <div class="fieldDescription jpk-url">Queue URL: <a id="publicQueueUrl" href="#" target="_blank" rel="noopener">/youtube/queue</a></div>
+                    <div class="fieldDescription">A read-only view of the queue that any signed-in user can open to see what is waiting to be added and where it stands.</div>
 
                     <!-- URL Input -->
                     <div class="inputContainer">
@@ -25,10 +27,41 @@
                         <span>Queue</span>
                     </button>
 
+                    <!-- Playlist Import -->
+                    <div class="sectionTitleContainer flex align-items-center yta-section-heading">
+                        <h2 class="sectionTitle">Import a Playlist</h2>
+                    </div>
+                    <div class="inputContainer yta-playlist-import">
+                        <label for="filePlaylist">Playlist Export:</label>
+                        <input type="file" id="filePlaylist" class="yta-file-input" accept=".txt,.xml" />
+                        <div class="fieldDescription">Queue every track from a playlist exported from another music service. Each track is matched to a YouTube upload when it downloads, and keeps the service's title, artist, album and track details as its tags.</div>
+                        <div class="fieldDescription" id="playlistSources"></div>
+                        <div id="playlistChoices" class="yta-playlist-choices" hidden></div>
+                    </div>
+                    <div class="selectContainer">
+                        <label>Playlist Owner:</label>
+                        <div id="playlistOwner"></div>
+                        <div class="fieldDescription">Each imported playlist becomes a private Jellyfin playlist with the same name, owned by this user, filled as its songs reach the library. If the user already has a playlist with that name, missing songs are added to it.</div>
+                    </div>
+                    <button is="emby-button" type="button" id="btnImportPlaylist" class="raised jpk-button-submit jpk-button-small" disabled>
+                        <span>Queue Playlist</span>
+                    </button>
+
+                    <!-- Playlists being filled -->
+                    <div id="playlistTargetsSection" class="yta-playlist-targets" hidden>
+                        <div class="sectionTitleContainer flex align-items-center yta-section-heading">
+                            <h2 class="sectionTitle">Playlist Imports in Progress</h2>
+                            <button type="button" class="jpk-table-reload-btn" id="btnSyncPlaylists" title="Add songs that are in the library now">
+                                <span class="material-icons jpk-table-reload-icon">sync</span>
+                            </button>
+                        </div>
+                        <div class="jpk-table-body" id="playlistTargets"></div>
+                    </div>
+
                     <!-- Queue List (PaginatedTable pattern) -->
                     <div class="jpk-table-wrapper" id="queueWrapper">
 
-                        <div class="sectionTitleContainer flex align-items-center">
+                        <div class="sectionTitleContainer flex align-items-center yta-section-heading">
                             <h1 class="sectionTitle">Queue</h1>
                         </div>
 
@@ -86,4 +119,14 @@
     </div>
 
     <link rel="stylesheet" href="configurationpage?name=youtubeaudio_jpkribs_shared.css">
+    <style>
+        /* Space every section after the first evenly. Specific enough to beat Jellyfin's
+           ".sectionTitleContainer:first-child" reset, since the Queue heading opens its wrapper. */
+        .sectionTitleContainer.yta-section-heading,
+        .sectionTitleContainer.yta-section-heading:first-child { margin-top: 2em; }
+        .yta-file-input { display: block; margin: 0.5em 0; color: inherit; font: inherit; }
+        .yta-playlist-choices { margin-top: 1em; }
+        .yta-playlist-choices .emby-checkbox-label { display: flex; margin: 0.3em 0; }
+        .yta-match-note { color: #ff9800; font-size: 0.85em; margin-top: 0.2em; }
+    </style>
 </div>

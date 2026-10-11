@@ -73,6 +73,42 @@ public class LibraryService
     }
 
     /// <summary>
+    /// Lists every audio track in the Jellyfin music libraries, for duplicate detection.
+    /// Covers all music libraries, not just the import target, so a song kept anywhere counts.
+    /// </summary>
+    public List<LibraryTrack> GetLibraryTracks()
+    {
+        try
+        {
+            var items = _libraryManager.GetItemList(new InternalItemsQuery
+            {
+                IncludeItemTypes = new[] { BaseItemKind.Audio },
+                Recursive = true,
+                IsVirtualItem = false
+            });
+
+            return items
+                .OfType<Audio>()
+                .Select(a => new LibraryTrack
+                {
+                    ItemId = a.Id,
+                    Title = a.Name ?? string.Empty,
+                    Artist = a.Artists.Count > 0 ? a.Artists[0] : null,
+                    AlbumArtist = a.AlbumArtists.Count > 0 ? a.AlbumArtists[0] : null,
+                    Album = a.Album,
+                    Year = a.ProductionYear,
+                    Path = a.Path
+                })
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to list library tracks for duplicate detection");
+            return new List<LibraryTrack>();
+        }
+    }
+
+    /// <summary>
     /// Searches for artists in the Jellyfin library matching the query.
     /// </summary>
     public List<string> SearchArtists(string query, int limit = 20)

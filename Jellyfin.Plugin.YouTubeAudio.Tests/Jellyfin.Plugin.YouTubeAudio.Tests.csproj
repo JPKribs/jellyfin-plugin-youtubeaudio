@@ -15,11 +15,14 @@
     <PackageReference Include="TagLibSharp" Version="2.3.0" />
     <PackageReference Include="YoutubeDLSharp" Version="1.2.0" />
     <PackageReference Include="Xunit.SkippableFact" Version="1.4.13" />
+    <!-- Native SQLite for queue database tests; the server supplies it at runtime. -->
+    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="9.0.0" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.10" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Jellyfin.Controller" Version="12.0.0" />
-    <PackageReference Include="Jellyfin.Model" Version="12.0.0" />
+    <PackageReference Include="Jellyfin.Controller" Version="12.2.0" />
+    <PackageReference Include="Jellyfin.Model" Version="12.2.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -28,6 +31,12 @@
 
   <ItemGroup>
     <None Include="TestData\silence.opus">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="TestData\AppleMusicLibrary.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="TestData\AppleMusicPlaylist.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

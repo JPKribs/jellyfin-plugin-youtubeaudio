@@ -57,10 +57,10 @@ public class DownloadServiceTests
     // MARK: Title cleaning
 
     [Theory]
-    [InlineData("Disturbed - Ten Thousand Fists", "Disturbed", "Ten Thousand Fists")]
-    [InlineData("Song (Official Video)", null, "Song")]
-    [InlineData("Song [Official Audio]", null, "Song")]
-    [InlineData("Disturbed - Song (Official Music Video)", "Disturbed", "Song")]
+    [InlineData("Lang Lang - Clair de lune", "Lang Lang", "Clair de lune")]
+    [InlineData("Nocturne (Official Video)", null, "Nocturne")]
+    [InlineData("Nocturne [Official Audio]", null, "Nocturne")]
+    [InlineData("Yo-Yo Ma - Prélude (Official Music Video)", "Yo-Yo Ma", "Prélude")]
     [InlineData("Plain Title", null, "Plain Title")]
     public void CleanYouTubeTitle_StripsArtistPrefixAndSuffixes(string title, string? artist, string expected)
         => Assert.Equal(expected, DownloadService.CleanYouTubeTitle(title, artist));
@@ -69,11 +69,34 @@ public class DownloadServiceTests
     public void CleanYouTubeTitle_EmptyInput_ReturnsEmpty()
         => Assert.Equal(string.Empty, DownloadService.CleanYouTubeTitle("   ", null));
 
+    // MARK: Retries
+
+    [Theory]
+    [InlineData("ERROR: unable to download video data: HTTP Error 403: Forbidden")]
+    [InlineData("ERROR: [youtube] abc: Unable to download webpage: HTTP Error 429: Too Many Requests")]
+    [InlineData("ERROR: The read operation timed out")]
+    public void IsTransientFailure_RetriesThrottlingAndNetworkErrors(string error)
+        => Assert.True(DownloadService.IsTransientFailure(["WARNING: something", error]));
+
+    [Theory]
+    [InlineData("ERROR: [youtube] abc: Video unavailable. This video has been removed by the uploader")]
+    [InlineData("ERROR: [youtube] abc: Private video. Sign in if you've been granted access to this video")]
+    public void IsTransientFailure_DoesNotRetryPermanentErrors(string error)
+        => Assert.False(DownloadService.IsTransientFailure([error]));
+
+    [Fact]
+    public void IsTransientFailure_NoOutput_IsNotTransient()
+        => Assert.False(DownloadService.IsTransientFailure(null));
+
+    [Fact]
+    public void GetDenoTarget_KnowsThisPlatform()
+        => Assert.NotNull(DownloadService.GetDenoTarget());
+
     // MARK: Path sanitizing (filenames only — never applied to tags)
 
     [Theory]
-    [InlineData("AC/DC", "ACDC")]
-    [InlineData("Foo & Bar", "Foo and Bar")]
+    [InlineData("Bach/Busoni", "BachBusoni")]
+    [InlineData("Argerich & Barenboim", "Argerich and Barenboim")]
     [InlineData("a#b%c", "abc")]
     [InlineData("  ..name..  ", "name")]
     public void SanitizePathComponent_RemovesProblemChars(string input, string expected)

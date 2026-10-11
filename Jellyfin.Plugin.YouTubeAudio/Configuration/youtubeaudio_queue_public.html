@@ -1,0 +1,196 @@
+<!-- Content fragment injected into the base JPKribs.Jellyfin.Base status card. -->
+<link rel="stylesheet" href="../web/configurationpage?name=youtubeaudio_jpkribs_shared.css" />
+<style>
+    /* The card never outgrows the window: the header and filters stay put and only the list scrolls. */
+    .jpk-status-card { max-width: 760px; width: 100%; max-height: calc(100dvh - 48px); display: flex; flex-direction: column; }
+    .jpk-status-card > .jpk-logo { align-self: center; flex: none; }
+    #queue:not(.hidden) { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+    #queue > h1, #queue > p, .yta-q-summary, .yta-q-updated { flex: none; }
+    .yta-q-summary { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 12px 0 16px; }
+    /* Equal-width filters across the card; they wrap onto more rows on narrow screens. */
+    .yta-q-pill { flex: 1 1 0; min-width: 120px; text-align: center; padding: 6px 10px; border-radius: 999px; font: inherit; font-size: 0.85rem; color: inherit;
+        background: rgba(255,255,255,0.08); border: 1px solid transparent; cursor: pointer; }
+    .yta-q-pill:hover { background: rgba(255,255,255,0.14); }
+    .yta-q-pill[aria-pressed="true"] { background: rgba(0,164,220,0.22); border-color: rgba(0,164,220,0.7); color: #fff; }
+    .yta-q-pill:disabled { cursor: default; opacity: 0.5; }
+    .yta-q-list { list-style: none; margin: 0 -10px 0 0; padding: 0 10px 0 0; text-align: left; flex: 1 1 auto; min-height: 0;
+        overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.25) transparent; }
+    .yta-q-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.08); }
+    .yta-q-main { flex: 1; min-width: 0; }
+    .yta-q-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .yta-q-sub { font-size: 0.85rem; color: rgba(255,255,255,0.55); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .yta-q-status { flex: none; font-size: 0.8rem; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+    .yta-q-s0 { background: rgba(255,255,255,0.10); }
+    .yta-q-s1 { background: rgba(33,150,243,0.25); color: #90caf9; }
+    .yta-q-s2 { background: rgba(76,175,80,0.22); color: #a5d6a7; }
+    .yta-q-s4 { background: rgba(244,67,54,0.22); color: #ef9a9a; }
+    .yta-q-empty, .yta-q-updated { color: rgba(255,255,255,0.55); font-size: 0.9rem; }
+    .yta-q-updated { margin-top: 14px; }
+    /* Narrow screens: give the title the full width and drop the status badge below it. */
+    @media (max-width: 520px) { .yta-q-row { flex-wrap: wrap; gap: 6px; } .yta-q-main { flex-basis: 100%; } }
+</style>
+
+<div id="signin" class="hidden">
+    <h1>Sign in required</h1>
+    <p>Sign in to your account to view this page.</p>
+    <a id="signinLink" class="jpk-btn" href="/">Sign in</a>
+</div>
+
+<div id="unavailable" class="hidden">
+    <h1>Queue unavailable</h1>
+    <p>The queue couldn't be loaded. Try again in a moment.</p>
+    <a id="unavailableLink" class="jpk-btn" href="/">Back to Jellyfin</a>
+</div>
+
+<div id="queue" class="hidden">
+    <h1>Download Queue</h1>
+    <p>Songs waiting to be added to the music library, and where each one stands.</p>
+    <div id="summary" class="yta-q-summary"></div>
+    <ul id="list" class="yta-q-list"></ul>
+    <div id="updated" class="yta-q-updated"></div>
+</div>
+
+<script>
+    (function () {
+        var path = location.pathname.replace(/\/+$/, '');
+        var itemsUrl = path + '/Items';
+        // Derive the Jellyfin base path by stripping this page's own "/YouTube/Queue" suffix (served at any case).
+        var prefix = location.pathname.replace(/\/youtube\/queue\/?$/i, '');
+        if (prefix === location.pathname) { prefix = ''; }
+        var root = prefix + '/';
+        var REFRESH_MS = 10000;
+        // Status filter chosen from the summary pills; null shows everything.
+        var filter = null;
+        var lastItems = [];
+        var FILTERS = [
+            { code: 0, label: 'waiting', empty: 'Nothing is waiting to download.' },
+            { code: 1, label: 'downloading', empty: 'Nothing is downloading right now.' },
+            { code: 2, label: 'downloaded', empty: 'Nothing is waiting to be added.' },
+            { code: 4, label: 'failed', empty: 'Nothing has failed.' }
+        ];
+
+        var el = function (id) { return document.getElementById(id); };
+        function show(id) { el(id).classList.remove('hidden'); }
+        function hide(id) { el(id).classList.add('hidden'); }
+        function esc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        }
+
+        // Hide the base card's loading heading + spinner when leaving the loading state.
+        function leaveLoading() {
+            var h = document.querySelector('.jpk-status-card > h1');
+            var s = document.querySelector('.jpk-status-card > .jpk-spinner');
+            if (h) h.style.display = 'none';
+            if (s) s.style.display = 'none';
+        }
+
+        ['signinLink', 'unavailableLink'].forEach(function (id) { var a = el(id); if (a) a.href = root; });
+
+        fetch(prefix + '/System/Info/Public', { headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.json(); })
+            .then(function (info) { if (info && info.ServerName) { document.title = info.ServerName + ' - Queue'; } })
+            .catch(function () { /* keep the default title */ });
+
+        function getToken() {
+            try {
+                var raw = localStorage.getItem('jellyfin_credentials');
+                if (!raw) return null;
+                var creds = JSON.parse(raw);
+                var servers = (creds && creds.Servers) || [];
+                var withToken = [];
+                for (var i = 0; i < servers.length; i++) {
+                    if (servers[i] && servers[i].AccessToken) withToken.push(servers[i]);
+                }
+                // Prefer the server whose stored address matches this page's origin.
+                var origin = location.origin.replace(/\/+$/, '').toLowerCase();
+                for (var j = 0; j < withToken.length; j++) {
+                    var s = withToken[j];
+                    var addrs = [s.ManualAddress, s.LocalAddress, s.RemoteAddress, s.Address];
+                    for (var k = 0; k < addrs.length; k++) {
+                        if (addrs[k] && addrs[k].replace(/\/+$/, '').toLowerCase() === origin) return s.AccessToken;
+                    }
+                }
+                return withToken.length > 0 ? withToken[0].AccessToken : null;
+            } catch (e) { /* no token */ }
+            return null;
+        }
+
+        var token = getToken();
+        if (!token) { leaveLoading(); show('signin'); return; }
+        var authHeader = 'MediaBrowser Token="' + token + '"';
+
+        function render(items) {
+            lastItems = items;
+            var counts = { 0: 0, 1: 0, 2: 0, 4: 0 };
+            items.forEach(function (i) { if (counts[i.StatusCode] !== undefined) counts[i.StatusCode]++; });
+
+            // A filter whose status has emptied out (e.g. downloads finished) falls back to all.
+            if (filter !== null && !counts[filter]) filter = null;
+
+            el('summary').innerHTML = FILTERS
+                .filter(function (f) { return f.code !== 4 || counts[4]; })
+                .map(function (f) {
+                    return '<button type="button" class="yta-q-pill" data-status="' + f.code + '"'
+                        + ' aria-pressed="' + (filter === f.code) + '"'
+                        + (counts[f.code] ? '' : ' disabled')
+                        + ' title="' + (filter === f.code ? 'Show everything' : 'Show only ' + f.label) + '">'
+                        + counts[f.code] + ' ' + f.label + '</button>';
+                }).join('');
+
+            var shown = filter === null ? items : items.filter(function (i) { return i.StatusCode === filter; });
+            if (!shown.length) {
+                var empty = filter === null ? 'The queue is empty.' : FILTERS.filter(function (f) { return f.code === filter; })[0].empty;
+                el('list').innerHTML = '<li class="yta-q-empty">' + esc(empty) + '</li>';
+            } else {
+                el('list').innerHTML = shown.map(function (i) {
+                    var sub = [i.Artist, i.Album].filter(Boolean).join(' \u00b7 ');
+                    sub = sub ? sub + ' \u00b7 ' + i.Source : i.Source;
+                    return '<li class="yta-q-row">'
+                        + '<div class="yta-q-main">'
+                        + '<div class="yta-q-title">' + esc(i.Title || 'Title not known yet') + '</div>'
+                        + '<div class="yta-q-sub">' + esc(sub) + '</div>'
+                        + '</div>'
+                        + '<span class="yta-q-status yta-q-s' + esc(i.StatusCode) + '">' + esc(i.Status) + '</span>'
+                        + '</li>';
+                }).join('');
+            }
+
+            el('updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+        }
+
+        // One listener for the pills, which are re-rendered on every refresh.
+        el('summary').addEventListener('click', function (e) {
+            var pill = e.target.closest('.yta-q-pill');
+            if (!pill || pill.disabled) return;
+            var code = parseInt(pill.getAttribute('data-status'), 10);
+            filter = filter === code ? null : code;
+            render(lastItems);
+        });
+
+        var timer = null;
+        function load(first) {
+            fetch(itemsUrl, { headers: { 'Authorization': authHeader, 'Accept': 'application/json' } })
+                .then(function (r) {
+                    if (r.status === 401) { leaveLoading(); hide('queue'); show('signin'); return null; }
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json();
+                })
+                .then(function (items) {
+                    if (items === null) { if (timer) clearInterval(timer); return; }
+                    leaveLoading();
+                    hide('unavailable');
+                    render(items || []);
+                    show('queue');
+                })
+                .catch(function () {
+                    // Keep showing the last good list on a failed refresh; only the first load reports it.
+                    if (first) { leaveLoading(); show('unavailable'); }
+                });
+        }
+
+        load(true);
+        timer = setInterval(function () { if (!document.hidden) load(false); }, REFRESH_MS);
+    })();
+</script>

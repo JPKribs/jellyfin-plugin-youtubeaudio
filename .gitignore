@@ -34,3 +34,7 @@ packages/
 
 # Rider
 *.sln.iml
+
+# Docker end-to-end test scratch folder (test library, server config, throwaway logins)
+e2e/.work/
+__pycache__/

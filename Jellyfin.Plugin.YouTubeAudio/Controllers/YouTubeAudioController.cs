@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.YouTubeAudio.Models;
 using Jellyfin.Plugin.YouTubeAudio.Services;
+using Jellyfin.Plugin.YouTubeAudio.Services.Playlists;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -24,6 +25,8 @@ public class YouTubeAudioController : ControllerBase
 {
     private readonly DownloadService _downloadService;
     private readonly LibraryService _libraryService;
+    private readonly PlaylistImportService _playlistImportService;
+    private readonly PlaylistSyncService _playlistSyncService;
     private readonly ILogger<YouTubeAudioController> _logger;
 
     /// <summary>
@@ -32,10 +35,14 @@ public class YouTubeAudioController : ControllerBase
     public YouTubeAudioController(
         DownloadService downloadService,
         LibraryService libraryService,
+        PlaylistImportService playlistImportService,
+        PlaylistSyncService playlistSyncService,
         ILogger<YouTubeAudioController> logger)
     {
+        _playlistSyncService = playlistSyncService;
         _downloadService = downloadService;
         _libraryService = libraryService;
+        _playlistImportService = playlistImportService;
         _logger = logger;
     }
 
@@ -66,6 +73,86 @@ public class YouTubeAudioController : ControllerBase
             _logger.LogError(ex, "Error in QueueUrl endpoint");
             return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
         }
+    }
+
+    /// <summary>
+    /// Lists the playlist export formats that can be imported.
+    /// </summary>
+    /// <returns>The supported playlist sources.</returns>
+    [HttpGet("Playlists/Sources")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<List<PlaylistSourceInfo>> GetPlaylistSources()
+        => Ok(_playlistImportService.GetSources());
+
+    /// <summary>
+    /// Queues every track in an uploaded playlist export. Each track's YouTube match is found
+    /// when it is downloaded. For a file holding several playlists, the first call returns them
+    /// for selection and the file is sent again with the chosen IDs.
+    /// </summary>
+    /// <param name="request">The uploaded export file.</param>
+    /// <returns>The source used and the created queue items.</returns>
+    [HttpPost("Queue/Playlist")]
+    [RequestSizeLimit(PlaylistImportService.MaxRequestBytes)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public ActionResult<PlaylistImportResult> QueuePlaylist([FromBody] PlaylistImportRequest request)
+    {
+        try
+        {
+            return Ok(_playlistImportService.Import(request));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { Error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in QueuePlaylist endpoint");
+            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+        }
+    }
+
+    /// <summary>
+    /// Lists the Jellyfin playlists being filled by playlist imports, with progress.
+    /// </summary>
+    /// <returns>The playlist targets.</returns>
+    [HttpGet("Playlists")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<List<PlaylistTargetDto>> GetPlaylistTargets()
+        => Ok(_playlistSyncService.GetTargets());
+
+    /// <summary>
+    /// Adds every pending playlist song that is now in the library, without waiting for a scan.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token tied to the HTTP request.</param>
+    /// <returns>The number of songs added.</returns>
+    [HttpPost("Playlists/Sync")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult> SyncPlaylists(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var added = await _playlistSyncService.SyncAsync(cancellationToken).ConfigureAwait(false);
+            return Ok(new { Added = added });
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Error in SyncPlaylists endpoint");
+            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+        }
+    }
+
+    /// <summary>
+    /// Stops filling a playlist. The Jellyfin playlist and its songs are kept.
+    /// </summary>
+    /// <param name="id">The playlist target ID.</param>
+    /// <returns>Success status.</returns>
+    [HttpDelete("Playlists/{id}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult DeletePlaylistTarget(string id)
+    {
+        _downloadService.DeletePlaylistTarget(id);
+        return Ok(new { Success = true });
     }
 
     /// <summary>
@@ -238,6 +325,9 @@ public class YouTubeAudioController : ControllerBase
             if (result.ImportedIds.Count > 0)
             {
                 _libraryService.QueueLibraryScan();
+
+                // The scan's ItemAdded events trigger the playlist sync; this is the fallback.
+                _playlistSyncService.RequestSync(TimeSpan.FromMinutes(2));
             }
 
             return Ok(result);

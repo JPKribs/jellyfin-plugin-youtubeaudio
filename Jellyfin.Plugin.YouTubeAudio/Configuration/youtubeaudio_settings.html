@@ -147,8 +147,9 @@
                         <div id="ytdlpContent" class="jpk-collapsible-content collapsed">
                             <div class="fieldDescription" style="margin-bottom: 12px;">
                                 <a href="https://github.com/yt-dlp/yt-dlp" target="_blank" style="color: var(--yta-accent);">yt-dlp</a>
-                                is automatically downloaded on first use.
-                                Only set a path below to override the bundled version.
+                                and the <a href="https://deno.com" target="_blank" style="color: var(--yta-accent);">Deno</a> runtime it needs for YouTube
+                                are downloaded into the plugin folder automatically, and yt-dlp is kept up to date (checked every 12 hours).
+                                Only set a path below to use your own yt-dlp instead.
                             </div>
                             <div class="inputContainer">
                                 <label for="txtYtDlpPath">yt-dlp Path Override:</label>
@@ -163,7 +164,7 @@
                             </button>
                             <div class="fieldDescription" style="margin-top: 16px;">
                                 YouTube changes frequently and old yt-dlp versions stop working.
-                                If downloads start failing, update yt-dlp to the latest release.
+                                To update right away instead of waiting for the next check, use this button.
                             </div>
                             <button is="emby-button" type="button" id="btnUpdateYtDlp" class="raised jpk-button-submit jpk-button-small" style="margin-top: 8px;">
                                 <span>Update yt-dlp</span>

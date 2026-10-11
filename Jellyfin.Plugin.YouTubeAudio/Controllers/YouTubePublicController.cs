@@ -9,6 +9,7 @@ using Jellyfin.Data;
 using Jellyfin.Database.Implementations.Enums;
 using Jellyfin.Plugin.YouTubeAudio.Models;
 using Jellyfin.Plugin.YouTubeAudio.Services;
+using Jellyfin.Plugin.YouTubeAudio.Services.Playlists;
 using JPKribs.Jellyfin.Base;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Library;
@@ -31,6 +32,7 @@ public class YouTubePublicController : ControllerBase
     private const string UserIdClaim = "Jellyfin-UserId";
 
     private static string? _pageHtml;
+    private static string? _queuePageHtml;
 
     private static readonly object _faviconLock = new();
     private static bool _faviconResolved;
@@ -39,6 +41,7 @@ public class YouTubePublicController : ControllerBase
 
     private readonly DownloadService _downloadService;
     private readonly LibraryService _libraryService;
+    private readonly PlaylistImportService _playlistImportService;
     private readonly IUserManager _userManager;
     private readonly IServerApplicationPaths _paths;
     private readonly ILogger<YouTubePublicController> _logger;
@@ -48,18 +51,21 @@ public class YouTubePublicController : ControllerBase
     /// </summary>
     /// <param name="downloadService">The download service.</param>
     /// <param name="libraryService">The library service, used for artist and album lookups.</param>
+    /// <param name="playlistImportService">The playlist import service, used for source names on the queue page.</param>
     /// <param name="userManager">The user manager.</param>
     /// <param name="paths">The server application paths, used to locate the web client favicon.</param>
     /// <param name="logger">The logger.</param>
     public YouTubePublicController(
         DownloadService downloadService,
         LibraryService libraryService,
+        PlaylistImportService playlistImportService,
         IUserManager userManager,
         IServerApplicationPaths paths,
         ILogger<YouTubePublicController> logger)
     {
         _downloadService = downloadService;
         _libraryService = libraryService;
+        _playlistImportService = playlistImportService;
         _userManager = userManager;
         _paths = paths;
         _logger = logger;
@@ -84,6 +90,42 @@ public class YouTubePublicController : ControllerBase
             ["CONTENT"] = GetContentFragment()
         });
         return Content(html, "text/html");
+    }
+
+    /// <summary>Serves the public, read-only queue page (static HTML; requires a signed-in user client-side).</summary>
+    /// <returns>The HTML page.</returns>
+    [HttpGet("Queue")]
+    [AllowAnonymous]
+    [Produces("text/html")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ContentResult QueuePage()
+    {
+        ApplyHardeningHeaders();
+        var html = TemplateLoader.Fill("status", new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["TITLE"] = "Queue",
+            ["HEADING"] = "Loading…",
+            ["MESSAGE"] = string.Empty,
+            ["SPINNER"] = "<div class=\"jpk-spinner\" role=\"status\" aria-label=\"Loading\"></div>",
+            ["BUTTON"] = string.Empty,
+            ["CONTENT"] = _queuePageHtml ??= ReadResource("youtubeaudio_queue_public.html", "Queue page unavailable.")
+        });
+        return Content(html, "text/html");
+    }
+
+    /// <summary>
+    /// Lists the download queue, read-only, for any signed-in user. Titles, artists, albums and
+    /// status only; no URLs, file names or error details.
+    /// </summary>
+    /// <returns>The queue, oldest first.</returns>
+    [HttpGet("Queue/Items")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<List<PublicQueueItem>> QueueItems()
+    {
+        ApplyHardeningHeaders();
+        var sourceNames = _playlistImportService.GetSources().ToDictionary(s => s.Id, s => s.Name, StringComparer.Ordinal);
+        return Ok(_downloadService.GetPublicQueue(sourceNames));
     }
 
     /// <summary>Serves the web client's favicon so the page can reuse the server's real icon at a stable path.</summary>
@@ -236,23 +278,20 @@ public class YouTubePublicController : ControllerBase
     }
 
     private static string GetContentFragment()
-    {
-        if (_pageHtml is not null)
-        {
-            return _pageHtml;
-        }
+        => _pageHtml ??= ReadResource("youtubeaudio_download_public.html", "Download page unavailable.");
 
+    private static string ReadResource(string fileName, string fallback)
+    {
         var assembly = typeof(Plugin).Assembly;
-        var resourceName = typeof(Plugin).Namespace + ".Configuration.youtubeaudio_download_public.html";
+        var resourceName = typeof(Plugin).Namespace + ".Configuration." + fileName;
         using var stream = assembly.GetManifestResourceStream(resourceName);
         if (stream is null)
         {
-            return "<!DOCTYPE html><html><body>Download page unavailable.</body></html>";
+            return "<!DOCTYPE html><html><body>" + fallback + "</body></html>";
         }
 
         using var reader = new StreamReader(stream);
-        _pageHtml = reader.ReadToEnd();
-        return _pageHtml;
+        return reader.ReadToEnd();
     }
 
     private (byte[] Bytes, string ContentType)? GetFavicon()

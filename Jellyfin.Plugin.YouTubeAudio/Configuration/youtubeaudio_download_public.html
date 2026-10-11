@@ -1,5 +1,15 @@
 <!-- Content fragment injected into the base JPKribs.Jellyfin.Base status card. -->
 <link rel="stylesheet" href="../web/configurationpage?name=youtubeaudio_jpkribs_shared.css" />
+<style>
+    /* The status line only takes space when it has something to say. */
+    .yta-msg { font-size: 0.9rem; }
+    .yta-msg:not(:empty) { margin-top: 12px; }
+    .yta-warn { margin-top: 16px; }
+    /* Outlined secondary button: full width like Submit, without competing with it. */
+    .yta-secondary { display: block; box-sizing: border-box; width: 100%; margin-top: 12px; padding: 0.8em; border-radius: 8px;
+        border: 1px solid rgba(255,255,255,0.25); color: #fff; font-size: 0.95rem; font-weight: 600; text-align: center; text-decoration: none; }
+    .yta-secondary:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.4); }
+</style>
 
 <div id="signin" class="hidden">
     <h1>Sign in required</h1>
@@ -40,8 +50,9 @@
     </div>
 
     <button type="submit" id="submit" class="jpk-submit">Submit</button>
-    <div id="msg" style="margin-top:14px;font-size:0.9rem;min-height:1.2em"></div>
-    <div class="jpk-warn" style="margin-top:16px">Lyrics videos or videos without prologues and epilogues are preferred.</div>
+    <div id="msg" class="yta-msg"></div>
+    <div class="jpk-warn yta-warn">Lyrics videos or videos without prologues and epilogues are preferred.</div>
+    <a id="queueLink" class="yta-secondary" href="Queue">View the Queue</a>
 </form>
 
 <script>
@@ -74,6 +85,7 @@
         }
 
         ['signinLink', 'deniedLink'].forEach(function (id) { var a = el(id); if (a) a.href = root; });
+        el('queueLink').href = prefix + '/YouTube/Queue';
 
         fetch(prefix + '/System/Info/Public', { headers: { 'Accept': 'application/json' } })
             .then(function (r) { return r.json(); })

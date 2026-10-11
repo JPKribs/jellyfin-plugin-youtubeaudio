@@ -9,6 +9,9 @@ export default function (view) {
     });
 
     var _allItems = [];
+    var _sourceNames = {};
+    var _pendingUpload = null;
+    var _ownerSelector = null;
     var _pollInterval = null;
     var _processingGraceUntil = 0;
 
@@ -53,9 +56,8 @@ export default function (view) {
 
             // Search filter
             if (searchVal) {
-                var title = (item.Title || '').toLowerCase();
-                var url = (item.Url || '').toLowerCase();
-                if (title.indexOf(searchVal) === -1 && url.indexOf(searchVal) === -1) return false;
+                var haystack = [item.Title, item.Artist, item.Url].join(' ').toLowerCase();
+                if (haystack.indexOf(searchVal) === -1) return false;
             }
 
             return true;
@@ -149,6 +151,25 @@ export default function (view) {
     function renderRow(item) {
         var esc = Shared.escapeHtml;
         var displayTitle = item.Title || item.Url;
+        var subText = item.Url;
+
+        // Playlist-imported tracks show their artist, and have no URL until their YouTube match
+        // is found at download time.
+        if (item.Source) {
+            if (item.Artist) displayTitle = item.Artist + ' \u2013 ' + displayTitle;
+            var sourceName = _sourceNames[item.Source] || item.Source;
+            subText = item.Url
+                ? sourceName + ' \u00b7 ' + item.Url
+                : sourceName + ' \u00b7 YouTube match is found when downloaded';
+        }
+
+        var matchNote = '';
+        if (item.MatchNote && item.StatusCode !== 4) {
+            matchNote = '<div class="yta-match-note" title="' + esc(item.MatchNote) + '">' + esc(item.MatchNote) + '</div>';
+        }
+        if (item.ReplacesFileCount > 0) {
+            matchNote += '<div class="jpk-table-item-sub">Replaces the single already in your library when imported.</div>';
+        }
 
         var errorPreview = '';
         if (item.StatusCode === 4 && item.ErrorMessage) {
@@ -163,8 +184,9 @@ export default function (view) {
             + '</div>'
             + '<div class="jpk-table-cell">'
             + '<div class="jpk-table-item-info">'
-            + '<div class="jpk-table-item-title" title="' + esc(item.Url) + '">' + esc(displayTitle) + '</div>'
-            + '<div class="jpk-table-item-sub">' + esc(item.Url) + '</div>'
+            + '<div class="jpk-table-item-title" title="' + esc(subText) + '">' + esc(displayTitle) + '</div>'
+            + '<div class="jpk-table-item-sub">' + esc(subText) + '</div>'
+            + matchNote
             + errorPreview
             + '</div>'
             + '</div>'
@@ -251,6 +273,230 @@ export default function (view) {
             });
     }
 
+    // loadPlaylistSources
+    // Fetches the supported playlist export formats and lists how to produce each one.
+    //
+    // No parameters
+    function loadPlaylistSources() {
+        Shared.apiRequest('Playlists/Sources', 'GET')
+            .then(function(sources) {
+                sources = sources || [];
+                var extensions = [];
+                var lines = [];
+                sources.forEach(function(source) {
+                    _sourceNames[source.Id] = source.Name;
+                    (source.Extensions || []).forEach(function(ext) {
+                        if (extensions.indexOf(ext) === -1) extensions.push(ext);
+                    });
+                    lines.push('<strong>' + Shared.escapeHtml(source.Name) + ':</strong> ' + Shared.escapeHtml(source.Instructions));
+                });
+
+                var el = Shared.getEl('playlistSources');
+                if (el) el.innerHTML = lines.join('<br>');
+
+                var input = Shared.getEl('filePlaylist');
+                if (input && extensions.length) input.setAttribute('accept', extensions.join(','));
+
+                renderQueue();
+            })
+            .catch(function() { /* the import still works; only the instructions are missing */ });
+    }
+
+    // readFileAsBase64
+    // Reads a file's raw bytes as base64 so the server can detect its text encoding (the Music
+    // app writes UTF-16), rather than letting the browser decode it as UTF-8.
+    //
+    // Param: file | the File from the input
+    function readFileAsBase64(file) {
+        return new Promise(function(resolve, reject) {
+            var reader = new FileReader();
+            reader.onload = function() {
+                var result = String(reader.result || '');
+                resolve(result.substring(result.indexOf(',') + 1));
+            };
+            reader.onerror = function() { reject(reader.error); };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // resetPlaylistImport
+    // Clears the pending upload and the playlist picker, e.g. after a new file is chosen.
+    //
+    // No parameters
+    function resetPlaylistImport() {
+        _pendingUpload = null;
+        var choices = Shared.getEl('playlistChoices');
+        if (choices) {
+            choices.hidden = true;
+            choices.innerHTML = '';
+        }
+
+        var btn = Shared.getEl('btnImportPlaylist');
+        if (btn) btn.querySelector('span').textContent = 'Queue Playlist';
+    }
+
+    // renderPlaylistChoices
+    // Shows a checkbox per playlist when the file holds several (a library export).
+    //
+    // Param: playlists | the PlaylistChoice list from the server
+    function renderPlaylistChoices(playlists) {
+        var esc = Shared.escapeHtml;
+        var choices = Shared.getEl('playlistChoices');
+        if (!choices) return;
+
+        // Everything is ticked by default: a library upload downloads every song and recreates
+        // every playlist unless something is unticked.
+        var html = '<div class="fieldDescription">This file holds ' + playlists.length + ' playlists. Untick any you don\'t want:</div>';
+        playlists.forEach(function(p) {
+            var label = esc(p.Name) + ' (' + p.TrackCount + ' track' + (p.TrackCount !== 1 ? 's' : '') + ')';
+            if (p.IsLibrary) label += ' \u2014 songs only, no playlist';
+            html += '<label class="emby-checkbox-label">'
+                + '<input type="checkbox" is="emby-checkbox" class="yta-playlist-choice" value="' + esc(p.Id) + '" checked />'
+                + '<span class="checkboxLabel">' + label + '</span>'
+                + '</label>';
+        });
+        choices.innerHTML = html;
+        choices.hidden = false;
+
+        var btn = Shared.getEl('btnImportPlaylist');
+        if (btn) {
+            btn.querySelector('span').textContent = 'Queue Selected';
+            btn.disabled = false;
+        }
+
+        choices.querySelectorAll('.yta-playlist-choice').forEach(function(cb) {
+            cb.addEventListener('change', function() {
+                if (btn) btn.disabled = !choices.querySelector('.yta-playlist-choice:checked');
+            });
+        });
+    }
+
+    // importPlaylist
+    // Uploads the chosen playlist export and queues its tracks. A file holding several
+    // playlists comes back for selection first; the same upload is then resent with the picks.
+    //
+    // No parameters
+    function importPlaylist() {
+        var input = Shared.getEl('filePlaylist');
+        var file = input && input.files && input.files[0];
+        if (!file) {
+            Shared.setStatus('queueStatus', 'Choose a playlist export file first.', true);
+            return;
+        }
+
+        var btn = Shared.getEl('btnImportPlaylist');
+        if (btn) btn.disabled = true;
+
+        var playlistIds = [];
+        view.querySelectorAll('.yta-playlist-choice:checked').forEach(function(cb) { playlistIds.push(cb.value); });
+
+        var upload = _pendingUpload
+            ? Promise.resolve(_pendingUpload)
+            : readFileAsBase64(file).then(function(content) {
+                _pendingUpload = { FileName: file.name, Content: content };
+                return _pendingUpload;
+            });
+
+        Shared.setStatus('queueStatus', 'Reading ' + file.name + '...', false);
+
+        upload
+            .then(function(body) {
+                return Shared.apiRequest('Queue/Playlist', 'POST', {
+                    FileName: body.FileName,
+                    Content: body.Content,
+                    PlaylistIds: playlistIds,
+                    UserId: _ownerSelector ? _ownerSelector.getValue() : ''
+                });
+            })
+            .then(function(result) {
+                if (result && result.NeedsSelection) {
+                    Shared.setStatus('queueStatus', '', false);
+                    renderPlaylistChoices(result.Playlists || []);
+                    return;
+                }
+
+                var count = (result && result.Items) ? result.Items.length : 0;
+                var msg = 'Added ' + count + ' track' + (count !== 1 ? 's' : '') + ' from ' + ((result && result.Source) || 'the playlist');
+                if (result && result.PlaylistName) msg += ' (' + result.PlaylistName + ')';
+                msg += '.';
+                var left = [];
+                if (result && result.AlreadyInLibrary) left.push(result.AlreadyInLibrary + ' already in your library');
+                if (result && result.AlreadyQueued) left.push(result.AlreadyQueued + ' already queued');
+                if (result && result.DuplicateTracks) left.push(result.DuplicateTracks + ' duplicate or lesser version(s)');
+                if (left.length) msg += ' Left out ' + left.join(', ') + '.';
+                if (result && result.LibraryUpgrades) msg += ' ' + result.LibraryUpgrades + ' will replace a single in your library with the album version.';
+                if (result && result.PlaylistsTracked) msg += ' ' + result.PlaylistsTracked + ' playlist' + (result.PlaylistsTracked !== 1 ? 's' : '') + ' will fill in as songs reach the library.';
+                if (result && result.SkippedRows) msg += ' Skipped ' + result.SkippedRows + ' entr' + (result.SkippedRows !== 1 ? 'ies' : 'y') + ' with no title.';
+                Shared.setStatus('queueStatus', msg, false);
+                input.value = '';
+                resetPlaylistImport();
+                loadQueue();
+                loadPlaylistTargets();
+            })
+            .catch(function(err) {
+                Shared.setStatus('queueStatus', (err && err.Error) || 'Failed to import the playlist.', true);
+                if (btn) btn.disabled = false;
+            });
+    }
+
+    // loadPlaylistTargets
+    // Shows the Jellyfin playlists being filled by imports and how many songs each has so far.
+    //
+    // No parameters
+    function loadPlaylistTargets() {
+        Shared.apiRequest('Playlists', 'GET')
+            .then(function(targets) {
+                targets = targets || [];
+                var section = Shared.getEl('playlistTargetsSection');
+                var body = Shared.getEl('playlistTargets');
+                if (!section || !body) return;
+
+                section.hidden = targets.length === 0;
+                var esc = Shared.escapeHtml;
+                body.innerHTML = targets.map(function(t) {
+                    var state = (t.Total - t.Added) + ' waiting for download or import';
+                    return '<div class="jpk-table-row">'
+                        + '<div class="jpk-table-cell"><div class="jpk-table-item-info">'
+                        + '<div class="jpk-table-item-title">' + esc(t.Name) + '</div>'
+                        + '<div class="jpk-table-item-sub">' + esc(t.UserName) + ' \u00b7 ' + t.Added + ' of ' + t.Total + ' songs \u00b7 ' + esc(state) + '</div>'
+                        + '</div></div>'
+                        + '<div class="jpk-table-cell jpk-table-cell-status">'
+                        + '<button is="emby-button" type="button" class="raised jpk-button-destructive yta-playlist-forget" data-id="' + esc(t.Id) + '" title="Stop adding songs; the Jellyfin playlist is kept"><span>Stop</span></button>'
+                        + '</div></div>';
+                }).join('');
+
+                body.querySelectorAll('.yta-playlist-forget').forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        if (!confirm('Stop adding songs to this playlist? The Jellyfin playlist and its songs are kept.')) return;
+                        Shared.apiRequest('Playlists/' + encodeURIComponent(btn.getAttribute('data-id')), 'DELETE')
+                            .then(loadPlaylistTargets);
+                    });
+                });
+            })
+            .catch(function() { /* playlist progress is informational */ });
+    }
+
+    // syncPlaylists
+    // Adds pending playlist songs that are already in the library, without waiting for a scan.
+    //
+    // No parameters
+    function syncPlaylists() {
+        var btn = Shared.getEl('btnSyncPlaylists');
+        if (btn) btn.classList.add('spinning');
+        Shared.apiRequest('Playlists/Sync', 'POST')
+            .then(function(result) {
+                var added = (result && result.Added) || 0;
+                Shared.setStatus('queueStatus', 'Added ' + added + ' song' + (added !== 1 ? 's' : '') + ' to playlists.', false);
+            })
+            .catch(function() {
+                Shared.setStatus('queueStatus', 'Playlist sync failed.', true);
+            })
+            .then(function() {
+                if (btn) btn.classList.remove('spinning');
+                loadPlaylistTargets();
+            });
+    }
+
     function processQueue() {
         var checkboxes = view.querySelectorAll('.yta-queue-check:checked');
         var selectedIds = [];
@@ -283,6 +529,8 @@ export default function (view) {
         _sharedPromise.then(function() {
             LibraryMenu.setTabs('youtubeaudio', 0, getTabs);
             loadQueue();
+            loadPlaylistSources();
+            loadPlaylistTargets();
         });
     });
 
@@ -300,8 +548,36 @@ export default function (view) {
             dlLink.href = origin.replace(/\/+$/, '') + '/YouTube/Download';
         }
 
+        var queueLink = Shared.getEl('publicQueueUrl');
+        if (queueLink) {
+            var queueOrigin = (window.ApiClient && ApiClient.serverAddress) ? ApiClient.serverAddress() : window.location.origin;
+            queueLink.href = queueOrigin.replace(/\/+$/, '') + '/YouTube/Queue';
+        }
+
         var btnQueue = Shared.getEl('btnQueue');
         if (btnQueue) btnQueue.addEventListener('click', queueUrl);
+
+        var ownerContainer = Shared.getEl('playlistOwner');
+        if (ownerContainer && !_ownerSelector) {
+            _ownerSelector = Shared.createUserSelector({
+                emptyLabel: "Don't create playlists",
+                value: (window.ApiClient && ApiClient.getCurrentUserId) ? ApiClient.getCurrentUserId() : ''
+            });
+            ownerContainer.appendChild(_ownerSelector.element);
+        }
+
+        var btnSyncPlaylists = Shared.getEl('btnSyncPlaylists');
+        if (btnSyncPlaylists) btnSyncPlaylists.addEventListener('click', syncPlaylists);
+
+        var playlistInput = Shared.getEl('filePlaylist');
+        var btnImportPlaylist = Shared.getEl('btnImportPlaylist');
+        if (playlistInput && btnImportPlaylist) {
+            playlistInput.addEventListener('change', function() {
+                resetPlaylistImport();
+                btnImportPlaylist.disabled = !(playlistInput.files && playlistInput.files.length);
+            });
+            btnImportPlaylist.addEventListener('click', importPlaylist);
+        }
 
         var btnProcess = Shared.getEl('btnProcess');
         if (btnProcess) btnProcess.addEventListener('click', processQueue);

@@ -12,6 +12,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.YouTubeAudio.Configuration;
 using Jellyfin.Plugin.YouTubeAudio.Models;
+using Jellyfin.Plugin.YouTubeAudio.Services.Playlists;
 using MediaBrowser.Controller.MediaEncoding;
 using Microsoft.Extensions.Logging;
 using YoutubeDLSharp;
@@ -26,6 +27,25 @@ namespace Jellyfin.Plugin.YouTubeAudio.Services;
 public sealed class DownloadService : IDisposable
 {
     private static readonly HttpClient _httpClient = new();
+
+    // Reads GitHub's "latest release" redirect to learn the newest yt-dlp version without downloading it.
+    private static readonly HttpClient _noRedirectClient = new(new HttpClientHandler { AllowAutoRedirect = false, CheckCertificateRevocationList = true });
+
+    private static readonly string[] _commonDenoPaths = ["/opt/homebrew/bin/deno", "/usr/local/bin/deno", "/usr/bin/deno"];
+
+    // How often the plugin-managed yt-dlp is checked for a newer release. YouTube changes often and
+    // an outdated yt-dlp gets HTTP 403 for every download.
+    private static readonly TimeSpan _ytDlpUpdateInterval = TimeSpan.FromHours(12);
+
+    // Waits before retrying a download or search that failed for a transient reason.
+    private static readonly TimeSpan[] _retryDelays = [TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(10)];
+
+    // yt-dlp error text that marks a failure worth retrying (throttling, server or network hiccups).
+    private static readonly string[] _transientErrorMarkers =
+    [
+        "HTTP Error 403", "HTTP Error 429", "HTTP Error 500", "HTTP Error 502", "HTTP Error 503", "HTTP Error 504",
+        "timed out", "Connection reset", "Temporary failure", "Unable to download webpage", "unable to download video data"
+    ];
     private static readonly string[] _selfUpdateArgs = ["-U"];
     private static readonly string[] _versionArgs = ["--version"];
     private static readonly char[] _newlineChars = ['\r', '\n'];
@@ -35,6 +55,7 @@ public sealed class DownloadService : IDisposable
     private readonly IMediaEncoder _mediaEncoder;
     [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed", Justification = "Disposed in Dispose() method")]
     private readonly SemaphoreSlim _downloadLock = new(1, 1);
+    private DateTime _lastYtDlpUpdateCheckUtc = DateTime.MinValue;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DownloadService"/> class.
@@ -95,7 +116,7 @@ public sealed class DownloadService : IDisposable
             {
                 await EnsureYtDlpAsync().ConfigureAwait(false);
                 var ytdl = CreateYoutubeDL();
-                var fetchResult = await ytdl.RunVideoDataFetch(url, cancellationToken).ConfigureAwait(false);
+                var fetchResult = await ytdl.RunVideoDataFetch(url, cancellationToken, overrideOptions: await CreateToolOptionsAsync().ConfigureAwait(false)).ConfigureAwait(false);
 
                 if (fetchResult.Success && fetchResult.Data?.Entries != null)
                 {
@@ -157,8 +178,51 @@ public sealed class DownloadService : IDisposable
     }
 
     /// <summary>
+    /// Queues tracks read from a playlist export. Each item starts without a URL; its YouTube
+    /// match is searched for when it is downloaded, so a large playlist queues instantly. The
+    /// source's title, artist, album and year are authoritative and never cleaned.
+    /// </summary>
+    /// <param name="source">The playlist source ID.</param>
+    /// <param name="tracks">The parsed tracks.</param>
+    /// <returns>The created queue items.</returns>
+    public List<QueueItemDto> QueuePlaylistTracks(string source, IReadOnlyList<PlaylistTrack> tracks)
+    {
+        ArgumentNullException.ThrowIfNull(tracks);
+
+        var ext = Config.AudioFormat.ToFileExtension();
+        var db = _dbProvider.Database;
+        var now = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
+        var created = new List<QueueItemDto>(tracks.Count);
+
+        foreach (var track in tracks)
+        {
+            var item = new QueueItem
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Url = string.Empty,
+                Title = track.Title,
+                UserTitled = true,
+                FileName = Guid.NewGuid().ToString("N") + ext,
+                Status = QueueStatus.Queued,
+                CreatedAt = now,
+                UpdatedAt = now,
+                Artist = track.Artist,
+                Album = track.Album,
+                Year = track.Year,
+                Source = source,
+                SourceTrack = track
+            };
+            db.AddItem(item);
+            created.Add(item.ToDto());
+        }
+
+        return created;
+    }
+
+    /// <summary>
     /// Processes queued items by downloading them.
-    /// When ids is provided, only those items are processed. Otherwise all queued items are processed.
+    /// When ids is provided, only those items are processed, and selected items that previously
+    /// failed are retried. Otherwise all queued items are processed.
     /// </summary>
     public async Task ProcessQueueAsync(CancellationToken cancellationToken, IReadOnlyList<string>? ids = null)
     {
@@ -171,6 +235,14 @@ public sealed class DownloadService : IDisposable
             foreach (var id in ids)
             {
                 var item = db.GetItemById(id);
+                if (item?.Status == QueueStatus.Error)
+                {
+                    // Selecting a failed item and starting it again is how it is retried.
+                    db.UpdateStatus(item.Id, QueueStatus.Queued);
+                    item.Status = QueueStatus.Queued;
+                    item.ErrorMessage = null;
+                }
+
                 if (item != null && item.Status == QueueStatus.Queued)
                 {
                     queuedItems.Add(item);
@@ -191,8 +263,11 @@ public sealed class DownloadService : IDisposable
         await _downloadLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            // Auto-download yt-dlp if not available
+            // Provision yt-dlp (and keep the plugin-managed copy current) plus the Deno runtime it
+            // needs for YouTube, before any download starts.
             await EnsureYtDlpAsync().ConfigureAwait(false);
+            await UpdateManagedYtDlpIfDueAsync().ConfigureAwait(false);
+            var toolOptions = await CreateToolOptionsAsync().ConfigureAwait(false);
 
             var cacheDir = _dbProvider.GetAudioCacheDirectory();
             var ytdl = CreateYoutubeDL();
@@ -217,6 +292,12 @@ public sealed class DownloadService : IDisposable
 
                 try
                 {
+                    // Playlist-imported tracks have no URL yet: find the YouTube upload first.
+                    if (string.IsNullOrEmpty(item.Url) && !await ResolvePlaylistTrackAsync(ytdl, toolOptions, item, cancellationToken).ConfigureAwait(false))
+                    {
+                        continue;
+                    }
+
                     var outputPath = Path.Combine(cacheDir, item.FileName);
                     var nameWithoutExt = Path.GetFileNameWithoutExtension(item.FileName);
 
@@ -229,13 +310,15 @@ public sealed class DownloadService : IDisposable
                         NoPlaylist = true,
                         Output = Path.Combine(cacheDir, nameWithoutExt + ".%(ext)s")
                     };
+                    options = options.OverrideOptions(toolOptions);
 
                     var format = MapToAudioConversionFormat(Config.AudioFormat);
-                    var runResult = await ytdl.RunAudioDownload(
-                        item.Url,
-                        format,
-                        ct: cancellationToken,
-                        overrideOptions: options).ConfigureAwait(false);
+                    var runResult = await RunWithRetriesAsync(
+                        () => ytdl.RunAudioDownload(item.Url, format, ct: cancellationToken, overrideOptions: options),
+                        result => result.Success,
+                        result => result.ErrorOutput,
+                        "download " + item.Url,
+                        cancellationToken).ConfigureAwait(false);
 
                     if (runResult.Success)
                     {
@@ -298,6 +381,99 @@ public sealed class DownloadService : IDisposable
     }
 
     /// <summary>
+    /// Searches YouTube for a playlist-imported track and records the best match on the item.
+    /// Marks the item as Error and returns false when nothing acceptable is found.
+    /// </summary>
+    private async Task<bool> ResolvePlaylistTrackAsync(YoutubeDL ytdl, OptionSet toolOptions, QueueItem item, CancellationToken cancellationToken)
+    {
+        var db = _dbProvider.Database;
+        var track = item.SourceTrack;
+        if (track == null)
+        {
+            db.UpdateStatus(item.Id, QueueStatus.Error, "This item has no YouTube URL or track details to search for.");
+            return false;
+        }
+
+        var query = YouTubeMatcher.BuildSearchQuery(track);
+        var search = await RunWithRetriesAsync(
+            () => ytdl.RunVideoDataFetch($"ytsearch{YouTubeMatcher.SearchResultCount}:{query}", cancellationToken, flat: true, overrideOptions: toolOptions),
+            result => result.Success,
+            result => result.ErrorOutput,
+            "search " + query,
+            cancellationToken).ConfigureAwait(false);
+
+        if (!search.Success)
+        {
+            var errors = string.Join("; ", search.ErrorOutput ?? Array.Empty<string>());
+            db.UpdateStatus(item.Id, QueueStatus.Error, "YouTube search failed: " + errors);
+            _logger.LogWarning("YouTube search failed for {Query}: {Errors}", SanitizeForLog(query), errors);
+            return false;
+        }
+
+        var candidates = (search.Data?.Entries ?? Array.Empty<YoutubeDLSharp.Metadata.VideoData>())
+            .Where(entry => !string.IsNullOrEmpty(entry.ID))
+            .Select(entry => new MatchCandidate(entry.ID, entry.Title ?? string.Empty, entry.Channel ?? entry.Uploader, entry.Duration));
+
+        var match = YouTubeMatcher.PickBest(track, candidates);
+        if (match == null)
+        {
+            db.UpdateStatus(item.Id, QueueStatus.Error, $"No matching YouTube upload found for \"{query}\".");
+            _logger.LogInformation("No YouTube match for {Query}", SanitizeForLog(query));
+            return false;
+        }
+
+        var url = "https://www.youtube.com/watch?v=" + match.Candidate.Id;
+        var note = YouTubeMatcher.DescribeConcerns(match);
+        db.UpdateResolvedUrl(item.Id, url, note);
+        item.Url = url;
+        item.MatchNote = note;
+        _logger.LogInformation("Matched {Query} to {Url} ({Title})", SanitizeForLog(query), url, SanitizeForLog(match.Candidate.Title));
+        return true;
+    }
+
+    /// <summary>
+    /// Runs a yt-dlp call, retrying with a short backoff when it fails for a transient reason
+    /// (YouTube throttling with 403/429, server errors, network hiccups). Permanent failures, such
+    /// as a removed video, are returned straight away.
+    /// </summary>
+    private async Task<T> RunWithRetriesAsync<T>(
+        Func<Task<T>> run,
+        Func<T, bool> succeeded,
+        Func<T, IEnumerable<string>?> errors,
+        string what,
+        CancellationToken cancellationToken)
+    {
+        var result = await run().ConfigureAwait(false);
+        foreach (var delay in _retryDelays)
+        {
+            if (succeeded(result) || !IsTransientFailure(errors(result)))
+            {
+                break;
+            }
+
+            _logger.LogInformation("Retrying {What} in {Seconds}s after a transient failure", SanitizeForLog(what), delay.TotalSeconds);
+            await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+            result = await run().ConfigureAwait(false);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Returns whether yt-dlp's error output describes a failure worth retrying.
+    /// </summary>
+    internal static bool IsTransientFailure(IEnumerable<string>? errorOutput)
+    {
+        if (errorOutput == null)
+        {
+            return false;
+        }
+
+        var text = string.Join(' ', errorOutput);
+        return _transientErrorMarkers.Any(marker => text.Contains(marker, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
     /// Starts processing the given queue items in the background. Nothing awaits the result, so
     /// failures that abort the whole run (e.g. yt-dlp could not be provisioned) are surfaced by
     /// marking the affected items as Error instead of disappearing with the discarded task.
@@ -334,6 +510,59 @@ public sealed class DownloadService : IDisposable
                 }
             }
         });
+    }
+
+    /// <summary>
+    /// Stops tracking a playlist target.
+    /// </summary>
+    public void DeletePlaylistTarget(string id) => _dbProvider.Database.DeletePlaylistTarget(id);
+
+    /// <summary>
+    /// Lists queued tracks for duplicate detection.
+    /// </summary>
+    public List<QueuedTrack> GetQueuedTracks()
+        => _dbProvider.Database.GetAllItems()
+            .Where(item => !string.IsNullOrWhiteSpace(item.Title))
+            .Select(item => new QueuedTrack
+            {
+                Id = item.Id,
+                Title = item.Title!,
+                Artist = item.Artist,
+                Status = item.Status,
+                ReleaseType = item.SourceTrack?.ReleaseType
+            })
+            .ToList();
+
+    /// <summary>
+    /// Gets the queue as the public, read-only page shows it: oldest first, without URLs or
+    /// error details.
+    /// </summary>
+    /// <param name="sourceNames">Display names for playlist source IDs.</param>
+    public List<PublicQueueItem> GetPublicQueue(IReadOnlyDictionary<string, string> sourceNames)
+    {
+        ArgumentNullException.ThrowIfNull(sourceNames);
+
+        return _dbProvider.Database.GetAllItems()
+            .Where(item => item.Status != QueueStatus.Imported)
+            .OrderBy(item => item.CreatedAt, StringComparer.Ordinal)
+            .Select(item => new PublicQueueItem
+            {
+                Title = item.Title,
+                Artist = item.Artist,
+                Album = item.Album,
+                StatusCode = (int)item.Status,
+                Status = item.Status switch
+                {
+                    QueueStatus.Queued => "Waiting to download",
+                    QueueStatus.Downloading => "Downloading",
+                    QueueStatus.Downloaded => "Downloaded, not yet added",
+                    QueueStatus.Error => "Could not be downloaded",
+                    _ => item.Status.ToString()
+                },
+                Source = item.Source == null ? "YouTube" : sourceNames.GetValueOrDefault(item.Source) ?? item.Source,
+                CreatedAt = item.CreatedAt
+            })
+            .ToList();
     }
 
     /// <summary>
@@ -463,7 +692,8 @@ public sealed class DownloadService : IDisposable
         var hasMetadata = !string.IsNullOrWhiteSpace(item.Artist)
             || !string.IsNullOrWhiteSpace(item.Album)
             || item.Year.HasValue
-            || !string.IsNullOrWhiteSpace(item.Title);
+            || !string.IsNullOrWhiteSpace(item.Title)
+            || item.SourceTrack != null;
         if (!hasMetadata)
         {
             return;
@@ -500,12 +730,66 @@ public sealed class DownloadService : IDisposable
                 tagFile.Tag.Year = (uint)item.Year.Value;
             }
 
+            if (item.SourceTrack != null)
+            {
+                ApplySourceTrackTags(tagFile.Tag, item.SourceTrack);
+            }
+
             tagFile.Save();
             _logger.LogInformation("Applied submitted metadata to {FileName}", item.FileName);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to apply submitted metadata to {FileName}", item.FileName);
+        }
+    }
+
+    /// <summary>
+    /// Writes the playlist export's extra fields (beyond title, artist, album and year). Only
+    /// fields the source provided are written. The album artist replaces the track artist that
+    /// was written as album artist, so compilations file under "Various Artists".
+    /// </summary>
+    internal static void ApplySourceTrackTags(TagLib.Tag tag, PlaylistTrack track)
+    {
+        // Primary artist first, then featured: how the Import tab reads performers back.
+        if (track.FeaturedArtists is { Count: > 0 } && !string.IsNullOrWhiteSpace(track.Artist))
+        {
+            tag.Performers = new[] { track.Artist }.Concat(track.FeaturedArtists).ToArray();
+        }
+
+        if (!string.IsNullOrWhiteSpace(track.AlbumArtist))
+        {
+            tag.AlbumArtists = new[] { track.AlbumArtist };
+        }
+
+        if (!string.IsNullOrWhiteSpace(track.Composer))
+        {
+            tag.Composers = new[] { track.Composer };
+        }
+
+        if (!string.IsNullOrWhiteSpace(track.Genre))
+        {
+            tag.Genres = ParseGenres(track.Genre);
+        }
+
+        if (track.TrackNumber.HasValue)
+        {
+            tag.Track = (uint)track.TrackNumber.Value;
+        }
+
+        if (track.TrackCount.HasValue)
+        {
+            tag.TrackCount = (uint)track.TrackCount.Value;
+        }
+
+        if (track.DiscNumber.HasValue)
+        {
+            tag.Disc = (uint)track.DiscNumber.Value;
+        }
+
+        if (track.DiscCount.HasValue)
+        {
+            tag.DiscCount = (uint)track.DiscCount.Value;
         }
     }
 
@@ -628,6 +912,19 @@ public sealed class DownloadService : IDisposable
                     File.Delete(sourcePath);
                 }
 
+                // An album version replaces the single (or other lesser version) already in the library.
+                if (item.SourceTrack?.ReplacesFiles is { Count: > 0 } replaced)
+                {
+                    var removed = RemoveReplacedFiles(replaced, destPath, libraryPath);
+                    result.RemovedFiles += removed;
+
+                    // Playlists holding the deleted single should get the album version instead.
+                    if (removed > 0)
+                    {
+                        db.ResetPlaylistEntriesForSong(TrackMetadataCleaner.SongKey(item.Artist, item.Title));
+                    }
+                }
+
                 // Clean up info.json from cache
                 var infoJsonPath = GetInfoJsonPath(sourcePath);
                 if (File.Exists(infoJsonPath))
@@ -635,7 +932,9 @@ public sealed class DownloadService : IDisposable
                     File.Delete(infoJsonPath);
                 }
 
-                // The file has left the cache, so the queue row has nothing left to track.
+                // The file has left the cache, so the queue row has nothing left to track. Playlists
+                // waiting on this song now wait for the library scan instead.
+                db.MarkPlaylistEntriesImported(TrackMetadataCleaner.SongKey(item.Artist, item.Title));
                 db.DeleteItem(id);
                 result.ImportedIds.Add(id);
                 if (isDuplicate)
@@ -656,6 +955,54 @@ public sealed class DownloadService : IDisposable
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Deletes library files superseded by a better version of the same song, then removes any
+    /// album or artist folders left empty. Only files inside the import library are touched.
+    /// </summary>
+    /// <returns>The number of files deleted.</returns>
+    [SuppressMessage("Security", "CA3003:Review code for file path injection vulnerabilities", Justification = "Paths come from Jellyfin's own library items and are confined to the configured library root.")]
+    private int RemoveReplacedFiles(IEnumerable<string> paths, string keptPath, string libraryPath)
+    {
+        var root = Path.GetFullPath(libraryPath).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var kept = Path.GetFullPath(keptPath);
+        var removed = 0;
+
+        foreach (var path in paths)
+        {
+            try
+            {
+                var full = Path.GetFullPath(path);
+                if (!full.StartsWith(root, StringComparison.Ordinal) || string.Equals(full, kept, StringComparison.Ordinal) || !File.Exists(full))
+                {
+                    continue;
+                }
+
+                File.Delete(full);
+                removed++;
+                _logger.LogInformation("Removed {Path}, replaced by the album version at {Kept}", full, kept);
+
+                // Drop the album folder, then the artist folder, if nothing is left in them.
+                var dir = Path.GetDirectoryName(full);
+                for (var depth = 0; depth < 2 && dir != null && dir.StartsWith(root, StringComparison.Ordinal); depth++)
+                {
+                    if (Directory.EnumerateFileSystemEntries(dir).Any())
+                    {
+                        break;
+                    }
+
+                    Directory.Delete(dir);
+                    dir = Path.GetDirectoryName(dir);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _logger.LogWarning(ex, "Could not remove replaced file {Path}", path);
+            }
+        }
+
+        return removed;
     }
 
     // ===== Delete / Reset Operations =====
@@ -754,45 +1101,181 @@ public sealed class DownloadService : IDisposable
 
 
     /// <summary>
-    /// Ensures yt-dlp is available, downloading it to the plugin directory if needed.
+    /// Ensures yt-dlp is available. Unless a path is set in Settings, the plugin uses its own
+    /// standalone copy in the plugin directory (downloaded on first use, kept current by
+    /// <see cref="UpdateManagedYtDlpIfDueAsync"/>), never a possibly outdated system install; a
+    /// system copy is only the fallback when the download is impossible.
     /// Must be called before CreateYoutubeDL(). Safe to call under _downloadLock.
-    /// Downloads the standalone binary (not the Python script) so it works in containers without Python.
     /// </summary>
     private async Task EnsureYtDlpAsync()
     {
-        if (FindYtDlp() != null)
+        if (GetConfiguredYtDlp() != null || GetManagedYtDlp() != null)
         {
             return;
         }
 
-        var pluginDir = GetPluginDirectory();
-        if (string.IsNullOrEmpty(pluginDir))
-        {
-            throw new InvalidOperationException(
-                "Could not determine the plugin directory. Set the yt-dlp path manually in Settings.");
-        }
+        var pluginDir = GetPluginDirectory()
+            ?? throw new InvalidOperationException("Could not determine the plugin directory. Set the yt-dlp path manually in Settings.");
 
-        _logger.LogInformation("yt-dlp not found — downloading standalone binary to: {Dir}", pluginDir);
-
+        _logger.LogInformation("Downloading the standalone yt-dlp to: {Dir}", pluginDir);
         try
         {
             await DownloadStandaloneYtDlpAsync(pluginDir).ConfigureAwait(false);
-
-            var expectedPath = Path.Combine(pluginDir, GetStandaloneBinaryName());
-            if (!File.Exists(expectedPath))
+            _logger.LogInformation("Downloaded yt-dlp to: {Path}", Path.Combine(pluginDir, GetStandaloneBinaryName()));
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or UnauthorizedAccessException or TaskCanceledException)
+        {
+            if (FindSystemYtDlp() is { } system)
             {
-                throw new FileNotFoundException($"Download completed but binary not found at {expectedPath}");
+                _logger.LogWarning(ex, "Could not download yt-dlp; falling back to the system copy at {Path}, which may be outdated", system);
+                return;
             }
 
-            _logger.LogInformation("Successfully downloaded yt-dlp to: {Path}", expectedPath);
-        }
-        catch (Exception ex) when (ex is not InvalidOperationException)
-        {
             throw new InvalidOperationException(
                 $"Failed to download yt-dlp automatically: {ex.Message}. " +
                 "Check your internet connection, or install yt-dlp manually and set the path in Settings.",
                 ex);
         }
+    }
+
+    /// <summary>
+    /// Replaces the plugin-managed yt-dlp when a newer release exists, checking at most every
+    /// <see cref="_ytDlpUpdateInterval"/>. Skipped when a path is set in Settings. Failures only
+    /// log: the current copy keeps working until the next check. Call under _downloadLock.
+    /// </summary>
+    private async Task UpdateManagedYtDlpIfDueAsync()
+    {
+        var managed = GetManagedYtDlp();
+        if (managed == null || GetConfiguredYtDlp() != null || DateTime.UtcNow - _lastYtDlpUpdateCheckUtc < _ytDlpUpdateInterval)
+        {
+            return;
+        }
+
+        _lastYtDlpUpdateCheckUtc = DateTime.UtcNow;
+        try
+        {
+            var latest = await GetLatestYtDlpVersionAsync().ConfigureAwait(false);
+            var current = (await RunProcessAsync(managed, _versionArgs, TimeSpan.FromSeconds(30)).ConfigureAwait(false)).Trim();
+            if (latest == null || string.Equals(latest, current, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _logger.LogInformation("Updating yt-dlp from {Current} to {Latest}", current, latest);
+            await DownloadStandaloneYtDlpAsync(Path.GetDirectoryName(managed)!).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or UnauthorizedAccessException or InvalidOperationException or TaskCanceledException)
+        {
+            _logger.LogWarning(ex, "Could not check for a newer yt-dlp; keeping the current copy");
+        }
+    }
+
+    /// <summary>
+    /// Reads the newest yt-dlp release tag (e.g. "2026.08.19") from GitHub's latest-release
+    /// redirect, without downloading anything.
+    /// </summary>
+    private static async Task<string?> GetLatestYtDlpVersionAsync()
+    {
+        using var response = await _noRedirectClient.GetAsync(new Uri("https://github.com/yt-dlp/yt-dlp/releases/latest")).ConfigureAwait(false);
+        var location = response.Headers.Location?.ToString();
+        var marker = location?.LastIndexOf("/tag/", StringComparison.Ordinal) ?? -1;
+        return marker < 0 ? null : location![(marker + "/tag/".Length)..].Trim();
+    }
+
+    /// <summary>
+    /// Builds the options every yt-dlp call needs: the Deno JavaScript runtime, which YouTube
+    /// requires; without it downloads intermittently fail with HTTP 403.
+    /// </summary>
+    private async Task<OptionSet> CreateToolOptionsAsync()
+    {
+        var options = new OptionSet();
+        var deno = await EnsureDenoAsync().ConfigureAwait(false);
+        if (deno != null)
+        {
+            options.AddCustomOption("--js-runtimes", "deno:" + deno);
+        }
+
+        return options;
+    }
+
+    /// <summary>
+    /// Finds Deno (plugin-managed copy first, then a system install), downloading the official
+    /// release into the plugin directory when there is none. Returns null if it cannot be had, in
+    /// which case downloads still run but YouTube may refuse some of them.
+    /// </summary>
+    private async Task<string?> EnsureDenoAsync()
+    {
+        var pluginDir = GetPluginDirectory();
+        var denoName = OperatingSystem.IsWindows() ? "deno.exe" : "deno";
+        var managed = pluginDir == null ? null : Path.Combine(pluginDir, denoName);
+        if (managed != null && File.Exists(managed))
+        {
+            return managed;
+        }
+
+        var system = Utils.GetFullPath("deno")
+            ?? _commonDenoPaths.FirstOrDefault(File.Exists);
+        if (system != null)
+        {
+            return system;
+        }
+
+        if (managed == null || GetDenoTarget() is not { } target)
+        {
+            _logger.LogWarning("No Deno build for this platform; YouTube downloads may be refused (HTTP 403)");
+            return null;
+        }
+
+        try
+        {
+            _logger.LogInformation("Downloading the Deno JavaScript runtime for yt-dlp to: {Dir}", pluginDir);
+            var url = new Uri($"https://github.com/denoland/deno/releases/latest/download/deno-{target}.zip");
+            using var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+
+            var temp = managed + ".download";
+            using (var archive = new System.IO.Compression.ZipArchive(await response.Content.ReadAsStreamAsync().ConfigureAwait(false)))
+            {
+                var entry = archive.GetEntry(denoName) ?? throw new IOException("The Deno archive has no " + denoName);
+                using var source = await entry.OpenAsync().ConfigureAwait(false);
+                using var destination = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None);
+                await source.CopyToAsync(destination).ConfigureAwait(false);
+            }
+
+            MakeExecutable(temp);
+            File.Move(temp, managed, overwrite: true);
+            _logger.LogInformation("Downloaded Deno to: {Path}", managed);
+            return managed;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or UnauthorizedAccessException or InvalidDataException or TaskCanceledException)
+        {
+            _logger.LogWarning(ex, "Could not download Deno; YouTube downloads may be refused (HTTP 403)");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Gets the Deno release target for this platform, or null when Deno publishes none.
+    /// </summary>
+    internal static string? GetDenoTarget()
+    {
+        var arm = RuntimeInformation.OSArchitecture == Architecture.Arm64;
+        if (OperatingSystem.IsWindows())
+        {
+            return arm ? "aarch64-pc-windows-msvc" : "x86_64-pc-windows-msvc";
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            return arm ? "aarch64-apple-darwin" : "x86_64-apple-darwin";
+        }
+
+        if (OperatingSystem.IsLinux())
+        {
+            return arm ? "aarch64-unknown-linux-gnu" : "x86_64-unknown-linux-gnu";
+        }
+
+        return null;
     }
 
     private YoutubeDL CreateYoutubeDL()
@@ -810,43 +1293,47 @@ public sealed class DownloadService : IDisposable
         };
     }
 
+    /// <summary>
+    /// Finds the yt-dlp to run: the Settings path, then the plugin-managed copy, then (only as a
+    /// fallback) a system install.
+    /// </summary>
     private string? FindYtDlp()
+        => GetConfiguredYtDlp() ?? GetManagedYtDlp() ?? FindSystemYtDlp();
+
+    private static string? GetConfiguredYtDlp()
     {
-        // 1. Check explicit config override first
         var configPath = Plugin.Instance?.Configuration.YtDlpPath;
-        if (!string.IsNullOrWhiteSpace(configPath) && File.Exists(configPath))
-        {
-            return configPath;
-        }
+        return !string.IsNullOrWhiteSpace(configPath) && File.Exists(configPath) ? configPath : null;
+    }
 
-        // 2. Check plugin directory for auto-downloaded standalone binary
+    private static string? GetManagedYtDlp()
+    {
         var pluginDir = GetPluginDirectory();
-        if (!string.IsNullOrEmpty(pluginDir))
+        if (string.IsNullOrEmpty(pluginDir))
         {
-            var standalonePath = Path.Combine(pluginDir, GetStandaloneBinaryName());
-            if (File.Exists(standalonePath))
-            {
-                _logger.LogInformation("Found standalone yt-dlp at: {Path}", standalonePath);
-                return standalonePath;
-            }
-
-            // Fallback: check for legacy YoutubeDLSharp binary name
-            var bundledPath = Path.Combine(pluginDir, Utils.YtDlpBinaryName);
-            if (File.Exists(bundledPath))
-            {
-                _logger.LogInformation("Found bundled yt-dlp at: {Path}", bundledPath);
-                return bundledPath;
-            }
+            return null;
         }
 
-        // 3. Check system PATH via YoutubeDLSharp utility
+        var standalonePath = Path.Combine(pluginDir, GetStandaloneBinaryName());
+        if (File.Exists(standalonePath))
+        {
+            return standalonePath;
+        }
+
+        // Legacy YoutubeDLSharp binary name from older plugin versions.
+        var bundledPath = Path.Combine(pluginDir, Utils.YtDlpBinaryName);
+        return File.Exists(bundledPath) ? bundledPath : null;
+    }
+
+    private string? FindSystemYtDlp()
+    {
         var pathResult = Utils.GetFullPath("yt-dlp");
         if (pathResult != null)
         {
             return pathResult;
         }
 
-        // 4. Check common install locations (macOS GUI apps have limited PATH)
+        // Common install locations (macOS GUI apps have limited PATH)
         string[] commonPaths =
         [
             "/opt/homebrew/bin/yt-dlp",     // macOS ARM Homebrew
@@ -855,16 +1342,13 @@ public sealed class DownloadService : IDisposable
             "/snap/bin/yt-dlp"              // Snap installs
         ];
 
-        foreach (var path in commonPaths)
+        var found = commonPaths.FirstOrDefault(File.Exists);
+        if (found != null)
         {
-            if (File.Exists(path))
-            {
-                _logger.LogInformation("Found yt-dlp at common location: {Path}", path);
-                return path;
-            }
+            _logger.LogInformation("Found yt-dlp at common location: {Path}", found);
         }
 
-        return null;
+        return found;
     }
 
     private static string? GetPluginDirectory()
@@ -895,24 +1379,33 @@ public sealed class DownloadService : IDisposable
     }
 
     /// <summary>
-    /// Downloads the standalone yt-dlp binary from the official GitHub releases.
+    /// Downloads the standalone yt-dlp binary from the official GitHub releases. Written to a
+    /// temporary file and moved into place, so a copy that is running is never half-overwritten.
     /// </summary>
     private static async Task DownloadStandaloneYtDlpAsync(string directory)
     {
         var binaryName = GetStandaloneBinaryName();
         var url = new Uri($"https://github.com/yt-dlp/yt-dlp/releases/latest/download/{binaryName}");
         var destPath = Path.Combine(directory, binaryName);
+        var tempPath = destPath + ".download";
 
-        using var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        using (var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false))
+        {
+            response.EnsureSuccessStatusCode();
+            using var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None);
+            await response.Content.CopyToAsync(fs).ConfigureAwait(false);
+        }
 
-        using var fs = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None);
-        await response.Content.CopyToAsync(fs).ConfigureAwait(false);
+        MakeExecutable(tempPath);
+        File.Move(tempPath, destPath, overwrite: true);
+    }
 
+    private static void MakeExecutable(string path)
+    {
         if (!OperatingSystem.IsWindows())
         {
             File.SetUnixFileMode(
-                destPath,
+                path,
                 UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
                 UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
                 UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
@@ -953,10 +1446,14 @@ public sealed class DownloadService : IDisposable
 
             _logger.LogInformation("Downloading latest standalone yt-dlp to {Dir}", pluginDir);
             await DownloadStandaloneYtDlpAsync(pluginDir).ConfigureAwait(false);
+            _lastYtDlpUpdateCheckUtc = DateTime.UtcNow;
 
             var binaryPath = Path.Combine(pluginDir, GetStandaloneBinaryName());
             var version = await RunProcessAsync(binaryPath, _versionArgs, TimeSpan.FromSeconds(30)).ConfigureAwait(false);
-            return $"Downloaded latest yt-dlp ({version}).";
+            var deno = await EnsureDenoAsync().ConfigureAwait(false);
+            return deno != null
+                ? $"Downloaded latest yt-dlp ({version}), using Deno at {deno}."
+                : $"Downloaded latest yt-dlp ({version}). Deno could not be set up, so YouTube may refuse some downloads.";
         }
         finally
         {
@@ -1181,7 +1678,7 @@ public sealed class DownloadService : IDisposable
             // This prevents overwriting user-edited metadata saved via SaveTags.
             if (string.IsNullOrEmpty(dto.Album))
             {
-                dto.Album = GetJsonString(root, "album") ?? dto.Album;
+                dto.Album = TrackMetadataCleaner.CleanAlbum(GetJsonString(root, "album")) ?? dto.Album;
             }
 
             if (!dto.TrackNumber.HasValue

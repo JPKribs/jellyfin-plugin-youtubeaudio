@@ -1,4 +1,5 @@
 using Jellyfin.Plugin.YouTubeAudio.Services;
+using Jellyfin.Plugin.YouTubeAudio.Services.Playlists;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,7 +20,16 @@ public class ServiceRegistrator : IPluginServiceRegistrator
         // Singleton: download service (owns SemaphoreSlim for download serialization)
         serviceCollection.AddSingleton<DownloadService>();
 
-        // Transient: stateless library query service
-        serviceCollection.AddTransient<LibraryService>();
+        // Playlist export formats. Add a source here to support another service's exports.
+        serviceCollection.AddSingleton<IPlaylistSource, AppleMusicPlaylistSource>();
+        serviceCollection.AddSingleton<IPlaylistSource, AppleMusicLibrarySource>();
+        serviceCollection.AddSingleton<PlaylistImportService>();
+
+        // Singleton: stateless library queries, shared with the playlist sync service
+        serviceCollection.AddSingleton<LibraryService>();
+
+        // Fills imported playlists as their songs reach the library (listens to library scans)
+        serviceCollection.AddSingleton<PlaylistSyncService>();
+        serviceCollection.AddHostedService(provider => provider.GetRequiredService<PlaylistSyncService>());
     }
 }

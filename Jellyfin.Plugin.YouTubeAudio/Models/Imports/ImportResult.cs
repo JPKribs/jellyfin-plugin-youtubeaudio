@@ -18,4 +18,7 @@ public class ImportResult
 
     /// <summary>Gets or sets any errors that occurred during import.</summary>
     public List<string> Errors { get; set; } = new();
+
+    /// <summary>Gets or sets the number of library files deleted because an imported album version replaced them.</summary>
+    public int RemovedFiles { get; set; }
 }
