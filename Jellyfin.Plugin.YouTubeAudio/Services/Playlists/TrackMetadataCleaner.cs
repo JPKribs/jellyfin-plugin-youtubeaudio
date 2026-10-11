@@ -19,6 +19,51 @@ public static partial class TrackMetadataCleaner
 
     private static readonly string[] _featuredSeparators = [", ", " & ", " and "];
 
+    // Separators between several genres in one value ("Classical; Baroque", "Pop/Rock").
+    private static readonly char[] _genreSeparators = [';', ',', '/', '|'];
+
+    // Genre names that contain a separator but are one genre.
+    private static readonly string[] _compoundGenres = ["Singer/Songwriter"];
+
+    // Genre words written in capitals (or a fixed form) rather than title case.
+    private static readonly Dictionary<string, string> _genreWordForms = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["r&b"] = "R&B", ["rnb"] = "R&B", ["edm"] = "EDM", ["idm"] = "IDM", ["ebm"] = "EBM", ["uk"] = "UK", ["us"] = "US",
+        ["dj"] = "DJ", ["ost"] = "OST", ["mpb"] = "MPB", ["k-pop"] = "K-Pop", ["j-pop"] = "J-Pop", ["c-pop"] = "C-Pop",
+        ["j-rock"] = "J-Rock", ["lo-fi"] = "Lo-Fi", ["hi-fi"] = "Hi-Fi", ["a cappella"] = "A Cappella"
+    };
+
+    // Spellings of one genre (or one genre that stands for several) mapped to the standard names.
+    private static readonly Dictionary<string, string[]> _genreAliases = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["hip hop"] = ["Hip-Hop"], ["hip-hop"] = ["Hip-Hop"], ["hiphop"] = ["Hip-Hop"],
+        ["r&b"] = ["R&B"], ["rnb"] = ["R&B"], ["r and b"] = ["R&B"], ["rhythm and blues"] = ["R&B"], ["rhythm & blues"] = ["R&B"],
+        ["electronica"] = ["Electronic"], ["electro"] = ["Electronic"], ["electronic music"] = ["Electronic"],
+        ["edm"] = ["Electronic", "Dance"], ["electronic dance music"] = ["Electronic", "Dance"],
+        ["drum and bass"] = ["Drum & Bass"], ["drum & bass"] = ["Drum & Bass"], ["drum n bass"] = ["Drum & Bass"], ["dnb"] = ["Drum & Bass"], ["d&b"] = ["Drum & Bass"],
+        ["lofi"] = ["Lo-Fi"], ["lo fi"] = ["Lo-Fi"], ["lo-fi"] = ["Lo-Fi"],
+        ["singer-songwriter"] = ["Singer/Songwriter"], ["singer songwriter"] = ["Singer/Songwriter"],
+        ["ost"] = ["Soundtrack"], ["film score"] = ["Soundtrack"], ["soundtracks"] = ["Soundtrack"],
+        ["alt"] = ["Alternative"]
+    };
+
+    // Standard genres that compound genres are built from. A genre made only of these words
+    // ("alt-pop", "Indie Rock", "Pop Punk") is split into them; anything else is kept whole.
+    private static readonly Dictionary<string, string> _baseGenreWords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["alt"] = "Alternative", ["alternative"] = "Alternative", ["indie"] = "Indie", ["pop"] = "Pop", ["rock"] = "Rock",
+        ["metal"] = "Metal", ["punk"] = "Punk", ["folk"] = "Folk", ["jazz"] = "Jazz", ["soul"] = "Soul", ["funk"] = "Funk",
+        ["blues"] = "Blues", ["country"] = "Country", ["dance"] = "Dance", ["electronic"] = "Electronic", ["electro"] = "Electronic",
+        ["electronica"] = "Electronic", ["house"] = "House", ["techno"] = "Techno", ["trance"] = "Trance", ["ambient"] = "Ambient",
+        ["classical"] = "Classical", ["gospel"] = "Gospel", ["reggae"] = "Reggae", ["latin"] = "Latin", ["disco"] = "Disco",
+        ["grunge"] = "Grunge", ["emo"] = "Emo", ["rap"] = "Rap", ["opera"] = "Opera", ["choral"] = "Choral", ["orchestral"] = "Orchestral"
+    };
+
+    private static readonly char[] _genreWordSeparators = [' ', '-'];
+
+    // Short words kept lowercase inside a genre name ("Drum and Bass", "Music of the Night").
+    private static readonly HashSet<string> _genreMinorWords = new(StringComparer.OrdinalIgnoreCase) { "and", "of", "the", "n" };
+
     /// <summary>
     /// Returns a cleaned copy of the track with its release type set. The source track is not
     /// modified.
@@ -45,6 +90,8 @@ public static partial class TrackMetadataCleaner
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+        var genres = CleanGenres(track.Genre);
+
         return new PlaylistTrack
         {
             Title = title,
@@ -55,7 +102,7 @@ public static partial class TrackMetadataCleaner
             IsCompilation = track.IsCompilation,
             ReleaseType = track.ReleaseType ?? DetectReleaseType(track.Album, track.AlbumArtist, track.IsCompilation, track.TrackCount),
             Composer = track.Composer,
-            Genre = track.Genre,
+            Genre = genres.Length > 0 ? string.Join("; ", genres) : null,
             Year = track.Year,
             TrackNumber = track.TrackNumber,
             TrackCount = track.TrackCount,
@@ -85,6 +132,112 @@ public static partial class TrackMetadataCleaner
         cleaned = CollapseWhitespace(cleaned);
 
         return cleaned.Length == 0 ? album.Trim() : cleaned;
+    }
+
+    /// <summary>
+    /// Splits a genre value into separate, consistently capitalized, standard genres:
+    /// "classical;baroque" becomes "Classical" and "Baroque", "Pop/Rock" becomes "Pop" and "Rock",
+    /// a compound of standard genres is broken down ("alt-pop" becomes "Alternative" and "Pop"),
+    /// and spellings of one genre are unified ("electronica" becomes "Electronic"). Genres that are
+    /// not built only from standard ones ("Synthwave", "Contemporary Classical") stay whole,
+    /// compound names ("Singer/Songwriter", "Drum &amp; Bass") are kept, and duplicates are dropped.
+    /// </summary>
+    public static string[] CleanGenres(string? genre)
+    {
+        if (string.IsNullOrWhiteSpace(genre))
+        {
+            return [];
+        }
+
+        // Protect compound names from the separator split.
+        var text = genre;
+        foreach (var compound in _compoundGenres)
+        {
+            text = text.Replace(compound, compound.Replace('/', '\u0001'), StringComparison.OrdinalIgnoreCase);
+        }
+
+        var result = new List<string>();
+        foreach (var part in text.Split(_genreSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            foreach (var name in StandardizeGenre(CollapseWhitespace(part.Replace('\u0001', '/'))))
+            {
+                if (name.Length > 0 && !result.Contains(name, StringComparer.OrdinalIgnoreCase))
+                {
+                    result.Add(name);
+                }
+            }
+        }
+
+        return result.ToArray();
+    }
+
+    /// <summary>
+    /// Maps one genre to its standard name(s): a known alias, else a breakdown into standard
+    /// genres when every word is one ("Alt Pop" -> Alternative, Pop), else the genre itself,
+    /// capitalized.
+    /// </summary>
+    private static string[] StandardizeGenre(string genre)
+    {
+        if (genre.Length == 0)
+        {
+            return [];
+        }
+
+        if (_genreAliases.TryGetValue(genre, out var alias))
+        {
+            return alias;
+        }
+
+        var words = genre.Split(_genreWordSeparators, StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length > 1 && words.All(_baseGenreWords.ContainsKey))
+        {
+            return words.Select(w => _baseGenreWords[w]).ToArray();
+        }
+
+        return [CapitalizeGenre(genre)];
+    }
+
+    private static string CapitalizeGenre(string genre)
+    {
+        if (_genreWordForms.TryGetValue(genre, out var whole))
+        {
+            return whole;
+        }
+
+        var words = genre.Split(' ');
+        for (var i = 0; i < words.Length; i++)
+        {
+            var word = words[i];
+            if (_genreWordForms.TryGetValue(word, out var form))
+            {
+                words[i] = form;
+            }
+            else if (i > 0 && _genreMinorWords.Contains(word))
+            {
+                words[i] = word.ToLowerInvariant();
+            }
+            else if (word.Length is >= 2 and <= 4 && word.All(char.IsUpper))
+            {
+                // A short all-capitals word is an acronym ("CCM", "IDM"): keep it as written.
+                words[i] = word;
+            }
+            else
+            {
+                // Capitalize each joined piece: "hip-hop" -> "Hip-Hop", "singer/songwriter" -> "Singer/Songwriter".
+                var chars = word.ToLowerInvariant().ToCharArray();
+                for (var c = 0; c < chars.Length; c++)
+                {
+                    if (c == 0 || chars[c - 1] is '-' or '&' or '(' or '/')
+                    {
+                        chars[c] = char.ToUpperInvariant(chars[c]);
+                    }
+                }
+
+                words[i] = new string(chars);
+            }
+        }
+
+        return string.Join(' ', words);
     }
 
     /// <summary>

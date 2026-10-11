@@ -14,6 +14,10 @@ export default function (view) {
     var _bulkAlbumCombo = null;
     var _activeComboBoxes = []; // Track all combo-boxes for cleanup
 
+    // One shared player previews the downloaded file of whichever row is playing.
+    var _player = null;
+    var _playingId = null;
+
     // Tidy genre display so every ";" is followed by one space ("Rock;Pop" -> "Rock; Pop").
     // Cosmetic only; the server splits on ";" and writes one GENRE field per genre regardless.
     function normalizeGenre(value) {
@@ -163,17 +167,134 @@ export default function (view) {
             cb.addEventListener('change', updateSelectedCount);
         });
 
+        // Bind preview controls
+        body.querySelectorAll('.jpk-table-row').forEach(function(row) {
+            var id = row.getAttribute('data-id');
+            row.querySelector('.yta-preview-btn').addEventListener('click', function(e) {
+                e.stopPropagation();
+                togglePreview(id);
+            });
+            row.querySelector('.yta-preview-seek').addEventListener('input', function(e) {
+                if (_player && _playingId === id) _player.currentTime = parseFloat(e.target.value) || 0;
+            });
+        });
+
+        // A row that was playing and has since been imported or deleted stops playing.
+        if (_playingId && !_downloads.some(function(d) { return d.Id === _playingId; })) stopPreview();
+        updatePreviewUi();
+
         updateSelectedCount();
+    }
+
+    // ============================================
+    // PREVIEW
+    // ============================================
+
+    // formatTime
+    // Formats seconds as m:ss for the preview clock.
+    //
+    // Param: seconds | position or duration in seconds
+    function formatTime(seconds) {
+        if (!isFinite(seconds) || seconds < 0) seconds = 0;
+        var s = Math.floor(seconds);
+        return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
+    }
+
+    // ensurePlayer
+    // Creates the shared audio element on first use and keeps the rows in sync with it.
+    //
+    // No parameters
+    function ensurePlayer() {
+        if (_player) return _player;
+        _player = new Audio();
+        _player.preload = 'auto';
+        ['play', 'pause', 'timeupdate', 'loadedmetadata', 'durationchange'].forEach(function(ev) {
+            _player.addEventListener(ev, updatePreviewUi);
+        });
+        _player.addEventListener('ended', function() {
+            _player.currentTime = 0;
+            updatePreviewUi();
+        });
+        _player.addEventListener('error', function() {
+            if (!_playingId) return;
+            stopPreview();
+            Dashboard.alert('This file could not be played in this browser.');
+        });
+        return _player;
+    }
+
+    // togglePreview
+    // Plays or pauses a row's downloaded file; starting another row stops the current one.
+    //
+    // Param: id | queue item id of the row
+    function togglePreview(id) {
+        var player = ensurePlayer();
+        if (_playingId === id) {
+            if (player.paused) player.play().catch(function() {}); else player.pause();
+            return;
+        }
+
+        _playingId = id;
+        // An <audio> element cannot send headers, so the token rides in the query (ApiKey; the
+        // older api_key is rejected by current Jellyfin).
+        player.src = ApiClient.getUrl('YouTubeAudio/Downloads/' + encodeURIComponent(id) + '/Audio', { ApiKey: ApiClient.accessToken() });
+        player.play().catch(function() {});
+        updatePreviewUi();
+    }
+
+    // stopPreview
+    // Stops playback and releases the current file.
+    //
+    // No parameters
+    function stopPreview() {
+        _playingId = null;
+        if (_player) {
+            _player.pause();
+            _player.removeAttribute('src');
+            _player.load();
+        }
+        updatePreviewUi();
+    }
+
+    // updatePreviewUi
+    // Shows play/pause on every row, and the seek bar and clock on the row that is playing.
+    //
+    // No parameters
+    function updatePreviewUi() {
+        view.querySelectorAll('#importBody .jpk-table-row').forEach(function(row) {
+            var active = row.getAttribute('data-id') === _playingId;
+            var playing = active && _player && !_player.paused;
+            var btn = row.querySelector('.yta-preview-btn');
+            if (!btn) return;
+            btn.querySelector('.material-icons').textContent = playing ? 'pause' : 'play_arrow';
+            btn.title = playing ? 'Pause preview' : 'Play preview';
+            btn.classList.toggle('active', active);
+
+            var bar = row.querySelector('.yta-preview');
+            bar.hidden = !active;
+            if (!active || !_player) return;
+            var duration = isFinite(_player.duration) ? _player.duration : 0;
+            var seek = bar.querySelector('.yta-preview-seek');
+            seek.max = duration || 0;
+            if (document.activeElement !== seek) seek.value = _player.currentTime || 0;
+            bar.querySelector('.yta-preview-time').textContent = formatTime(_player.currentTime) + ' / ' + formatTime(duration);
+        });
     }
 
     function renderImportRow(d) {
         var esc = Shared.escapeHtml;
         return '<div class="jpk-table-row jpk-edit-row" data-id="' + esc(d.Id) + '">'
-            // Line 1: Checkbox | Size | spacer | Save
+            // Line 1: Checkbox | Preview (button, then seek bar while playing) | Size | Save
             + '<div class="jpk-edit-line">'
             + '<label class="emby-checkbox-label"><input type="checkbox" is="emby-checkbox" class="jpk-table-row-checkbox yta-file-check" data-id="' + esc(d.Id) + '" /><span class="checkboxLabel"></span></label>'
+            + '<div class="yta-preview-group">'
+            + '<button type="button" class="jpk-row-btn yta-preview-btn" title="Play preview"><span class="material-icons">play_arrow</span></button>'
+            + '<div class="yta-preview" hidden>'
+            + '<input type="range" class="yta-preview-seek" min="0" max="0" step="0.1" value="0" aria-label="Seek" />'
+            + '<span class="yta-preview-time">0:00 / 0:00</span>'
+            + '</div>'
+            + '</div>'
             + '<span class="jpk-edit-secondary">' + Shared.formatSize(d.FileSize) + '</span>'
-            + '<span class="jpk-edit-line-spacer"></span>'
             + '<button type="button" class="jpk-row-btn save" title="Save tags"><span class="material-icons">save</span></button>'
             + '</div>'
             // Line 2: Title (6/7) | Track # (1/7)
@@ -212,7 +333,7 @@ export default function (view) {
             + '</div>'
             + '<div class="jpk-field" style="flex:3">'
             + '<label>Genre</label>'
-            + '<input type="text" class="jpk-edit-input yta-field-genre" value="' + esc(d.Genre) + '" placeholder="Rock; Pop" />'
+            + '<input type="text" class="jpk-edit-input yta-field-genre" value="' + esc(d.Genre) + '" placeholder="Classical; Baroque" />'
             + '</div>'
             + '</div>'
             + '</div>';
@@ -456,6 +577,7 @@ export default function (view) {
 
     view.addEventListener('viewhide', function() {
         destroyActiveComboBoxes();
+        stopPreview();
     });
 
     _sharedPromise.then(function() {

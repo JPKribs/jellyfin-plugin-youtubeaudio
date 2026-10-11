@@ -1,7 +1,7 @@
 ---
 name: "YouTube Audio"
 guid: "7323ea64-a200-4265-ab8f-e7ae27d06c38"
-version: "12.2.1.0"
+version: "12.2.1.1"
 targetAbi: "12.2.0.0"
 framework: "net10.0"
 overview: "Download YouTube audio directly to a Jellyfin Music Library."
@@ -18,9 +18,5 @@ artifacts:
 - "TagLibSharp.dll"
 changelog:
   features:
-  - Import Apple Music playlists (text or XML export) and whole library exports; each track is matched to a YouTube upload at download time.
-  - Imported playlists become private Jellyfin playlists for a chosen user, filled as songs reach the library, appended to and re-ordered when one of the same name exists.
-  - Import cleanup groups album editions (Deluxe, Remastered, Bonus Track…), moves "feat." artists into tags, skips songs already in the library or queue, and upgrades library singles to the album version.
-  - Public read-only queue page at /YouTube/Queue for signed-in users.
-  - yt-dlp and the Deno runtime it needs for YouTube are downloaded automatically, yt-dlp is kept up to date, and downloads YouTube temporarily refuses are retried.
-  - Failed queue items can be retried from the Download tab.
+  - Preview downloaded tracks on the Import tab before importing them.
+  - Genres are capitalized, split into separate genres, and standardized (for example alt-pop becomes Alternative and Pop).

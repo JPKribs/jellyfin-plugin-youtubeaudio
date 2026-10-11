@@ -1,10 +1,16 @@
 <!-- Content fragment injected into the base JPKribs.Jellyfin.Base status card. -->
 <link rel="stylesheet" href="../web/configurationpage?name=youtubeaudio_jpkribs_shared.css" />
 <style>
-    /* The status line only takes space when it has something to say. */
-    .yta-msg { font-size: 0.9rem; }
-    .yta-msg:not(:empty) { margin-top: 12px; }
-    .yta-warn { margin-top: 16px; }
+    .yta-hint { margin: 6px 0 0; font-size: 0.82rem; line-height: 1.4; color: rgba(255,255,255,0.5); text-align: left; }
+    .yta-optional { font-weight: 400; color: rgba(255,255,255,0.45); }
+    /* No spinner on the year field: it is typed, not stepped. */
+    #year { -moz-appearance: textfield; appearance: textfield; }
+    #year::-webkit-outer-spin-button, #year::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    /* Result banner: only shown when there is something to say. */
+    .yta-msg { display: none; margin-top: 14px; padding: 10px 12px; border-radius: 8px; font-size: 0.9rem; line-height: 1.4; text-align: left; }
+    .yta-msg.info { display: block; background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.75); }
+    .yta-msg.success { display: block; background: rgba(76,175,80,0.15); border: 1px solid rgba(76,175,80,0.45); color: #a5d6a7; }
+    .yta-msg.error { display: block; background: rgba(244,67,54,0.13); border: 1px solid rgba(244,67,54,0.45); color: #ef9a9a; }
     /* Outlined secondary button: full width like Submit, without competing with it. */
     .yta-secondary { display: block; box-sizing: border-box; width: 100%; margin-top: 12px; padding: 0.8em; border-radius: 8px;
         border: 1px solid rgba(255,255,255,0.25); color: #fff; font-size: 0.95rem; font-weight: 600; text-align: center; text-decoration: none; }
@@ -23,13 +29,14 @@
     <a id="deniedLink" class="jpk-btn" href="/">Back to Jellyfin</a>
 </div>
 
-<form id="form" class="hidden" autocomplete="off">
-    <h1>Download Song(s)</h1>
-    <p>Provide a YouTube song or playlist link for download.</p>
+<form id="form" class="hidden" autocomplete="off" novalidate>
+    <h1>Request a Download</h1>
+    <p>Paste a YouTube link to a song or a playlist.</p>
 
     <div class="jpk-fields">
-        <label for="url">YouTube URL</label>
-        <input type="text" id="url" placeholder="https://www.youtube.com/..." />
+        <label for="url">YouTube Link</label>
+        <input type="url" id="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=…" />
+        <p class="yta-hint">Audio-only or lyric uploads work best.</p>
 
         <label for="artist">Artist</label>
         <div id="artistBox"></div>
@@ -40,18 +47,17 @@
         <div class="jpk-field-pair">
             <div>
                 <label for="year">Year</label>
-                <input type="number" id="year" min="1500" max="3000" step="1" />
+                <input type="number" id="year" inputmode="numeric" min="1500" max="3000" step="1" placeholder="e.g. 2018" />
             </div>
             <div>
-                <label for="title">Title</label>
-                <input type="text" id="title" />
+                <label for="title">Title <span class="yta-optional">(optional)</span></label>
+                <input type="text" id="title" placeholder="From the video if empty" />
             </div>
         </div>
     </div>
 
     <button type="submit" id="submit" class="jpk-submit">Submit</button>
-    <div id="msg" class="yta-msg"></div>
-    <div class="jpk-warn yta-warn">Lyrics videos or videos without prologues and epilogues are preferred.</div>
+    <div id="msg" class="yta-msg" role="status" aria-live="polite"></div>
     <a id="queueLink" class="yta-secondary" href="Queue">View the Queue</a>
 </form>
 
@@ -70,10 +76,11 @@
         function show(id) { el(id).classList.remove('hidden'); }
         function hide(id) { el(id).classList.add('hidden'); }
         function val(id) { return (el(id).value || '').trim(); }
-        function status(message, color) {
+        // Shows the result banner: kind is 'info', 'success' or 'error'; an empty message hides it.
+        function status(message, kind) {
             var m = el('msg');
-            m.textContent = message;
-            m.style.color = color || 'rgba(255,255,255,0.55)';
+            m.textContent = message || '';
+            m.className = 'yta-msg' + (message ? ' ' + (kind || 'info') : '');
         }
 
         // Hide the base card's loading heading + spinner when leaving the loading state.
@@ -184,7 +191,7 @@
             var title = el('title');
             title.disabled = isPlaylist;
             if (isPlaylist) { title.value = ''; title.placeholder = 'Not used for playlists'; }
-            else { title.placeholder = ''; }
+            else { title.placeholder = 'From the video if empty'; }
         }
         el('url').addEventListener('input', syncTitleForPlaylist);
         syncTitleForPlaylist();
@@ -198,13 +205,13 @@
             var yearRaw = val('year');
             var title = val('title');
 
-            if (!url || !artist || !album || !yearRaw) { status('URL, artist, album, and year are required.', '#ff5252'); return; }
+            if (!url || !artist || !album || !yearRaw) { status('Add the YouTube link, artist, album and year.', 'error'); return; }
             var year = parseInt(yearRaw, 10);
-            if (isNaN(year)) { status('Enter a valid year.', '#ff5252'); return; }
+            if (isNaN(year)) { status('Enter the year as a number, like 2018.', 'error'); return; }
 
             var btn = el('submit');
             btn.disabled = true;
-            status('Submitting…', null);
+            status('Submitting…', 'info');
 
             fetch(submitUrl, {
                 method: 'POST',
@@ -217,14 +224,14 @@
                 })
                 .then(function (res) {
                     btn.disabled = false;
-                    if (!res.ok) { status((res.data && res.data.Error) || 'Submission failed.', '#ff5252'); return; }
+                    if (!res.ok) { status((res.data && res.data.Error) || 'The request could not be submitted.', 'error'); return; }
                     var n = (res.data && res.data.Queued) || 0;
-                    status('Queued ' + n + ' track' + (n === 1 ? '' : 's') + ' for download.', '#5cb85c');
+                    status('Queued ' + n + ' track' + (n === 1 ? '' : 's') + ' for download.', 'success');
                     el('form').reset();
                     if (artistControl && artistControl.setValue) artistControl.setValue('');
                     if (albumControl && albumControl.setValue) albumControl.setValue('');
                 })
-                .catch(function () { btn.disabled = false; status('Network error. Please try again.', '#ff5252'); });
+                .catch(function () { btn.disabled = false; status('Could not reach the server. Please try again.', 'error'); });
         });
     })();
 </script>

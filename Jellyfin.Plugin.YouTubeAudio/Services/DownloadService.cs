@@ -604,6 +604,43 @@ public sealed class DownloadService : IDisposable
         }).ToList();
     }
 
+    /// <summary>
+    /// Gets the cached audio file of a downloaded item, for previewing it before import.
+    /// Returns null unless the item is downloaded and its file is in the cache folder.
+    /// </summary>
+    /// <param name="id">The queue item ID.</param>
+    /// <returns>The file path and its media type, or null.</returns>
+    public (string Path, string ContentType)? GetPreviewFile(string id)
+    {
+        var item = _dbProvider.Database.GetItemById(id);
+        if (item == null || item.Status != QueueStatus.Downloaded)
+        {
+            return null;
+        }
+
+        // File names are GUIDs from the database, but confine the path to the cache anyway.
+        var cacheDir = Path.GetFullPath(_dbProvider.GetAudioCacheDirectory());
+        var path = Path.GetFullPath(Path.Combine(cacheDir, item.FileName));
+        if (!path.StartsWith(cacheDir.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.Ordinal) || !File.Exists(path))
+        {
+            return null;
+        }
+
+        return (path, GetAudioContentType(path));
+    }
+
+    /// <summary>
+    /// Maps a cached audio file to the media type browsers expect for playback.
+    /// </summary>
+    internal static string GetAudioContentType(string path)
+        => Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            ".opus" => "audio/ogg",
+            ".mp3" => "audio/mpeg",
+            ".m4a" => "audio/mp4",
+            _ => "application/octet-stream"
+        };
+
     // ===== Tag Operations =====
 
     /// <summary>
@@ -1515,14 +1552,12 @@ public sealed class DownloadService : IDisposable
     }
 
     /// <summary>
-    /// Splits a "; "-style genre string into one entry per genre. Each entry becomes its own
-    /// tag value (e.g. a separate "GENRE=" Vorbis comment), which is how players — including
-    /// Jellyfin — recognize multiple genres. Never join them back into a single value.
+    /// Splits a genre string into one cleaned entry per genre (see
+    /// <see cref="TrackMetadataCleaner.CleanGenres"/>). Each entry becomes its own tag value (e.g.
+    /// a separate "GENRE=" Vorbis comment), which is how players — including Jellyfin — recognize
+    /// multiple genres. Never join them back into a single value.
     /// </summary>
-    internal static string[] ParseGenres(string? genre)
-        => string.IsNullOrWhiteSpace(genre)
-            ? Array.Empty<string>()
-            : genre.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    internal static string[] ParseGenres(string? genre) => TrackMetadataCleaner.CleanGenres(genre);
 
 
     internal static AudioConversionFormat MapToAudioConversionFormat(AudioFormat format)
@@ -1699,7 +1734,8 @@ public sealed class DownloadService : IDisposable
 
             if (string.IsNullOrEmpty(dto.Genre))
             {
-                dto.Genre = GetJsonString(root, "genre") ?? dto.Genre;
+                var genres = TrackMetadataCleaner.CleanGenres(GetJsonString(root, "genre"));
+                dto.Genre = genres.Length > 0 ? string.Join("; ", genres) : dto.Genre;
             }
 
             if (root.TryGetProperty("duration", out var duration) && duration.ValueKind == JsonValueKind.Number)

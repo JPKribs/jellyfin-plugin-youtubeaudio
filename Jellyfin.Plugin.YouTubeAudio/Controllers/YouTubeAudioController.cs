@@ -277,6 +277,27 @@ public class YouTubeAudioController : ControllerBase
     }
 
     /// <summary>
+    /// Streams a downloaded file so it can be previewed before it is imported. Supports range
+    /// requests, so the player can seek.
+    /// </summary>
+    /// <param name="id">The queue item ID.</param>
+    /// <returns>The audio file, or 404 when the item is not downloaded.</returns>
+    [HttpGet("Downloads/{id}/Audio")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult GetDownloadAudio(string id)
+    {
+        var file = _downloadService.GetPreviewFile(id);
+        if (file == null)
+        {
+            return NotFound();
+        }
+
+        Response.Headers["Cache-Control"] = "no-store";
+        return PhysicalFile(file.Value.Path, file.Value.ContentType, enableRangeProcessing: true);
+    }
+
+    /// <summary>
     /// Saves metadata tags to a downloaded file.
     /// </summary>
     /// <param name="request">The tag update request.</param>

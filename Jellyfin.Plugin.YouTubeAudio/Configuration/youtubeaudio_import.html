@@ -45,7 +45,7 @@
                                 </div>
                                 <div class="jpk-field" style="flex:3">
                                     <label>Genre</label>
-                                    <input type="text" class="jpk-edit-input" id="bulkGenre" placeholder="Rock; Pop" />
+                                    <input type="text" class="jpk-edit-input" id="bulkGenre" placeholder="Classical; Baroque" />
                                 </div>
                             </div>
                             <button is="emby-button" type="button" id="btnApplyBulk" class="raised jpk-button-submit jpk-button-small" disabled>
@@ -98,6 +98,39 @@
             border: 1px solid var(--jpk-border);
             border-radius: 6px;
             background: rgba(255, 255, 255, 0.04);
+        }
+        /* Preview: play/pause per row, with a seek bar and clock on the row that is playing. */
+        #YouTubeAudioImportPage .yta-preview-btn.active { color: #00a4dc; }
+        /* Play button and seek bar sit right after the checkbox and take the free width. */
+        /* Jellyfin styles checkbox labels width:100%; here the checkbox takes only its own width. */
+        #YouTubeAudioImportPage .jpk-edit-line > .emby-checkbox-label { flex: none; width: auto; }
+        #YouTubeAudioImportPage .jpk-edit-line:first-child { align-items: center; }
+        #YouTubeAudioImportPage .jpk-edit-line:first-child > .jpk-edit-secondary { margin: 0; padding: 0; align-self: center; }
+        #YouTubeAudioImportPage .yta-preview-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1 1 auto;
+            min-width: 0;
+            margin: 0 12px 0 4px;
+        }
+        #YouTubeAudioImportPage .yta-preview:not([hidden]) {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+        #YouTubeAudioImportPage .yta-preview-seek {
+            flex: 1 1 auto;
+            min-width: 80px;
+            accent-color: #00a4dc;
+        }
+        #YouTubeAudioImportPage .yta-preview-time {
+            flex: none;
+            font-size: 0.85em;
+            font-variant-numeric: tabular-nums;
+            opacity: 0.7;
         }
     </style>
 </div>

@@ -77,6 +77,52 @@ public class ImportCleanupTests
     public void Clean_DropsRemasterLabelsFromTitlesOnly(string title, string expected)
         => Assert.Equal(expected, TrackMetadataCleaner.Clean(new PlaylistTrack { Title = title }).Title);
 
+    // MARK: Genres
+
+    [Theory]
+    [InlineData("classical", "Classical")]
+    [InlineData("CLASSICAL", "Classical")]
+    [InlineData("classical;baroque", "Classical|Baroque")]
+    [InlineData("Classical, Romantic", "Classical|Romantic")]
+    [InlineData("Pop/Rock", "Pop|Rock")]
+    [InlineData("hip-hop/rap", "Hip-Hop|Rap")]
+    [InlineData("contemporary classical", "Contemporary Classical")]
+    [InlineData("Singer/Songwriter", "Singer/Songwriter")]
+    [InlineData("drum & bass", "Drum & Bass")]
+    [InlineData("rhythm and blues", "R&B")]
+    [InlineData("r&b; edm", "R&B|Electronic|Dance")]
+    [InlineData("k-pop", "K-Pop")]
+    [InlineData("Classical; classical ;BAROQUE", "Classical|Baroque")]
+    [InlineData(" ; ", "")]
+    public void CleanGenres_SplitsAndCapitalizes(string genre, string expected)
+        => Assert.Equal(expected.Length == 0 ? [] : expected.Split('|'), TrackMetadataCleaner.CleanGenres(genre));
+
+    [Theory]
+    [InlineData("alt-pop", "Alternative|Pop")]
+    [InlineData("Alternative Rock", "Alternative|Rock")]
+    [InlineData("indie folk", "Indie|Folk")]
+    [InlineData("Pop Punk; pop", "Pop|Punk")]
+    [InlineData("electronica", "Electronic")]
+    [InlineData("EDM", "Electronic|Dance")]
+    [InlineData("hip hop/rap", "Hip-Hop|Rap")]
+    [InlineData("rnb", "R&B")]
+    [InlineData("dnb", "Drum & Bass")]
+    [InlineData("OST", "Soundtrack")]
+    [InlineData("singer-songwriter", "Singer/Songwriter")]
+    [InlineData("classical; orchestral", "Classical|Orchestral")]
+    [InlineData("Contemporary Classical", "Contemporary Classical")]
+    [InlineData("synthwave", "Synthwave")]
+    [InlineData("Classic Rock", "Classic Rock")]
+    [InlineData("Baroque", "Baroque")]
+    [InlineData("CCM", "CCM")]
+    [InlineData("Death Metal/Black Metal", "Death Metal|Black Metal")]
+    public void CleanGenres_BreaksCompoundsIntoStandardGenres(string genre, string expected)
+        => Assert.Equal(expected.Split('|'), TrackMetadataCleaner.CleanGenres(genre));
+
+    [Fact]
+    public void Clean_NormalizesGenreForImportedTracks()
+        => Assert.Equal("Classical; Baroque", TrackMetadataCleaner.Clean(new PlaylistTrack { Title = "Canon in D", Genre = "classical/baroque" }).Genre);
+
     // MARK: Release type
 
     [Theory]

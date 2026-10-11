@@ -69,6 +69,16 @@ public class DownloadServiceTests
     public void CleanYouTubeTitle_EmptyInput_ReturnsEmpty()
         => Assert.Equal(string.Empty, DownloadService.CleanYouTubeTitle("   ", null));
 
+    // MARK: Preview
+
+    [Theory]
+    [InlineData("a.opus", "audio/ogg")]
+    [InlineData("a.MP3", "audio/mpeg")]
+    [InlineData("a.m4a", "audio/mp4")]
+    [InlineData("a.bin", "application/octet-stream")]
+    public void GetAudioContentType_MapsCachedFormats(string file, string expected)
+        => Assert.Equal(expected, DownloadService.GetAudioContentType(file));
+
     // MARK: Retries
 
     [Theory]
