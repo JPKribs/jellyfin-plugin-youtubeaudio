@@ -9,6 +9,14 @@
     "category": "Music",
     "versions": [
       {
+        "version": "12.2.1.2",
+        "changelog": "## Features\r\n- Change the YouTube link of any queued track from its queue row, keeping its details and playlist.\r\n- Better matching for classical tracks, and uploads by other performers are no longer picked.\r\n- Classical tracks already in your library are recognized even when tagged with only the movement name (or only the full work title), so they are not downloaded again.",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/v12.2.1.2/jellyfin-plugin-youtubeaudio-12.2.1.2.zip",
+        "checksum": "9d39bc38007d0273a77dfe94f666319b",
+        "timestamp": "2026-10-12T02:23:33Z"
+      },
+      {
         "version": "12.2.1.1",
         "changelog": "## Features\r\n- Preview downloaded tracks on the Import tab before importing them.\r\n- Genres are capitalized, split into separate genres, and standardized (for example alt-pop becomes Alternative and Pop).",
         "targetAbi": "12.2.0.0",
