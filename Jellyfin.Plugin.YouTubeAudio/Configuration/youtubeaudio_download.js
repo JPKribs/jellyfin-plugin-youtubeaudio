@@ -100,6 +100,11 @@ export default function (view) {
         var footer = view.querySelector('#queueFooter');
         if (!body) return;
 
+        // Keep an open link editor (and what was typed) across poll-driven re-renders.
+        var openEditor = body.querySelector('.yta-link-editor:not([hidden])');
+        var editingId = openEditor ? openEditor.closest('.jpk-table-row').getAttribute('data-id') : null;
+        var editingValue = openEditor ? openEditor.querySelector('.yta-link-input').value : '';
+
         // Remember checked rows so poll-driven re-renders don't wipe the selection.
         var checkedIds = {};
         body.querySelectorAll('.yta-queue-check:checked').forEach(function(cb) {
@@ -124,6 +129,12 @@ export default function (view) {
                 cb.checked = !!checkedIds[cb.getAttribute('data-id')];
                 cb.addEventListener('change', updateQueueSelectedCount);
             });
+
+            bindLinkEditors(body);
+            if (editingId) {
+                var editingRow = body.querySelector('.jpk-table-row[data-id="' + editingId.replace(/"/g, '') + '"]');
+                if (editingRow && editingRow.querySelector('.yta-link-btn')) openLinkEditor(editingRow, editingValue);
+            }
 
         }
 
@@ -188,12 +199,95 @@ export default function (view) {
             + '<div class="jpk-table-item-sub">' + esc(subText) + '</div>'
             + matchNote
             + errorPreview
+            + '<div class="yta-link-editor" hidden>'
+            + '<input type="url" class="yta-link-input" placeholder="https://www.youtube.com/watch?v=…" aria-label="YouTube link" />'
+            + '<button is="emby-button" type="button" class="raised jpk-button-submit jpk-button-small yta-link-save"><span>Use Link</span></button>'
+            + '<button is="emby-button" type="button" class="raised jpk-button-small yta-link-cancel"><span>Cancel</span></button>'
+            + '<div class="yta-link-error"></div>'
             + '</div>'
             + '</div>'
-            + '<div class="jpk-table-cell jpk-table-cell-status">'
+            + '</div>'
+            + '<div class="jpk-table-cell jpk-table-cell-status yta-status-cell">'
+            + (item.StatusCode === 1 ? '' : '<button type="button" class="jpk-row-btn yta-link-btn" title="Change YouTube link"><span class="material-icons">link</span></button>')
             + Shared.getStatusBadge(item.StatusCode, item.Status)
             + '</div>'
             + '</div>';
+    }
+
+    // ============================================
+    // CHANGE YOUTUBE LINK
+    // ============================================
+
+    // bindLinkEditors
+    // Wires each row's link button and inline editor, used to point a track at a different
+    // YouTube upload when its match is wrong or failed.
+    //
+    // Param: body | the queue body element
+    function bindLinkEditors(body) {
+        body.querySelectorAll('.jpk-table-row').forEach(function(row) {
+            var id = row.getAttribute('data-id');
+            var editor = row.querySelector('.yta-link-editor');
+            var input = row.querySelector('.yta-link-input');
+            var btn = row.querySelector('.yta-link-btn');
+            if (!editor || !input) return;
+
+            if (btn) btn.addEventListener('click', function() {
+                var opening = editor.hidden;
+                closeLinkEditors(body);
+                if (opening) openLinkEditor(row, '');
+            });
+            row.querySelector('.yta-link-cancel').addEventListener('click', function() { closeLinkEditors(body); });
+            row.querySelector('.yta-link-save').addEventListener('click', function() { saveLink(row, id); });
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') { e.preventDefault(); saveLink(row, id); }
+                if (e.key === 'Escape') { e.preventDefault(); closeLinkEditors(body); }
+            });
+        });
+    }
+
+    // openLinkEditor
+    // Shows a row's link editor with the given text and focuses it.
+    //
+    // Param: row   | the queue row
+    // Param: value | text to put in the field
+    function openLinkEditor(row, value) {
+        var editor = row.querySelector('.yta-link-editor');
+        var input = row.querySelector('.yta-link-input');
+        editor.hidden = false;
+        input.value = value || '';
+        row.querySelector('.yta-link-error').textContent = '';
+        input.focus();
+    }
+
+    // closeLinkEditors
+    // Hides every open link editor.
+    //
+    // Param: body | the queue body element
+    function closeLinkEditors(body) {
+        body.querySelectorAll('.yta-link-editor').forEach(function(ed) { ed.hidden = true; });
+    }
+
+    // saveLink
+    // Sends the new link; the server keeps the track's details and starts downloading it.
+    //
+    // Param: row | the queue row
+    // Param: id  | queue item id
+    function saveLink(row, id) {
+        var input = row.querySelector('.yta-link-input');
+        var error = row.querySelector('.yta-link-error');
+        var url = (input.value || '').trim();
+        if (!url) { error.textContent = 'Paste a YouTube link.'; return; }
+
+        Shared.apiRequest('Queue/' + encodeURIComponent(id) + '/Url', 'POST', { Url: url })
+            .then(function() {
+                row.querySelector('.yta-link-editor').hidden = true;
+                _processingGraceUntil = Date.now() + 120000;
+                Shared.setStatus('queueStatus', 'Link changed. Downloading from the new link.', false);
+                loadQueue();
+            })
+            .catch(function(err) {
+                error.textContent = (err && err.Error) || 'Could not use that link.';
+            });
     }
 
     // ============================================

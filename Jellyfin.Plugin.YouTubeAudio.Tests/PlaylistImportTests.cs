@@ -334,6 +334,45 @@ public class PlaylistImportTests
         Assert.True(match.ChannelMatchesArtist);
     }
 
+    // Real ytsearch5 results for an Apple-style classical title. "Lang Lang - Debussy Clair de
+    // Lune" (a fan channel) omits the catalogue details, so it only matches through the artist's
+    // name plus the movement name; the DW upload names a different pianist and must not match.
+    private static readonly MatchCandidate[] _clairDeLuneSearch =
+    [
+        new("U3u4pQ4WKOk", "Seong-Jin Cho – Debussy: Suite bergamasque, L.75: III. Clair de lune", "Deutsche Grammophon - DG", 334),
+        new("Nw5LWwf8i3w", "Lang Lang - Debussy Clair de Lune", "Richard", 367),
+        new("-Bxpm0EmOMU", "Debussy: Clair de lune | Menahem Pressler, piano", "DW Classical Music", 327)
+    ];
+
+    [Fact]
+    public void PickBest_MatchesClassicalMovementWhenArtistIsInTheTitle()
+    {
+        var track = new PlaylistTrack { Title = "Suite bergamasque, L. 75: III. Clair de lune", Artist = "Lang Lang", DurationSeconds = 367 };
+
+        var match = YouTubeMatcher.PickBest(track, _clairDeLuneSearch);
+
+        Assert.Equal("Nw5LWwf8i3w", match?.Candidate.Id);
+        Assert.False(match!.ChannelMatchesArtist);
+    }
+
+    [Fact]
+    public void PickBest_DoesNotMatchMovementByAnotherPerformer()
+    {
+        // Same length as the Pressler upload, but neither his channel nor his name is the artist.
+        var track = new PlaylistTrack { Title = "Suite bergamasque, L. 75: III. Clair de lune", Artist = "Lang Lang", DurationSeconds = 327 };
+
+        Assert.Null(YouTubeMatcher.PickBest(track, _clairDeLuneSearch));
+    }
+
+    [Theory]
+    [InlineData("Suite bergamasque, L. 75: III. Clair de lune", "clair de lune")]
+    [InlineData("Kinderszenen, Op. 15: No. 7, Träumerei", "träumerei")]
+    [InlineData("Goldberg Variations, BWV 988: Variation 1", "variation 1")]
+    [InlineData("Clair de lune", "")]
+    [InlineData("Suite: III.", "")]
+    public void GetDistinctiveTitleWords_TakesTheMovementName(string title, string expected)
+        => Assert.Equal(expected, string.Join(' ', YouTubeMatcher.GetDistinctiveTitleWords(title)));
+
     [Fact]
     public void PickBest_RejectsCandidatesTooFarOffInLength()
     {

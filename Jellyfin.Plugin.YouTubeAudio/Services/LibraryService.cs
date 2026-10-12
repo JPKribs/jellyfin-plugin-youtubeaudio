@@ -97,7 +97,8 @@ public class LibraryService
                     AlbumArtist = a.AlbumArtists.Count > 0 ? a.AlbumArtists[0] : null,
                     Album = a.Album,
                     Year = a.ProductionYear,
-                    Path = a.Path
+                    Path = a.Path,
+                    DurationSeconds = a.RunTimeTicks > 0 ? TimeSpan.FromTicks(a.RunTimeTicks.Value).TotalSeconds : null
                 })
                 .ToList();
         }

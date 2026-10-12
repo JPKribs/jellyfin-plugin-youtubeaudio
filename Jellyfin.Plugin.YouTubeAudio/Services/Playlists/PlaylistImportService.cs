@@ -145,7 +145,7 @@ public sealed class PlaylistImportService
             foreach (var playlist in selected.Where(p => !p.IsLibrary && !string.IsNullOrWhiteSpace(p.Name)))
             {
                 var target = _dbProvider.Database.GetOrCreatePlaylistTarget(playlistUserId, playlist.Name!.Trim(), source.Id);
-                _dbProvider.Database.AddPlaylistEntries(target.Id, BuildPlaylistEntries(playlist));
+                _dbProvider.Database.AddPlaylistEntries(target.Id, BuildPlaylistEntries(playlist, plan.LibraryAliases));
                 playlistsTracked++;
             }
 
@@ -183,9 +183,10 @@ public sealed class PlaylistImportService
     }
 
     /// <summary>
-    /// Lists a playlist's songs as playlist entries, in order, once per song.
+    /// Lists a playlist's songs as playlist entries, in order, once per song. Songs the library
+    /// has under another title (see <see cref="ImportPlan.LibraryAliases"/>) use the library's key.
     /// </summary>
-    internal static List<PlaylistEntry> BuildPlaylistEntries(ParsedPlaylist playlist)
+    internal static List<PlaylistEntry> BuildPlaylistEntries(ParsedPlaylist playlist, IReadOnlyDictionary<string, string>? libraryAliases = null)
     {
         var entries = new List<PlaylistEntry>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -193,6 +194,11 @@ public sealed class PlaylistImportService
         {
             var track = TrackMetadataCleaner.Clean(raw);
             var key = TrackMetadataCleaner.SongKey(track.Artist, track.Title);
+            if (libraryAliases != null && libraryAliases.TryGetValue(key, out var libraryKey))
+            {
+                key = libraryKey;
+            }
+
             if (seen.Add(key))
             {
                 entries.Add(new PlaylistEntry { Position = entries.Count, SongKey = key, Artist = track.Artist, Title = track.Title });

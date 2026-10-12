@@ -156,6 +156,40 @@ public class YouTubeAudioController : ControllerBase
     }
 
     /// <summary>
+    /// Points a queue item at a different YouTube link (to fix a wrong or failed match) and
+    /// starts downloading it. Its metadata and playlist entries are kept.
+    /// </summary>
+    /// <param name="id">The queue item ID.</param>
+    /// <param name="request">The new YouTube link.</param>
+    /// <returns>The updated item.</returns>
+    [HttpPost("Queue/{id}/Url")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public ActionResult<QueueItemDto> ChangeQueueUrl(string id, [FromBody] QueueUrlRequest request)
+    {
+        try
+        {
+            var item = _downloadService.ChangeUrl(id, request?.Url ?? string.Empty);
+            _downloadService.StartProcessing([id]);
+            return Ok(item);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { Error = ex.Message });
+        }
+        catch (FileNotFoundException ex)
+        {
+            return NotFound(new { Error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { Error = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Gets all queue items.
     /// </summary>
     /// <returns>List of queue items with total count.</returns>

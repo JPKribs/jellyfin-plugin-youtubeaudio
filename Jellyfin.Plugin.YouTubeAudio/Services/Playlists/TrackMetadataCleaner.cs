@@ -25,6 +25,19 @@ public static partial class TrackMetadataCleaner
     // Genre names that contain a separator but are one genre.
     private static readonly string[] _compoundGenres = ["Singer/Songwriter"];
 
+    // Tempo and form words shared by countless movements. A movement named only by these
+    // ("I. Allegro", "Prélude") does not identify a piece on its own.
+    private static readonly HashSet<string> _genericMovementWords = new(StringComparer.Ordinal)
+    {
+        "allegro", "allegretto", "adagio", "adagietto", "andante", "andantino", "presto", "prestissimo", "largo",
+        "larghetto", "lento", "grave", "vivace", "vivo", "moderato", "molto", "assai", "non", "troppo", "con", "brio",
+        "moto", "poco", "più", "piu", "sostenuto", "cantabile", "maestoso", "espressivo", "scherzo", "scherzando",
+        "menuetto", "menuet", "minuet", "minuetto", "trio", "rondo", "rondeau", "finale", "aria", "prelude", "prélude",
+        "praeludium", "intermezzo", "allemande", "courante", "sarabande", "gigue", "gavotte", "bourrée", "bourree",
+        "theme", "variation", "variations", "var", "introduction", "intro", "coda", "tempo", "alla", "marcia",
+        "recitative", "recitativo", "chorus", "overture", "ouverture", "sinfonia", "toccata", "fugue", "fuga", "the", "and"
+    };
+
     // Genre words written in capitals (or a fixed form) rather than title case.
     private static readonly Dictionary<string, string> _genreWordForms = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -330,6 +343,25 @@ public static partial class TrackMetadataCleaner
         var (primary, _) = SplitArtist(artist);
         var (cleanTitle, _) = ExtractFeatured(title);
         return Normalize(primary) + "|" + Normalize(StripTitleDesignations(cleanTitle));
+    }
+
+    /// <summary>
+    /// Builds a song key from just the movement of a classical title, in the same form as
+    /// <see cref="SongKey"/>: "Suite bergamasque, L. 75: III. Clair de lune" gives the key of
+    /// "Clair de lune". Returns null for titles without a movement, or whose movement is only a
+    /// tempo or form ("I. Allegro"), which many pieces share.
+    /// </summary>
+    public static string? MovementKey(string? artist, string? title)
+    {
+        var (cleanTitle, _) = ExtractFeatured(title);
+        var words = YouTubeMatcher.GetDistinctiveTitleWords(StripTitleDesignations(cleanTitle));
+        if (words.All(w => w.Length <= 2 || w.All(char.IsDigit) || _genericMovementWords.Contains(w)))
+        {
+            return null;
+        }
+
+        var (primary, _) = SplitArtist(artist);
+        return Normalize(primary) + "|" + Normalize(string.Concat(words));
     }
 
     /// <summary>

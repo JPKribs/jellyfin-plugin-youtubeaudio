@@ -381,6 +381,44 @@ public sealed class DownloadService : IDisposable
     }
 
     /// <summary>
+    /// Points a queue item at a different YouTube upload (to fix a wrong or failed match) and
+    /// queues it again. Its playlist details, metadata and playlist entries are kept; a file
+    /// already downloaded from the old link is discarded.
+    /// </summary>
+    /// <param name="id">The queue item ID.</param>
+    /// <param name="url">The YouTube link to use.</param>
+    /// <returns>The updated item.</returns>
+    [SuppressMessage("Security", "CA3003:Review code for file path injection vulnerabilities", Justification = "File paths use GUID-based names from database lookup.")]
+    public QueueItemDto ChangeUrl(string id, string url)
+    {
+        url = url?.Trim() ?? string.Empty;
+        if (!IsValidYouTubeUrl(url))
+        {
+            throw new ArgumentException("Enter a YouTube link.");
+        }
+
+        var db = _dbProvider.Database;
+        var item = db.GetItemById(id) ?? throw new FileNotFoundException("Queue item not found.");
+        if (item.Status is QueueStatus.Downloading or QueueStatus.Imported)
+        {
+            throw new InvalidOperationException(item.Status == QueueStatus.Downloading
+                ? "This item is downloading; change its link once it finishes."
+                : "This item is already in the library.");
+        }
+
+        if (item.Status == QueueStatus.Downloaded)
+        {
+            DeleteCachedFiles(item);
+        }
+
+        db.UpdateResolvedUrl(item.Id, url, null);
+        db.UpdateStatus(item.Id, QueueStatus.Queued);
+        _logger.LogInformation("Changed the YouTube link of {Id} to {Url}", id, SanitizeForLog(url));
+
+        return db.GetItemById(id)!.ToDto();
+    }
+
+    /// <summary>
     /// Searches YouTube for a playlist-imported track and records the best match on the item.
     /// Marks the item as Error and returns false when nothing acceptable is found.
     /// </summary>
@@ -1055,22 +1093,28 @@ public sealed class DownloadService : IDisposable
 
         if (item != null)
         {
-            var cacheDir = _dbProvider.GetAudioCacheDirectory();
-            var filePath = Path.Combine(cacheDir, item.FileName);
-
-            if (File.Exists(filePath))
-            {
-                File.Delete(filePath);
-            }
-
-            var infoJsonPath = GetInfoJsonPath(filePath);
-            if (File.Exists(infoJsonPath))
-            {
-                File.Delete(infoJsonPath);
-            }
-
+            DeleteCachedFiles(item);
             db.DeleteItem(id);
             _logger.LogInformation("Deleted cached file for queue item {Id}", id);
+        }
+    }
+
+    /// <summary>
+    /// Deletes an item's cached audio file and info.json sidecar, if present.
+    /// </summary>
+    [SuppressMessage("Security", "CA3003:Review code for file path injection vulnerabilities", Justification = "File paths use GUID-based names from database lookup.")]
+    private void DeleteCachedFiles(QueueItem item)
+    {
+        var filePath = Path.Combine(_dbProvider.GetAudioCacheDirectory(), item.FileName);
+        if (File.Exists(filePath))
+        {
+            File.Delete(filePath);
+        }
+
+        var infoJsonPath = GetInfoJsonPath(filePath);
+        if (File.Exists(infoJsonPath))
+        {
+            File.Delete(infoJsonPath);
         }
     }
 

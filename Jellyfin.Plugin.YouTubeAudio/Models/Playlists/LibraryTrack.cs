@@ -27,4 +27,7 @@ public class LibraryTrack
 
     /// <summary>Gets or sets the file path.</summary>
     public string? Path { get; set; }
+
+    /// <summary>Gets or sets the track length in seconds, when known.</summary>
+    public double? DurationSeconds { get; set; }
 }

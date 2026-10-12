@@ -27,6 +27,13 @@ public sealed class ImportPlan
 
     /// <summary>Gets or sets the number of queued tracks that will replace a lesser version in the library.</summary>
     public int LibraryUpgrades { get; set; }
+
+    /// <summary>
+    /// Gets the library songs matched under a different title (a classical movement tagged
+    /// with or without its work), as the export's song key → the library's song key, so
+    /// playlists use the library copy.
+    /// </summary>
+    public Dictionary<string, string> LibraryAliases { get; } = new(StringComparer.Ordinal);
 }
 
 /// <summary>
@@ -35,7 +42,8 @@ public sealed class ImportPlan
 /// <list type="bullet">
 /// <item>Each song (primary artist + title) is queued once, choosing its best release: album,
 /// then compilation, then EP, then single.</item>
-/// <item>A song the library already has is skipped, except that a library single is upgraded:
+/// <item>A song the library already has is skipped (a classical movement also counts when one
+/// side names only the movement: see <see cref="FindLibrarySong"/>), except that a library single is upgraded:
 /// the studio album version is queued and replaces the single's file on import.</item>
 /// <item>A song already queued is skipped, unless the queued copy is a lesser release that
 /// has not downloaded yet, which is swapped for the better one, or a failed download, which is
@@ -106,6 +114,12 @@ public static class ImportPlanner
             .Where(t => !string.IsNullOrWhiteSpace(t.Album))
             .GroupBy(t => TrackMetadataCleaner.AlbumKey(t.AlbumArtist, t.Artist, t.Album))
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+        var libraryByMovement = library
+            .Where(t => !string.IsNullOrWhiteSpace(t.Title))
+            .Select(t => (Key: TrackMetadataCleaner.MovementKey(t.Artist, t.Title), Track: t))
+            .Where(x => x.Key != null)
+            .GroupBy(x => x.Key!, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Track).ToList(), StringComparer.Ordinal);
         // Imported rows (kept by older plugin versions) describe songs already moved into the
         // library; the library check covers them, so they never block a song from being queued.
         var queuedSongs = queued
@@ -121,6 +135,15 @@ public static class ImportPlanner
             // 3. The library: skip what it has. The one upgrade is single → studio album, and
             //    only when the library copy is on a different album: a title track alone on its
             //    album ("Boléro" on Boléro) looks like a single but is the same release.
+            var libraryKey = FindLibrarySong(track, librarySongs, libraryByMovement);
+            if (libraryKey != null && libraryKey != key)
+            {
+                // Matched on the movement alone: the library copy is used as it is, never upgraded.
+                plan.LibraryAliases[key] = libraryKey;
+                plan.AlreadyInLibrary++;
+                continue;
+            }
+
             if (librarySongs.TryGetValue(key, out var existing))
             {
                 var trackAlbum = AlbumKey(track);
@@ -168,6 +191,48 @@ public static class ImportPlanner
         }
 
         return plan;
+    }
+
+    /// <summary>
+    /// Finds the library song for a track and returns its song key, or null when the library
+    /// does not have it. Besides an exact artist and title match, a classical movement matches
+    /// when one side is tagged with only the movement: the export's "Suite bergamasque, L. 75:
+    /// III. Clair de lune" and a library "Clair de lune" by the same artist, or the other way
+    /// round. Two full titles that differ are never matched, the movement must name exactly one
+    /// library song, and the lengths must agree when both are known.
+    /// </summary>
+    internal static string? FindLibrarySong(
+        PlaylistTrack track,
+        IReadOnlyDictionary<string, List<LibraryTrack>> librarySongs,
+        IReadOnlyDictionary<string, List<LibraryTrack>> libraryByMovement)
+    {
+        var key = TrackMetadataCleaner.SongKey(track.Artist, track.Title);
+        if (librarySongs.ContainsKey(key))
+        {
+            return key;
+        }
+
+        var movement = TrackMetadataCleaner.MovementKey(track.Artist, track.Title);
+        List<LibraryTrack>? matches = null;
+        if (movement != null)
+        {
+            librarySongs.TryGetValue(movement, out matches);
+        }
+        else if (!track.Title.Contains(':', StringComparison.Ordinal))
+        {
+            libraryByMovement.TryGetValue(key, out matches);
+        }
+
+        if (matches == null)
+        {
+            return null;
+        }
+
+        var songKeys = matches.Select(t => TrackMetadataCleaner.SongKey(t.Artist, t.Title)).Distinct(StringComparer.Ordinal).ToList();
+        var lengthAgrees = matches.Any(t => !t.DurationSeconds.HasValue || !track.DurationSeconds.HasValue
+            || Math.Abs(t.DurationSeconds.Value - track.DurationSeconds.Value) <= YouTubeMatcher.MaxDurationDeltaSeconds);
+
+        return songKeys.Count == 1 && lengthAgrees ? songKeys[0] : null;
     }
 
     /// <summary>

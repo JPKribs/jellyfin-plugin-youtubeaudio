@@ -338,6 +338,84 @@ public class ImportCleanupTests
         Assert.Equal(2004, track.Year);
     }
 
+    // MARK: Classical movements in the library
+
+    private const string MovementTitle = "Suite bergamasque, L. 75: III. Clair de lune";
+
+    [Fact]
+    public void Plan_UsesALibraryCopyTaggedWithOnlyTheMovement()
+    {
+        var library = new List<LibraryTrack> { new() { Title = "Clair de lune", Artist = "Lang Lang", Album = "Piano Book", DurationSeconds = 300 } };
+
+        var plan = ImportPlanner.Plan([new PlaylistTrack { Title = MovementTitle, Artist = "Lang Lang", Album = "Debussy", DurationSeconds = 302 }], library, []);
+
+        Assert.Empty(plan.Tracks);
+        Assert.Equal(1, plan.AlreadyInLibrary);
+        Assert.Equal("langlang|clairdelune", plan.LibraryAliases[TrackMetadataCleaner.SongKey("Lang Lang", MovementTitle)]);
+    }
+
+    [Fact]
+    public void Plan_UsesALibraryCopyTaggedWithTheWholeWork()
+    {
+        var library = new List<LibraryTrack> { new() { Title = MovementTitle, Artist = "Lang Lang", Album = "Debussy" } };
+
+        var plan = ImportPlanner.Plan([new PlaylistTrack { Title = "Clair de lune", Artist = "Lang Lang", Album = "Piano Book" }], library, []);
+
+        Assert.Empty(plan.Tracks);
+        Assert.Equal(TrackMetadataCleaner.SongKey("Lang Lang", MovementTitle), plan.LibraryAliases["langlang|clairdelune"]);
+    }
+
+    [Theory]
+    [InlineData("Lang Lang", "Clair de lune", 300, "Seong-Jin Cho")] // another performer
+    [InlineData("Lang Lang", "Clair de lune", 420, "Lang Lang")] // a different recording length
+    [InlineData("Yo-Yo Ma", "Cello Suite No. 2 in D Minor, BWV 1008: I. Prélude", 230, "Yo-Yo Ma")] // a tempo/form name alone
+    public void Plan_DownloadsWhenTheMovementMatchIsNotCertain(string libraryArtist, string libraryTitle, double libraryLength, string trackArtist)
+    {
+        var title = trackArtist == "Yo-Yo Ma" ? "Cello Suite No. 1 in G Major, BWV 1007: I. Prélude" : MovementTitle;
+        var library = new List<LibraryTrack> { new() { Title = libraryTitle, Artist = libraryArtist, DurationSeconds = libraryLength } };
+
+        var plan = ImportPlanner.Plan([new PlaylistTrack { Title = title, Artist = trackArtist, DurationSeconds = 300 }], library, []);
+
+        Assert.Single(plan.Tracks);
+        Assert.Empty(plan.LibraryAliases);
+    }
+
+    [Fact]
+    public void Plan_DownloadsWhenTheMovementNamesSeveralLibrarySongs()
+    {
+        // Two different works by the artist share the movement name "Romance": it identifies neither.
+        var library = new List<LibraryTrack>
+        {
+            new() { Title = "Violin Sonata No. 5: II. Romanze", Artist = "Hilary Hahn" },
+            new() { Title = "Romance in F Major, Op. 50: Romanze", Artist = "Hilary Hahn" }
+        };
+
+        var plan = ImportPlanner.Plan([new PlaylistTrack { Title = "Romanze", Artist = "Hilary Hahn" }], library, []);
+
+        Assert.Single(plan.Tracks);
+    }
+
+    [Fact]
+    public void BuildPlaylistEntries_UseTheLibraryKeyForAMovementMatch()
+    {
+        var playlist = new ParsedPlaylist { Name = "Evening Piano" };
+        playlist.Tracks.Add(new PlaylistTrack { Title = MovementTitle, Artist = "Lang Lang" });
+        var aliases = new Dictionary<string, string> { [TrackMetadataCleaner.SongKey("Lang Lang", MovementTitle)] = "langlang|clairdelune" };
+
+        var entry = Assert.Single(PlaylistImportService.BuildPlaylistEntries(playlist, aliases));
+
+        Assert.Equal("langlang|clairdelune", entry.SongKey);
+        Assert.Equal(MovementTitle, entry.Title);
+    }
+
+    [Theory]
+    [InlineData(MovementTitle, "langlang|clairdelune")]
+    [InlineData("Cello Suite No. 1 in G Major, BWV 1007: I. Prélude", null)]
+    [InlineData("Piano Sonata No. 14: III. Presto agitato", "langlang|prestoagitato")]
+    [InlineData("Clair de lune", null)]
+    public void MovementKey_KeepsOnlyDistinctiveMovements(string title, string? expected)
+        => Assert.Equal(expected, TrackMetadataCleaner.MovementKey("Lang Lang", title));
+
     // MARK: Tagging
 
     [Fact]

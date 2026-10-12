@@ -65,8 +65,8 @@ public static class YouTubeMatcher
 
     /// <summary>
     /// Returns the best candidate, or null when none is acceptable. A candidate must be close
-    /// in length (when both lengths are known) and must come from the artist's channel or carry
-    /// the track title. Among the rest, the artist's own channel and the closest length win;
+    /// in length (when both lengths are known) and come from the artist's channel, or name the
+    /// artist in a title that carries the track title (or, for classical titles, the movement). Among the rest, the artist's own channel and the closest length win;
     /// alternate versions (slowed, live, cover…) lose unless the source title asks for them.
     /// </summary>
     public static MatchResult? PickBest(PlaylistTrack track, IEnumerable<MatchCandidate> candidates)
@@ -82,6 +82,13 @@ public static class YouTubeMatcher
 
         var titleWords = Tokenize(track.Title);
         var sourceTitleText = " " + string.Join(' ', titleWords) + " ";
+        var tailWords = GetDistinctiveTitleWords(track.Title);
+        var artistNames = new[] { track.Artist }.Concat(track.FeaturedArtists ?? [])
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .SelectMany(name => name!.Split(_artistSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Append(name!))
+            .Select(Tokenize)
+            .Where(words => words.Count > 0)
+            .ToList();
 
         MatchResult? best = null;
         var bestScore = double.MinValue;
@@ -101,7 +108,16 @@ public static class YouTubeMatcher
 
             var candidateWords = Tokenize(candidate.Title);
             var titleMatch = titleWords.Count > 0 && titleWords.All(candidateWords.Contains);
-            if (!channelMatch && !titleMatch)
+
+            // Classical uploads rarely repeat every catalogue detail ("Suite bergamasque, L. 75:
+            // III. Clair de lune" uploaded as "Lang Lang - Debussy: Clair de lune"), so the
+            // movement name alone can match the title.
+            var tailMatch = !titleMatch && tailWords.Count > 0 && tailWords.All(candidateWords.Contains);
+            var artistInTitle = !channelMatch && artistNames.Any(words => words.All(candidateWords.Contains));
+
+            // An upload must show it is by the artist: their (or their label's) channel, or their
+            // name in the title. A matching title alone may be another performer's recording.
+            if (!channelMatch && !(artistInTitle && (titleMatch || tailMatch)))
             {
                 continue;
             }
@@ -114,6 +130,8 @@ public static class YouTubeMatcher
             var score = 0.0;
             score += channelMatch ? 50 : 0;
             score += titleMatch ? 30 : 0;
+            score += tailMatch ? 15 : 0;
+            score += artistInTitle ? 25 : 0;
             score += isTopic ? 10 : 0;
             score -= alternateVersion ? 25 : 0;
             score -= (delta ?? 0) * 3;
@@ -150,6 +168,36 @@ public static class YouTubeMatcher
         }
 
         return notes.Count == 0 ? null : string.Join("; ", notes) + ". Check the match before importing.";
+    }
+
+    /// <summary>
+    /// Gets the words that identify a piece within a long classical title: the part after the
+    /// last colon (the movement or aria), without its numbering. "Suite bergamasque, L. 75: III.
+    /// Clair de lune" gives "clair de lune"; a title without a colon gives nothing.
+    /// </summary>
+    internal static List<string> GetDistinctiveTitleWords(string? title)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            return new List<string>();
+        }
+
+        var colon = title.LastIndexOf(':');
+        if (colon < 0 || colon == title.Length - 1)
+        {
+            return new List<string>();
+        }
+
+        var words = Tokenize(title[(colon + 1)..]);
+        while (words.Count > 1 && IsNumbering(words[0]))
+        {
+            words.RemoveAt(0);
+        }
+
+        return words.Count > 0 && words.Any(w => w.Length > 2 && !IsNumbering(w)) ? words : new List<string>();
+
+        static bool IsNumbering(string word)
+            => word == "no" || word.All(char.IsDigit) || (word.Length <= 5 && word.All(c => "ivxlc".Contains(c, StringComparison.Ordinal)));
     }
 
     private static List<string> GetArtistKeys(string? artist)
