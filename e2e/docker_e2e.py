@@ -105,14 +105,24 @@ def tag(rel, title, artist, album, year, track):
     subprocess.run(cmd + ["/m/" + rel], check=True, capture_output=True)
 
 
-def ffprobe(rel):
+def probe(path):
     out = sh("docker", "exec", NAME, "/usr/lib/jellyfin-ffmpeg/ffprobe", "-v", "error", "-show_entries",
-             "format=duration:format_tags:stream=codec_name:stream_tags", "-of", "json", "/media/music/" + rel)
-    data = json.loads(out)
+             "format=duration:format_tags:stream=codec_type,codec_name:stream_tags", "-of", "json", path)
+    return json.loads(out)
+
+
+def ffprobe(rel):
+    """Duration, audio codec and tags (from the audio stream; an embedded cover is a separate stream)."""
+    data = probe("/media/music/" + rel)
+    audio = [s for s in data.get("streams", []) if s.get("codec_type") == "audio"]
     tags = {k.lower(): v for k, v in (data["format"].get("tags") or {}).items()}
-    for s in data.get("streams", []):
+    for s in audio:
         tags.update({k.lower(): v for k, v in (s.get("tags") or {}).items()})
-    return float(data["format"]["duration"]), data["streams"][0]["codec_name"], tags
+    return float(data["format"]["duration"]), audio[0]["codec_name"], tags
+
+
+def has_cover(path):
+    return any(s.get("codec_type") == "video" for s in probe(path).get("streams", []))
 
 
 def start_container():
@@ -133,6 +143,10 @@ TITLE_TRACK = "Rhapsody in Blue"
 UNMATCHABLE = "Qwxzv Unmatchable Sonata Zzyx"
 FIX_URL = "https://www.youtube.com/watch?v=noW9fM9vgJs"  # Yo-Yo Ma, Bach Cello Suite No. 1: Prélude (~152 s)
 FIX_SECONDS = 152
+# Lang Lang's own upload, titled "Beethoven: Für Elise, Bagatelle in A Minor, WoO 59" (204 s); on Apple
+# Music it is 'Bagatelle No. 25 in A Minor, WoO 59 "Für Elise"', track 2 of Piano Book (2019).
+LINK_URL = "https://www.youtube.com/watch?v=k_ZLxAPro3w"
+LINK_TITLE = 'Bagatelle No. 25 in A Minor, WoO 59 "Für Elise"'
 ARTIST, ALBUM, LIBRARY_ALBUM, YEAR, GENRE = "Lang Lang", "Piano Book", "Piano Book (Deluxe Edition)", 2019, "Classical"
 ALBUM_DIR = f"{ARTIST}/{LIBRARY_ALBUM} ({YEAR})/"
 SINGLE_FILE = f"{ARTIST}/{UPGRADE} (2018)/{UPGRADE}.opus"
@@ -410,12 +424,39 @@ def main():
     check("Singles unchanged", len(ltitles(singles)) == 1)
     check("library untouched by re-import", snapshot() == lib_before)
 
+    print("== 8. A plain YouTube link gets its details and cover from Apple Music")
+
+    def download_link():
+        lid = call("POST", "/YouTubeAudio/Queue", {"Url": LINK_URL})[0]["Id"]
+        call("POST", "/YouTubeAudio/Queue/Process", {"Ids": [lid]})
+        item = wait(lambda: (lambda i: i if i and i["StatusCode"] in (2, 4) else None)(
+            next((i for i in queue() if i["Id"] == lid), None)), "link download", 300, 3)
+        return item, next((x for x in call("GET", "/YouTubeAudio/Downloads")["Items"] if x["Id"] == lid), {})
+
+    item, d = download_link()
+    check("plain link downloaded", item["StatusCode"] == 2, item.get("ErrorMessage"))
+    fields = {k: d.get(k) for k in ("MetadataTitle", "Artist", "AlbumArtist", "Album", "Year", "TrackNumber", "Genre", "InLibrary")}
+    check("Apple Music filled in title, album, year, track number and genre",
+          d.get("MetadataTitle") == LINK_TITLE and d.get("Artist") == ARTIST and d.get("AlbumArtist") == ARTIST and d.get("Album") == "Piano Book"
+          and d.get("Year") == YEAR and d.get("TrackNumber") == 2 and d.get("Genre") == GENRE, json.dumps(fields, ensure_ascii=False))
+    check("cover art embedded in the download", has_cover("/config/data/youtubeaudio/cache/" + item["FileName"]))
+    check("a new song is not flagged as in the library", d.get("InLibrary") is False, json.dumps(fields, ensure_ascii=False))
+    imp = call("POST", "/YouTubeAudio/Import", {"Ids": [item["Id"]]})
+    link_rel = f"{ARTIST}/Piano Book ({YEAR})/Bagatelle No. 25 in A Minor, WoO 59 'Für Elise'.opus"
+    check("imported with a share-safe file name", len(imp["ImportedIds"]) == 1 and os.path.exists(os.path.join(MUSIC, link_rel)),
+          json.dumps(imp) + " " + str(sorted(k for k in snapshot() if "Bagatelle" in k)))
+    check("imported file keeps its cover", has_cover("/media/music/" + link_rel))
+    wait(lambda: any(i["Name"] == LINK_TITLE for i in call("GET", "/Items?includeItemTypes=Audio&recursive=true")["Items"]), "library scan of the link import", 180, 3)
+    item, d = download_link()
+    check("downloading it again shows 'Already in your library'", d.get("InLibrary") is True, json.dumps({k: d.get(k) for k in ("MetadataTitle", "Artist", "InLibrary")}, ensure_ascii=False))
+    call("DELETE", f"/YouTubeAudio/Downloads/{item['Id']}")
+
     logs = sh("docker", "logs", NAME, check=False) + subprocess.run(["docker", "logs", NAME], capture_output=True, text=True).stderr
     errs = [l for l in logs.splitlines() if "YouTubeAudio" in l and ("[ERR]" in l or "[FTL]" in l)]
     check("no plugin errors in server log", not errs, "\n".join(errs[:5]))
     print("\n  plugin log:")
     for l in logs.splitlines():
-        if "YouTubeAudio" in l and any(w in l for w in ("Queued", "Matched", "Downloaded", "Imported", "Removed", "Created", "Added", "Re-ordered", "finished", "No YouTube", "yt-dlp", "Deno", "Retrying", "WRN")):
+        if "YouTubeAudio" in l and any(w in l for w in ("Queued", "Matched", "Downloaded", "Imported", "Removed", "Created", "Added", "Re-ordered", "finished", "No YouTube", "yt-dlp", "Deno", "Retrying", "Apple Music", "WRN")):
             print("  >", l.split("] ", 2)[-1][:220])
 
     print("\nRESULT:", f"FAILED ({len(FAILED)}): " + "; ".join(FAILED) if FAILED else "ALL PASSED")

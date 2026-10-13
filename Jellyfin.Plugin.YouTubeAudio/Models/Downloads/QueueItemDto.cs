@@ -8,6 +8,9 @@ public class QueueItemDto
     /// <summary>Gets or sets the unique identifier.</summary>
     public string Id { get; set; } = string.Empty;
 
+    /// <summary>Gets or sets a value indicating whether the library already has this song.</summary>
+    public bool InLibrary { get; set; }
+
     /// <summary>Gets or sets the original YouTube URL.</summary>
     public string Url { get; set; } = string.Empty;
 

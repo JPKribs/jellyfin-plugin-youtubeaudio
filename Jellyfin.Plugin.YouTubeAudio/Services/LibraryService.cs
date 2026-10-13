@@ -110,6 +110,45 @@ public class LibraryService
     }
 
     /// <summary>
+    /// Maps each artist in the music libraries (compared case- and punctuation-insensitively) to
+    /// the spelling the library uses most, so new imports reuse "Linkin Park" rather than
+    /// adding "LINKIN PARK" as a second artist.
+    /// </summary>
+    public Dictionary<string, string> GetArtistSpellings()
+    {
+        try
+        {
+            var items = _libraryManager.GetItemList(new InternalItemsQuery
+            {
+                IncludeItemTypes = new[] { BaseItemKind.Audio },
+                Recursive = true,
+                IsVirtualItem = false
+            });
+
+            return BuildArtistSpellings(items.OfType<Audio>().SelectMany(a => a.Artists.Concat(a.AlbumArtists)));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to list library artists");
+            return new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+    }
+
+    /// <summary>
+    /// Picks the most used spelling of each artist name.
+    /// </summary>
+    internal static Dictionary<string, string> BuildArtistSpellings(IEnumerable<string> names)
+        => names
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Select(n => n.Trim())
+            .GroupBy(Services.Playlists.TrackMetadataCleaner.Normalize, StringComparer.Ordinal)
+            .Where(g => g.Key.Length > 0)
+            .ToDictionary(
+                g => g.Key,
+                g => g.GroupBy(n => n, StringComparer.Ordinal).OrderByDescending(v => v.Count()).ThenBy(v => v.Key, StringComparer.Ordinal).First().Key,
+                StringComparer.Ordinal);
+
+    /// <summary>
     /// Searches for artists in the Jellyfin library matching the query.
     /// </summary>
     public List<string> SearchArtists(string query, int limit = 20)

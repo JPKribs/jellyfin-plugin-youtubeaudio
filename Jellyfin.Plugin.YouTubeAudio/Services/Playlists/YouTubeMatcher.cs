@@ -263,7 +263,7 @@ public static class YouTubeMatcher
             || (artistKey.Length >= 4 && channelKey.Contains(artistKey, StringComparison.Ordinal))
             || (channelKey.Length >= 4 && artistKey.Contains(channelKey, StringComparison.Ordinal));
 
-    private static string Normalize(string value)
+    internal static string Normalize(string value)
     {
         var sb = new StringBuilder(value.Length);
         foreach (var c in value)
@@ -277,7 +277,7 @@ public static class YouTubeMatcher
         return sb.ToString();
     }
 
-    private static List<string> Tokenize(string? value)
+    internal static List<string> Tokenize(string? value)
     {
         var words = new List<string>();
         if (string.IsNullOrEmpty(value))

@@ -1,4 +1,5 @@
 using Jellyfin.Plugin.YouTubeAudio.Services;
+using Jellyfin.Plugin.YouTubeAudio.Services.Catalog;
 using Jellyfin.Plugin.YouTubeAudio.Services.Playlists;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
@@ -16,6 +17,9 @@ public class ServiceRegistrator : IPluginServiceRegistrator
     {
         // Singleton: database provider (lazy-creates SQLite DB)
         serviceCollection.AddSingleton<QueueDatabaseProvider>();
+
+        // Singleton: Apple catalog lookups (rate-limited, cached for the server's lifetime)
+        serviceCollection.AddSingleton<AppleCatalogClient>();
 
         // Singleton: download service (owns SemaphoreSlim for download serialization)
         serviceCollection.AddSingleton<DownloadService>();

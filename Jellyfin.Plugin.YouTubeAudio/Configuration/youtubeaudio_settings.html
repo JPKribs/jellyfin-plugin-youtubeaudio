@@ -87,6 +87,25 @@
                                     When disabled, duplicate files are skipped and left in the download cache.
                                 </div>
                             </div>
+                            <div class="checkboxContainer checkboxContainer-withDescription" style="margin-bottom: 12px;">
+                                <label class="emby-checkbox-label">
+                                    <input type="checkbox" is="emby-checkbox" id="chkLookUpCatalog" checked />
+                                    <span class="checkboxLabel">Look up song details on Apple Music</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">
+                                    Fills in the album, album artist, release year, track number and genre of each download from Apple's catalog.
+                                    Only confident matches are used, and you can still edit everything before importing.
+                                </div>
+                            </div>
+                            <div class="checkboxContainer checkboxContainer-withDescription" style="margin-bottom: 12px;">
+                                <label class="emby-checkbox-label">
+                                    <input type="checkbox" is="emby-checkbox" id="chkEmbedCoverArt" checked />
+                                    <span class="checkboxLabel">Embed cover art</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">
+                                    Adds the album cover from Apple's catalog to each downloaded file.
+                                </div>
+                            </div>
                             <button is="emby-button" type="button" id="btnSaveImportBehavior" class="raised jpk-button-submit jpk-button-small" style="margin-top: 12px;">
                                 <span>Save</span>
                             </button>

@@ -1,3 +1,4 @@
+using System;
 using Jellyfin.Plugin.YouTubeAudio.Models;
 using Jellyfin.Plugin.YouTubeAudio.Services;
 using Xunit;
@@ -109,6 +110,9 @@ public class DownloadServiceTests
     [InlineData("Argerich & Barenboim", "Argerich and Barenboim")]
     [InlineData("a#b%c", "abc")]
     [InlineData("  ..name..  ", "name")]
+    [InlineData("Carnival of the Animals: XIII. The Swan", "Carnival of the Animals - XIII. The Swan")]
+    [InlineData("Bagatelle \"Für Elise\"", "Bagatelle 'Für Elise'")]
+    [InlineData("Who? Me*<>|", "Who Me")]
     public void SanitizePathComponent_RemovesProblemChars(string input, string expected)
         => Assert.Equal(expected, DownloadService.SanitizePathComponent(input));
 
@@ -118,6 +122,28 @@ public class DownloadServiceTests
     [InlineData("###")]
     public void SanitizePathComponent_EmptyResult_FallsBackToUnknown(string input)
         => Assert.Equal("Unknown", DownloadService.SanitizePathComponent(input));
+
+    [Fact]
+    public void SanitizePathComponent_ShortensLongNamesAtAWordBreak()
+    {
+        var name = "Goldberg Variations, BWV 988: Aria da capo e fine, as recorded in the 1981 session at the Columbia 30th Street Studio in New York";
+
+        var result = DownloadService.SanitizePathComponent(name);
+
+        Assert.True(result.Length <= DownloadService.MaxPathComponentLength, result);
+        Assert.StartsWith("Goldberg Variations, BWV 988 - Aria da capo", result, StringComparison.Ordinal);
+        Assert.False(result.EndsWith(' '));
+    }
+
+    // MARK: Channel names
+
+    [Theory]
+    [InlineData("Lang Lang - Topic", "Lang Lang")]
+    [InlineData("HilaryHahnVEVO", "HilaryHahn")]
+    [InlineData("Deutsche Grammophon", "Deutsche Grammophon")]
+    [InlineData("  ", null)]
+    public void ChannelToArtist_StripsTopicAndVevo(string channel, string? expected)
+        => Assert.Equal(expected, DownloadService.ChannelToArtist(channel));
 
     // MARK: Log sanitizing
 

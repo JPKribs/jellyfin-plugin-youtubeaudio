@@ -12,6 +12,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.YouTubeAudio.Configuration;
 using Jellyfin.Plugin.YouTubeAudio.Models;
+using Jellyfin.Plugin.YouTubeAudio.Services.Catalog;
 using Jellyfin.Plugin.YouTubeAudio.Services.Playlists;
 using MediaBrowser.Controller.MediaEncoding;
 using Microsoft.Extensions.Logging;
@@ -50,9 +51,17 @@ public sealed class DownloadService : IDisposable
     private static readonly string[] _versionArgs = ["--version"];
     private static readonly char[] _newlineChars = ['\r', '\n'];
 
+    /// <summary>Longest file or folder name written to the library, in characters.</summary>
+    internal const int MaxPathComponentLength = 100;
+
+    /// <summary>Embedded cover art size, in pixels.</summary>
+    private const int CoverArtSize = 1200;
+
     private readonly ILogger<DownloadService> _logger;
     private readonly QueueDatabaseProvider _dbProvider;
     private readonly IMediaEncoder _mediaEncoder;
+    private readonly AppleCatalogClient _catalog;
+    private readonly LibraryService _libraryService;
     [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed", Justification = "Disposed in Dispose() method")]
     private readonly SemaphoreSlim _downloadLock = new(1, 1);
     private DateTime _lastYtDlpUpdateCheckUtc = DateTime.MinValue;
@@ -63,11 +72,15 @@ public sealed class DownloadService : IDisposable
     public DownloadService(
         ILogger<DownloadService> logger,
         QueueDatabaseProvider dbProvider,
-        IMediaEncoder mediaEncoder)
+        IMediaEncoder mediaEncoder,
+        AppleCatalogClient catalog,
+        LibraryService libraryService)
     {
         _logger = logger;
         _dbProvider = dbProvider;
         _mediaEncoder = mediaEncoder;
+        _catalog = catalog;
+        _libraryService = libraryService;
     }
 
     private static PluginConfiguration Config =>
@@ -350,6 +363,7 @@ public sealed class DownloadService : IDisposable
                         }
 
                         ApplyQueuedMetadata(item, cacheDir);
+                        await ApplyCatalogMetadataAsync(item, outputPath, cancellationToken).ConfigureAwait(false);
 
                         db.UpdateStatus(item.Id, QueueStatus.Downloaded);
                         _logger.LogInformation("Downloaded {Url} as {FileName}", SanitizeForLog(item.Url), item.FileName);
@@ -619,6 +633,9 @@ public sealed class DownloadService : IDisposable
         var db = _dbProvider.Database;
         var items = db.GetDownloadedItems();
         var cacheDir = _dbProvider.GetAudioCacheDirectory();
+        var librarySongs = items.Count == 0
+            ? new HashSet<string>(StringComparer.Ordinal)
+            : _libraryService.GetLibraryTracks().Select(t => TrackMetadataCleaner.SongKey(t.Artist, t.Title)).ToHashSet(StringComparer.Ordinal);
 
         return items.Select(item =>
         {
@@ -638,6 +655,7 @@ public sealed class DownloadService : IDisposable
                 }
             }
 
+            dto.InLibrary = librarySongs.Contains(TrackMetadataCleaner.SongKey(dto.Artist, dto.MetadataTitle));
             return dto;
         }).ToList();
     }
@@ -748,9 +766,7 @@ public sealed class DownloadService : IDisposable
         tagFile.Tag.Year = request.Year.HasValue ? (uint)request.Year.Value : 0;
         tagFile.Tag.Genres = ParseGenres(request.Genre);
 
-        // Strip any embedded artwork — text metadata only
-        tagFile.Tag.Pictures = Array.Empty<TagLib.IPicture>();
-
+        // Embedded cover art (from the catalog lookup) is kept.
         tagFile.Save();
 
         _logger.LogInformation("Tags saved for queue item {Id} ({FileName})", request.Id, item.FileName);
@@ -820,6 +836,153 @@ public sealed class DownloadService : IDisposable
     }
 
     /// <summary>
+    /// Looks a download up in Apple's catalog and fills in what YouTube does not provide: the
+    /// title, album, album artist, release year, track and disc numbers, genre and cover art. Only a
+    /// confident match is used. A title, artist, album or year given when the song was queued
+    /// is kept. Playlist imports already carry the export's details, so they only get the
+    /// cover. A failed or empty lookup leaves the file as it is.
+    /// </summary>
+    private async Task ApplyCatalogMetadataAsync(QueueItem item, string filePath, CancellationToken cancellationToken)
+    {
+        var lookUp = Config.LookUpCatalogMetadata;
+        if ((!lookUp && !Config.EmbedCoverArt) || !File.Exists(filePath))
+        {
+            return;
+        }
+
+        try
+        {
+            var info = ReadInfoJson(GetInfoJsonPath(filePath));
+            using var tagFile = TagLib.File.Create(filePath);
+            var tag = tagFile.Tag;
+            var artist = !string.IsNullOrWhiteSpace(item.Artist) ? item.Artist : tag.FirstPerformer ?? info.Artist;
+            var title = tag.Title ?? item.Title;
+            var duration = tagFile.Properties.Duration.TotalSeconds > 0 ? tagFile.Properties.Duration.TotalSeconds : info.Duration;
+
+            var song = await _catalog.FindSongAsync(artist, title, duration, cancellationToken).ConfigureAwait(false);
+            if (song == null)
+            {
+                _logger.LogInformation("No Apple Music match for {Artist} - {Title}", SanitizeForLog(artist), SanitizeForLog(title));
+                return;
+            }
+
+            if (lookUp && item.SourceTrack == null)
+            {
+                // Apple's title is cleaner than a video title; a title typed by the user stays.
+                var (appleTitle, _) = TrackMetadataCleaner.ExtractFeatured(song.TrackName);
+                appleTitle = TrackMetadataCleaner.StripTitleDesignations(appleTitle);
+                if (!item.UserTitled && appleTitle.Length > 0)
+                {
+                    tag.Title = appleTitle;
+                    _dbProvider.Database.UpdateTitle(item.Id, appleTitle);
+                    item.Title = appleTitle;
+                }
+
+                if (string.IsNullOrWhiteSpace(item.Artist))
+                {
+                    var (_, titleFeatured) = TrackMetadataCleaner.ExtractFeatured(song.TrackName);
+                    var performers = await ResolveCreditAsync(song.ArtistName, null, cancellationToken).ConfigureAwait(false);
+                    tag.Performers = performers.Concat(titleFeatured)
+                        .DistinctBy(TrackMetadataCleaner.Normalize, StringComparer.Ordinal)
+                        .ToArray();
+                    tag.AlbumArtists = new[] { await ResolveAlbumArtistAsync(song.AlbumArtist, null, cancellationToken).ConfigureAwait(false) };
+                }
+
+                if (string.IsNullOrWhiteSpace(item.Album))
+                {
+                    tag.Album = CatalogMatcher.CleanAlbumName(song.AlbumName);
+                }
+
+                if (!item.Year.HasValue && song.Year.HasValue)
+                {
+                    tag.Year = (uint)song.Year.Value;
+                }
+
+                tag.Track = (uint)(song.TrackNumber ?? 0);
+                tag.TrackCount = (uint)(song.TrackCount ?? 0);
+                tag.Disc = (uint)(song.DiscNumber ?? 0);
+                tag.DiscCount = (uint)(song.DiscCount ?? 0);
+                if (tag.Genres.Length == 0 && !string.IsNullOrWhiteSpace(song.Genre))
+                {
+                    tag.Genres = ParseGenres(song.Genre);
+                }
+            }
+
+            if (Config.EmbedCoverArt && tag.Pictures.Length == 0)
+            {
+                var artwork = await _catalog.GetArtworkAsync(song.ArtworkUrl, CoverArtSize, cancellationToken).ConfigureAwait(false);
+                if (artwork is { Length: > 0 })
+                {
+                    tag.Pictures = new TagLib.IPicture[]
+                    {
+                        new TagLib.Picture(new TagLib.ByteVector(artwork)) { Type = TagLib.PictureType.FrontCover, MimeType = "image/jpeg", Description = "Cover" }
+                    };
+                }
+            }
+
+            tagFile.Save();
+            _logger.LogInformation("Matched {Artist} - {Title} to {Album} ({Year}) on Apple Music", SanitizeForLog(artist), SanitizeForLog(title), SanitizeForLog(song.AlbumName), song.Year);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Apple Music lookup failed for {FileName}", item.FileName);
+        }
+    }
+
+    /// <summary>
+    /// Splits a joint artist credit into its artists, keeping names the library or Apple knows
+    /// as a single act whole, and spells each one the way the library already does.
+    /// </summary>
+    private async Task<List<string>> ResolveCreditAsync(string credit, Dictionary<string, string>? spellings, CancellationToken cancellationToken)
+    {
+        spellings ??= _libraryService.GetArtistSpellings();
+        if (!Config.LookUpCatalogMetadata)
+        {
+            // Without Apple's artist list, "Simon & Garfunkel" cannot be told from a joint
+            // credit, so only the explicit multi-artist separator splits.
+            return credit.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(name => spellings.GetValueOrDefault(TrackMetadataCleaner.Normalize(name), name))
+                .ToList();
+        }
+
+        var oneActs = new HashSet<string>(StringComparer.Ordinal);
+
+        // The whole credit and any "A & B" pair inside a list could be one act's name.
+        var candidates = new[] { credit }
+            .Concat(credit.Split([';', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .Where(c => c.Contains(" & ", StringComparison.Ordinal) || c.Contains(',', StringComparison.Ordinal) || c.Contains(';', StringComparison.Ordinal))
+            .Distinct(StringComparer.Ordinal);
+        foreach (var candidate in candidates)
+        {
+            var key = TrackMetadataCleaner.Normalize(candidate);
+            if (spellings.ContainsKey(key)
+                || (Config.LookUpCatalogMetadata && await _catalog.IsArtistAsync(candidate, cancellationToken).ConfigureAwait(false)))
+            {
+                oneActs.Add(key);
+            }
+        }
+
+        return TrackMetadataCleaner.SplitCredit(credit, name => oneActs.Contains(TrackMetadataCleaner.Normalize(name)))
+            .Select(name => spellings.GetValueOrDefault(TrackMetadataCleaner.Normalize(name), name))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Gets the album artist for a credit: "Various Artists" stays, a joint credit is filed
+    /// under its first artist, and the library's spelling is used.
+    /// </summary>
+    private async Task<string> ResolveAlbumArtistAsync(string credit, Dictionary<string, string>? spellings, CancellationToken cancellationToken)
+    {
+        if (string.Equals(credit, "Various Artists", StringComparison.OrdinalIgnoreCase))
+        {
+            return credit;
+        }
+
+        var artists = await ResolveCreditAsync(credit, spellings, cancellationToken).ConfigureAwait(false);
+        return artists.Count > 0 ? artists[0] : credit;
+    }
+
+    /// <summary>
     /// Writes the playlist export's extra fields (beyond title, artist, album and year). Only
     /// fields the source provided are written. The album artist replaces the track artist that
     /// was written as album artist, so compilations file under "Various Artists".
@@ -874,7 +1037,7 @@ public sealed class DownloadService : IDisposable
     /// Imports downloaded files to the Jellyfin music library.
     /// </summary>
     [SuppressMessage("Security", "CA3003:Review code for file path injection vulnerabilities", Justification = "File paths use GUID-based names from database lookup; destination paths are sanitized.")]
-    public ImportResult ImportToLibrary(List<string> ids)
+    public async Task<ImportResult> ImportToLibraryAsync(List<string> ids, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(ids);
 
@@ -889,6 +1052,7 @@ public sealed class DownloadService : IDisposable
         }
 
         var cacheDir = _dbProvider.GetAudioCacheDirectory();
+        var spellings = _libraryService.GetArtistSpellings();
 
         foreach (var id in ids)
         {
@@ -943,6 +1107,8 @@ public sealed class DownloadService : IDisposable
 
                 using (tagFile)
                 {
+                    await NormalizeArtistsAsync(tagFile, spellings, cancellationToken).ConfigureAwait(false);
+
                     // Titles are cleaned when written (queue/download time) and user edits are
                     // saved verbatim, so trust the tag as-is here — re-cleaning would mangle a
                     // deliberately saved title like "Song (Lyrics)".
@@ -1030,6 +1196,39 @@ public sealed class DownloadService : IDisposable
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Final artist cleanup before a file is filed: joint credits are split into separate
+    /// artists (the album files under the first), and each artist is spelled the way the
+    /// library already spells it. Saves the file only when something changed.
+    /// </summary>
+    private async Task NormalizeArtistsAsync(TagLib.File tagFile, Dictionary<string, string> spellings, CancellationToken cancellationToken)
+    {
+        var tag = tagFile.Tag;
+        var performers = new List<string>();
+        foreach (var credit in tag.Performers ?? Array.Empty<string>())
+        {
+            performers.AddRange(await ResolveCreditAsync(credit, spellings, cancellationToken).ConfigureAwait(false));
+        }
+
+        performers = performers.DistinctBy(TrackMetadataCleaner.Normalize, StringComparer.Ordinal).ToList();
+        var albumArtists = new List<string>();
+        foreach (var credit in tag.AlbumArtists ?? Array.Empty<string>())
+        {
+            albumArtists.Add(await ResolveAlbumArtistAsync(credit, spellings, cancellationToken).ConfigureAwait(false));
+        }
+
+        albumArtists = albumArtists.DistinctBy(TrackMetadataCleaner.Normalize, StringComparer.Ordinal).ToList();
+        if (performers.SequenceEqual(tag.Performers ?? Array.Empty<string>(), StringComparer.Ordinal)
+            && albumArtists.SequenceEqual(tag.AlbumArtists ?? Array.Empty<string>(), StringComparer.Ordinal))
+        {
+            return;
+        }
+
+        tag.Performers = performers.ToArray();
+        tag.AlbumArtists = albumArtists.ToArray();
+        tagFile.Save();
     }
 
     /// <summary>
@@ -1767,9 +1966,16 @@ public sealed class DownloadService : IDisposable
                 dto.TrackNumber = trackNum.GetInt32();
             }
 
+            // YouTube Music's release year beats the upload date, which for a re-upload or a
+            // label's channel can be years after the song came out.
+            if (!dto.Year.HasValue && root.TryGetProperty("release_year", out var releaseYear) && releaseYear.ValueKind == JsonValueKind.Number)
+            {
+                dto.Year = releaseYear.GetInt32();
+            }
+
             if (!dto.Year.HasValue)
             {
-                var uploadDate = GetJsonString(root, "upload_date");
+                var uploadDate = GetJsonString(root, "release_date") ?? GetJsonString(root, "upload_date");
                 if (uploadDate?.Length >= 4 && int.TryParse(uploadDate[..4], out var year))
                 {
                     dto.Year = year;
@@ -1945,6 +2151,59 @@ public sealed class DownloadService : IDisposable
         return string.IsNullOrWhiteSpace(cleaned) ? title.Trim() : cleaned;
     }
 
+    /// <summary>
+    /// Reads the artist and length of a download from its info.json. The artist is YouTube
+    /// Music's credit when present, otherwise the uploading channel without its " - Topic" or
+    /// "VEVO" suffix.
+    /// </summary>
+    private InfoJsonDetails ReadInfoJson(string infoJsonPath)
+    {
+        if (!File.Exists(infoJsonPath))
+        {
+            return new InfoJsonDetails(null, null);
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(File.ReadAllText(infoJsonPath));
+            var root = doc.RootElement;
+            var artist = GetJsonString(root, "artist") ?? GetJsonString(root, "creator")
+                ?? ChannelToArtist(GetJsonString(root, "channel") ?? GetJsonString(root, "uploader"));
+            double? duration = root.TryGetProperty("duration", out var d) && d.ValueKind == JsonValueKind.Number ? d.GetDouble() : null;
+            return new InfoJsonDetails(artist, duration);
+        }
+        catch (Exception ex) when (ex is JsonException or IOException)
+        {
+            _logger.LogDebug(ex, "Could not read {Path}", Path.GetFileName(infoJsonPath));
+            return new InfoJsonDetails(null, null);
+        }
+    }
+
+    /// <summary>
+    /// Turns a channel name into an artist name: "Lang Lang - Topic" and "LangLangVEVO" give
+    /// the artist; other channels are returned as they are.
+    /// </summary>
+    internal static string? ChannelToArtist(string? channel)
+    {
+        if (string.IsNullOrWhiteSpace(channel))
+        {
+            return null;
+        }
+
+        var name = channel.Trim();
+        if (name.EndsWith(" - Topic", StringComparison.OrdinalIgnoreCase))
+        {
+            name = name[..^" - Topic".Length];
+        }
+        else if (name.EndsWith("VEVO", StringComparison.OrdinalIgnoreCase) && name.Length > 4)
+        {
+            name = name[..^4];
+        }
+
+        name = name.Trim();
+        return name.Length == 0 ? null : name;
+    }
+
     private static string GetInfoJsonPath(string audioFilePath)
     {
         var dir = Path.GetDirectoryName(audioFilePath) ?? string.Empty;
@@ -1966,6 +2225,9 @@ public sealed class DownloadService : IDisposable
     /// <summary>
     /// Sanitizes a single path component (file or folder name) by removing invalid
     /// and problematic characters. Metadata tags are NOT affected — this is only for filenames.
+    /// Names must also work over network shares (SMB) and on Windows, so characters those
+    /// reject are removed even on Linux (":" becomes " - "), and long names are shortened to
+    /// <see cref="MaxPathComponentLength"/> characters at a word break.
     /// </summary>
     internal static string SanitizePathComponent(string name)
     {
@@ -1975,26 +2237,43 @@ public sealed class DownloadService : IDisposable
         }
 
         // Characters that are problematic across platforms (network shares, web servers, shells)
-        var extraBadChars = new HashSet<char> { '#', '%', '{', '}', '`', '!', '$', '@', '~', '=' };
+        var extraBadChars = new HashSet<char> { '#', '%', '{', '}', '`', '!', '$', '@', '~', '=', '<', '>', '|', '?', '*', '\\', '/' };
 
         var invalidChars = Path.GetInvalidFileNameChars();
         var sb = new System.Text.StringBuilder(name.Length);
 
         foreach (var c in name)
         {
-            if (invalidChars.Contains(c) || extraBadChars.Contains(c))
+            if (c == ':')
+            {
+                sb.Append(" - ");
+            }
+            else if (c == '"')
+            {
+                sb.Append('\'');
+            }
+            else if (invalidChars.Contains(c) || extraBadChars.Contains(c) || char.IsControl(c))
             {
                 continue; // Strip the character
             }
-
-            sb.Append(c);
+            else
+            {
+                sb.Append(c);
+            }
         }
 
         // Replace & with 'and' for readability
-        var sanitized = sb.ToString().Replace("&", "and", StringComparison.Ordinal).Trim();
+        var sanitized = sb.ToString().Replace("&", "and", StringComparison.Ordinal);
+        sanitized = string.Join(' ', sanitized.Split(' ', StringSplitOptions.RemoveEmptyEntries));
 
-        // Remove leading/trailing dots and spaces which cause issues on some filesystems
-        sanitized = sanitized.Trim('.', ' ');
+        if (sanitized.Length > MaxPathComponentLength)
+        {
+            var cut = sanitized.LastIndexOf(' ', MaxPathComponentLength);
+            sanitized = sanitized[..(cut > MaxPathComponentLength / 2 ? cut : MaxPathComponentLength)];
+        }
+
+        // Remove leading/trailing dots, dashes and spaces which cause issues on some filesystems
+        sanitized = sanitized.Trim('.', ' ', '-');
 
         return string.IsNullOrEmpty(sanitized) ? "Unknown" : sanitized;
     }
@@ -2010,3 +2289,10 @@ public sealed class DownloadService : IDisposable
         return sanitized.Length > 200 ? string.Concat(sanitized.AsSpan(0, 200), "...") : sanitized;
     }
 }
+
+/// <summary>
+/// What a download's info.json says about it.
+/// </summary>
+/// <param name="Artist">The artist, when known.</param>
+/// <param name="Duration">The length in seconds, when known.</param>
+internal sealed record InfoJsonDetails(string? Artist, double? Duration);

@@ -370,11 +370,11 @@ public class YouTubeAudioController : ControllerBase
     [HttpPost("Import")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public ActionResult<ImportResult> Import([FromBody] ImportRequest request)
+    public async Task<ActionResult<ImportResult>> Import([FromBody] ImportRequest request)
     {
         try
         {
-            var result = _downloadService.ImportToLibrary(request.Ids);
+            var result = await _downloadService.ImportToLibraryAsync(request.Ids, HttpContext.RequestAborted).ConfigureAwait(false);
 
             // Kick a scan so the imported files show up without waiting for the schedule.
             if (result.ImportedIds.Count > 0)

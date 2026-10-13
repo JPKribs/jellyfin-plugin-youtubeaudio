@@ -294,6 +294,7 @@ export default function (view) {
             + '<span class="yta-preview-time">0:00 / 0:00</span>'
             + '</div>'
             + '</div>'
+            + (d.InLibrary ? '<span class="yta-in-library" title="This song is already in your music library. Importing it adds a second copy.">Already in your library</span>' : '')
             + '<span class="jpk-edit-secondary">' + Shared.formatSize(d.FileSize) + '</span>'
             + '<button type="button" class="jpk-row-btn save" title="Save tags"><span class="material-icons">save</span></button>'
             + '</div>'

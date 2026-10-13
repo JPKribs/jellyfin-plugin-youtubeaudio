@@ -280,6 +280,65 @@ public static partial class TrackMetadataCleaner
     }
 
     /// <summary>
+    /// Splits a joint credit ("Yo-Yo Ma &amp; Kathryn Stott", "A, B &amp; C", "A;B") into its
+    /// artists, in order. "and" never splits, since it belongs to names ("Coheed and Cambria").
+    /// A credit that <paramref name="isOneArtist"/> recognizes as a single act ("Katia &amp;
+    /// Marielle Labèque") stays whole, and so does any "A &amp; B" pair inside a longer credit.
+    /// </summary>
+    public static List<string> SplitCredit(string? credit, Func<string, bool>? isOneArtist = null)
+    {
+        var result = new List<string>();
+        if (string.IsNullOrWhiteSpace(credit))
+        {
+            return result;
+        }
+
+        var whole = credit.Trim();
+        if (isOneArtist?.Invoke(whole) == true)
+        {
+            result.Add(whole);
+            return result;
+        }
+
+        // Split on ";" and "," first, then on "&", so "A & B" pairs can be checked as one act.
+        foreach (var group in whole.Split([';', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (isOneArtist?.Invoke(group) == true)
+            {
+                AddDistinct(result, group);
+                continue;
+            }
+
+            foreach (var part in group.Split(" & ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                AddDistinct(result, part);
+            }
+        }
+
+        return result;
+
+        static void AddDistinct(List<string> list, string name)
+        {
+            if (!list.Any(n => Normalize(n) == Normalize(name)))
+            {
+                list.Add(name);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets the artist a song is filed under for duplicate checks: the first artist of the
+    /// credit, without "feat." guests. "Winona Oak &amp; Robin Schulz" and a library copy tagged
+    /// with the separate artists "Winona Oak" and "Robin Schulz" both give "Winona Oak".
+    /// </summary>
+    public static string? PrimaryArtist(string? artist)
+    {
+        var (primary, _) = SplitArtist(artist);
+        var parts = SplitCredit(primary);
+        return parts.Count > 0 ? parts[0] : primary;
+    }
+
+    /// <summary>
     /// Splits "Artist feat. Other" into the primary artist and the featured artists. Joint
     /// billing such as "Martha Argerich &amp; Daniel Barenboim" is kept as one artist.
     /// </summary>
@@ -335,12 +394,13 @@ public static partial class TrackMetadataCleaner
         => !string.IsNullOrEmpty(album) && CompilationNameRegex().IsMatch(album);
 
     /// <summary>
-    /// Builds the key identifying a song regardless of release: primary artist plus title, with
-    /// "feat." credits and remaster labels removed, compared case- and punctuation-insensitively.
+    /// Builds the key identifying a song regardless of release: the credit's first artist (see
+    /// <see cref="PrimaryArtist"/>) plus the title, with "feat." credits and remaster labels
+    /// removed, compared case- and punctuation-insensitively.
     /// </summary>
     public static string SongKey(string? artist, string? title)
     {
-        var (primary, _) = SplitArtist(artist);
+        var primary = PrimaryArtist(artist);
         var (cleanTitle, _) = ExtractFeatured(title);
         return Normalize(primary) + "|" + Normalize(StripTitleDesignations(cleanTitle));
     }
@@ -360,7 +420,7 @@ public static partial class TrackMetadataCleaner
             return null;
         }
 
-        var (primary, _) = SplitArtist(artist);
+        var primary = PrimaryArtist(artist);
         return Normalize(primary) + "|" + Normalize(string.Concat(words));
     }
 
@@ -370,7 +430,7 @@ public static partial class TrackMetadataCleaner
     /// </summary>
     public static string AlbumKey(string? albumArtist, string? artist, string? album)
     {
-        var (primary, _) = SplitArtist(string.IsNullOrWhiteSpace(albumArtist) ? artist : albumArtist);
+        var primary = PrimaryArtist(string.IsNullOrWhiteSpace(albumArtist) ? artist : albumArtist);
         return Normalize(primary) + "|" + Normalize(CleanAlbum(album));
     }
 
@@ -397,7 +457,7 @@ public static partial class TrackMetadataCleaner
         return sb.ToString();
     }
 
-    private static string StripTitleDesignations(string title)
+    internal static string StripTitleDesignations(string title)
     {
         var cleaned = BracketRegex().Replace(title, match => IsTitleDesignation(match.Groups["inner"].Value) ? string.Empty : match.Value);
         cleaned = DashSuffixRegex().Replace(cleaned, match => IsTitleDesignation(match.Groups["inner"].Value) ? string.Empty : match.Value);

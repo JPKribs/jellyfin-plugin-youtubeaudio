@@ -112,7 +112,9 @@ public sealed class AppleMusicLibrarySource : IPlaylistSource
             IsCompilation = GetBool(entry, "Compilation"),
             Composer = GetString(entry, "Composer"),
             Genre = GetString(entry, "Genre"),
-            Year = GetPositiveInt(entry, "Year"),
+            // "Release Date" is the album's release; "Year" can be the song's original year,
+            // which would file a 2002 greatest-hits album under 1972.
+            Year = GetReleaseYear(entry) ?? GetPositiveInt(entry, "Year"),
             TrackNumber = GetPositiveInt(entry, "Track Number"),
             TrackCount = GetPositiveInt(entry, "Track Count"),
             DiscNumber = GetPositiveInt(entry, "Disc Number"),
@@ -129,6 +131,9 @@ public sealed class AppleMusicLibrarySource : IPlaylistSource
 
     private static int? GetPositiveInt(Dictionary<string, object?> entry, string key)
         => GetLong(entry, key) is > 0 and <= int.MaxValue and var value ? (int)value : null;
+
+    private static int? GetReleaseYear(Dictionary<string, object?> entry)
+        => entry.GetValueOrDefault("Release Date") is DateTime date && date.Year > 1900 ? date.Year : null;
 
     private static bool GetBool(Dictionary<string, object?> entry, string key)
         => entry.GetValueOrDefault(key) is true;

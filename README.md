@@ -31,7 +31,10 @@ YouTube Audio lets you paste a YouTube video or playlist URL, download the audio
 | MP3 (.mp3) | Widest compatibility |
 | M4A (.m4a) | Well-suited for Apple devices |
 
-**Import Behavior** — Choose whether importing a file that already exists in the library should overwrite the existing file or skip it (leaving the duplicate in the download cache).
+**Import Behavior** — Choose whether importing a file that already exists in the library should overwrite the existing file or skip it (leaving the duplicate in the download cache). Two more options are on by default:
+
+- **Look up song details on Apple Music** — each download is looked up in Apple's public music catalog (no account needed) to fill in its title, album, album artist, release year, track and disc numbers and genre. Only a confident match is used: the artist must match and the length must agree. Anything you entered when queueing the song is kept, and playlist imports keep their export's details.
+- **Embed cover art** — the album cover from Apple's catalog is added to each downloaded file, so Jellyfin shows it.
 
 **Cache Directory** — By default, downloaded files are cached in the Jellyfin data directory. Override this if you need a specific staging location.
 
@@ -70,7 +73,7 @@ YouTube Audio lets you paste a YouTube video or playlist URL, download the audio
 |--------|
 | ![Import](Jellyfin.Plugin.YouTubeAudio/Assets/Import.png) |
 
-1. Review and edit metadata for each downloaded file (title, artist, album artist, featured artists, album, year, genre, track number)
+1. Review and edit metadata for each downloaded file (title, artist, album artist, featured artists, album, year, genre, track number). Songs your library already has are marked **Already in your library**, so you can skip a second copy
 2. To apply the same metadata to multiple files at once, fill in the bulk fields at the top and click **Apply to Selected**
 3. Remember to save any unsaved changes on individual tracks before importing (look for the save icon)
 4. Select the files you want to import and click **Import**
@@ -80,6 +83,8 @@ Metadata is written directly to the audio files. On import, files are copied int
 ```
 <library path>/Artist/Album (Year)/Song.ext
 ```
+
+Before a file is filed, its artists are tidied: a joint credit such as "Yo-Yo Ma & Kathryn Stott" is stored as separate artists (the album files under the first), while names Apple or your library know as one act, like "Katia & Marielle Labèque", stay whole. Artists already in your library keep the library's spelling, so "LANG LANG" is filed as "Lang Lang". File and folder names avoid characters that network shares and Windows reject (a ":" becomes " - ") and are kept to 100 characters.
 
 Successfully imported files are removed from the queue.
 

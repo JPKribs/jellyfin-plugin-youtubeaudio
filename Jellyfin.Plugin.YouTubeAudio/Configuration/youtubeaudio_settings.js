@@ -55,6 +55,8 @@ export default function (view) {
                 Shared.getEl('selMusicLibrary').value = config.MusicLibraryId || '';
                 Shared.getEl('txtLibraryPath').value = config.MusicLibraryPath || '';
                 Shared.getEl('chkReplaceDuplicates').checked = config.ReplaceDuplicates !== false;
+                Shared.getEl('chkLookUpCatalog').checked = config.LookUpCatalogMetadata !== false;
+                Shared.getEl('chkEmbedCoverArt').checked = config.EmbedCoverArt !== false;
                 Shared.getEl('txtCacheOverride').value = config.CacheDirectoryOverride || '';
                 Shared.getEl('txtYtDlpPath').value = config.YtDlpPath || '';
                 var picker = ensureApprovedUsers();
@@ -107,6 +109,8 @@ export default function (view) {
         _sharedPromise.then(function() {
             Shared.getConfig().then(function(config) {
                 config.ReplaceDuplicates = Shared.getEl('chkReplaceDuplicates').checked;
+                config.LookUpCatalogMetadata = Shared.getEl('chkLookUpCatalog').checked;
+                config.EmbedCoverArt = Shared.getEl('chkEmbedCoverArt').checked;
                 Shared.saveConfig(config).then(function() {
                     Dashboard.alert('Import behavior saved.');
                 });

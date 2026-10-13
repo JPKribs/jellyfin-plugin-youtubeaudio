@@ -1,0 +1,15 @@
+{
+ "resultCount": 1,
+ "results": [
+  {
+   "wrapperType": "artist",
+   "artistType": "Artist",
+   "artistName": "Kathryn Stott",
+   "artistLinkUrl": "https://music.apple.com/us/artist/kathryn-stott/129828948?uo=4",
+   "artistId": 129828948,
+   "amgArtistId": 520032,
+   "primaryGenreName": "Classical",
+   "primaryGenreId": 5
+  }
+ ]
+}

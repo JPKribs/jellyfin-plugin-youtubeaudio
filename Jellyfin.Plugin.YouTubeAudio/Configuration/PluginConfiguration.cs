@@ -31,6 +31,18 @@ public class PluginConfiguration : BasePluginConfiguration
     public bool ReplaceDuplicates { get; set; } = true;
 
     /// <summary>
+    /// Gets or sets a value indicating whether downloads are looked up in Apple's music catalog
+    /// to fill in the album, album artist, release year, track number and genre.
+    /// </summary>
+    public bool LookUpCatalogMetadata { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the album cover from Apple's catalog is embedded
+    /// in downloaded files.
+    /// </summary>
+    public bool EmbedCoverArt { get; set; } = true;
+
+    /// <summary>
     /// Gets or sets an optional override for the cache directory.
     /// When empty, defaults to {IApplicationPaths.DataPath}/youtubeaudio.
     /// </summary>
