@@ -87,6 +87,22 @@ public class CatalogTests
     }
 
     [Fact]
+    public void PickBest_NeverTakesALiveAlbumVersion()
+    {
+        CatalogSong Song(string album) => new("Lang Lang", "Clair de lune", album, "Lang Lang", 2019, 3, 25, 1, 1, "Classical", null, 300);
+
+        Assert.Null(CatalogMatcher.PickBest("Lang Lang", "Clair de lune", 300, [Song("Live in Vienna")]));
+        Assert.Equal("Piano Book", CatalogMatcher.PickBest("Lang Lang", "Clair de lune", 300, [Song("Live in Vienna"), Song("Piano Book")])?.AlbumName);
+    }
+
+    [Theory]
+    [InlineData("Claude Debussy", "Claude Debussy")]
+    [InlineData("Daniel Deimann, Dennis Bierbrodt & Stefan Dabruck", "Daniel Deimann|Dennis Bierbrodt|Stefan Dabruck")]
+    [InlineData("Wolfgang Amadeus Mozart & Lorenzo Da Ponte", "Wolfgang Amadeus Mozart|Lorenzo Da Ponte")]
+    public void SplitCredit_SplitsComposerCredits(string credit, string expected)
+        => Assert.Equal(expected, string.Join('|', TrackMetadataCleaner.SplitCredit(credit)));
+
+    [Fact]
     public void PickBest_PrefersTheAlbumOverACompilation()
     {
         // YouTube Music credits "Yo-Yo Ma, Kathryn Stott"; Apple credits "Yo-Yo Ma & Kathryn Stott".

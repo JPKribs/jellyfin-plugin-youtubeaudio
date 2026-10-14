@@ -43,16 +43,19 @@ public static partial class YouTubeMatcher
     /// <summary>Accepted matches whose length differs by more than this get a review note.</summary>
     internal const double NoteDurationDeltaSeconds = 3;
 
-    // Words marking an alternate version. Penalized unless the source title contains them too.
-    private static readonly string[] _alternateVersionWords =
-    [
-        "slowed", "reverb", "live", "cover", "remix", "instrumental",
-        "karaoke", "extended", "dj set", "loop", "reaction"
-    ];
+    // Words marking a longer or looped edit. Penalized unless the source title contains them too.
+    private static readonly string[] _alternateVersionWords = ["extended", "loop"];
 
-    // Words marking a re-pitched or sped-up copy of the recording. Never matched unless the
-    // source title asks for that version.
-    private static readonly string[] _alteredAudioWords = ["432hz", "432 hz", "528hz", "sped up", "speed up", "8d", "nightcore"];
+    /// <summary>
+    /// Words marking a different recording or an altered copy: live and concert recordings,
+    /// remixes, covers, acoustic, instrumental and karaoke versions, and re-pitched or sped-up
+    /// uploads. Never matched unless the source title names that version itself.
+    /// </summary>
+    internal static readonly string[] OtherVersionWords =
+    [
+        "live", "concert", "unplugged", "remix", "rmx", "cover", "acoustic", "instrumental", "karaoke",
+        "reaction", "dj set", "slowed", "reverb", "432hz", "432 hz", "528hz", "sped up", "speed up", "8d", "nightcore"
+    ];
 
     /// <summary>A song by an artist written in another alphabet must be this close in length when its album differs.</summary>
     internal const double OtherScriptMaxDeltaSeconds = 3;
@@ -158,10 +161,7 @@ public static partial class YouTubeMatcher
             }
 
             var candidateTitleText = " " + string.Join(' ', candidateWords) + " ";
-            var rawTitle = " " + (candidate.Title ?? string.Empty).ToLowerInvariant() + " ";
-            if (_alteredAudioWords.Any(word =>
-                    (candidateTitleText.Contains(" " + word + " ", StringComparison.Ordinal) || rawTitle.Contains(word, StringComparison.Ordinal))
-                    && !sourceTitleText.Contains(" " + word + " ", StringComparison.Ordinal)))
+            if (IsOtherVersion(candidate.Title, track.Title))
             {
                 continue;
             }
@@ -242,6 +242,20 @@ public static partial class YouTubeMatcher
 
         static bool IsNumbering(string word)
             => word == "no" || word.All(char.IsDigit) || (word.Length <= 5 && word.All(c => "ivxlc".Contains(c, StringComparison.Ordinal)));
+    }
+
+    /// <summary>
+    /// Returns whether a candidate title names a version (live, remix, cover…) that the source
+    /// title does not: "Clair de lune (Live)" is another recording of "Clair de lune", while
+    /// "Times Like These (Live Acoustic 2006)" may match a live acoustic upload.
+    /// </summary>
+    internal static bool IsOtherVersion(string? candidateTitle, string? sourceTitle)
+    {
+        var candidate = " " + string.Join(' ', Tokenize(candidateTitle)) + " ";
+        var source = " " + string.Join(' ', Tokenize(sourceTitle)) + " ";
+        return OtherVersionWords.Any(word =>
+            candidate.Contains(" " + word + " ", StringComparison.Ordinal)
+            && !source.Contains(" " + word + " ", StringComparison.Ordinal));
     }
 
     /// <summary>

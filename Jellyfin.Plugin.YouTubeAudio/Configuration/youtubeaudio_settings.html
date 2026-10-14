@@ -135,6 +135,32 @@
                         </div>
                     </div>
 
+                    <!-- COLLAPSIBLE SECTION: Generated Album Art -->
+                    <div class="jpk-collapsible-section">
+                        <button type="button" class="jpk-collapsible-header collapsed" aria-expanded="false" data-target="albumArtContent">
+                            <span class="jpk-collapsible-title">Album Art</span>
+                            <span class="jpk-collapsible-icon">&#9660;</span>
+                        </button>
+                        <div id="albumArtContent" class="jpk-collapsible-content collapsed">
+                            <div class="fieldDescription" style="margin-bottom: 12px;">
+                                The wand on the Import tab draws a cover for an album with no art. Choose the text it shows, top to bottom; use the arrows to change the order.
+                            </div>
+                            <ul id="coverTextList" class="yta-cover-text-list" aria-label="Cover text"></ul>
+                            <div class="selectContainer" style="margin-top: 16px;">
+                                <label class="selectLabel" for="selCoverColors">Colors From:</label>
+                                <select is="emby-select" id="selCoverColors" class="emby-select-withcolor">
+                                    <option value="Album">Album</option>
+                                    <option value="AlbumYear">Album and year</option>
+                                    <option value="AlbumArtistYear">Album artist and year</option>
+                                </select>
+                                <div class="fieldDescription">The colors are drawn from these, so the same values always give the same colors.</div>
+                            </div>
+                            <button is="emby-button" type="button" id="btnSaveAlbumArt" class="raised jpk-button-submit jpk-button-small" style="margin-top: 12px;">
+                                <span>Save</span>
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- COLLAPSIBLE SECTION: Approved Users -->
                     <div class="jpk-collapsible-section">
                         <button type="button" class="jpk-collapsible-header collapsed" aria-expanded="false" data-target="approvedUsersContent">
@@ -233,4 +259,14 @@
     </div>
 
     <link rel="stylesheet" href="configurationpage?name=youtubeaudio_jpkribs_shared.css">
+    <style>
+        .yta-cover-text-list { list-style: none; margin: 0; padding: 0; max-width: 28em; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; }
+        .yta-cover-text-list li { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-top: 1px solid rgba(255,255,255,0.08); }
+        .yta-cover-text-list li:first-child { border-top: 0; }
+        .yta-cover-text-list .emby-checkbox-label { flex: 1 1 auto; width: auto; }
+        .yta-cover-text-list button { border: 0; background: none; color: inherit; cursor: pointer; opacity: 0.75; padding: 4px; line-height: 1; }
+        .yta-cover-text-list button:hover { opacity: 1; color: #00a4dc; }
+        .yta-cover-text-list button:disabled { opacity: 0.2; cursor: default; color: inherit; }
+        .yta-cover-text-list button:focus-visible { outline: 2px solid #00a4dc; outline-offset: 1px; }
+    </style>
 </div>

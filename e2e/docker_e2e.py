@@ -472,6 +472,23 @@ def main():
     check("an uploaded square cover is embedded and served back", served == pics["square"], f"{len(served)} bytes vs {len(pics['square'])}")
     call("DELETE", f"/YouTubeAudio/Downloads/{item['Id']}")
 
+    print("== 9. A Spotify ZIP from Exportify offers each playlist; owned songs are not queued again")
+    import io, zipfile
+    head = "Track URI,Track Name,Artist URI(s),Artist Name(s),Album URI,Album Name,Album Artist URI(s),Album Artist Name(s),Album Release Date,Album Image URL,Disc Number,Track Number,Track Duration (ms),Track Preview URL,Explicit,Popularity,ISRC,Added By,Added At"
+    def row(title, ms):
+        return f"spotify:track:x,{title},spotify:artist:a,{ARTIST},spotify:album:b,{LIBRARY_ALBUM},spotify:artist:a,{ARTIST},{YEAR}-01-01,,1,1,{ms},,false,1,,,"
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("evening_piano.csv", "\n".join([head, row(OWNED, 204000), row(NEW, NEW_SECONDS * 1000)]))
+        z.writestr("liked.csv", "\n".join([head, row(OWNED, 204000)]))
+    spot = base64.b64encode(buf.getvalue()).decode()
+    sel = call("POST", "/YouTubeAudio/Queue/Playlist", {"FileName": "spotify_playlists.zip", "Content": spot, "UserId": listener_id})
+    check("Spotify ZIP lists its playlists by name, Liked Songs last", sel["Source"] == "Spotify" and [p["Name"] for p in sel["Playlists"]] == ["Evening Piano", "Liked Songs"],
+          json.dumps([p["Name"] for p in sel["Playlists"]]))
+    res = call("POST", "/YouTubeAudio/Queue/Playlist", {"FileName": "spotify_playlists.zip", "Content": spot, "UserId": listener_id, "PlaylistIds": [sel["Playlists"][0]["Id"]]})
+    check("Spotify songs already in the library are not queued", res["Items"] == [] and res["AlreadyInLibrary"] == 2, json.dumps({k: res[k] for k in ("AlreadyInLibrary", "AlreadyQueued")}))
+    wait(lambda: lplaylists().get("Evening Piano"), "Evening Piano playlist from Spotify", 60)
+
     logs = sh("docker", "logs", NAME, check=False) + subprocess.run(["docker", "logs", NAME], capture_output=True, text=True).stderr
     errs = [l for l in logs.splitlines() if "YouTubeAudio" in l and ("[ERR]" in l or "[FTL]" in l)]
     check("no plugin errors in server log", not errs, "\n".join(errs[:5]))

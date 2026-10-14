@@ -24,13 +24,11 @@
                             <span class="jpk-choice-name">Apple Music</span>
                             <span class="jpk-choice-text">Upload a playlist or library exported from the Music app.</span>
                         </label>
-                        <!-- Spotify: hidden until its export source exists.
                         <label class="jpk-choice">
                             <input type="radio" name="downloadSource" value="spotify" />
                             <span class="jpk-choice-name">Spotify</span>
-                            <span class="jpk-choice-text">Upload a playlist exported from Spotify.</span>
+                            <span class="jpk-choice-text">Upload playlists exported with Exportify.</span>
                         </label>
-                        -->
                     </div>
 
                         <!-- YouTube -->
@@ -47,12 +45,14 @@
                         </div>
 
                         <!-- Apple Music -->
-                        <div class="yta-source-panel" id="panelAppleMusic" data-source="applemusic" hidden>
+                        <!-- Apple Music and Spotify: one export form, with each service's own instructions -->
+                        <div class="yta-source-panel" id="panelPlaylist" data-source="applemusic spotify" hidden>
                             <div class="inputContainer yta-playlist-import">
                                 <label for="filePlaylist">Playlist Export:</label>
                                 <input type="file" id="filePlaylist" class="yta-file-input" accept=".txt,.xml" />
-                                <div class="fieldDescription">A playlist or library exported from the Music app. Each track is matched to a YouTube upload when it downloads, and keeps Apple Music's title, artist, album and track details as its tags.</div>
-                                <div class="fieldDescription" id="playlistSources"></div>
+                                <div class="fieldDescription yta-source-help" data-source="applemusic">In the Music app, choose File &rarr; Library &rarr; Export Library&hellip; to pick from all your playlists, or export one playlist as XML or text.</div>
+                                <div class="fieldDescription yta-source-help" data-source="spotify" hidden>Export your playlists with <a href="https://github.com/watsonbox/exportify" target="_blank" rel="noopener">Exportify</a>: one playlist as a CSV file, or all of them as a ZIP. Liked Songs is offered like a whole library and does not become a playlist.</div>
+                                <div class="fieldDescription">Each track is matched to a YouTube upload when it downloads, and keeps the export's title, artist, album and track details as its tags.</div>
                                 <div id="playlistChoices" class="yta-playlist-choices" hidden></div>
                             </div>
                             <div class="selectContainer">
@@ -76,15 +76,6 @@
                             </div>
                         </div>
 
-                        <!-- Spotify: hidden until its export source exists.
-                        <div class="yta-source-panel" id="panelSpotify" data-source="spotify" hidden>
-                            <div class="inputContainer">
-                                <label for="fileSpotify">Spotify Export:</label>
-                                <input type="file" id="fileSpotify" class="yta-file-input" accept=".csv" />
-                                <div class="fieldDescription">A playlist exported from Spotify as CSV.</div>
-                            </div>
-                        </div>
-                        -->
 
                     <!-- Queue List (PaginatedTable pattern) -->
                     <div class="jpk-table-wrapper" id="queueWrapper">

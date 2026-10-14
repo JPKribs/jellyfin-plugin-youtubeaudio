@@ -13,6 +13,7 @@ export default function (view) {
     var _bulkArtistCombo = null;
     var _bulkAlbumCombo = null;
     var _coverTargets = [];
+    var _coverSettings = null;
     var _activeComboBoxes = []; // Track all combo-boxes for cleanup
 
     // One shared player previews the downloaded file of whichever row is playing.
@@ -175,6 +176,11 @@ export default function (view) {
                 e.stopPropagation();
                 pickCover([id]);
             });
+            row.querySelector('.yta-wand-btn').addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                generateCoverFor(row);
+            });
             row.querySelector('.yta-preview-btn').addEventListener('click', function(e) {
                 e.stopPropagation();
                 togglePreview(id);
@@ -302,6 +308,7 @@ export default function (view) {
             + '<div class="jpk-edit-line">'
             + '<label class="emby-checkbox-label"><input type="checkbox" is="emby-checkbox" class="jpk-table-row-checkbox yta-file-check" data-id="' + esc(d.Id) + '" /><span class="checkboxLabel"></span></label>'
             + '<button type="button" class="yta-cover-btn" title="Set cover art" aria-label="Set cover art">' + renderCover(d.Id, d.HasCover) + '</button>'
+            + '<button type="button" class="jpk-row-btn yta-wand-btn" title="Generate cover art" aria-label="Generate cover art"><span class="material-icons">auto_fix_high</span></button>'
             + '<div class="yta-preview-group">'
             + '<button type="button" class="jpk-row-btn yta-preview-btn" title="Play preview"><span class="material-icons">play_arrow</span></button>'
             + '<div class="yta-preview" hidden>'
@@ -597,35 +604,159 @@ export default function (view) {
     }
 
     // uploadCover
-    // Embeds the chosen picture in each target file, one at a time, and refreshes their
-    // thumbnails in place (re-rendering would drop unsaved edits).
+    // Embeds the chosen picture in each target file.
     function uploadCover(file) {
         var ids = _coverTargets.slice();
         _coverTargets = [];
         squareCover(file).then(function(data) {
-            Shared.setStatus('importStatus', 'Setting cover art on ' + ids.length + ' file(s)...', false);
-            var failed = 0;
-            function next(index) {
-                if (index >= ids.length) {
-                    var done = ids.length - failed;
-                    Shared.setStatus('importStatus', 'Cover art set on ' + done + ' file(s).' + (failed ? ' ' + failed + ' failed.' : ''), failed > 0);
-                    return;
-                }
-                var id = ids[index];
-                Shared.apiRequest('Downloads/' + encodeURIComponent(id) + '/Cover', 'POST', { Data: data })
-                    .then(function() {
-                        var btn = view.querySelector('.jpk-table-row[data-id="' + CSS.escape(id) + '"] .yta-cover-btn');
-                        if (btn) btn.innerHTML = renderCover(id, true);
-                        var d = _downloads.find(function(x) { return x.Id === id; });
-                        if (d) d.HasCover = true;
-                    })
-                    .catch(function() { failed++; })
-                    .then(function() { next(index + 1); });
-            }
-            next(0);
+            embedCover(ids, data);
         }).catch(function(err) {
             Shared.setStatus('importStatus', err.message, true);
         });
+    }
+
+    // generateCoverFor
+    // Draws a cover from the row's fields, as chosen in Settings → Album Art (which text lines,
+    // in what order, and what the colors come from), and embeds it.
+    function generateCoverFor(row) {
+        var albumCell = row.querySelector('.yta-album-cell');
+        var artistCell = row.querySelector('.yta-artist-cell');
+        var album = (albumCell && albumCell._combo ? albumCell._combo.getValue() : '').trim();
+        var artist = (artistCell && artistCell._combo ? artistCell._combo.getValue() : '').trim();
+        var albumArtist = (row.querySelector('.yta-field-albumArtist').value || '').trim() || artist;
+        var year = (row.querySelector('.yta-field-year').value || '').trim();
+
+        var settings = _coverSettings || {};
+        var values = { Artist: albumArtist, Album: album, Year: year };
+        var order = String(settings.GeneratedCoverTextOrder || 'Album,Artist,Year').split(',');
+        var shown = String(settings.GeneratedCoverText === undefined || settings.GeneratedCoverText === null ? 'Album' : settings.GeneratedCoverText).split(',');
+        var lines = order.filter(function(k) { return shown.indexOf(k) !== -1 && values[k]; }).map(function(k) { return values[k]; });
+
+        var colors = settings.GeneratedCoverColors || 'Album';
+        var colorKey = colors === 'AlbumYear' ? album + '|' + year
+            : colors === 'AlbumArtistYear' ? albumArtist + '|' + year
+            : album;
+        if (!colorKey.replace(/\|/g, '').trim()) {
+            Shared.setStatus('importStatus', 'Enter an album name to generate its cover.', true);
+            return;
+        }
+
+        var data = generateCover(lines, colorKey, 1200).toDataURL('image/jpeg', 0.92).split(',')[1];
+        embedCover([row.getAttribute('data-id')], data);
+    }
+
+    // generateCover
+    // Draws a square cover for an album with no art: three colors derived from a hash of
+    // colorKey, blended into a soft blur, with the text lines centred on top (the first large,
+    // the rest smaller). The same key always gives the same colors.
+    //
+    // Param: lines | the text lines, top to bottom (may be empty)
+    // Param: colorKey | the text the colors are drawn from
+    // Param: size | the side length in pixels
+    function generateCover(lines, colorKey, size) {
+        // FNV-1a hash of the lowercased key, then xorshift for further stable numbers.
+        var hash = 2166136261;
+        var key = String(colorKey || '').toLowerCase();
+        for (var i = 0; i < key.length; i++) {
+            hash ^= key.charCodeAt(i);
+            hash = Math.imul(hash, 16777619) >>> 0;
+        }
+        function next() {
+            hash ^= hash << 13; hash >>>= 0;
+            hash ^= hash >>> 17;
+            hash ^= hash << 5; hash >>>= 0;
+            return hash / 4294967296;
+        }
+        var base = Math.floor(next() * 360);
+        var colors = [0, 1, 2].map(function(n) {
+            var hue = (base + n * (70 + Math.floor(next() * 50))) % 360;
+            return 'hsl(' + hue + ',' + (55 + Math.floor(next() * 25)) + '%,' + (38 + Math.floor(next() * 20)) + '%)';
+        });
+
+        var canvas = document.createElement('canvas');
+        canvas.width = canvas.height = size;
+        var ctx = canvas.getContext('2d');
+        ctx.fillStyle = colors[0];
+        ctx.fillRect(0, 0, size, size);
+        ctx.filter = 'blur(' + Math.round(size * 0.12) + 'px)';
+        colors.forEach(function(color) {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(size * (0.15 + next() * 0.7), size * (0.15 + next() * 0.7), size * (0.35 + next() * 0.25), 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.filter = 'none';
+        if (!lines || lines.length === 0) return canvas;
+
+        // Wrap every line to the width, shrinking the type until all of it fits.
+        var maxWidth = size * 0.78;
+        var maxHeight = size * 0.72;
+        var scale = 1;
+        var layout;
+        function font(n) {
+            return (n === 0 ? '700 ' : '500 ') + Math.round(size * 0.13 * scale * (n === 0 ? 1 : 0.5)) + 'px "Noto Sans", "Helvetica Neue", Arial, sans-serif';
+        }
+        function wrapAll() {
+            return lines.map(function(text, n) {
+                ctx.font = font(n);
+                var out = [], line = '';
+                String(text).split(/\s+/).forEach(function(word) {
+                    var test = line ? line + ' ' + word : word;
+                    if (ctx.measureText(test).width > maxWidth && line) { out.push(line); line = word; } else { line = test; }
+                });
+                out.push(line);
+                return { n: n, rows: out, height: Math.round(size * 0.13 * scale * (n === 0 ? 1 : 0.5)) * 1.18 };
+            });
+        }
+        while (true) {
+            layout = wrapAll();
+            var total = layout.reduce(function(sum, l) { return sum + l.rows.length * l.height; }, 0);
+            var tooWide = layout.some(function(l) { ctx.font = font(l.n); return l.rows.some(function(r) { return ctx.measureText(r).width > maxWidth; }); });
+            if ((total <= maxHeight && !tooWide) || scale < 0.3) break;
+            scale *= 0.9;
+        }
+
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'rgba(0,0,0,0.35)';
+        ctx.shadowBlur = size * 0.02;
+        var height = layout.reduce(function(sum, l) { return sum + l.rows.length * l.height; }, 0);
+        var y = (size - height) / 2;
+        layout.forEach(function(l) {
+            ctx.font = font(l.n);
+            l.rows.forEach(function(r) {
+                ctx.fillText(r, size / 2, y + l.height / 2);
+                y += l.height;
+            });
+        });
+        return canvas;
+    }
+
+    // embedCover
+    // Embeds a square base64 JPEG in each target file, one at a time, and refreshes their
+    // thumbnails in place (re-rendering would drop unsaved edits).
+    function embedCover(ids, data) {
+        Shared.setStatus('importStatus', 'Setting cover art on ' + ids.length + ' file(s)...', false);
+        var failed = 0;
+        function next(index) {
+            if (index >= ids.length) {
+                var done = ids.length - failed;
+                Shared.setStatus('importStatus', 'Cover art set on ' + done + ' file(s).' + (failed ? ' ' + failed + ' failed.' : ''), failed > 0);
+                return;
+            }
+            var id = ids[index];
+            Shared.apiRequest('Downloads/' + encodeURIComponent(id) + '/Cover', 'POST', { Data: data })
+                .then(function() {
+                    var btn = view.querySelector('.jpk-table-row[data-id="' + CSS.escape(id) + '"] .yta-cover-btn');
+                    if (btn) btn.innerHTML = renderCover(id, true);
+                    var d = _downloads.find(function(x) { return x.Id === id; });
+                    if (d) d.HasCover = true;
+                })
+                .catch(function() { failed++; })
+                .then(function() { next(index + 1); });
+        }
+        next(0);
     }
 
     function deleteSelected() {
@@ -665,6 +796,7 @@ export default function (view) {
         _sharedPromise.then(function() {
             LibraryMenu.setTabs('youtubeaudio', 1, getTabs);
             loadDownloads();
+            Shared.getConfig().then(function(config) { _coverSettings = config; }).catch(function() { /* defaults apply */ });
         });
     });
 

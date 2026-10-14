@@ -368,32 +368,19 @@ export default function (view) {
     }
 
     // loadPlaylistSources
-    // Fetches the supported playlist export formats and lists how to produce each one.
+    // Fetches the supported playlist export formats, so queue rows can name the service each
+    // song came from. Each service's instructions are on its card.
     //
     // No parameters
     function loadPlaylistSources() {
         Shared.apiRequest('Playlists/Sources', 'GET')
             .then(function(sources) {
-                sources = sources || [];
-                var extensions = [];
-                var lines = [];
-                sources.forEach(function(source) {
+                (sources || []).forEach(function(source) {
                     _sourceNames[source.Id] = source.Name;
-                    (source.Extensions || []).forEach(function(ext) {
-                        if (extensions.indexOf(ext) === -1) extensions.push(ext);
-                    });
-                    lines.push('<strong>' + Shared.escapeHtml(source.Name) + ':</strong> ' + Shared.escapeHtml(source.Instructions));
                 });
-
-                var el = Shared.getEl('playlistSources');
-                if (el) el.innerHTML = lines.join('<br>');
-
-                var input = Shared.getEl('filePlaylist');
-                if (input && extensions.length) input.setAttribute('accept', extensions.join(','));
-
                 renderQueue();
             })
-            .catch(function() { /* the import still works; only the instructions are missing */ });
+            .catch(function() { /* queue rows fall back to the source ID */ });
     }
 
     // readFileAsBase64
@@ -636,9 +623,15 @@ export default function (view) {
         if (!group) return;
 
         function show(source) {
-            view.querySelectorAll('.yta-source-panel').forEach(function(panel) {
-                panel.hidden = panel.getAttribute('data-source') !== source;
+            view.querySelectorAll('.yta-source-panel, .yta-source-help').forEach(function(el) {
+                el.hidden = el.getAttribute('data-source').split(' ').indexOf(source) === -1;
             });
+            var input = view.querySelector('#filePlaylist');
+            if (input) {
+                var accept = source === 'spotify' ? '.csv,.zip' : '.txt,.xml';
+                if (input.getAttribute('accept') !== accept && input.value) resetPlaylistImport();
+                input.setAttribute('accept', accept);
+            }
             try { localStorage.setItem('yta-download-source', source); } catch (e) { /* storage unavailable */ }
         }
 

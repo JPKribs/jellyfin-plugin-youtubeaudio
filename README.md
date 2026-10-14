@@ -54,9 +54,9 @@ YouTube Audio lets you paste a YouTube video or playlist URL, download the audio
 
 #### Import a playlist from another service.
 
-1. Export from the Apple Music app, either:
-   - one playlist: select it and choose **File → Library → Export Playlist…** (Unicode Text or XML), or
-   - your whole library: choose **File → Library → Export Library…**, which lets you pick any of your playlists, or the entire library, in the next step
+1. Choose **Apple Music** or **Spotify** on the Download tab, then export:
+   - **Apple Music:** one playlist: select it and choose **File → Library → Export Playlist…** (Unicode Text or XML), or your whole library: choose **File → Library → Export Library…**, which lets you pick any of your playlists, or the entire library, in the next step
+   - **Spotify:** use [Exportify](https://github.com/watsonbox/exportify) to export one playlist as a CSV file, or all of them as a ZIP to pick from in the next step. Playlist names come from the file names. Liked Songs is offered like Apple Music's entire library and does not become a playlist. Spotify's own album cover is embedded, the genre (which Spotify does not export) comes from the Apple Music lookup, and each track's ISRC is used to find its official YouTube upload
 2. Pick the **Playlist Owner**: each imported playlist becomes a private Jellyfin playlist with the same name, owned by that user (choose "Don't create playlists" to only download). Then, under **Playlist Export**, choose the file and click **Queue Playlist**. For a library export, tick the playlists you want and click **Queue Selected**; a track in more than one selected playlist is queued once. Every track is added to the queue with its title, artist, album, genre, composer, year and track and disc numbers from the export (and its album artist, from a library or XML export)
    - Album names are cleaned so every edition groups as one album: labels like "(Deluxe Edition)", "(Remastered)", "(Bonus Track Version)", " - Single" and " - EP" are removed, while ones naming a different recording ("Live", "Orchestral Version") are kept. "feat." artists are moved out of titles and tagged as featured artists
    - Nothing is queued twice: songs already in any of your Jellyfin music libraries or the queue are skipped, and the playlist uses your existing copy. Classical movements count when one side names only the movement: an export's "Suite bergamasque, L. 75: III. Clair de lune" uses your "Clair de lune" by the same artist, and the other way round, as long as the lengths agree and the movement isn't just a tempo like "Allegro". A song appearing more than once keeps its best version (album, then compilation, then EP, then single). If your library only has a song's single and the import brings its album version, the album version is queued and the single's file is deleted once it is imported
@@ -75,7 +75,7 @@ YouTube Audio lets you paste a YouTube video or playlist URL, download the audio
 
 1. Review and edit metadata for each downloaded file (title, artist, album artist, featured artists, album, year, genre, track number). Songs your library already has are marked **Already in your library**, so you can skip a second copy
 2. To apply the same metadata to multiple files at once, fill in the bulk fields at the top and click **Apply to Selected**
-3. To add or replace cover art, click the picture square on a row, or select several files and click **Set Cover on Selected**, then choose an image. Pictures are cropped to a centred square
+3. To add or replace cover art, click the picture square on a row, or select several files and click **Set Cover on Selected**, then choose an image. Pictures are cropped to a centred square. For an album with no art, click the wand next to **Album** to generate a cover: a soft blend of three colours drawn from the album name, with the name in the middle
 4. Remember to save any unsaved changes on individual tracks before importing (look for the save icon)
 5. Select the files you want to import and click **Import**
 

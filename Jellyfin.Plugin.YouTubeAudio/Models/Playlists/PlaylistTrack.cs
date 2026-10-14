@@ -65,4 +65,13 @@ public class PlaylistTrack
 
     /// <summary>Gets or sets the track length in seconds, used to verify the YouTube match.</summary>
     public double? DurationSeconds { get; set; }
+
+    /// <summary>
+    /// Gets or sets the recording's ISRC, an industry-wide recording ID. YouTube finds the
+    /// official upload by it, so it is searched first when present.
+    /// </summary>
+    public string? Isrc { get; set; }
+
+    /// <summary>Gets or sets a link to the album cover the source provides (square), embedded on download.</summary>
+    public string? ArtworkUrl { get; set; }
 }

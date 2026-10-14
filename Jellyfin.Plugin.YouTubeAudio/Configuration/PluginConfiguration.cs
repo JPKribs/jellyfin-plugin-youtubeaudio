@@ -43,6 +43,22 @@ public class PluginConfiguration : BasePluginConfiguration
     public bool EmbedCoverArt { get; set; } = true;
 
     /// <summary>
+    /// Gets or sets the order of the text lines a generated cover can show, comma-separated:
+    /// Artist, Album and Year. A string rather than a list, since Jellyfin's settings file
+    /// would add a list's defaults to the saved items again on every load.
+    /// </summary>
+    public string GeneratedCoverTextOrder { get; set; } = "Album,Artist,Year";
+
+    /// <summary>Gets or sets which of those lines a generated cover shows, comma-separated.</summary>
+    public string GeneratedCoverText { get; set; } = "Album";
+
+    /// <summary>
+    /// Gets or sets what a generated cover's colours are drawn from: Album, AlbumYear or
+    /// AlbumArtistYear. The same value always gives the same colours.
+    /// </summary>
+    public string GeneratedCoverColors { get; set; } = "Album";
+
+    /// <summary>
     /// Gets or sets an optional override for the cache directory.
     /// When empty, defaults to {IApplicationPaths.DataPath}/youtubeaudio.
     /// </summary>

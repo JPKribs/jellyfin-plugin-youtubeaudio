@@ -27,6 +27,7 @@ public class ServiceRegistrator : IPluginServiceRegistrator
         // Playlist export formats. Add a source here to support another service's exports.
         serviceCollection.AddSingleton<IPlaylistSource, AppleMusicPlaylistSource>();
         serviceCollection.AddSingleton<IPlaylistSource, AppleMusicLibrarySource>();
+        serviceCollection.AddSingleton<IPlaylistSource, SpotifyPlaylistSource>();
         serviceCollection.AddSingleton<PlaylistImportService>();
 
         // Singleton: stateless library queries, shared with the playlist sync service

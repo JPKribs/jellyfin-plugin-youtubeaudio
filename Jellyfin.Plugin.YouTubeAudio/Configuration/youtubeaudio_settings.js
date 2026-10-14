@@ -57,6 +57,8 @@ export default function (view) {
                 Shared.getEl('chkReplaceDuplicates').checked = config.ReplaceDuplicates !== false;
                 Shared.getEl('chkLookUpCatalog').checked = config.LookUpCatalogMetadata !== false;
                 Shared.getEl('chkEmbedCoverArt').checked = config.EmbedCoverArt !== false;
+                renderCoverText(config.GeneratedCoverTextOrder, config.GeneratedCoverText);
+                Shared.getEl('selCoverColors').value = config.GeneratedCoverColors || 'Album';
                 Shared.getEl('txtCacheOverride').value = config.CacheDirectoryOverride || '';
                 Shared.getEl('txtYtDlpPath').value = config.YtDlpPath || '';
                 var picker = ensureApprovedUsers();
@@ -100,6 +102,54 @@ export default function (view) {
                 config.AudioFormat = Shared.getEl('selAudioFormat').value || 'Opus';
                 Shared.saveConfig(config).then(function() {
                     Dashboard.alert('Audio format saved.');
+                });
+            });
+        });
+    }
+
+    // The text lines a generated cover can show, by stored key.
+    var COVER_TEXT_NAMES = { Artist: 'Artist Name', Album: 'Album Name', Year: 'Year' };
+
+    // renderCoverText
+    // Lists the cover text lines in their saved order, each with a checkbox and up/down arrows.
+    //
+    // Param: order | comma-separated keys in display order
+    // Param: shown | comma-separated keys that are checked
+    function renderCoverText(order, shown) {
+        var list = Shared.getEl('coverTextList');
+        if (!list) return;
+        var keys = String(order || 'Album,Artist,Year').split(',').filter(function(k) { return COVER_TEXT_NAMES[k]; });
+        Object.keys(COVER_TEXT_NAMES).forEach(function(k) { if (keys.indexOf(k) === -1) keys.push(k); });
+        var on = String(shown === undefined || shown === null ? 'Album' : shown).split(',');
+        list.innerHTML = keys.map(function(k, i) {
+            return '<li data-key="' + k + '">'
+                + '<label class="emby-checkbox-label"><input type="checkbox" is="emby-checkbox"' + (on.indexOf(k) !== -1 ? ' checked' : '') + ' />'
+                + '<span class="checkboxLabel">' + COVER_TEXT_NAMES[k] + '</span></label>'
+                + '<button type="button" class="yta-move-up" aria-label="Move ' + COVER_TEXT_NAMES[k] + ' up"' + (i === 0 ? ' disabled' : '') + '><span class="material-icons">arrow_upward</span></button>'
+                + '<button type="button" class="yta-move-down" aria-label="Move ' + COVER_TEXT_NAMES[k] + ' down"' + (i === keys.length - 1 ? ' disabled' : '') + '><span class="material-icons">arrow_downward</span></button>'
+                + '</li>';
+        }).join('');
+    }
+
+    // readCoverText
+    // Returns the cover text order and the checked lines as comma-separated keys.
+    function readCoverText() {
+        var items = Array.prototype.slice.call(Shared.getEl('coverTextList').querySelectorAll('li'));
+        return {
+            order: items.map(function(li) { return li.getAttribute('data-key'); }).join(','),
+            shown: items.filter(function(li) { return li.querySelector('input').checked; }).map(function(li) { return li.getAttribute('data-key'); }).join(',')
+        };
+    }
+
+    function saveAlbumArt() {
+        _sharedPromise.then(function() {
+            Shared.getConfig().then(function(config) {
+                var text = readCoverText();
+                config.GeneratedCoverTextOrder = text.order;
+                config.GeneratedCoverText = text.shown;
+                config.GeneratedCoverColors = Shared.getEl('selCoverColors').value || 'Album';
+                Shared.saveConfig(config).then(function() {
+                    Dashboard.alert('Album art saved.');
                 });
             });
         });
@@ -228,6 +278,24 @@ export default function (view) {
         if (dlLink) dlLink.href = origin + '/YouTube/Download';
         var queueLink = Shared.getEl('publicQueueUrl');
         if (queueLink) queueLink.href = origin + '/YouTube/Queue';
+
+        var coverTextList = Shared.getEl('coverTextList');
+        if (coverTextList) coverTextList.addEventListener('click', function(e) {
+            var btn = e.target.closest('.yta-move-up, .yta-move-down');
+            if (!btn || btn.disabled) return;
+            var text = readCoverText();
+            var keys = text.order.split(',');
+            var key = btn.closest('li').getAttribute('data-key');
+            var from = keys.indexOf(key);
+            var to = from + (btn.classList.contains('yta-move-up') ? -1 : 1);
+            keys.splice(to, 0, keys.splice(from, 1)[0]);
+            renderCoverText(keys.join(','), text.shown);
+            var moved = coverTextList.querySelector('li[data-key="' + key + '"] .' + (to < from ? 'yta-move-up' : 'yta-move-down'));
+            if (moved && !moved.disabled) moved.focus();
+        });
+
+        var btnSaveAlbumArt = Shared.getEl('btnSaveAlbumArt');
+        if (btnSaveAlbumArt) btnSaveAlbumArt.addEventListener('click', saveAlbumArt);
 
         var btnSaveApprovedUsers = Shared.getEl('btnSaveApprovedUsers');
         if (btnSaveApprovedUsers) btnSaveApprovedUsers.addEventListener('click', saveApprovedUsers);

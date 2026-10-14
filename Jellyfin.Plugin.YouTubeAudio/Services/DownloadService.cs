@@ -450,6 +450,15 @@ public sealed class DownloadService : IDisposable
         }
 
         var query = YouTubeMatcher.BuildSearchQuery(track);
+
+        // An ISRC finds the official upload directly; it is still checked like any result.
+        var isrcMatch = await SearchByIsrcAsync(ytdl, toolOptions, track, cancellationToken).ConfigureAwait(false);
+        if (isrcMatch != null)
+        {
+            AcceptMatch(item, isrcMatch, query);
+            return true;
+        }
+
         var search = await RunWithRetriesAsync(
             () => ytdl.RunVideoDataFetch($"ytsearch{YouTubeMatcher.SearchResultCount}:{query}", cancellationToken, flat: true, overrideOptions: toolOptions),
             result => result.Success,
@@ -482,13 +491,51 @@ public sealed class DownloadService : IDisposable
             return false;
         }
 
+        AcceptMatch(item, match, query);
+        return true;
+    }
+
+    /// <summary>
+    /// Records the chosen YouTube upload on a queue item.
+    /// </summary>
+    private void AcceptMatch(QueueItem item, MatchResult match, string query)
+    {
         var url = "https://www.youtube.com/watch?v=" + match.Candidate.Id;
         var note = YouTubeMatcher.DescribeConcerns(match);
-        db.UpdateResolvedUrl(item.Id, url, note);
+        _dbProvider.Database.UpdateResolvedUrl(item.Id, url, note);
         item.Url = url;
         item.MatchNote = note;
         _logger.LogInformation("Matched {Query} to {Url} ({Title})", SanitizeForLog(query), url, SanitizeForLog(match.Candidate.Title));
-        return true;
+    }
+
+    /// <summary>
+    /// Searches YouTube by the track's ISRC (a recording ID that official uploads carry) and
+    /// returns an acceptable match, or null. Results are held to the usual title, artist and
+    /// length rules, so a wrong ISRC cannot pick a wrong song.
+    /// </summary>
+    private async Task<MatchResult?> SearchByIsrcAsync(YoutubeDL ytdl, OptionSet toolOptions, PlaylistTrack track, CancellationToken cancellationToken)
+    {
+        var isrc = track.Isrc?.Trim();
+        if (string.IsNullOrEmpty(isrc) || isrc.Length != 12 || !isrc.All(char.IsLetterOrDigit))
+        {
+            return null;
+        }
+
+        var search = await RunWithRetriesAsync(
+            () => ytdl.RunVideoDataFetch($"ytsearch3:{isrc}", cancellationToken, flat: true, overrideOptions: toolOptions),
+            result => result.Success,
+            result => result.ErrorOutput,
+            "ISRC search " + isrc,
+            cancellationToken).ConfigureAwait(false);
+        if (!search.Success)
+        {
+            return null;
+        }
+
+        var candidates = (search.Data?.Entries ?? Array.Empty<YoutubeDLSharp.Metadata.VideoData>())
+            .Where(entry => !string.IsNullOrEmpty(entry.ID))
+            .Select(entry => new MatchCandidate(entry.ID, entry.Title ?? string.Empty, entry.Channel ?? entry.Uploader, entry.Duration));
+        return YouTubeMatcher.PickBest(track, candidates);
     }
 
     /// <summary>
@@ -860,6 +907,29 @@ public sealed class DownloadService : IDisposable
         }
     }
 
+    /// <summary>
+    /// Downloads the square cover a playlist source links to (Spotify's i.scdn.co images), or
+    /// returns null for a missing, foreign or non-square image.
+    /// </summary>
+    private async Task<byte[]?> DownloadSourceCoverAsync(string? url, CancellationToken cancellationToken)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps || uri.Host != "i.scdn.co")
+        {
+            return null;
+        }
+
+        try
+        {
+            var data = await _httpClient.GetByteArrayAsync(uri, cancellationToken).ConfigureAwait(false);
+            return ImageInfo.Read(data) is { } image && image.Width == image.Height ? data : null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning("Could not download the cover {Url}: {Message}", SanitizeForLog(url), ex.Message);
+            return null;
+        }
+    }
+
     private static TagLib.Picture CreateCover(byte[] data, string mimeType)
         => new(new TagLib.ByteVector(data)) { Type = TagLib.PictureType.FrontCover, MimeType = mimeType, Description = "Cover" };
 
@@ -1037,6 +1107,12 @@ public sealed class DownloadService : IDisposable
             var title = tag.Title ?? item.Title;
             var duration = tagFile.Properties.Duration.TotalSeconds > 0 ? tagFile.Properties.Duration.TotalSeconds : info.Duration;
 
+            // A source that supplies its own cover (Spotify) needs no lookup for one.
+            if (Config.EmbedCoverArt && tag.Pictures.Length == 0 && await DownloadSourceCoverAsync(item.SourceTrack?.ArtworkUrl, cancellationToken).ConfigureAwait(false) is { } sourceCover)
+            {
+                tag.Pictures = new TagLib.IPicture[] { CreateCover(sourceCover, "image/jpeg") };
+            }
+
             var song = await _catalog.FindSongAsync(artist, title, duration, cancellationToken).ConfigureAwait(false);
             if (song == null)
             {
@@ -1089,6 +1165,12 @@ public sealed class DownloadService : IDisposable
                 {
                     tag.Genres = ParseGenres(song.Genre);
                 }
+            }
+
+            // Spotify exports carry no genre; Apple's fills the gap.
+            if (lookUp && item.SourceTrack != null && tag.Genres.Length == 0 && !string.IsNullOrWhiteSpace(song.Genre))
+            {
+                tag.Genres = ParseGenres(song.Genre);
             }
 
             if (Config.EmbedCoverArt && tag.Pictures.Length == 0)
@@ -1181,9 +1263,10 @@ public sealed class DownloadService : IDisposable
             tag.AlbumArtists = new[] { track.AlbumArtist };
         }
 
+        // Exports credit composers as one string ("A, B & C"); each is a separate person.
         if (!string.IsNullOrWhiteSpace(track.Composer))
         {
-            tag.Composers = new[] { track.Composer };
+            tag.Composers = TrackMetadataCleaner.SplitCredit(track.Composer).ToArray();
         }
 
         if (!string.IsNullOrWhiteSpace(track.Genre))
@@ -1382,8 +1465,8 @@ public sealed class DownloadService : IDisposable
 
     /// <summary>
     /// Final artist cleanup before a file is filed: joint credits are split into separate
-    /// artists (the album files under the first), and each artist is spelled the way the
-    /// library already spells it. Saves the file only when something changed.
+    /// artists (the album files under the first) and composers, and each artist is spelled
+    /// the way the library already spells it. Saves the file only when something changed.
     /// </summary>
     private async Task NormalizeArtistsAsync(TagLib.File tagFile, Dictionary<string, string> spellings, CancellationToken cancellationToken)
     {
@@ -1402,14 +1485,22 @@ public sealed class DownloadService : IDisposable
         }
 
         albumArtists = albumArtists.DistinctBy(TrackMetadataCleaner.Normalize, StringComparer.Ordinal).ToList();
+
+        // Composers too: "A, B & C" is three people.
+        var composers = (tag.Composers ?? Array.Empty<string>())
+            .SelectMany(credit => TrackMetadataCleaner.SplitCredit(credit))
+            .DistinctBy(TrackMetadataCleaner.Normalize, StringComparer.Ordinal)
+            .ToList();
         if (performers.SequenceEqual(tag.Performers ?? Array.Empty<string>(), StringComparer.Ordinal)
-            && albumArtists.SequenceEqual(tag.AlbumArtists ?? Array.Empty<string>(), StringComparer.Ordinal))
+            && albumArtists.SequenceEqual(tag.AlbumArtists ?? Array.Empty<string>(), StringComparer.Ordinal)
+            && composers.SequenceEqual(tag.Composers ?? Array.Empty<string>(), StringComparer.Ordinal))
         {
             return;
         }
 
         tag.Performers = performers.ToArray();
         tag.AlbumArtists = albumArtists.ToArray();
+        tag.Composers = composers.ToArray();
         tagFile.Save();
     }
 

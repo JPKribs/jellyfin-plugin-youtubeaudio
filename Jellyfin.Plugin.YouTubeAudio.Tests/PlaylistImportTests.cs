@@ -351,6 +351,13 @@ public class PlaylistImportTests
             YouTubeMatcher.BuildMusicSearchUrl(new PlaylistTrack { Title = "Für Elise", Artist = "Lang Lang" }));
 
     [Theory]
+    [InlineData("Clair de lune (Live at Carnegie Hall)")]
+    [InlineData("Clair de lune - Live")]
+    [InlineData("Clair de lune (Remix)")]
+    [InlineData("Clair de lune (Piano Cover)")]
+    [InlineData("Clair de lune (Acoustic Version)")]
+    [InlineData("Clair de lune (Instrumental)")]
+    [InlineData("Clair de lune (Unplugged)")]
     [InlineData("Clair de lune (432Hz)")]
     [InlineData("Clair de lune - 432 Hz")]
     [InlineData("Clair de lune (sped up)")]
@@ -384,6 +391,14 @@ public class PlaylistImportTests
     [InlineData("Lang Lang", "", false)]
     public void WrittenInOtherScript_ComparesAlphabets(string a, string b, bool expected)
         => Assert.Equal(expected, YouTubeMatcher.WrittenInOtherScript(a, b));
+
+    [Fact]
+    public void PickBest_MatchesALiveVersionWhenTheTitleAsksForIt()
+    {
+        var track = new PlaylistTrack { Title = "Clair de lune (Live)", Artist = "Lang Lang", DurationSeconds = 330 };
+
+        Assert.NotNull(YouTubeMatcher.PickBest(track, [new MatchCandidate("l", "Clair de lune (Live at Carnegie Hall)", "Lang Lang", 331)]));
+    }
 
     [Fact]
     public void PickBest_RejectsAnotherSongFromTheArtistsChannel()

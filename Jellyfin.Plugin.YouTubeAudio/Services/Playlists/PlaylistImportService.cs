@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using Jellyfin.Plugin.YouTubeAudio.Models;
@@ -22,6 +23,9 @@ public sealed class PlaylistImportService
     /// covers a library of roughly 30,000 tracks.
     /// </summary>
     internal const int MaxFileBytes = 64 * 1024 * 1024;
+
+    /// <summary>Most files a playlist ZIP may hold.</summary>
+    internal const int MaxArchiveEntries = 1000;
 
     /// <summary>Request body limit for the upload endpoint: the file base64 encoded, plus slack.</summary>
     internal const long MaxRequestBytes = (MaxFileBytes / 3 * 4) + (1024 * 1024);
@@ -98,7 +102,7 @@ public sealed class PlaylistImportService
         }
 
         var fileName = Path.GetFileName(request.FileName ?? string.Empty);
-        var (source, playlists) = Parse(_sources, fileName, DecodeText(bytes));
+        var (source, playlists) = IsZip(bytes) ? ParseArchive(_sources, bytes) : Parse(_sources, fileName, DecodeText(bytes));
 
         var choices = playlists.Select(p => new PlaylistChoice
         {
@@ -258,6 +262,59 @@ public sealed class PlaylistImportService
                 + string.Join(", ", sources.Select(s => s.Name)) + ".");
 
         return (source, source.Parse(fileName, content));
+    }
+
+    /// <summary>
+    /// Returns whether the upload is a ZIP archive (a "PK" local file header).
+    /// </summary>
+    internal static bool IsZip(byte[] bytes) => bytes.Length > 4 && bytes[0] == 0x50 && bytes[1] == 0x4B && bytes[2] == 0x03 && bytes[3] == 0x04;
+
+    /// <summary>
+    /// Reads a ZIP of playlist exports (Exportify's "export all"): every CSV inside becomes one
+    /// playlist to choose from, identified by its file name. Whole-library playlists (Liked
+    /// Songs) are listed last. Only CSV files are read, and the archive's entry count and
+    /// unpacked size are capped so a malformed or malicious ZIP cannot exhaust memory.
+    /// </summary>
+    internal static (IPlaylistSource Source, List<ParsedPlaylist> Playlists) ParseArchive(IReadOnlyList<IPlaylistSource> sources, byte[] bytes)
+    {
+        using var archive = new ZipArchive(new MemoryStream(bytes), ZipArchiveMode.Read);
+        var entries = archive.Entries
+            .Where(e => e.Name.EndsWith(".csv", StringComparison.OrdinalIgnoreCase) && !e.Name.StartsWith('.') && !e.FullName.StartsWith("__MACOSX", StringComparison.Ordinal))
+            .ToList();
+        if (entries.Count == 0 || entries.Count > MaxArchiveEntries)
+        {
+            throw new ArgumentException(entries.Count == 0 ? "The ZIP holds no playlist exports." : "The ZIP holds too many files to be a playlist export.");
+        }
+
+        IPlaylistSource? source = null;
+        var playlists = new List<ParsedPlaylist>();
+        long unpacked = 0;
+        foreach (var entry in entries)
+        {
+            unpacked += entry.Length;
+            if (unpacked > MaxFileBytes)
+            {
+                throw new ArgumentException("The ZIP is too large to be a playlist export.");
+            }
+
+            using var stream = entry.Open();
+            using var buffer = new MemoryStream();
+            stream.CopyTo(buffer);
+            var (entrySource, entryPlaylists) = Parse(sources, entry.Name, DecodeText(buffer.ToArray()));
+            if (source != null && source.Id != entrySource.Id)
+            {
+                throw new ArgumentException("The ZIP mixes exports from different services.");
+            }
+
+            source = entrySource;
+            foreach (var playlist in entryPlaylists)
+            {
+                playlist.Id ??= entry.FullName;
+                playlists.Add(playlist);
+            }
+        }
+
+        return (source!, playlists.OrderBy(p => p.IsLibrary).ToList());
     }
 
     /// <summary>

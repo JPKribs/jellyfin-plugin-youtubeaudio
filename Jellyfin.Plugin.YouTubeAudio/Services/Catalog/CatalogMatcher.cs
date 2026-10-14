@@ -154,6 +154,12 @@ public static partial class CatalogMatcher
                 continue;
             }
 
+            // A live album or a remix is another recording, unless the title asks for it.
+            if (YouTubeMatcher.IsOtherVersion(song.TrackName + " " + song.AlbumName, title))
+            {
+                continue;
+            }
+
             var candidateWords = YouTubeMatcher.Tokenize(song.TrackName);
             var candidateCore = YouTubeMatcher.Tokenize(StripBrackets(song.TrackName));
             var sameTitle = candidateCore.SequenceEqual(titleWords);

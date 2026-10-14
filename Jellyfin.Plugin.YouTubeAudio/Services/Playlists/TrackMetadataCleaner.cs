@@ -122,6 +122,8 @@ public static partial class TrackMetadataCleaner
             DiscNumber = track.DiscNumber,
             DiscCount = track.DiscCount,
             DurationSeconds = track.DurationSeconds,
+            Isrc = track.Isrc,
+            ArtworkUrl = track.ArtworkUrl,
             ReplacesFiles = track.ReplacesFiles
         };
     }
