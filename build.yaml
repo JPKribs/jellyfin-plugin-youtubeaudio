@@ -1,7 +1,7 @@
 ---
 name: "YouTube Audio"
 guid: "7323ea64-a200-4265-ab8f-e7ae27d06c38"
-version: "12.2.3.0"
+version: "12.2.3.1"
 targetAbi: "12.2.0.0"
 framework: "net10.0"
 overview: "Download YouTube audio directly to a Jellyfin Music Library."
@@ -18,9 +18,4 @@ artifacts:
 - "TagLibSharp.dll"
 changelog:
   features:
-  - Import Spotify playlists exported with Exportify, one playlist as CSV or all of them as a ZIP.
-  - Spotify imports embed Spotify's album cover and fill in the genre from Apple Music.
-  - Playlist tracks with an ISRC are matched to their official YouTube upload by it first.
-  - Generate a cover with the wand button on the Import tab; choose its text, order and colors in Settings → Album Art.
-  - Composer credits are stored as separate composers.
-  - Live, remix, cover, acoustic and instrumental versions are never matched unless the song's title names that version.
+  - Republishes 12.2.3.0, whose download did not match its checksum and could not install.
