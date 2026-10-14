@@ -1526,8 +1526,8 @@ public sealed partial class DownloadService : IDisposable
                     await NormalizeArtistsAsync(tagFile, spellings, cancellationToken).ConfigureAwait(false);
 
                     // Join the library's own folders for this artist and album when the names
-                    // differ only in case, punctuation or year ("Tlc" joins "TLC", "EvErMoRe
-                    // (2021)" joins "evermore (2020)"), and take that album's name and year so
+                    // differ only in case, punctuation or year ("LANG LANG" joins "Lang Lang", "PIANO
+                    // book (2020)" joins "Piano Book (2019)"), and take that album's name and year so
                     // Jellyfin keeps the songs together.
                     var replacingInPlace = item.SourceTrack is { ReplaceInPlace: true, ReplacesFiles: [var target] } && File.Exists(target);
                     var artistDir = FindMatchingFolder(libraryPath, SanitizePathComponent(tagFile.Tag.FirstAlbumArtist ?? tagFile.Tag.FirstPerformer ?? "Unknown Artist"), false);
