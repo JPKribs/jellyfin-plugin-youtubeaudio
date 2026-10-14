@@ -9,6 +9,14 @@
     "category": "Music",
     "versions": [
       {
+        "version": "12.2.3.2",
+        "changelog": "## Features\r\n- Replace a library song's audio with a different YouTube upload from the Download tab; it keeps the song's file, tags, cover and playlist places.\r\n- Choosing an album already in the library on the Import tab takes that album's cover.\r\n- Imports join existing artist and album folders whose names differ only in case, punctuation or year, and take that album's name and year.",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/v12.2.3.2/jellyfin-plugin-youtubeaudio-12.2.3.2.zip",
+        "checksum": "f053a096c601dc50f98ca487f2591e91",
+        "timestamp": "2026-10-14T16:06:50Z"
+      },
+      {
         "version": "12.2.3.1",
         "changelog": "## Features\r\n- Republishes 12.2.3.0, whose download did not match its checksum and could not install.",
         "targetAbi": "12.2.0.0",
