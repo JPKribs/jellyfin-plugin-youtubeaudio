@@ -28,7 +28,7 @@ public sealed record MatchResult(MatchCandidate Candidate, double? DurationDelta
 /// Picks the YouTube upload that best matches a playlist track. Pure scoring logic, kept apart
 /// from yt-dlp so it can be tested against captured search results.
 /// </summary>
-public static class YouTubeMatcher
+public static partial class YouTubeMatcher
 {
     /// <summary>How many search results to consider per track.</summary>
     internal const int SearchResultCount = 5;
@@ -97,6 +97,9 @@ public static class YouTubeMatcher
         }
 
         var titleWords = Tokenize(track.Title);
+        // The title without its bracketed parts: "Times Like These (Live Acoustic 2006)" is
+        // still that song when an upload words the version differently.
+        var titleCore = Tokenize(TitleBracketRegex().Replace(track.Title ?? string.Empty, " "));
         var sourceTitleText = " " + string.Join(' ', titleWords) + " ";
         var tailWords = GetDistinctiveTitleWords(track.Title);
         var artistNames = new[] { track.Artist }.Concat(track.FeaturedArtists ?? [])
@@ -124,6 +127,7 @@ public static class YouTubeMatcher
 
             var candidateWords = Tokenize(candidate.Title);
             var titleMatch = titleWords.Count > 0 && titleWords.All(candidateWords.Contains);
+            var coreMatch = !titleMatch && titleCore.Count > 0 && titleCore.All(candidateWords.Contains);
 
             // Classical uploads rarely repeat every catalogue detail ("Suite bergamasque, L. 75:
             // III. Clair de lune" uploaded as "Lang Lang - Debussy: Clair de lune"), so the
@@ -131,9 +135,11 @@ public static class YouTubeMatcher
             var tailMatch = !titleMatch && tailWords.Count > 0 && tailWords.All(candidateWords.Contains);
             var artistInTitle = !channelMatch && artistNames.Any(words => words.All(candidateWords.Contains));
 
-            // An upload must show it is by the artist: their (or their label's) channel, or their
+            // An upload must be this song: the title (or its movement) has to appear, even on the
+            // artist's own channel, where another song of a similar length would otherwise pass.
+            // It must also show it is by the artist: their (or their label's) channel, or their
             // name in the title. A matching title alone may be another performer's recording.
-            if (!channelMatch && !(artistInTitle && (titleMatch || tailMatch)))
+            if (!(titleMatch || coreMatch || tailMatch) || (!channelMatch && !artistInTitle))
             {
                 continue;
             }
@@ -146,6 +152,7 @@ public static class YouTubeMatcher
             var score = 0.0;
             score += channelMatch ? 50 : 0;
             score += titleMatch ? 30 : 0;
+            score += coreMatch ? 20 : 0;
             score += tailMatch ? 15 : 0;
             score += artistInTitle ? 25 : 0;
             score += isTopic ? 10 : 0;
@@ -322,4 +329,7 @@ public static class YouTubeMatcher
 
         return words;
     }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"[\(\[][^\)\]]*[\)\]]")]
+    private static partial System.Text.RegularExpressions.Regex TitleBracketRegex();
 }

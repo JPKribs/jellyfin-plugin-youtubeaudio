@@ -351,6 +351,25 @@ public class PlaylistImportTests
             YouTubeMatcher.BuildMusicSearchUrl(new PlaylistTrack { Title = "Für Elise", Artist = "Lang Lang" }));
 
     [Fact]
+    public void PickBest_RejectsAnotherSongFromTheArtistsChannel()
+    {
+        // YouTube Music lists the artist's other songs beside the one searched for; a similar
+        // length on the right channel is not enough.
+        var track = new PlaylistTrack { Title = "Gymnopédie No. 1", Artist = "Lang Lang", DurationSeconds = 300 };
+
+        Assert.Null(YouTubeMatcher.PickBest(track, [new MatchCandidate("x", "Clair de lune", "Lang Lang", 302)]));
+    }
+
+    [Fact]
+    public void PickBest_MatchesTheSameSongWithDifferentlyWordedBrackets()
+    {
+        var track = new PlaylistTrack { Title = "Clair de lune (Live at Carnegie Hall 2003)", Artist = "Lang Lang", DurationSeconds = 330 };
+        var match = YouTubeMatcher.PickBest(track, [new MatchCandidate("y", "Clair de lune (Live from Carnegie Hall)", "Lang Lang - Topic", 331)]);
+
+        Assert.Equal("y", match?.Candidate.Id);
+    }
+
+    [Fact]
     public void PickBest_AcceptsAYouTubeMusicSongCredit()
     {
         // YouTube Music's full details for an art track: the song title, the artist credit and the album length.
