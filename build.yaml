@@ -20,6 +20,8 @@ changelog:
   features:
   - Look up each download on Apple Music to fill in its title, album, album artist, year, track number and genre (Settings, on by default).
   - Embed the album cover from Apple Music in downloaded files (Settings, on by default).
+  - Upload your own cover art on the Import tab, for one file or all selected files.
   - Songs already in your library are marked "Already in your library" on the Import tab.
   - Joint artist credits are stored as separate artists, and new imports reuse the library's spelling of an artist.
   - Playlist imports use the album's release date for its year.
+  - Playlist tracks the regular YouTube search cannot match are looked up in YouTube Music's song results.

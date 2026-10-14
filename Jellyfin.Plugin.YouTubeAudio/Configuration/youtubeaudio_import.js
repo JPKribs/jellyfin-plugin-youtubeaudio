@@ -12,6 +12,7 @@ export default function (view) {
     var _artistSearch = null;
     var _bulkArtistCombo = null;
     var _bulkAlbumCombo = null;
+    var _coverTargets = [];
     var _activeComboBoxes = []; // Track all combo-boxes for cleanup
 
     // One shared player previews the downloaded file of whichever row is playing.
@@ -115,7 +116,7 @@ export default function (view) {
         body.querySelectorAll('.jpk-table-row').forEach(function(row) {
             var artistCell = row.querySelector('.yta-artist-cell');
             var albumCell = row.querySelector('.yta-album-cell');
-            var saveBtn = row.querySelector('.jpk-row-btn');
+            var saveBtn = row.querySelector('.jpk-row-btn.save');
             function markDirty() { if (saveBtn) saveBtn.classList.add('dirty'); }
 
             // Artist combo-box
@@ -146,7 +147,7 @@ export default function (view) {
 
         // Bind save handlers and dirty-state tracking
         body.querySelectorAll('.jpk-table-row').forEach(function(row) {
-            var saveBtn = row.querySelector('.jpk-row-btn');
+            var saveBtn = row.querySelector('.jpk-row-btn.save');
             if (saveBtn) {
                 saveBtn.addEventListener('click', function(e) {
                     e.stopPropagation();
@@ -170,6 +171,10 @@ export default function (view) {
         // Bind preview controls
         body.querySelectorAll('.jpk-table-row').forEach(function(row) {
             var id = row.getAttribute('data-id');
+            row.querySelector('.yta-cover-btn').addEventListener('click', function(e) {
+                e.stopPropagation();
+                pickCover([id]);
+            });
             row.querySelector('.yta-preview-btn').addEventListener('click', function(e) {
                 e.stopPropagation();
                 togglePreview(id);
@@ -281,12 +286,22 @@ export default function (view) {
         });
     }
 
+    // renderCover
+    // The row's cover thumbnail, or an "add picture" icon when the file has none. An <img>
+    // cannot send headers, so the token rides in the query, like the audio preview.
+    function renderCover(id, hasCover) {
+        if (!hasCover) return '<span class="material-icons">add_photo_alternate</span>';
+        var url = ApiClient.getUrl('YouTubeAudio/Downloads/' + encodeURIComponent(id) + '/Cover', { ApiKey: ApiClient.accessToken(), v: Date.now() });
+        return '<img alt="" src="' + Shared.escapeHtml(url) + '" />';
+    }
+
     function renderImportRow(d) {
         var esc = Shared.escapeHtml;
         return '<div class="jpk-table-row jpk-edit-row" data-id="' + esc(d.Id) + '">'
             // Line 1: Checkbox | Preview (button, then seek bar while playing) | Size | Save
             + '<div class="jpk-edit-line">'
             + '<label class="emby-checkbox-label"><input type="checkbox" is="emby-checkbox" class="jpk-table-row-checkbox yta-file-check" data-id="' + esc(d.Id) + '" /><span class="checkboxLabel"></span></label>'
+            + '<button type="button" class="yta-cover-btn" title="Set cover art" aria-label="Set cover art">' + renderCover(d.Id, d.HasCover) + '</button>'
             + '<div class="yta-preview-group">'
             + '<button type="button" class="jpk-row-btn yta-preview-btn" title="Play preview"><span class="material-icons">play_arrow</span></button>'
             + '<div class="yta-preview" hidden>'
@@ -361,6 +376,8 @@ export default function (view) {
         // Disable Apply to Selected when nothing selected
         var applyBtn = view.querySelector('#btnApplyBulk');
         if (applyBtn) applyBtn.disabled = checked === 0;
+        var coverBtn = view.querySelector('#btnBulkCover');
+        if (coverBtn) coverBtn.disabled = checked === 0;
     }
 
     // ============================================
@@ -388,7 +405,7 @@ export default function (view) {
 
         Shared.apiRequest('Tags', 'POST', data)
             .then(function() {
-                var btn = row.querySelector('.jpk-row-btn');
+                var btn = row.querySelector('.jpk-row-btn.save');
                 btn.classList.remove('dirty');
                 btn.classList.add('success');
                 setTimeout(function() { btn.classList.remove('success'); }, 1000);
@@ -483,7 +500,7 @@ export default function (view) {
             Shared.apiRequest('Tags', 'POST', data)
                 .then(function() {
                     saved++;
-                    var btn = row.querySelector('.jpk-row-btn');
+                    var btn = row.querySelector('.jpk-row-btn.save');
                     if (btn) {
                         btn.classList.add('success');
                         setTimeout(function() { btn.classList.remove('success'); }, 1000);
@@ -534,6 +551,81 @@ export default function (view) {
             .catch(function(err) {
                 Shared.setStatus('importStatus', (err && err.Error) || 'Import failed.', true);
             });
+    }
+
+    // ============================================
+    // COVER ART
+    // ============================================
+
+    // pickCover
+    // Opens the file picker; the chosen picture becomes the cover of the given files.
+    function pickCover(ids) {
+        var input = view.querySelector('#coverFileInput');
+        if (!input || ids.length === 0) return;
+        _coverTargets = ids;
+        input.value = '';
+        input.click();
+    }
+
+    // squareCover
+    // Crops a picture to a centred square (at most 1200 px) and returns it as base64 JPEG, so
+    // every cover is 1:1 whatever shape was uploaded.
+    function squareCover(file) {
+        return new Promise(function(resolve, reject) {
+            if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+                reject(new Error('Choose a JPEG, PNG or WebP picture.'));
+                return;
+            }
+            var url = URL.createObjectURL(file);
+            var img = new Image();
+            img.onload = function() {
+                var side = Math.min(img.naturalWidth, img.naturalHeight);
+                var size = Math.min(side, 1200);
+                var canvas = document.createElement('canvas');
+                canvas.width = size;
+                canvas.height = size;
+                canvas.getContext('2d').drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, size, size);
+                URL.revokeObjectURL(url);
+                resolve(canvas.toDataURL('image/jpeg', 0.9).split(',')[1]);
+            };
+            img.onerror = function() {
+                URL.revokeObjectURL(url);
+                reject(new Error('That file could not be opened as a picture.'));
+            };
+            img.src = url;
+        });
+    }
+
+    // uploadCover
+    // Embeds the chosen picture in each target file, one at a time, and refreshes their
+    // thumbnails in place (re-rendering would drop unsaved edits).
+    function uploadCover(file) {
+        var ids = _coverTargets.slice();
+        _coverTargets = [];
+        squareCover(file).then(function(data) {
+            Shared.setStatus('importStatus', 'Setting cover art on ' + ids.length + ' file(s)...', false);
+            var failed = 0;
+            function next(index) {
+                if (index >= ids.length) {
+                    var done = ids.length - failed;
+                    Shared.setStatus('importStatus', 'Cover art set on ' + done + ' file(s).' + (failed ? ' ' + failed + ' failed.' : ''), failed > 0);
+                    return;
+                }
+                var id = ids[index];
+                Shared.apiRequest('Downloads/' + encodeURIComponent(id) + '/Cover', 'POST', { Data: data })
+                    .then(function() {
+                        var btn = view.querySelector('.jpk-table-row[data-id="' + CSS.escape(id) + '"] .yta-cover-btn');
+                        if (btn) btn.innerHTML = renderCover(id, true);
+                        var d = _downloads.find(function(x) { return x.Id === id; });
+                        if (d) d.HasCover = true;
+                    })
+                    .catch(function() { failed++; })
+                    .then(function() { next(index + 1); });
+            }
+            next(0);
+        }).catch(function(err) {
+            Shared.setStatus('importStatus', err.message, true);
+        });
     }
 
     function deleteSelected() {
@@ -608,6 +700,18 @@ export default function (view) {
 
         var btnApplyBulk = Shared.getEl('btnApplyBulk');
         if (btnApplyBulk) btnApplyBulk.addEventListener('click', applyBulkEdit);
+
+        var btnBulkCover = Shared.getEl('btnBulkCover');
+        if (btnBulkCover) btnBulkCover.addEventListener('click', function() {
+            var ids = [];
+            view.querySelectorAll('.yta-file-check:checked').forEach(function(cb) { ids.push(cb.getAttribute('data-id')); });
+            pickCover(ids);
+        });
+
+        var coverInput = Shared.getEl('coverFileInput');
+        if (coverInput) coverInput.addEventListener('change', function() {
+            if (coverInput.files && coverInput.files[0]) uploadCover(coverInput.files[0]);
+        });
 
         var btnImport = Shared.getEl('btnImportSelected');
         if (btnImport) btnImport.addEventListener('click', importSelected);

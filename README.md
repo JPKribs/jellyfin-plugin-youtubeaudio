@@ -34,7 +34,7 @@ YouTube Audio lets you paste a YouTube video or playlist URL, download the audio
 **Import Behavior** — Choose whether importing a file that already exists in the library should overwrite the existing file or skip it (leaving the duplicate in the download cache). Two more options are on by default:
 
 - **Look up song details on Apple Music** — each download is looked up in Apple's public music catalog (no account needed) to fill in its title, album, album artist, release year, track and disc numbers and genre. Only a confident match is used: the artist must match and the length must agree. Anything you entered when queueing the song is kept, and playlist imports keep their export's details.
-- **Embed cover art** — the album cover from Apple's catalog is added to each downloaded file, so Jellyfin shows it.
+- **Embed cover art** — the album cover from Apple's catalog (as a 1200 × 1200 square) is added to each downloaded file, so Jellyfin shows it.
 
 **Cache Directory** — By default, downloaded files are cached in the Jellyfin data directory. Override this if you need a specific staging location.
 
@@ -62,7 +62,7 @@ YouTube Audio lets you paste a YouTube video or playlist URL, download the audio
    - Nothing is queued twice: songs already in any of your Jellyfin music libraries or the queue are skipped, and the playlist uses your existing copy. Classical movements count when one side names only the movement: an export's "Suite bergamasque, L. 75: III. Clair de lune" uses your "Clair de lune" by the same artist, and the other way round, as long as the lengths agree and the movement isn't just a tempo like "Allegro". A song appearing more than once keeps its best version (album, then compilation, then EP, then single). If your library only has a song's single and the import brings its album version, the album version is queued and the single's file is deleted once it is imported
    - New tracks from an album you already have reuse that album's name and year, so they land in its existing folder
    - The owner's playlist fills in as songs reach the library: songs you already have are added straight away, the rest once they are downloaded, imported and scanned. If the owner already has a playlist with that name, only the songs it is missing are added, and its songs are put in the export's order (songs the owner added themselves keep their place). Each import is one-time: it finishes once every song is in, or once a song's download fails or is removed. Re-importing later simply adds what is new and re-orders
-3. Download as usual. Each track is matched to a YouTube upload when it downloads, preferring the artist's own channel and an upload close to the track's length. An upload from another channel is only accepted when its title names the artist, so another performer's recording of the same piece is not picked. For long classical titles ("Suite bergamasque, L. 75: III. Clair de lune"), the movement name is enough to match. A match worth checking (a length difference over 3 seconds, or an upload not from the artist) is noted on the queue row, and a track with no acceptable upload is marked as an error
+3. Download as usual. Each track is matched to a YouTube upload when it downloads, preferring the artist's own channel and an upload close to the track's length. When the regular search only finds music videos of the wrong length (or nothing), YouTube Music's song results are checked too, under the same rules. An upload from another channel is only accepted when its title names the artist, so another performer's recording of the same piece is not picked. For long classical titles ("Suite bergamasque, L. 75: III. Clair de lune"), the movement name is enough to match. A match worth checking (a length difference over 3 seconds, or an upload not from the artist) is noted on the queue row, and a track with no acceptable upload is marked as an error
 4. To fix a wrong or failed match, click the link button on its queue row, paste the right YouTube link and click **Use Link**. The track downloads again from that link and keeps its title, artist, album and other details, and its place in any playlist import
 
 ### 3. Import
@@ -75,8 +75,9 @@ YouTube Audio lets you paste a YouTube video or playlist URL, download the audio
 
 1. Review and edit metadata for each downloaded file (title, artist, album artist, featured artists, album, year, genre, track number). Songs your library already has are marked **Already in your library**, so you can skip a second copy
 2. To apply the same metadata to multiple files at once, fill in the bulk fields at the top and click **Apply to Selected**
-3. Remember to save any unsaved changes on individual tracks before importing (look for the save icon)
-4. Select the files you want to import and click **Import**
+3. To add or replace cover art, click the picture square on a row, or select several files and click **Set Cover on Selected**, then choose an image. Pictures are cropped to a centred square
+4. Remember to save any unsaved changes on individual tracks before importing (look for the save icon)
+5. Select the files you want to import and click **Import**
 
 Metadata is written directly to the audio files. On import, files are copied into your music library directory following Jellyfin's expected structure:
 

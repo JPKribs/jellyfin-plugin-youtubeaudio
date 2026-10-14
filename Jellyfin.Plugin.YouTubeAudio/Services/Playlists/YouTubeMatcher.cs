@@ -33,6 +33,9 @@ public static class YouTubeMatcher
     /// <summary>How many search results to consider per track.</summary>
     internal const int SearchResultCount = 5;
 
+    /// <summary>How many YouTube Music song results to look at when the regular search finds nothing.</summary>
+    internal const int MusicSearchResultCount = 3;
+
     /// <summary>Candidates whose length differs by more than this are rejected outright.</summary>
     internal const double MaxDurationDeltaSeconds = 8;
 
@@ -61,6 +64,19 @@ public static class YouTubeMatcher
 
         // yt-dlp receives the query on its command line; quotes would break the argument.
         return query.Replace("\"", string.Empty, StringComparison.Ordinal).Trim();
+    }
+
+    /// <summary>
+    /// Builds a YouTube Music search for a track's song results. YouTube Music lists the
+    /// official audio (the album track's exact length) first, where a regular search often
+    /// shows only music videos with intros, or nothing at all for words YouTube filters when
+    /// signed out.
+    /// </summary>
+    public static string BuildMusicSearchUrl(PlaylistTrack track)
+    {
+        ArgumentNullException.ThrowIfNull(track);
+        var query = string.IsNullOrWhiteSpace(track.Artist) ? track.Title : track.Artist + " " + track.Title;
+        return "https://music.youtube.com/search?q=" + Uri.EscapeDataString(query.Trim()) + "#songs";
     }
 
     /// <summary>

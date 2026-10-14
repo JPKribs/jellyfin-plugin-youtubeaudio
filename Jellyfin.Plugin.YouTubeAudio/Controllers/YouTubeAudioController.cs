@@ -332,6 +332,65 @@ public class YouTubeAudioController : ControllerBase
     }
 
     /// <summary>
+    /// Gets the cover art embedded in a downloaded file.
+    /// </summary>
+    /// <param name="id">The queue item ID.</param>
+    /// <returns>The image, or 404 when the file has none.</returns>
+    [HttpGet("Downloads/{id}/Cover")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult GetDownloadCover(string id)
+    {
+        var cover = _downloadService.GetCoverArt(id);
+        if (cover == null)
+        {
+            return NotFound();
+        }
+
+        Response.Headers["Cache-Control"] = "no-store";
+        return File(cover.Value.Data, cover.Value.MimeType);
+    }
+
+    /// <summary>
+    /// Embeds an uploaded cover image (a square JPEG or PNG) in a downloaded file.
+    /// </summary>
+    /// <param name="id">The queue item ID.</param>
+    /// <param name="request">The base64-encoded image.</param>
+    /// <returns>Success status.</returns>
+    [HttpPost("Downloads/{id}/Cover")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult SetDownloadCover(string id, [FromBody] CoverArtRequest request)
+    {
+        byte[] data;
+        try
+        {
+            var base64 = request?.Data ?? string.Empty;
+            var comma = base64.IndexOf(',', StringComparison.Ordinal);
+            data = Convert.FromBase64String(comma >= 0 ? base64[(comma + 1)..] : base64);
+        }
+        catch (FormatException)
+        {
+            return BadRequest(new { Error = "The image could not be read." });
+        }
+
+        try
+        {
+            _downloadService.SetCoverArt(id, data);
+            return Ok();
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { Error = ex.Message });
+        }
+        catch (FileNotFoundException)
+        {
+            return NotFound(new { Error = "Downloaded file not found." });
+        }
+    }
+
+    /// <summary>
     /// Saves metadata tags to a downloaded file.
     /// </summary>
     /// <param name="request">The tag update request.</param>

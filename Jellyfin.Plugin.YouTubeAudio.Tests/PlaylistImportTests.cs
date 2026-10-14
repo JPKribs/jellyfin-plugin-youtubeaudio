@@ -345,6 +345,22 @@ public class PlaylistImportTests
     ];
 
     [Fact]
+    public void BuildMusicSearchUrl_SearchesYouTubeMusicSongs()
+        => Assert.Equal(
+            "https://music.youtube.com/search?q=Lang%20Lang%20F%C3%BCr%20Elise#songs",
+            YouTubeMatcher.BuildMusicSearchUrl(new PlaylistTrack { Title = "Für Elise", Artist = "Lang Lang" }));
+
+    [Fact]
+    public void PickBest_AcceptsAYouTubeMusicSongCredit()
+    {
+        // YouTube Music's full details for an art track: the song title, the artist credit and the album length.
+        var track = new PlaylistTrack { Title = "Für Elise", Artist = "Lang Lang", DurationSeconds = 206 };
+        var match = YouTubeMatcher.PickBest(track, [new MatchCandidate("abc", "Für Elise", "Lang Lang", 205)]);
+
+        Assert.Equal("abc", match?.Candidate.Id);
+    }
+
+    [Fact]
     public void PickBest_MatchesClassicalMovementWhenArtistIsInTheTitle()
     {
         var track = new PlaylistTrack { Title = "Suite bergamasque, L. 75: III. Clair de lune", Artist = "Lang Lang", DurationSeconds = 367 };

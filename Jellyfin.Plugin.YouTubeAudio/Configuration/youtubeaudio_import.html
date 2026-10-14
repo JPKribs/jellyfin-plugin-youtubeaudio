@@ -48,9 +48,15 @@
                                     <input type="text" class="jpk-edit-input" id="bulkGenre" placeholder="Classical; Baroque" />
                                 </div>
                             </div>
-                            <button is="emby-button" type="button" id="btnApplyBulk" class="raised jpk-button-submit jpk-button-small" disabled>
-                                <span>Apply to Selected</span>
-                            </button>
+                            <div class="yta-bulk-buttons">
+                                <button is="emby-button" type="button" id="btnApplyBulk" class="raised jpk-button-submit jpk-button-small" disabled>
+                                    <span>Apply to Selected</span>
+                                </button>
+                                <button is="emby-button" type="button" id="btnBulkCover" class="raised jpk-button-small" disabled>
+                                    <span>Set Cover on Selected</span>
+                                </button>
+                            </div>
+                            <input type="file" id="coverFileInput" accept="image/jpeg,image/png,image/webp" hidden />
                         </div>
 
                         <!-- Selection Header -->
@@ -101,6 +107,34 @@
         }
         /* Preview: play/pause per row, with a seek bar and clock on the row that is playing. */
         #YouTubeAudioImportPage .yta-preview-btn.active { color: #00a4dc; }
+        #YouTubeAudioImportPage .yta-bulk-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        #YouTubeAudioImportPage .yta-cover-btn {
+            width: 40px;
+            height: 40px;
+            flex: 0 0 40px;
+            padding: 0;
+            border: 1px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            color: inherit;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        #YouTubeAudioImportPage .yta-cover-btn:has(img) { border-style: solid; }
+        #YouTubeAudioImportPage .yta-cover-btn img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        #YouTubeAudioImportPage .yta-cover-btn:focus-visible { outline: 2px solid #00a4dc; outline-offset: 2px; }
         #YouTubeAudioImportPage .yta-in-library {
             font-size: 0.8em;
             padding: 2px 8px;

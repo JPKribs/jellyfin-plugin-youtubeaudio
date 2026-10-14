@@ -103,10 +103,35 @@ public class CatalogTests
     }
 
     [Fact]
-    public void GetArtworkUrl_AsksForTheRequestedSize()
+    public void GetArtworkUrl_AsksForASquareOfTheRequestedSize()
         => Assert.Equal(
-            "https://is1-ssl.mzstatic.com/image/thumb/Music/v4/a/cover.jpg/1200x1200bb.jpg",
+            "https://is1-ssl.mzstatic.com/image/thumb/Music/v4/a/cover.jpg/1200x1200cc.jpg",
             CatalogMatcher.GetArtworkUrl("https://is1-ssl.mzstatic.com/image/thumb/Music/v4/a/cover.jpg/100x100bb.jpg", 1200));
+
+    // MARK: Images
+
+    [Fact]
+    public void ImageInfo_ReadsPngSize()
+    {
+        byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 2, 0x58, 0, 0, 1, 0x90];
+
+        Assert.Equal(("image/png", 600, 400), ImageInfo.Read(png));
+    }
+
+    [Fact]
+    public void ImageInfo_ReadsJpegSizeAfterOtherSegments()
+    {
+        // SOI, an APP0 segment, then a baseline frame header for 1000 x 905.
+        byte[] jpeg = [0xFF, 0xD8, 0xFF, 0xE0, 0, 4, 0, 0, 0xFF, 0xC0, 0, 17, 8, 0x03, 0x89, 0x03, 0xE8, 3, 0, 0, 0, 0];
+
+        Assert.Equal(("image/jpeg", 1000, 905), ImageInfo.Read(jpeg));
+    }
+
+    [Theory]
+    [InlineData(new byte[0])]
+    [InlineData(new byte[] { 0x47, 0x49, 0x46, 0x38, 0x39, 0x61 })]
+    public void ImageInfo_RejectsOtherData(byte[] data)
+        => Assert.Null(ImageInfo.Read(data));
 
     // MARK: Artist credits
 

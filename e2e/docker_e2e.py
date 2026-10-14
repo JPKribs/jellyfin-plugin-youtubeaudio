@@ -449,6 +449,26 @@ def main():
     wait(lambda: any(i["Name"] == LINK_TITLE for i in call("GET", "/Items?includeItemTypes=Audio&recursive=true")["Items"]), "library scan of the link import", 180, 3)
     item, d = download_link()
     check("downloading it again shows 'Already in your library'", d.get("InLibrary") is True, json.dumps({k: d.get(k) for k in ("MetadataTitle", "Artist", "InLibrary")}, ensure_ascii=False))
+
+    # Cover art upload on the Import tab: only square pictures are embedded.
+    check("Import tab sees the embedded cover", d.get("HasCover") is True)
+    pics = {}
+    for name, size in (("square", "640x640"), ("wide", "640x480")):
+        out = os.path.join(WORK, f"cover-{name}.jpg")
+        subprocess.run(["docker", "run", "--rm", *USER, "-v", f"{WORK}:/w", "--entrypoint", "/usr/lib/jellyfin-ffmpeg/ffmpeg", IMAGE,
+                        "-v", "error", "-y", "-f", "lavfi", "-i", f"color=c=0x3f4fb3:s={size}", "-frames:v", "1", f"/w/cover-{name}.jpg"], check=True)
+        pics[name] = open(out, "rb").read()
+    try:
+        call("POST", f"/YouTubeAudio/Downloads/{item['Id']}/Cover", {"Data": base64.b64encode(pics["wide"]).decode()})
+        wide = 200
+    except urllib.error.HTTPError as ex:
+        wide = ex.code
+    check("a non-square cover is refused", wide == 400, str(wide))
+    call("POST", f"/YouTubeAudio/Downloads/{item['Id']}/Cover", {"Data": base64.b64encode(pics["square"]).decode()})
+    req = urllib.request.Request(BASE + f"/YouTubeAudio/Downloads/{item['Id']}/Cover", headers={"Authorization": AUTH + f', Token="{TOKEN}"'})
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        served = resp.read()
+    check("an uploaded square cover is embedded and served back", served == pics["square"], f"{len(served)} bytes vs {len(pics['square'])}")
     call("DELETE", f"/YouTubeAudio/Downloads/{item['Id']}")
 
     logs = sh("docker", "logs", NAME, check=False) + subprocess.run(["docker", "logs", NAME], capture_output=True, text=True).stderr

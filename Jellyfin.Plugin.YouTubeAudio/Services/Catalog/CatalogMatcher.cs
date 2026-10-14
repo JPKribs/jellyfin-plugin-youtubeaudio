@@ -201,13 +201,14 @@ public static partial class CatalogMatcher
     }
 
     /// <summary>
-    /// Turns Apple's 100 px artwork link into one of the given size (Apple serves any size up to
-    /// the original from the same path).
+    /// Turns Apple's 100 px artwork link into a square one of the given size (Apple serves any
+    /// size from the same path; "cc" crops to the centre, so covers that are not quite square
+    /// still come back 1:1).
     /// </summary>
     public static string? GetArtworkUrl(string? artworkUrl100, int size)
         => string.IsNullOrEmpty(artworkUrl100)
             ? null
-            : ArtworkSizeRegex().Replace(artworkUrl100, string.Create(CultureInfo.InvariantCulture, $"/{size}x{size}bb."));
+            : ArtworkSizeRegex().Replace(artworkUrl100, string.Create(CultureInfo.InvariantCulture, $"/{size}x{size}cc."));
 
     /// <summary>
     /// Strips Apple's " - Single" and " - EP" suffixes and edition labels from an album name.
@@ -255,6 +256,6 @@ public static partial class CatalogMatcher
     [GeneratedRegex(@"\s+-\s+(Single|EP)$", RegexOptions.IgnoreCase)]
     private static partial Regex SingleOrEpRegex();
 
-    [GeneratedRegex(@"/\d+x\d+bb\.")]
+    [GeneratedRegex(@"/\d+x\d+(bb|cc)\.")]
     private static partial Regex ArtworkSizeRegex();
 }

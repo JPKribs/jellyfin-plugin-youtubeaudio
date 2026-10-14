@@ -8,6 +8,9 @@ public class QueueItemDto
     /// <summary>Gets or sets the unique identifier.</summary>
     public string Id { get; set; } = string.Empty;
 
+    /// <summary>Gets or sets a value indicating whether the downloaded file has embedded cover art.</summary>
+    public bool HasCover { get; set; }
+
     /// <summary>Gets or sets a value indicating whether the library already has this song.</summary>
     public bool InLibrary { get; set; }
 

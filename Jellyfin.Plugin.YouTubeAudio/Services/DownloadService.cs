@@ -54,8 +54,11 @@ public sealed class DownloadService : IDisposable
     /// <summary>Longest file or folder name written to the library, in characters.</summary>
     internal const int MaxPathComponentLength = 100;
 
-    /// <summary>Embedded cover art size, in pixels.</summary>
+    /// <summary>Embedded cover art size, in pixels (always square).</summary>
     private const int CoverArtSize = 1200;
+
+    /// <summary>Largest cover image accepted from an upload, in bytes.</summary>
+    internal const int MaxCoverArtBytes = 10 * 1024 * 1024;
 
     private readonly ILogger<DownloadService> _logger;
     private readonly QueueDatabaseProvider _dbProvider;
@@ -454,7 +457,17 @@ public sealed class DownloadService : IDisposable
             "search " + query,
             cancellationToken).ConfigureAwait(false);
 
-        if (!search.Success)
+        var candidates = !search.Success
+            ? Enumerable.Empty<MatchCandidate>()
+            : (search.Data?.Entries ?? Array.Empty<YoutubeDLSharp.Metadata.VideoData>())
+                .Where(entry => !string.IsNullOrEmpty(entry.ID))
+                .Select(entry => new MatchCandidate(entry.ID, entry.Title ?? string.Empty, entry.Channel ?? entry.Uploader, entry.Duration));
+
+        // Music videos often run longer than the album track, and a signed-out search returns
+        // nothing for some words, so try YouTube Music's song results before giving up.
+        var match = YouTubeMatcher.PickBest(track, candidates)
+            ?? await SearchYouTubeMusicAsync(ytdl, toolOptions, track, cancellationToken).ConfigureAwait(false);
+        if (match == null && !search.Success)
         {
             var errors = string.Join("; ", search.ErrorOutput ?? Array.Empty<string>());
             db.UpdateStatus(item.Id, QueueStatus.Error, "YouTube search failed: " + errors);
@@ -462,11 +475,6 @@ public sealed class DownloadService : IDisposable
             return false;
         }
 
-        var candidates = (search.Data?.Entries ?? Array.Empty<YoutubeDLSharp.Metadata.VideoData>())
-            .Where(entry => !string.IsNullOrEmpty(entry.ID))
-            .Select(entry => new MatchCandidate(entry.ID, entry.Title ?? string.Empty, entry.Channel ?? entry.Uploader, entry.Duration));
-
-        var match = YouTubeMatcher.PickBest(track, candidates);
         if (match == null)
         {
             db.UpdateStatus(item.Id, QueueStatus.Error, $"No matching YouTube upload found for \"{query}\".");
@@ -488,6 +496,49 @@ public sealed class DownloadService : IDisposable
     /// (YouTube throttling with 403/429, server errors, network hiccups). Permanent failures, such
     /// as a removed video, are returned straight away.
     /// </summary>
+    /// <summary>
+    /// Looks a track up in YouTube Music's song results and returns an acceptable match, or
+    /// null. The search lists songs without their length or artist, so the top few are read in
+    /// full and held to the same rules as regular search results.
+    /// </summary>
+    private async Task<MatchResult?> SearchYouTubeMusicAsync(YoutubeDL ytdl, OptionSet toolOptions, PlaylistTrack track, CancellationToken cancellationToken)
+    {
+        var url = YouTubeMatcher.BuildMusicSearchUrl(track);
+        var listOptions = new OptionSet { PlaylistItems = string.Create(CultureInfo.InvariantCulture, $"1:{YouTubeMatcher.MusicSearchResultCount}") }.OverrideOptions(toolOptions);
+        var search = await RunWithRetriesAsync(
+            () => ytdl.RunVideoDataFetch(url, cancellationToken, flat: true, overrideOptions: listOptions),
+            result => result.Success,
+            result => result.ErrorOutput,
+            "YouTube Music search " + track.Title,
+            cancellationToken).ConfigureAwait(false);
+        if (!search.Success)
+        {
+            return null;
+        }
+
+        var candidates = new List<MatchCandidate>();
+        foreach (var id in (search.Data?.Entries ?? Array.Empty<YoutubeDLSharp.Metadata.VideoData>())
+                     .Select(entry => entry.ID)
+                     .Where(id => !string.IsNullOrEmpty(id))
+                     .Take(YouTubeMatcher.MusicSearchResultCount))
+        {
+            var video = await ytdl.RunVideoDataFetch("https://www.youtube.com/watch?v=" + id, cancellationToken, overrideOptions: toolOptions).ConfigureAwait(false);
+            if (video.Success && video.Data != null)
+            {
+                // YouTube Music names the song and artist; fall back to the video title and channel.
+                candidates.Add(new MatchCandidate(id, video.Data.Track ?? video.Data.Title ?? string.Empty, video.Data.Artist ?? video.Data.Channel, video.Data.Duration));
+            }
+        }
+
+        var match = YouTubeMatcher.PickBest(track, candidates);
+        if (match != null)
+        {
+            _logger.LogInformation("Found {Title} through YouTube Music", SanitizeForLog(track.Title));
+        }
+
+        return match;
+    }
+
     private async Task<T> RunWithRetriesAsync<T>(
         Func<Task<T>> run,
         Func<T, bool> succeeded,
@@ -684,6 +735,54 @@ public sealed class DownloadService : IDisposable
 
         return (path, GetAudioContentType(path));
     }
+
+    /// <summary>
+    /// Gets the cover embedded in a downloaded file, or null when it has none.
+    /// </summary>
+    public (byte[] Data, string MimeType)? GetCoverArt(string id)
+    {
+        var file = GetPreviewFile(id);
+        if (file == null)
+        {
+            return null;
+        }
+
+        using var tagFile = TagLib.File.Create(file.Value.Path);
+        var picture = tagFile.Tag.Pictures.FirstOrDefault(p => p.Type == TagLib.PictureType.FrontCover) ?? tagFile.Tag.Pictures.FirstOrDefault();
+        return picture == null || picture.Data.Count == 0
+            ? null
+            : (picture.Data.Data, string.IsNullOrEmpty(picture.MimeType) ? "image/jpeg" : picture.MimeType);
+    }
+
+    /// <summary>
+    /// Embeds a cover in a downloaded file, replacing any it had. The image must be a square
+    /// JPEG or PNG no larger than <see cref="MaxCoverArtBytes"/>.
+    /// </summary>
+    /// <exception cref="FileNotFoundException">The item is not a downloaded file.</exception>
+    /// <exception cref="ArgumentException">The image is not usable.</exception>
+    public void SetCoverArt(string id, byte[] data)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        var file = GetPreviewFile(id) ?? throw new FileNotFoundException("Downloaded file not found.");
+        if (data.Length > MaxCoverArtBytes)
+        {
+            throw new ArgumentException("The image is too large. Use one under 10 MB.");
+        }
+
+        var info = ImageInfo.Read(data) ?? throw new ArgumentException("Choose a JPEG or PNG image.");
+        if (info.Width != info.Height)
+        {
+            throw new ArgumentException("Cover art must be square.");
+        }
+
+        using var tagFile = TagLib.File.Create(file.Path);
+        tagFile.Tag.Pictures = new TagLib.IPicture[] { CreateCover(data, info.MimeType) };
+        tagFile.Save();
+        _logger.LogInformation("Cover art set for queue item {Id}", id);
+    }
+
+    private static TagLib.Picture CreateCover(byte[] data, string mimeType)
+        => new(new TagLib.ByteVector(data)) { Type = TagLib.PictureType.FrontCover, MimeType = mimeType, Description = "Cover" };
 
     /// <summary>
     /// Maps a cached audio file to the media type browsers expect for playback.
@@ -911,12 +1010,9 @@ public sealed class DownloadService : IDisposable
             if (Config.EmbedCoverArt && tag.Pictures.Length == 0)
             {
                 var artwork = await _catalog.GetArtworkAsync(song.ArtworkUrl, CoverArtSize, cancellationToken).ConfigureAwait(false);
-                if (artwork is { Length: > 0 })
+                if (artwork is { Length: > 0 } && ImageInfo.Read(artwork) is { } art && art.Width == art.Height)
                 {
-                    tag.Pictures = new TagLib.IPicture[]
-                    {
-                        new TagLib.Picture(new TagLib.ByteVector(artwork)) { Type = TagLib.PictureType.FrontCover, MimeType = "image/jpeg", Description = "Cover" }
-                    };
+                    tag.Pictures = new TagLib.IPicture[] { CreateCover(artwork, art.MimeType) };
                 }
             }
 
@@ -1910,6 +2006,8 @@ public sealed class DownloadService : IDisposable
             // Join all genres with semicolons
             var genres = tagFile.Tag.Genres ?? Array.Empty<string>();
             dto.Genre = genres.Length > 0 ? string.Join("; ", genres) : string.Empty;
+
+            dto.HasCover = tagFile.Tag.Pictures.Length > 0;
 
             dto.Duration = tagFile.Properties.Duration.TotalSeconds > 0
                 ? tagFile.Properties.Duration.TotalSeconds
