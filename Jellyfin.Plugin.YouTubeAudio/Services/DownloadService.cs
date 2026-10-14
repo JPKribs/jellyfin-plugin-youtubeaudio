@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.YouTubeAudio.Configuration;
@@ -25,7 +26,7 @@ namespace Jellyfin.Plugin.YouTubeAudio.Services;
 /// Handles downloading audio from YouTube, managing tags, and importing to the library.
 /// Registered as singleton because it owns the download lock semaphore.
 /// </summary>
-public sealed class DownloadService : IDisposable
+public sealed partial class DownloadService : IDisposable
 {
     private static readonly HttpClient _httpClient = new();
 
@@ -53,6 +54,12 @@ public sealed class DownloadService : IDisposable
 
     /// <summary>Longest file or folder name written to the library, in characters.</summary>
     internal const int MaxPathComponentLength = 100;
+
+    /// <summary>The queue source of a download that replaces a library song.</summary>
+    internal const string ReplacementSource = "replace";
+
+    /// <summary>File extensions of songs, for reading an album folder's existing tags.</summary>
+    private static readonly HashSet<string> AudioExtensions = new(StringComparer.OrdinalIgnoreCase) { ".opus", ".ogg", ".mp3", ".m4a", ".flac", ".wav", ".aac", ".wma" };
 
     /// <summary>Embedded cover art size, in pixels (always square).</summary>
     private const int CoverArtSize = 1200;
@@ -398,6 +405,78 @@ public sealed class DownloadService : IDisposable
     }
 
     /// <summary>
+    /// Queues the audio from a YouTube link to replace a song already in the library. The new
+    /// download takes the song's tags and cover from its file, and on import is written to the
+    /// same path, so the song keeps its place in the library and in playlists.
+    /// </summary>
+    /// <param name="itemId">The Jellyfin item ID of the song.</param>
+    /// <param name="url">The YouTube link with the correct audio.</param>
+    /// <returns>The queued item.</returns>
+    /// <exception cref="ArgumentException">The link is not a YouTube link.</exception>
+    /// <exception cref="FileNotFoundException">The song or its file is not in the library.</exception>
+    [SuppressMessage("Security", "CA3003:Review code for file path injection vulnerabilities", Justification = "The path is Jellyfin's own library item path.")]
+    public QueueItemDto QueueReplacement(Guid itemId, string url)
+    {
+        url = url?.Trim() ?? string.Empty;
+        if (!IsValidYouTubeUrl(url))
+        {
+            throw new ArgumentException("Enter a YouTube link.");
+        }
+
+        var path = _libraryService.GetSongPath(itemId);
+        if (path == null || !File.Exists(path))
+        {
+            throw new FileNotFoundException("That song's file was not found in the library.");
+        }
+
+        PlaylistTrack track;
+        using (var tagFile = TagLib.File.Create(path))
+        {
+            var tag = tagFile.Tag;
+            var performers = tag.Performers ?? Array.Empty<string>();
+            track = new PlaylistTrack
+            {
+                Title = string.IsNullOrWhiteSpace(tag.Title) ? Path.GetFileNameWithoutExtension(path) : tag.Title,
+                Artist = performers.FirstOrDefault(),
+                FeaturedArtists = performers.Length > 1 ? performers.Skip(1).ToList() : null,
+                AlbumArtist = tag.FirstAlbumArtist,
+                Album = tag.Album,
+                Year = tag.Year > 0 ? (int)tag.Year : null,
+                TrackNumber = tag.Track > 0 ? (int)tag.Track : null,
+                TrackCount = tag.TrackCount > 0 ? (int)tag.TrackCount : null,
+                DiscNumber = tag.Disc > 0 ? (int)tag.Disc : null,
+                DiscCount = tag.DiscCount > 0 ? (int)tag.DiscCount : null,
+                Genre = tag.Genres.Length > 0 ? string.Join("; ", tag.Genres) : null,
+                Composer = tag.Composers.Length > 0 ? string.Join("; ", tag.Composers) : null,
+                DurationSeconds = tagFile.Properties.Duration.TotalSeconds > 0 ? tagFile.Properties.Duration.TotalSeconds : null,
+                ReplacesFiles = new List<string> { path },
+                ReplaceInPlace = true
+            };
+        }
+
+        var now = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
+        var item = new QueueItem
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Url = url,
+            Title = track.Title,
+            UserTitled = true,
+            FileName = Guid.NewGuid().ToString("N") + Config.AudioFormat.ToFileExtension(),
+            Status = QueueStatus.Queued,
+            CreatedAt = now,
+            UpdatedAt = now,
+            Artist = track.Artist,
+            Album = track.Album,
+            Year = track.Year,
+            Source = ReplacementSource,
+            SourceTrack = track
+        };
+        _dbProvider.Database.AddItem(item);
+        _logger.LogInformation("Queued {Url} to replace {Path}", SanitizeForLog(url), path);
+        return item.ToDto();
+    }
+
+    /// <summary>
     /// Points a queue item at a different YouTube upload (to fix a wrong or failed match) and
     /// queues it again. Its playlist details, metadata and playlist entries are kept; a file
     /// already downloaded from the old link is discarded.
@@ -709,7 +788,12 @@ public sealed class DownloadService : IDisposable
                     QueueStatus.Error => "Could not be downloaded",
                     _ => item.Status.ToString()
                 },
-                Source = item.Source == null ? "YouTube" : sourceNames.GetValueOrDefault(item.Source) ?? item.Source,
+                Source = item.Source switch
+                {
+                    null => "YouTube",
+                    ReplacementSource => "Replacement",
+                    _ => sourceNames.GetValueOrDefault(item.Source) ?? item.Source
+                },
                 CreatedAt = item.CreatedAt
             })
             .ToList();
@@ -864,9 +948,6 @@ public sealed class DownloadService : IDisposable
             return null;
         }
 
-        var cacheDir = _dbProvider.GetAudioCacheDirectory();
-        var input = Path.Combine(cacheDir, Guid.NewGuid().ToString("N") + ".thumb.jpg");
-        var output = Path.Combine(cacheDir, Guid.NewGuid().ToString("N") + ".cover.jpg");
         try
         {
             byte[] thumbnail;
@@ -885,8 +966,35 @@ public sealed class DownloadService : IDisposable
                 return null;
             }
 
-            await File.WriteAllBytesAsync(input, thumbnail, cancellationToken).ConfigureAwait(false);
-            await RunProcessAsync(ffmpeg, ["-v", "error", "-y", "-i", input, "-vf", "crop=ih:ih", "-q:v", "2", output], TimeSpan.FromSeconds(30)).ConfigureAwait(false);
+            return await CropToSquareJpegAsync(thumbnail, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Could not make a cover from the YouTube thumbnail of {Id}", videoId);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Converts an image (JPEG, PNG, WebP…) to a JPEG cropped to its centre square, using the
+    /// server's ffmpeg. Returns null when ffmpeg is missing or the image cannot be read.
+    /// </summary>
+    [SuppressMessage("Security", "CA3003:Review code for file path injection vulnerabilities", Justification = "Temporary files use GUID names in the cache folder.")]
+    private async Task<byte[]?> CropToSquareJpegAsync(byte[] image, CancellationToken cancellationToken)
+    {
+        var ffmpeg = _mediaEncoder.EncoderPath;
+        if (string.IsNullOrEmpty(ffmpeg) || !File.Exists(ffmpeg))
+        {
+            return null;
+        }
+
+        var cacheDir = _dbProvider.GetAudioCacheDirectory();
+        var input = Path.Combine(cacheDir, Guid.NewGuid().ToString("N") + ".cover-in");
+        var output = Path.Combine(cacheDir, Guid.NewGuid().ToString("N") + ".cover.jpg");
+        try
+        {
+            await File.WriteAllBytesAsync(input, image, cancellationToken).ConfigureAwait(false);
+            await RunProcessAsync(ffmpeg, ["-v", "error", "-y", "-i", input, "-vf", "crop='min(iw,ih)':'min(iw,ih)'", "-q:v", "2", output], TimeSpan.FromSeconds(30)).ConfigureAwait(false);
             if (!File.Exists(output))
             {
                 return null;
@@ -895,9 +1003,9 @@ public sealed class DownloadService : IDisposable
             var cover = await File.ReadAllBytesAsync(output, cancellationToken).ConfigureAwait(false);
             return ImageInfo.Read(cover) is { } square && square.Width == square.Height ? cover : null;
         }
-        catch (Exception ex) when (ex is IOException or InvalidOperationException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
+        catch (Exception ex) when (ex is IOException or InvalidOperationException)
         {
-            _logger.LogWarning(ex, "Could not make a cover from the YouTube thumbnail of {Id}", videoId);
+            _logger.LogWarning(ex, "Could not convert a cover image");
             return null;
         }
         finally
@@ -905,6 +1013,40 @@ public sealed class DownloadService : IDisposable
             File.Delete(input);
             File.Delete(output);
         }
+    }
+
+    /// <summary>
+    /// Returns the cover of a library album, as a square JPEG, or null when the album is not
+    /// in the library or has no cover.
+    /// </summary>
+    [SuppressMessage("Security", "CA3003:Review code for file path injection vulnerabilities", Justification = "The path is the image Jellyfin stores for its own library item.")]
+    private async Task<byte[]?> GetLibraryAlbumCoverAsync(string? album, string? albumArtist, CancellationToken cancellationToken)
+    {
+        var path = _libraryService.FindAlbumCoverPath(album, albumArtist);
+        return path == null
+            ? null
+            : await CropToSquareJpegAsync(await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Embeds the cover of an existing library album in a downloaded file. Returns false when
+    /// the album is not in the library or has no cover.
+    /// </summary>
+    /// <exception cref="FileNotFoundException">The item is not a downloaded file.</exception>
+    public async Task<bool> SetCoverFromLibraryAlbumAsync(string id, string? album, string? albumArtist, CancellationToken cancellationToken)
+    {
+        var file = GetPreviewFile(id) ?? throw new FileNotFoundException("Downloaded file not found.");
+        var cover = await GetLibraryAlbumCoverAsync(album, albumArtist, cancellationToken).ConfigureAwait(false);
+        if (cover == null)
+        {
+            return false;
+        }
+
+        using var tagFile = TagLib.File.Create(file.Path);
+        tagFile.Tag.Pictures = new TagLib.IPicture[] { CreateCover(cover, "image/jpeg") };
+        tagFile.Save();
+        _logger.LogInformation("Cover of library album {Album} set for queue item {Id}", SanitizeForLog(album), id);
+        return true;
     }
 
     /// <summary>
@@ -1106,6 +1248,16 @@ public sealed class DownloadService : IDisposable
             var artist = !string.IsNullOrWhiteSpace(item.Artist) ? item.Artist : tag.FirstPerformer ?? info.Artist;
             var title = tag.Title ?? item.Title;
             var duration = tagFile.Properties.Duration.TotalSeconds > 0 ? tagFile.Properties.Duration.TotalSeconds : info.Duration;
+
+            // A replacement keeps the cover of the file it replaces.
+            if (item.SourceTrack is { ReplaceInPlace: true, ReplacesFiles: [var replaced] } && tag.Pictures.Length == 0 && File.Exists(replaced))
+            {
+                using var old = TagLib.File.Create(replaced);
+                if (old.Tag.Pictures.Length > 0)
+                {
+                    tag.Pictures = old.Tag.Pictures;
+                }
+            }
 
             // A source that supplies its own cover (Spotify) needs no lookup for one.
             if (Config.EmbedCoverArt && tag.Pictures.Length == 0 && await DownloadSourceCoverAsync(item.SourceTrack?.ArtworkUrl, cancellationToken).ConfigureAwait(false) is { } sourceCover)
@@ -1373,6 +1525,26 @@ public sealed class DownloadService : IDisposable
                 {
                     await NormalizeArtistsAsync(tagFile, spellings, cancellationToken).ConfigureAwait(false);
 
+                    // Join the library's own folders for this artist and album when the names
+                    // differ only in case, punctuation or year ("Tlc" joins "TLC", "EvErMoRe
+                    // (2021)" joins "evermore (2020)"), and take that album's name and year so
+                    // Jellyfin keeps the songs together.
+                    var replacingInPlace = item.SourceTrack is { ReplaceInPlace: true, ReplacesFiles: [var target] } && File.Exists(target);
+                    var artistDir = FindMatchingFolder(libraryPath, SanitizePathComponent(tagFile.Tag.FirstAlbumArtist ?? tagFile.Tag.FirstPerformer ?? "Unknown Artist"), false);
+                    var albumDir = artistDir == null || replacingInPlace ? null : FindMatchingFolder(artistDir, SanitizePathComponent(tagFile.Tag.Album ?? "Unknown Album"), true);
+                    if (albumDir != null && AdoptAlbumTags(tagFile.Tag, albumDir))
+                    {
+                        tagFile.Save();
+                    }
+
+                    // A file joining an album the library already has takes that album's cover.
+                    if (Config.EmbedCoverArt && tagFile.Tag.Pictures.Length == 0
+                        && await GetLibraryAlbumCoverAsync(tagFile.Tag.Album, tagFile.Tag.FirstAlbumArtist ?? tagFile.Tag.FirstPerformer, cancellationToken).ConfigureAwait(false) is { } albumCover)
+                    {
+                        tagFile.Tag.Pictures = new TagLib.IPicture[] { CreateCover(albumCover, "image/jpeg") };
+                        tagFile.Save();
+                    }
+
                     // Titles are cleaned when written (queue/download time) and user edits are
                     // saved verbatim, so trust the tag as-is here — re-cleaning would mangle a
                     // deliberately saved title like "Song (Lyrics)".
@@ -1390,15 +1562,23 @@ public sealed class DownloadService : IDisposable
 
                     // Build: library/artist/album (year)/title.ext
                     var albumFolder = !string.IsNullOrEmpty(year) ? $"{album} ({year})" : album;
-                    destDir = Path.Combine(libraryPath, artist, albumFolder);
-                    Directory.CreateDirectory(destDir);
-
+                    destDir = albumDir ?? Path.Combine(artistDir ?? Path.Combine(libraryPath, artist), albumFolder);
                     destPath = Path.Combine(destDir, title + ext);
+
+                    // A replacement takes the exact place of the file it replaces (a different
+                    // format keeps the name and changes only the extension).
+                    if (item.SourceTrack is { ReplaceInPlace: true, ReplacesFiles: [var replacing] } && File.Exists(replacing))
+                    {
+                        destPath = Path.ChangeExtension(replacing, ext);
+                        destDir = Path.GetDirectoryName(destPath)!;
+                    }
+
+                    Directory.CreateDirectory(destDir);
                     isDuplicate = File.Exists(destPath);
                 }
 
                 // Handle duplicates based on setting
-                if (isDuplicate && !Config.ReplaceDuplicates)
+                if (isDuplicate && !Config.ReplaceDuplicates && item.SourceTrack?.ReplaceInPlace != true)
                 {
                     result.SkippedIds.Add(id);
                     _logger.LogInformation("Skipped duplicate {Title} at {Dest}", title, destPath);
@@ -1510,6 +1690,86 @@ public sealed class DownloadService : IDisposable
     /// </summary>
     /// <returns>The number of files deleted.</returns>
     [SuppressMessage("Security", "CA3003:Review code for file path injection vulnerabilities", Justification = "Paths come from Jellyfin's own library items and are confined to the configured library root.")]
+    /// <summary>
+    /// Finds the folder in <paramref name="parent"/> whose name matches <paramref name="name"/>
+    /// apart from case, spacing and punctuation (and, for an album, its "(year)" suffix), or
+    /// null when there is none. An exact match wins, then one differing only in case.
+    /// </summary>
+    [SuppressMessage("Security", "CA3003:Review code for file path injection vulnerabilities", Justification = "Folders inside the configured music library.")]
+    internal static string? FindMatchingFolder(string parent, string name, bool ignoreYear)
+    {
+        if (!Directory.Exists(parent))
+        {
+            return null;
+        }
+
+        string Key(string folder) => TrackMetadataCleaner.Normalize(ignoreYear ? FolderYearRegex().Replace(folder, string.Empty) : folder);
+        var key = Key(name);
+        var wanted = ignoreYear ? FolderYearRegex().Replace(name, string.Empty) : name;
+        if (key.Length == 0)
+        {
+            return null;
+        }
+
+        return Directory.EnumerateDirectories(parent)
+            .Select(dir => (Path: dir, Name: Path.GetFileName(dir)))
+            .Where(dir => string.Equals(Key(dir.Name), key, StringComparison.Ordinal))
+            .OrderByDescending(dir => string.Equals(dir.Name, name, StringComparison.Ordinal))
+            .ThenByDescending(dir => string.Equals(ignoreYear ? FolderYearRegex().Replace(dir.Name, string.Empty) : dir.Name, wanted, StringComparison.OrdinalIgnoreCase))
+            .ThenBy(dir => dir.Name, StringComparer.Ordinal)
+            .Select(dir => dir.Path)
+            .FirstOrDefault();
+    }
+
+    /// <summary>
+    /// Gives a tag the album name, year and album artist of the songs already in
+    /// <paramref name="albumDir"/>, where they name the same album and artist. Returns true
+    /// when the tag changed.
+    /// </summary>
+    [SuppressMessage("Security", "CA3003:Review code for file path injection vulnerabilities", Justification = "Files inside the configured music library.")]
+    internal static bool AdoptAlbumTags(TagLib.Tag tag, string albumDir)
+    {
+        foreach (var file in Directory.EnumerateFiles(albumDir).Where(f => AudioExtensions.Contains(Path.GetExtension(f))).Order(StringComparer.Ordinal))
+        {
+            try
+            {
+                using var existing = TagLib.File.Create(file);
+                var album = existing.Tag.Album;
+                if (string.IsNullOrWhiteSpace(album) || TrackMetadataCleaner.Normalize(album) != TrackMetadataCleaner.Normalize(tag.Album))
+                {
+                    continue;
+                }
+
+                var changed = !string.Equals(tag.Album, album, StringComparison.Ordinal);
+                tag.Album = album;
+                if (existing.Tag.Year > 0 && tag.Year != existing.Tag.Year)
+                {
+                    tag.Year = existing.Tag.Year;
+                    changed = true;
+                }
+
+                var albumArtists = existing.Tag.AlbumArtists;
+                if (albumArtists.Length > 0 && !albumArtists.SequenceEqual(tag.AlbumArtists, StringComparer.Ordinal)
+                    && TrackMetadataCleaner.Normalize(albumArtists[0]) == TrackMetadataCleaner.Normalize(tag.FirstAlbumArtist ?? tag.FirstPerformer))
+                {
+                    tag.AlbumArtists = albumArtists;
+                    changed = true;
+                }
+
+                return changed;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or TagLib.CorruptFileException or TagLib.UnsupportedFormatException)
+            {
+                // Try the next song in the folder.
+            }
+        }
+
+        return false;
+    }
+
+    [GeneratedRegex(@"\s*\(\d{4}\)\s*$")]
+    private static partial Regex FolderYearRegex();
+
     private int RemoveReplacedFiles(IEnumerable<string> paths, string keptPath, string libraryPath, List<string> changedPaths)
     {
         var root = Path.GetFullPath(libraryPath).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;

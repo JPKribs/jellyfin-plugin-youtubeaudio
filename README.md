@@ -65,6 +65,10 @@ YouTube Audio lets you paste a YouTube video or playlist URL, download the audio
 3. Download as usual. Each track is matched to a YouTube upload when it downloads, preferring the artist's own channel and an upload close to the track's length. When the regular search only finds music videos of the wrong length (or nothing), YouTube Music's song results are checked too, under the same rules. An upload from another channel is only accepted when its title names the artist, so another performer's recording of the same piece is not picked. For long classical titles ("Suite bergamasque, L. 75: III. Clair de lune"), the movement name is enough to match. A match worth checking (a length difference over 3 seconds, or an upload not from the artist) is noted on the queue row, and a track with no acceptable upload is marked as an error
 4. To fix a wrong or failed match, click the link button on its queue row, paste the right YouTube link and click **Use Link**. The track downloads again from that link and keeps its title, artist, album and other details, and its place in any playlist import
 
+#### Replace a song already in your library.
+
+If a song reached your library with the wrong audio, choose **Replace a Song** on the Download tab, search for the song and click it, paste the right YouTube link and click **Queue Replacement**. The new audio downloads with the song's own tags and cover, and importing it from the Import tab overwrites the song's file in place, so it keeps its place in the library and in playlists.
+
 ### 3. Import
 
 #### Tag your downloaded files and bring them into your library.
@@ -75,7 +79,7 @@ YouTube Audio lets you paste a YouTube video or playlist URL, download the audio
 
 1. Review and edit metadata for each downloaded file (title, artist, album artist, featured artists, album, year, genre, track number). Songs your library already has are marked **Already in your library**, so you can skip a second copy
 2. To apply the same metadata to multiple files at once, fill in the bulk fields at the top and click **Apply to Selected**
-3. To add or replace cover art, click the picture square on a row, or select several files and click **Set Cover on Selected**, then choose an image. Pictures are cropped to a centred square. For an album with no art, click the wand next to **Album** to generate a cover: a soft blend of three colours drawn from the album name, with the name in the middle
+3. To add or replace cover art, click the picture square on a row, or select several files and click **Set Cover on Selected**, then choose an image. Pictures are cropped to a centred square. Choosing an album your library already has takes that album's cover. For an album with no art, click the wand next to **Album** to generate a cover: a soft blend of three colours drawn from the album name, with the name in the middle
 4. Remember to save any unsaved changes on individual tracks before importing (look for the save icon)
 5. Select the files you want to import and click **Import**
 
@@ -85,7 +89,7 @@ Metadata is written directly to the audio files. On import, files are copied int
 <library path>/Artist/Album (Year)/Song.ext
 ```
 
-Before a file is filed, its artists are tidied: a joint credit such as "Yo-Yo Ma & Kathryn Stott" is stored as separate artists (the album files under the first), while names Apple or your library know as one act, like "Katia & Marielle Labèque", stay whole. Artists already in your library keep the library's spelling, so "LANG LANG" is filed as "Lang Lang". File and folder names avoid characters that network shares and Windows reject (a ":" becomes " - ") and are kept to 100 characters.
+Before a file is filed, its artists are tidied: a joint credit such as "Yo-Yo Ma & Kathryn Stott" is stored as separate artists (the album files under the first), while names Apple or your library know as one act, like "Katia & Marielle Labèque", stay whole. Artists already in your library keep the library's spelling, so "LANG LANG" is filed as "Lang Lang". Existing artist and album folders are reused when the names differ only in case, punctuation or year: "WIENER PHILHARMONIKER" files under "Wiener Philharmoniker", and "GoLdBeRg Variations (1982)" joins "Goldberg Variations (1981)" and takes its name and year. File and folder names avoid characters that network shares and Windows reject (a ":" becomes " - ") and are kept to 100 characters.
 
 Successfully imported files are removed from the queue.
 

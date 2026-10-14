@@ -470,7 +470,26 @@ def main():
     with urllib.request.urlopen(req, timeout=60) as resp:
         served = resp.read()
     check("an uploaded square cover is embedded and served back", served == pics["square"], f"{len(served)} bytes vs {len(pics['square'])}")
-    call("DELETE", f"/YouTubeAudio/Downloads/{item['Id']}")
+    # Picking an album the library already has takes that album's cover (Piano Book, imported above).
+    taken = wait(lambda: (lambda r: r if r.get("Found") else None)(
+        call("POST", f"/YouTubeAudio/Downloads/{item['Id']}/Cover/FromAlbum", {"Album": "Piano Book", "AlbumArtist": ARTIST})), "library album cover", 120, 5)
+    req = urllib.request.Request(BASE + f"/YouTubeAudio/Downloads/{item['Id']}/Cover", headers={"Authorization": AUTH + f', Token="{TOKEN}"'})
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        album_cover = resp.read()
+    check("picking an existing library album takes its cover", taken.get("Found") is True and album_cover != pics["square"] and len(album_cover) > 1000,
+          f"{len(album_cover)} bytes")
+    # Names that differ only in case or year join the library's existing artist and album folders.
+    call("POST", "/YouTubeAudio/Tags", {"Id": item["Id"], "Title": "Für Elise (Folder Test)", "Artist": ARTIST.upper(), "AlbumArtist": ARTIST.upper(),
+                                        "Album": "PIANO book", "Year": YEAR + 1, "TrackNumber": 2, "Genre": GENRE})
+    imp = call("POST", "/YouTubeAudio/Import", {"Ids": [item["Id"]]})
+    folder_rel = f"{ARTIST}/Piano Book ({YEAR})/Für Elise (Folder Test).opus"
+    check("differently cased artist and album, with another year, join the existing folders",
+          imp["ImportedIds"] == [item["Id"]] and os.path.exists(os.path.join(MUSIC, folder_rel)) and ARTIST.upper() not in os.listdir(MUSIC) and f"Piano Book ({YEAR + 1})" not in os.listdir(os.path.join(MUSIC, ARTIST)),
+          json.dumps(imp) + " " + str(sorted(k for k in snapshot() if "Folder Test" in k)))
+    _, _, tags = ffprobe(folder_rel)
+    check("it takes the existing album's name, year and album artist",
+          tags.get("album") == "Piano Book" and tags.get("date") == str(YEAR) and tags.get("albumartist", tags.get("album_artist")) == ARTIST,
+          json.dumps({k: tags.get(k) for k in ("album", "date", "albumartist", "album_artist")}))
 
     print("== 9. A Spotify ZIP from Exportify offers each playlist; owned songs are not queued again")
     import io, zipfile
@@ -488,6 +507,46 @@ def main():
     res = call("POST", "/YouTubeAudio/Queue/Playlist", {"FileName": "spotify_playlists.zip", "Content": spot, "UserId": listener_id, "PlaylistIds": [sel["Playlists"][0]["Id"]]})
     check("Spotify songs already in the library are not queued", res["Items"] == [] and res["AlreadyInLibrary"] == 2, json.dumps({k: res[k] for k in ("AlreadyInLibrary", "AlreadyQueued")}))
     wait(lambda: lplaylists().get("Evening Piano"), "Evening Piano playlist from Spotify", 60)
+
+    print("== 10. Replace a library song's audio with a different upload, in place")
+    owned_rel = ALBUM_DIR + OWNED + ".opus"
+    songs = call("GET", "/YouTubeAudio/Songs?" + urllib.parse.urlencode({"query": OWNED}))
+    owned = next((s for s in songs if s.get("Path", "").endswith(owned_rel)), None)
+    check("library song search finds the song", owned is not None and owned["Title"] == OWNED and owned["Album"] == LIBRARY_ALBUM, json.dumps(songs))
+    def status(method, path, body):
+        try:
+            call(method, path, body)
+            return 200
+        except urllib.error.HTTPError as ex:
+            return ex.code
+    check("replacing with a non-YouTube link is refused", status("POST", "/YouTubeAudio/Queue/Replace", {"ItemId": owned["Id"], "Url": "https://example.com/x"}) == 400)
+    check("replacing a song that is not in the library is refused",
+          status("POST", "/YouTubeAudio/Queue/Replace", {"ItemId": "00000000000000000000000000000001", "Url": LINK_URL}) == 404)
+    lib_before = snapshot()
+    rep = call("POST", "/YouTubeAudio/Queue/Replace", {"ItemId": owned["Id"], "Url": LINK_URL})
+    check("replacement queued with the song's own title", rep["Title"] == OWNED and rep["Source"] == "replace", json.dumps({k: rep.get(k) for k in ("Title", "Source", "Url")}))
+    done = wait(lambda: next((i for i in queue() if i["Id"] == rep["Id"] and i["StatusCode"] in (2, 4)), None), "replacement download", 600, 5)
+    check("replacement downloaded", done["StatusCode"] == 2, done.get("ErrorMessage"))
+    staged = next((d for d in call("GET", "/YouTubeAudio/Downloads")["Items"] if d["Id"] == rep["Id"]), {})
+    check("replacement keeps the old file's tags",
+          staged.get("MetadataTitle") == OWNED and staged.get("Artist") == ARTIST and staged.get("Album") == LIBRARY_ALBUM
+          and staged.get("Year") == YEAR and staged.get("TrackNumber") == 2,
+          json.dumps({k: staged.get(k) for k in ("MetadataTitle", "Artist", "Album", "Year", "TrackNumber")}))
+    imp = call("POST", "/YouTubeAudio/Import", {"Ids": [rep["Id"]]})
+    check("replacement imported over the old file, even with Replace Duplicates off", imp["ImportedIds"] == [rep["Id"]] and imp["RemovedFiles"] == 0 and not imp["Errors"], json.dumps(imp))
+    after = snapshot()
+    check("only the replaced file changed; nothing added or removed",
+          set(after) == set(lib_before) and [k for k in after if after[k] != lib_before[k]] == [owned_rel],
+          str(sorted(set(after) ^ set(lib_before))) + str([k for k in after if after.get(k) != lib_before.get(k)]))
+    d, codec, tags = ffprobe(owned_rel)
+    check("replaced file is the new upload with the old tags",
+          codec == "opus" and abs(d - 204) <= 8 and tags.get("title") == OWNED and tags.get("album") == LIBRARY_ALBUM
+          and tags.get("track", "").split("/")[0].lstrip("0") == "2",
+          f"{codec} {d:.0f}s {json.dumps({k: tags.get(k) for k in ('title', 'album', 'track')})}")
+    call("POST", "/Library/Refresh")
+    time.sleep(20)
+    check("the song keeps its library item", any(i["Id"] == owned["Id"] for i in call("GET", "/Items?includeItemTypes=Audio&recursive=true")["Items"]))
+    check("the song stays in its playlist", [t for t, _ in ltitles(favourites)] == [NEW, OWNED, UPGRADE, TITLE_TRACK], str([t for t, _ in ltitles(favourites)]))
 
     logs = sh("docker", "logs", NAME, check=False) + subprocess.run(["docker", "logs", NAME], capture_output=True, text=True).stderr
     errs = [l for l in logs.splitlines() if "YouTubeAudio" in l and ("[ERR]" in l or "[FTL]" in l)]

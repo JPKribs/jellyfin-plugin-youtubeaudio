@@ -74,4 +74,11 @@ public class PlaylistTrack
 
     /// <summary>Gets or sets a link to the album cover the source provides (square), embedded on download.</summary>
     public string? ArtworkUrl { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether this download replaces the library file in
+    /// <see cref="ReplacesFiles"/> in place: it keeps that file's tags and cover, and is written
+    /// to the same path, so the song keeps its place in the library and in playlists.
+    /// </summary>
+    public bool ReplaceInPlace { get; set; }
 }

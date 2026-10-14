@@ -391,6 +391,65 @@ public class YouTubeAudioController : ControllerBase
     }
 
     /// <summary>
+    /// Searches library songs by title, for choosing one to replace.
+    /// </summary>
+    /// <param name="query">The search text.</param>
+    /// <returns>Matching songs.</returns>
+    [HttpGet("Songs")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<List<LibrarySong>> SearchSongs([FromQuery] string query)
+        => Ok(_libraryService.SearchSongs(query));
+
+    /// <summary>
+    /// Queues the audio from a YouTube link to replace a library song in place.
+    /// </summary>
+    /// <param name="request">The song and the link.</param>
+    /// <returns>The queued item.</returns>
+    [HttpPost("Queue/Replace")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult<QueueItemDto> QueueReplacement([FromBody] ReplaceSongRequest request)
+    {
+        try
+        {
+            var item = _downloadService.QueueReplacement(request?.ItemId ?? Guid.Empty, request?.Url ?? string.Empty);
+            _downloadService.StartProcessing([item.Id]);
+            return Ok(item);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { Error = ex.Message });
+        }
+        catch (FileNotFoundException ex)
+        {
+            return NotFound(new { Error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Embeds the cover of an existing library album in a downloaded file.
+    /// </summary>
+    /// <param name="id">The queue item ID.</param>
+    /// <param name="request">The album and its album artist.</param>
+    /// <returns>Whether the album was found with a cover.</returns>
+    [HttpPost("Downloads/{id}/Cover/FromAlbum")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> SetDownloadCoverFromAlbum(string id, [FromBody] AlbumCoverRequest request)
+    {
+        try
+        {
+            var found = await _downloadService.SetCoverFromLibraryAlbumAsync(id, request?.Album, request?.AlbumArtist, HttpContext.RequestAborted).ConfigureAwait(false);
+            return Ok(new { Found = found });
+        }
+        catch (FileNotFoundException)
+        {
+            return NotFound(new { Error = "Downloaded file not found." });
+        }
+    }
+
+    /// <summary>
     /// Saves metadata tags to a downloaded file.
     /// </summary>
     /// <param name="request">The tag update request.</param>

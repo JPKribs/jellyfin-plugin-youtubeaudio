@@ -178,6 +178,76 @@ public class LibraryService
                 StringComparer.Ordinal);
 
     /// <summary>
+    /// Searches the music libraries for songs by title, for choosing one to replace.
+    /// </summary>
+    public List<LibrarySong> SearchSongs(string query, int limit = 20)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return new List<LibrarySong>();
+        }
+
+        try
+        {
+            return _libraryManager.GetItemList(new InternalItemsQuery
+            {
+                SearchTerm = query.Trim(),
+                IncludeItemTypes = new[] { BaseItemKind.Audio },
+                Recursive = true,
+                IsVirtualItem = false,
+                Limit = limit
+            })
+            .OfType<Audio>()
+            .Select(a => new LibrarySong { Id = a.Id, Title = a.Name ?? string.Empty, Artist = string.Join(", ", a.Artists), Album = a.Album, Path = a.Path })
+            .ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to search library songs");
+            return new List<LibrarySong>();
+        }
+    }
+
+    /// <summary>
+    /// Gets the file path of a library song, or null when it is not a song in the library.
+    /// </summary>
+    public string? GetSongPath(Guid itemId)
+        => _libraryManager.GetItemById(itemId) is Audio audio && !string.IsNullOrEmpty(audio.Path) ? audio.Path : null;
+
+    /// <summary>
+    /// Finds the cover image file of a library album by its name (and album artist, when
+    /// given), or null when the album is not in the library or has no cover.
+    /// </summary>
+    public string? FindAlbumCoverPath(string? album, string? albumArtist)
+    {
+        if (string.IsNullOrWhiteSpace(album))
+        {
+            return null;
+        }
+
+        try
+        {
+            var albums = _libraryManager.GetItemList(new InternalItemsQuery
+            {
+                IncludeItemTypes = new[] { BaseItemKind.MusicAlbum },
+                Recursive = true,
+                Name = album.Trim()
+            }).OfType<MusicAlbum>().ToList();
+
+            var match = albums.FirstOrDefault(a => string.IsNullOrWhiteSpace(albumArtist)
+                    || a.AlbumArtists.Any(aa => string.Equals(aa, albumArtist.Trim(), StringComparison.OrdinalIgnoreCase)))
+                ?? (string.IsNullOrWhiteSpace(albumArtist) ? null : albums.FirstOrDefault());
+            var path = match?.GetImagePath(ImageType.Primary, 0);
+            return !string.IsNullOrEmpty(path) && System.IO.File.Exists(path) ? path : null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to look up the cover of album {Album}", album);
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Searches for artists in the Jellyfin library matching the query.
     /// </summary>
     public List<string> SearchArtists(string query, int limit = 20)

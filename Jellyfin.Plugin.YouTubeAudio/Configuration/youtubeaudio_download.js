@@ -9,11 +9,13 @@ export default function (view) {
     });
 
     var _allItems = [];
-    var _sourceNames = {};
+    var _sourceNames = { replace: 'Replacement' };
     var _pendingUpload = null;
     var _ownerSelector = null;
     var _pollInterval = null;
     var _processingGraceUntil = 0;
+    var _replaceSongId = null;
+    var _replaceSearch = 0;
 
     // ============================================
     // DATA LOADING
@@ -383,6 +385,89 @@ export default function (view) {
             .catch(function() { /* queue rows fall back to the source ID */ });
     }
 
+    // searchReplaceSongs
+    // Lists library songs matching the search text, to pick the one to replace. Answers to
+    // older searches that arrive late are dropped.
+    //
+    // No parameters
+    function searchReplaceSongs() {
+        var input = Shared.getEl('txtReplaceSearch');
+        var list = Shared.getEl('replaceResults');
+        var query = ((input || {}).value || '').trim();
+        var search = ++_replaceSearch;
+        if (!list) return;
+        if (!query) {
+            list.innerHTML = '';
+            selectReplaceSong(null);
+            return;
+        }
+
+        Shared.apiRequest('Songs?query=' + encodeURIComponent(query), 'GET')
+            .then(function(songs) {
+                if (search !== _replaceSearch) return;
+                var esc = Shared.escapeHtml;
+                songs = songs || [];
+                list.innerHTML = songs.length
+                    ? songs.map(function(song) {
+                        var sub = [song.Artist, song.Album].filter(Boolean).join(' \u2014 ');
+                        return '<button type="button" class="yta-replace-result' + (song.Id === _replaceSongId ? ' selected' : '') + '" data-id="' + esc(song.Id) + '" title="' + esc(song.Path || '') + '">'
+                            + '<span>' + esc(song.Title) + '</span>'
+                            + '<span class="yta-replace-result-sub">' + esc(sub) + '</span></button>';
+                    }).join('')
+                    : '<div class="yta-replace-empty">No library songs match.</div>';
+                list.querySelectorAll('.yta-replace-result').forEach(function(btn) {
+                    btn.addEventListener('click', function() { selectReplaceSong(btn.getAttribute('data-id')); });
+                });
+                if (_replaceSongId && !songs.some(function(song) { return song.Id === _replaceSongId; })) selectReplaceSong(null);
+            })
+            .catch(function() {
+                if (search === _replaceSearch) list.innerHTML = '<div class="yta-replace-empty">Search failed.</div>';
+            });
+    }
+
+    // selectReplaceSong
+    // Marks the library song to replace and enables the button once a link is entered too.
+    //
+    // Param: id | the song's item ID, or null to clear the choice
+    function selectReplaceSong(id) {
+        _replaceSongId = id;
+        view.querySelectorAll('.yta-replace-result').forEach(function(btn) {
+            btn.classList.toggle('selected', btn.getAttribute('data-id') === id);
+        });
+        updateReplaceButton();
+    }
+
+    function updateReplaceButton() {
+        var btn = Shared.getEl('btnReplace');
+        var url = Shared.getEl('txtReplaceUrl');
+        if (btn) btn.disabled = !(_replaceSongId && url && url.value.trim());
+    }
+
+    // queueReplacement
+    // Queues the link to replace the chosen library song, and starts its download.
+    //
+    // No parameters
+    function queueReplacement() {
+        var url = Shared.getEl('txtReplaceUrl');
+        if (!_replaceSongId || !url || !url.value.trim()) return;
+
+        var btn = Shared.getEl('btnReplace');
+        if (btn) btn.disabled = true;
+        Shared.apiRequest('Queue/Replace', 'POST', { ItemId: _replaceSongId, Url: url.value.trim() })
+            .then(function(item) {
+                Shared.setStatus('queueStatus', 'Downloading the replacement for "' + ((item && item.Title) || 'the song') + '". Import it from the Import tab.', false);
+                url.value = '';
+                var search = Shared.getEl('txtReplaceSearch');
+                if (search) search.value = '';
+                searchReplaceSongs();
+                loadQueue();
+            })
+            .catch(function(err) {
+                Shared.setStatus('queueStatus', (err && err.Error) || 'Failed to queue the replacement.', true);
+                updateReplaceButton();
+            });
+    }
+
     // readFileAsBase64
     // Reads a file's raw bytes as base64 so the server can detect its text encoding (the Music
     // app writes UTF-16), rather than letting the browser decode it as UTF-8.
@@ -664,6 +749,29 @@ export default function (view) {
             });
             ownerContainer.appendChild(_ownerSelector.element);
         }
+
+        var replaceSearch = Shared.getEl('txtReplaceSearch');
+        if (replaceSearch) {
+            var replaceTimeout = null;
+            replaceSearch.addEventListener('input', function() {
+                if (replaceTimeout) clearTimeout(replaceTimeout);
+                replaceTimeout = setTimeout(searchReplaceSongs, 250);
+            });
+            replaceSearch.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') e.preventDefault();
+            });
+        }
+
+        var replaceUrl = Shared.getEl('txtReplaceUrl');
+        if (replaceUrl) {
+            replaceUrl.addEventListener('input', updateReplaceButton);
+            replaceUrl.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') { e.preventDefault(); queueReplacement(); }
+            });
+        }
+
+        var btnReplace = Shared.getEl('btnReplace');
+        if (btnReplace) btnReplace.addEventListener('click', queueReplacement);
 
         var btnSyncPlaylists = Shared.getEl('btnSyncPlaylists');
         if (btnSyncPlaylists) btnSyncPlaylists.addEventListener('click', syncPlaylists);

@@ -138,7 +138,11 @@ export default function (view) {
             var albumCombo = Shared.createSearchableComboBox({
                 placeholder: 'Type to search albums...',
                 searchFn: albumSearchFn,
-                onInput: markDirty
+                onInput: markDirty,
+                onSelect: function(value) {
+                    markDirty();
+                    takeAlbumCover(row, value);
+                }
             });
             albumCombo.setValue(albumCell.getAttribute('data-value'));
             albumCell.appendChild(albumCombo.element);
@@ -731,6 +735,26 @@ export default function (view) {
             });
         });
         return canvas;
+    }
+
+    // takeAlbumCover
+    // When an album already in the library is picked, its cover goes into this file too, so
+    // the new song matches the rest of the album.
+    function takeAlbumCover(row, album) {
+        var id = row.getAttribute('data-id');
+        var artistCell = row.querySelector('.yta-artist-cell');
+        var albumArtist = (row.querySelector('.yta-field-albumArtist').value || '').trim()
+            || (artistCell && artistCell._combo ? artistCell._combo.getValue() : '');
+        Shared.apiRequest('Downloads/' + encodeURIComponent(id) + '/Cover/FromAlbum', 'POST', { Album: album, AlbumArtist: albumArtist })
+            .then(function(result) {
+                if (!result || !result.Found) return;
+                var btn = row.querySelector('.yta-cover-btn');
+                if (btn) btn.innerHTML = renderCover(id, true);
+                var d = _downloads.find(function(x) { return x.Id === id; });
+                if (d) d.HasCover = true;
+                Shared.setStatus('importStatus', 'Cover taken from the library album "' + album + '".', false);
+            })
+            .catch(function() { /* keep the current cover */ });
     }
 
     // embedCover
