@@ -9,6 +9,14 @@
     "category": "Music",
     "versions": [
       {
+        "version": "12.2.2.0",
+        "changelog": "## Features\r\n- When Apple Music has no cover, the album cover from the official YouTube Music track is used.\r\n- Re-pitched, sped-up, 8D and nightcore uploads are never matched.\r\n- Artists YouTube Music credits in another alphabet (such as Cyrillic) are matched by album or exact length.\r\n- Re-importing a playlist removes queued or failed songs your library now has.",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/v12.2.2.0/jellyfin-plugin-youtubeaudio-12.2.2.0.zip",
+        "checksum": "297de6cfbba3352d805173c1be8555d9",
+        "timestamp": "2026-10-14T04:07:00Z"
+      },
+      {
         "version": "12.2.1.4",
         "changelog": "## Features\r\n- YouTube matches must contain the song title, so another song by the same artist with a similar length is never downloaded instead.\r\n- Importing rescans only the imported songs' folders instead of the whole library.",
         "targetAbi": "12.2.0.0",
