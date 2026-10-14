@@ -338,6 +338,24 @@ public class ImportCleanupTests
         Assert.Equal(2004, track.Year);
     }
 
+    [Fact]
+    public void Plan_RemovesQueuedAndFailedRowsForSongsNowInTheLibrary()
+    {
+        var library = new List<LibraryTrack> { new() { Title = "Für Elise", Artist = "Lang Lang", Album = "Piano Book" } };
+        var queued = new List<QueuedTrack>
+        {
+            new() { Id = "failed", Title = "Für Elise", Artist = "Lang Lang", Status = QueueStatus.Error },
+            new() { Id = "waiting", Title = "Für Elise", Artist = "Lang Lang", Status = QueueStatus.Queued },
+            new() { Id = "ready", Title = "Für Elise", Artist = "Lang Lang", Status = QueueStatus.Downloaded },
+            new() { Id = "other", Title = "Clair de lune", Artist = "Lang Lang", Status = QueueStatus.Error }
+        };
+
+        var plan = ImportPlanner.Plan([PianoBook("Für Elise")], library, queued);
+
+        Assert.Equal(1, plan.AlreadyInLibrary);
+        Assert.Equal(["failed", "waiting"], plan.StaleQueueIds);
+    }
+
     // MARK: Classical movements in the library
 
     private const string MovementTitle = "Suite bergamasque, L. 75: III. Clair de lune";

@@ -1,7 +1,7 @@
 ---
 name: "YouTube Audio"
 guid: "7323ea64-a200-4265-ab8f-e7ae27d06c38"
-version: "12.2.1.4"
+version: "12.2.2.0"
 targetAbi: "12.2.0.0"
 framework: "net10.0"
 overview: "Download YouTube audio directly to a Jellyfin Music Library."
@@ -18,5 +18,7 @@ artifacts:
 - "TagLibSharp.dll"
 changelog:
   features:
-  - YouTube matches must contain the song title, so another song by the same artist with a similar length is never downloaded instead.
-  - Importing rescans only the imported songs' folders instead of the whole library.
+  - When Apple Music has no cover, the album cover from the official YouTube Music track is used.
+  - Re-pitched, sped-up, 8D and nightcore uploads are never matched.
+  - Artists YouTube Music credits in another alphabet (such as Cyrillic) are matched by album or exact length.
+  - Re-importing a playlist removes queued or failed songs your library now has.

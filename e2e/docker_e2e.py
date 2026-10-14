@@ -382,6 +382,7 @@ def main():
     check("non-audio file beside the single kept (folder not deleted)", os.path.dirname(SINGLE_FILE) + "/folder.jpg" in after)
     check(f"{TITLE_TRACK} title track not 'upgraded'", after.get(TITLE_FILE) == before[TITLE_FILE])
     d, codec, tags = ffprobe(fixed_rel)
+    check("fixed-link piece got the YouTube Music cover (no Apple match exists)", has_cover("/media/music/" + fixed_rel))
     check("fixed-link piece is the new upload, tagged with its original details",
           codec == "opus" and abs(d - FIX_SECONDS) <= 8 and tags.get("title") == UNMATCHABLE and tags.get("artist") == "Nonexistent Ensemble Qqqq",
           f"{codec} {d:.0f}s {tags.get('title')}")

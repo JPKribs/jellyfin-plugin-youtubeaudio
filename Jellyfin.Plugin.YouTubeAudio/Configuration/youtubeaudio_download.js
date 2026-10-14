@@ -628,6 +628,28 @@ export default function (view) {
         });
     });
 
+    // bindSourceTabs
+    // Shows the form for the chosen source card (YouTube, Apple Music) and remembers the last
+    // one used in this browser.
+    function bindSourceTabs() {
+        var group = view.querySelector('#sourceChoices');
+        if (!group) return;
+
+        function show(source) {
+            view.querySelectorAll('.yta-source-panel').forEach(function(panel) {
+                panel.hidden = panel.getAttribute('data-source') !== source;
+            });
+            try { localStorage.setItem('yta-download-source', source); } catch (e) { /* storage unavailable */ }
+        }
+
+        var choices = Shared.createChoiceGroup(group, { onChange: show });
+        var saved = null;
+        try { saved = localStorage.getItem('yta-download-source'); } catch (e) { /* storage unavailable */ }
+        var initial = group.querySelector('input[value="' + saved + '"]') ? saved : 'youtube';
+        choices.set(initial);
+        show(initial);
+    }
+
     view.addEventListener('viewhide', function() {
         if (_pollInterval) {
             clearInterval(_pollInterval);
@@ -636,17 +658,7 @@ export default function (view) {
     });
 
     _sharedPromise.then(function() {
-        var dlLink = Shared.getEl('publicDownloadUrl');
-        if (dlLink) {
-            var origin = (window.ApiClient && ApiClient.serverAddress) ? ApiClient.serverAddress() : window.location.origin;
-            dlLink.href = origin.replace(/\/+$/, '') + '/YouTube/Download';
-        }
-
-        var queueLink = Shared.getEl('publicQueueUrl');
-        if (queueLink) {
-            var queueOrigin = (window.ApiClient && ApiClient.serverAddress) ? ApiClient.serverAddress() : window.location.origin;
-            queueLink.href = queueOrigin.replace(/\/+$/, '') + '/YouTube/Queue';
-        }
+        bindSourceTabs();
 
         var btnQueue = Shared.getEl('btnQueue');
         if (btnQueue) btnQueue.addEventListener('click', queueUrl);

@@ -222,6 +222,13 @@ export default function (view) {
         var btnUpdateYtDlp = Shared.getEl('btnUpdateYtDlp');
         if (btnUpdateYtDlp) btnUpdateYtDlp.addEventListener('click', updateYtDlp);
 
+        // Links to the approved-user download page and the read-only queue.
+        var origin = ((window.ApiClient && ApiClient.serverAddress) ? ApiClient.serverAddress() : window.location.origin).replace(/\/+$/, '');
+        var dlLink = Shared.getEl('publicDownloadUrl');
+        if (dlLink) dlLink.href = origin + '/YouTube/Download';
+        var queueLink = Shared.getEl('publicQueueUrl');
+        if (queueLink) queueLink.href = origin + '/YouTube/Queue';
+
         var btnSaveApprovedUsers = Shared.getEl('btnSaveApprovedUsers');
         if (btnSaveApprovedUsers) btnSaveApprovedUsers.addEventListener('click', saveApprovedUsers);
 

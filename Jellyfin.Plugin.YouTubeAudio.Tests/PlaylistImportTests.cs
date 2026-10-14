@@ -350,6 +350,41 @@ public class PlaylistImportTests
             "https://music.youtube.com/search?q=Lang%20Lang%20F%C3%BCr%20Elise#songs",
             YouTubeMatcher.BuildMusicSearchUrl(new PlaylistTrack { Title = "Für Elise", Artist = "Lang Lang" }));
 
+    [Theory]
+    [InlineData("Clair de lune (432Hz)")]
+    [InlineData("Clair de lune - 432 Hz")]
+    [InlineData("Clair de lune (sped up)")]
+    [InlineData("Clair de lune [8D Audio]")]
+    [InlineData("Clair de lune (Nightcore)")]
+    public void PickBest_RejectsRePitchedAndSpedUpCopies(string title)
+    {
+        var track = new PlaylistTrack { Title = "Clair de lune", Artist = "Lang Lang", DurationSeconds = 300 };
+
+        Assert.Null(YouTubeMatcher.PickBest(track, [new MatchCandidate("x", title, "Lang Lang", 300)]));
+    }
+
+    [Theory]
+    [InlineData(301, "Rachmaninoff: Piano Concerto No. 2", true)] // exact length
+    [InlineData(306, "Rachmaninoff: Piano Concerto No. 2 - Single", true)] // same album
+    [InlineData(306, "Live in Moscow", false)] // neither
+    public void PickBest_TrustsAlbumOrLengthForAnArtistInAnotherAlphabet(double length, string album, bool matches)
+    {
+        // YouTube Music credits Denis Matsuev in Cyrillic.
+        var track = new PlaylistTrack { Title = "Prelude in C-Sharp Minor, Op. 3 No. 2", Artist = "Denis Matsuev", Album = "Rachmaninoff: Piano Concerto No. 2", DurationSeconds = 300 };
+        var match = YouTubeMatcher.PickBest(track, [new MatchCandidate("z", "Prelude in C-Sharp Minor, Op. 3 No. 2", "Денис Мацуев", length, album)]);
+
+        Assert.Equal(matches, match != null);
+    }
+
+    [Theory]
+    [InlineData("Denis Matsuev", "Денис Мацуев", true)]
+    [InlineData("Denis Matsuev", "Denis Matsuev", false)]
+    [InlineData("Мацуев", "Денис Мацуев", false)]
+    [InlineData("Lang Lang", "郎朗", true)]
+    [InlineData("Lang Lang", "", false)]
+    public void WrittenInOtherScript_ComparesAlphabets(string a, string b, bool expected)
+        => Assert.Equal(expected, YouTubeMatcher.WrittenInOtherScript(a, b));
+
     [Fact]
     public void PickBest_RejectsAnotherSongFromTheArtistsChannel()
     {

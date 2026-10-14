@@ -142,9 +142,10 @@
                             <span class="jpk-collapsible-icon">&#9660;</span>
                         </button>
                         <div id="approvedUsersContent" class="jpk-collapsible-content collapsed">
-                            <div class="fieldDescription" style="margin-bottom: 12px;">
-                                Selected users can submit download links at /YouTube/Download without admin access. They cannot import into the library.
-                            </div>
+                            <div class="fieldDescription jpk-url">User URL: <a id="publicDownloadUrl" href="#" target="_blank" rel="noopener">/youtube/download</a></div>
+                            <div class="fieldDescription">Share this link with the users selected below. They can submit downloads without admin access, but cannot import into the library.</div>
+                            <div class="fieldDescription jpk-url">Queue URL: <a id="publicQueueUrl" href="#" target="_blank" rel="noopener">/youtube/queue</a></div>
+                            <div class="fieldDescription" style="margin-bottom: 12px;">A read-only view of the queue that any signed-in user can open to see what is waiting to be added and where it stands.</div>
                             <div id="approvedUsersList"></div>
                             <button is="emby-button" type="button" id="btnSaveApprovedUsers" class="raised jpk-button-submit jpk-button-small" style="margin-top: 12px;">
                                 <span>Save</span>

@@ -126,9 +126,14 @@ public sealed class PlaylistImportService
             _libraryService.GetLibraryTracks(),
             _downloadService.GetQueuedTracks());
 
-        foreach (var id in plan.QueueIdsToRemove)
+        foreach (var id in plan.QueueIdsToRemove.Concat(plan.StaleQueueIds))
         {
             _downloadService.DeleteCachedFile(id);
+        }
+
+        if (plan.StaleQueueIds.Count > 0)
+        {
+            _logger.LogInformation("Removed {Count} queued or failed songs the library now has", plan.StaleQueueIds.Count);
         }
 
         var playlistName = string.Join(", ", selected.Select(p => p.Name).Where(n => !string.IsNullOrEmpty(n)));

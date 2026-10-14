@@ -526,7 +526,7 @@ public sealed class DownloadService : IDisposable
             if (video.Success && video.Data != null)
             {
                 // YouTube Music names the song and artist; fall back to the video title and channel.
-                candidates.Add(new MatchCandidate(id, video.Data.Track ?? video.Data.Title ?? string.Empty, video.Data.Artist ?? video.Data.Channel, video.Data.Duration));
+                candidates.Add(new MatchCandidate(id, video.Data.Track ?? video.Data.Title ?? string.Empty, video.Data.Artist ?? video.Data.Channel, video.Data.Duration, video.Data.Album));
             }
         }
 
@@ -781,6 +781,85 @@ public sealed class DownloadService : IDisposable
         _logger.LogInformation("Cover art set for queue item {Id}", id);
     }
 
+    /// <summary>
+    /// Embeds the album cover from an official YouTube Music audio track when the file still has
+    /// no cover. Those uploads show the cover centred in a 16:9 thumbnail, so its centre square is
+    /// cut out with ffmpeg. Fan uploads and music videos are never used. Returns whether a cover
+    /// was added.
+    /// </summary>
+    private async Task<bool> EmbedYouTubeMusicCoverAsync(TagLib.Tag tag, InfoJsonDetails info, CancellationToken cancellationToken)
+    {
+        if (!Config.EmbedCoverArt || tag.Pictures.Length > 0 || !info.IsArtTrack || string.IsNullOrEmpty(info.VideoId))
+        {
+            return false;
+        }
+
+        var cover = await GetYouTubeMusicCoverAsync(info.VideoId, cancellationToken).ConfigureAwait(false);
+        if (cover == null)
+        {
+            return false;
+        }
+
+        tag.Pictures = new TagLib.IPicture[] { CreateCover(cover, "image/jpeg") };
+        _logger.LogInformation("Added the YouTube Music cover for video {Id}", info.VideoId);
+        return true;
+    }
+
+    /// <summary>
+    /// Downloads a video's full-size thumbnail and crops its centre square, or returns null.
+    /// </summary>
+    [SuppressMessage("Security", "CA3003:Review code for file path injection vulnerabilities", Justification = "Temporary files use GUID names in the cache folder.")]
+    private async Task<byte[]?> GetYouTubeMusicCoverAsync(string videoId, CancellationToken cancellationToken)
+    {
+        var ffmpeg = _mediaEncoder.EncoderPath;
+        if (string.IsNullOrEmpty(ffmpeg) || !File.Exists(ffmpeg) || !videoId.All(c => char.IsLetterOrDigit(c) || c is '-' or '_'))
+        {
+            return null;
+        }
+
+        var cacheDir = _dbProvider.GetAudioCacheDirectory();
+        var input = Path.Combine(cacheDir, Guid.NewGuid().ToString("N") + ".thumb.jpg");
+        var output = Path.Combine(cacheDir, Guid.NewGuid().ToString("N") + ".cover.jpg");
+        try
+        {
+            byte[] thumbnail;
+            try
+            {
+                thumbnail = await _httpClient.GetByteArrayAsync(new Uri($"https://i.ytimg.com/vi/{videoId}/maxresdefault.jpg"), cancellationToken).ConfigureAwait(false);
+            }
+            catch (HttpRequestException)
+            {
+                return null; // no full-size thumbnail; smaller ones are letterboxed
+            }
+
+            // Only a 16:9 frame has the cover as its centre square.
+            if (ImageInfo.Read(thumbnail) is not { } frame || frame.Width * 9 != frame.Height * 16)
+            {
+                return null;
+            }
+
+            await File.WriteAllBytesAsync(input, thumbnail, cancellationToken).ConfigureAwait(false);
+            await RunProcessAsync(ffmpeg, ["-v", "error", "-y", "-i", input, "-vf", "crop=ih:ih", "-q:v", "2", output], TimeSpan.FromSeconds(30)).ConfigureAwait(false);
+            if (!File.Exists(output))
+            {
+                return null;
+            }
+
+            var cover = await File.ReadAllBytesAsync(output, cancellationToken).ConfigureAwait(false);
+            return ImageInfo.Read(cover) is { } square && square.Width == square.Height ? cover : null;
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Could not make a cover from the YouTube thumbnail of {Id}", videoId);
+            return null;
+        }
+        finally
+        {
+            File.Delete(input);
+            File.Delete(output);
+        }
+    }
+
     private static TagLib.Picture CreateCover(byte[] data, string mimeType)
         => new(new TagLib.ByteVector(data)) { Type = TagLib.PictureType.FrontCover, MimeType = mimeType, Description = "Cover" };
 
@@ -962,6 +1041,11 @@ public sealed class DownloadService : IDisposable
             if (song == null)
             {
                 _logger.LogInformation("No Apple Music match for {Artist} - {Title}", SanitizeForLog(artist), SanitizeForLog(title));
+                if (await EmbedYouTubeMusicCoverAsync(tag, info, cancellationToken).ConfigureAwait(false))
+                {
+                    tagFile.Save();
+                }
+
                 return;
             }
 
@@ -1016,6 +1100,7 @@ public sealed class DownloadService : IDisposable
                 }
             }
 
+            await EmbedYouTubeMusicCoverAsync(tag, info, cancellationToken).ConfigureAwait(false);
             tagFile.Save();
             _logger.LogInformation("Matched {Artist} - {Title} to {Album} ({Year}) on Apple Music", SanitizeForLog(artist), SanitizeForLog(title), SanitizeForLog(song.AlbumName), song.Year);
         }
@@ -2270,7 +2355,8 @@ public sealed class DownloadService : IDisposable
             var artist = GetJsonString(root, "artist") ?? GetJsonString(root, "creator")
                 ?? ChannelToArtist(GetJsonString(root, "channel") ?? GetJsonString(root, "uploader"));
             double? duration = root.TryGetProperty("duration", out var d) && d.ValueKind == JsonValueKind.Number ? d.GetDouble() : null;
-            return new InfoJsonDetails(artist, duration);
+            var isArtTrack = GetJsonString(root, "description")?.StartsWith("Provided to YouTube by", StringComparison.Ordinal) == true;
+            return new InfoJsonDetails(artist, duration, GetJsonString(root, "id"), isArtTrack);
         }
         catch (Exception ex) when (ex is JsonException or IOException)
         {
@@ -2395,4 +2481,6 @@ public sealed class DownloadService : IDisposable
 /// </summary>
 /// <param name="Artist">The artist, when known.</param>
 /// <param name="Duration">The length in seconds, when known.</param>
-internal sealed record InfoJsonDetails(string? Artist, double? Duration);
+/// <param name="VideoId">The YouTube video ID, when known.</param>
+/// <param name="IsArtTrack">Whether this is an official YouTube Music audio track ("Provided to YouTube by …").</param>
+internal sealed record InfoJsonDetails(string? Artist, double? Duration, string? VideoId = null, bool IsArtTrack = false);

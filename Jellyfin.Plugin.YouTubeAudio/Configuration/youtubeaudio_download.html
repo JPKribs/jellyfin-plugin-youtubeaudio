@@ -10,53 +10,81 @@
                     <div class="sectionTitleContainer flex align-items-center">
                         <h1 class="sectionTitle">Download</h1>
                     </div>
-                    <div class="fieldDescription">Queue YouTube videos or playlists to download as audio, then tag and import them from the Import tab.</div>
-                    <div class="fieldDescription jpk-url">User URL: <a id="publicDownloadUrl" href="#" target="_blank" rel="noopener">/youtube/download</a></div>
-                    <div class="fieldDescription">Share this link with the approved users selected under Settings &rarr; Approved Users. They can submit downloads here without admin access, but cannot import into the library.</div>
-                    <div class="fieldDescription jpk-url">Queue URL: <a id="publicQueueUrl" href="#" target="_blank" rel="noopener">/youtube/queue</a></div>
-                    <div class="fieldDescription">A read-only view of the queue that any signed-in user can open to see what is waiting to be added and where it stands.</div>
+                    <div class="fieldDescription">Queue songs to download as audio, then tag and import them from the Import tab.</div>
 
-                    <!-- URL Input -->
-                    <div class="inputContainer">
-                        <label for="txtYouTubeUrl">YouTube URL:</label>
-                        <input is="emby-input" type="text" id="txtYouTubeUrl"
-                               placeholder="https://www.youtube.com/watch..." />
-                        <div class="fieldDescription">Provide a YouTube video or playlist URL to queue the audio for download.</div>
+                    <!-- Sources: pick where songs come from; that source's form shows below -->
+                    <div class="jpk-choice-group yta-source-choices" id="sourceChoices" role="radiogroup" aria-label="Source">
+                        <label class="jpk-choice">
+                            <input type="radio" name="downloadSource" value="youtube" />
+                            <span class="jpk-choice-name">YouTube</span>
+                            <span class="jpk-choice-text">Paste a link to a video or a playlist.</span>
+                        </label>
+                        <label class="jpk-choice">
+                            <input type="radio" name="downloadSource" value="applemusic" />
+                            <span class="jpk-choice-name">Apple Music</span>
+                            <span class="jpk-choice-text">Upload a playlist or library exported from the Music app.</span>
+                        </label>
+                        <!-- Spotify: hidden until its export source exists.
+                        <label class="jpk-choice">
+                            <input type="radio" name="downloadSource" value="spotify" />
+                            <span class="jpk-choice-name">Spotify</span>
+                            <span class="jpk-choice-text">Upload a playlist exported from Spotify.</span>
+                        </label>
+                        -->
                     </div>
-                    <button is="emby-button" type="button" id="btnQueue" class="raised jpk-button-submit jpk-button-small" disabled>
-                        <span>Queue</span>
-                    </button>
 
-                    <!-- Playlist Import -->
-                    <div class="sectionTitleContainer flex align-items-center yta-section-heading">
-                        <h2 class="sectionTitle">Import a Playlist</h2>
-                    </div>
-                    <div class="inputContainer yta-playlist-import">
-                        <label for="filePlaylist">Playlist Export:</label>
-                        <input type="file" id="filePlaylist" class="yta-file-input" accept=".txt,.xml" />
-                        <div class="fieldDescription">Queue every track from a playlist exported from another music service. Each track is matched to a YouTube upload when it downloads, and keeps the service's title, artist, album and track details as its tags.</div>
-                        <div class="fieldDescription" id="playlistSources"></div>
-                        <div id="playlistChoices" class="yta-playlist-choices" hidden></div>
-                    </div>
-                    <div class="selectContainer">
-                        <label>Playlist Owner:</label>
-                        <div id="playlistOwner"></div>
-                        <div class="fieldDescription">Each imported playlist becomes a private Jellyfin playlist with the same name, owned by this user, filled as its songs reach the library. If the user already has a playlist with that name, missing songs are added to it.</div>
-                    </div>
-                    <button is="emby-button" type="button" id="btnImportPlaylist" class="raised jpk-button-submit jpk-button-small" disabled>
-                        <span>Queue Playlist</span>
-                    </button>
-
-                    <!-- Playlists being filled -->
-                    <div id="playlistTargetsSection" class="yta-playlist-targets" hidden>
-                        <div class="sectionTitleContainer flex align-items-center yta-section-heading">
-                            <h2 class="sectionTitle">Playlist Imports in Progress</h2>
-                            <button type="button" class="jpk-table-reload-btn" id="btnSyncPlaylists" title="Add songs that are in the library now">
-                                <span class="material-icons jpk-table-reload-icon">sync</span>
+                        <!-- YouTube -->
+                        <div class="yta-source-panel" id="panelYouTube" data-source="youtube">
+                            <div class="inputContainer">
+                                <label for="txtYouTubeUrl">YouTube URL:</label>
+                                <input is="emby-input" type="text" id="txtYouTubeUrl"
+                                       placeholder="https://www.youtube.com/watch..." />
+                                <div class="fieldDescription">A YouTube video or playlist link. Each video is queued to download as audio.</div>
+                            </div>
+                            <button is="emby-button" type="button" id="btnQueue" class="raised jpk-button-submit jpk-button-small" disabled>
+                                <span>Queue</span>
                             </button>
                         </div>
-                        <div class="jpk-table-body" id="playlistTargets"></div>
-                    </div>
+
+                        <!-- Apple Music -->
+                        <div class="yta-source-panel" id="panelAppleMusic" data-source="applemusic" hidden>
+                            <div class="inputContainer yta-playlist-import">
+                                <label for="filePlaylist">Playlist Export:</label>
+                                <input type="file" id="filePlaylist" class="yta-file-input" accept=".txt,.xml" />
+                                <div class="fieldDescription">A playlist or library exported from the Music app. Each track is matched to a YouTube upload when it downloads, and keeps Apple Music's title, artist, album and track details as its tags.</div>
+                                <div class="fieldDescription" id="playlistSources"></div>
+                                <div id="playlistChoices" class="yta-playlist-choices" hidden></div>
+                            </div>
+                            <div class="selectContainer">
+                                <label>Playlist Owner:</label>
+                                <div id="playlistOwner"></div>
+                                <div class="fieldDescription">Each imported playlist becomes a private Jellyfin playlist with the same name, owned by this user, filled as its songs reach the library. If the user already has a playlist with that name, missing songs are added to it.</div>
+                            </div>
+                            <button is="emby-button" type="button" id="btnImportPlaylist" class="raised jpk-button-submit jpk-button-small" disabled>
+                                <span>Queue Playlist</span>
+                            </button>
+
+                            <!-- Playlists being filled -->
+                            <div id="playlistTargetsSection" class="yta-playlist-targets" hidden>
+                                <div class="yta-subheading">
+                                    <h3>Playlist Imports in Progress</h3>
+                                    <button type="button" class="jpk-table-reload-btn" id="btnSyncPlaylists" title="Add songs that are in the library now">
+                                        <span class="material-icons jpk-table-reload-icon">sync</span>
+                                    </button>
+                                </div>
+                                <div class="jpk-table-body" id="playlistTargets"></div>
+                            </div>
+                        </div>
+
+                        <!-- Spotify: hidden until its export source exists.
+                        <div class="yta-source-panel" id="panelSpotify" data-source="spotify" hidden>
+                            <div class="inputContainer">
+                                <label for="fileSpotify">Spotify Export:</label>
+                                <input type="file" id="fileSpotify" class="yta-file-input" accept=".csv" />
+                                <div class="fieldDescription">A playlist exported from Spotify as CSV.</div>
+                            </div>
+                        </div>
+                        -->
 
                     <!-- Queue List (PaginatedTable pattern) -->
                     <div class="jpk-table-wrapper" id="queueWrapper">
@@ -135,5 +163,11 @@
         .yta-link-error { flex-basis: 100%; color: #ef9a9a; font-size: 0.85em; }
         .yta-link-error:empty { display: none; }
         .yta-match-note { color: #ff9800; font-size: 0.85em; margin-top: 0.2em; }
+        /* Source choice cards, then the chosen source's form. */
+        .yta-source-choices { margin-top: 1.5em; }
+        .yta-source-panel { margin-top: 1.2em; }
+        .yta-playlist-targets { margin-top: 1.8em; }
+        .yta-subheading { display: flex; align-items: center; gap: 8px; margin-bottom: 0.5em; }
+        .yta-subheading h3 { margin: 0; font-size: 1.1em; font-weight: 500; }
     </style>
 </div>

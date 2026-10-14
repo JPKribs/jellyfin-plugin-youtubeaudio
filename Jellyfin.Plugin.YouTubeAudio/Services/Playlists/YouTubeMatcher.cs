@@ -14,7 +14,8 @@ namespace Jellyfin.Plugin.YouTubeAudio.Services.Playlists;
 /// <param name="Title">The video title.</param>
 /// <param name="Channel">The uploading channel, when known.</param>
 /// <param name="DurationSeconds">The video length, when known.</param>
-public sealed record MatchCandidate(string Id, string Title, string? Channel, double? DurationSeconds);
+/// <param name="Album">The album YouTube Music lists the song on, when known.</param>
+public sealed record MatchCandidate(string Id, string Title, string? Channel, double? DurationSeconds, string? Album = null);
 
 /// <summary>
 /// The chosen candidate for a playlist track.
@@ -45,9 +46,16 @@ public static partial class YouTubeMatcher
     // Words marking an alternate version. Penalized unless the source title contains them too.
     private static readonly string[] _alternateVersionWords =
     [
-        "slowed", "reverb", "sped up", "nightcore", "live", "cover", "remix", "instrumental",
-        "karaoke", "8d", "extended", "dj set", "loop", "reaction"
+        "slowed", "reverb", "live", "cover", "remix", "instrumental",
+        "karaoke", "extended", "dj set", "loop", "reaction"
     ];
+
+    // Words marking a re-pitched or sped-up copy of the recording. Never matched unless the
+    // source title asks for that version.
+    private static readonly string[] _alteredAudioWords = ["432hz", "432 hz", "528hz", "sped up", "speed up", "8d", "nightcore"];
+
+    /// <summary>A song by an artist written in another alphabet must be this close in length when its album differs.</summary>
+    internal const double OtherScriptMaxDeltaSeconds = 3;
 
     private static readonly string[] _artistSeparators = ["&", ",", "/", " x ", " and ", " feat. ", " feat ", " ft. ", " with "];
 
@@ -135,16 +143,28 @@ public static partial class YouTubeMatcher
             var tailMatch = !titleMatch && tailWords.Count > 0 && tailWords.All(candidateWords.Contains);
             var artistInTitle = !channelMatch && artistNames.Any(words => words.All(candidateWords.Contains));
 
+            // YouTube Music may credit the artist in another alphabet ("ЛЮТИК" for "LUTIC"), which
+            // no name comparison can match. Then the album, or a near-exact length, has to vouch.
+            var otherScript = !channelMatch && !artistInTitle && WrittenInOtherScript(track.Artist, candidate.Channel)
+                && (AlbumsMatch(track.Album, candidate.Album) || delta <= OtherScriptMaxDeltaSeconds);
+
             // An upload must be this song: the title (or its movement) has to appear, even on the
             // artist's own channel, where another song of a similar length would otherwise pass.
             // It must also show it is by the artist: their (or their label's) channel, or their
             // name in the title. A matching title alone may be another performer's recording.
-            if (!(titleMatch || coreMatch || tailMatch) || (!channelMatch && !artistInTitle))
+            if (!(titleMatch || coreMatch || tailMatch) || (!channelMatch && !artistInTitle && !otherScript))
             {
                 continue;
             }
 
             var candidateTitleText = " " + string.Join(' ', candidateWords) + " ";
+            var rawTitle = " " + (candidate.Title ?? string.Empty).ToLowerInvariant() + " ";
+            if (_alteredAudioWords.Any(word =>
+                    (candidateTitleText.Contains(" " + word + " ", StringComparison.Ordinal) || rawTitle.Contains(word, StringComparison.Ordinal))
+                    && !sourceTitleText.Contains(" " + word + " ", StringComparison.Ordinal)))
+            {
+                continue;
+            }
             var alternateVersion = _alternateVersionWords.Any(word =>
                 candidateTitleText.Contains(" " + word + " ", StringComparison.Ordinal)
                 && !sourceTitleText.Contains(" " + word + " ", StringComparison.Ordinal));
@@ -155,6 +175,7 @@ public static partial class YouTubeMatcher
             score += coreMatch ? 20 : 0;
             score += tailMatch ? 15 : 0;
             score += artistInTitle ? 25 : 0;
+            score += otherScript ? 20 : 0;
             score += isTopic ? 10 : 0;
             score -= alternateVersion ? 25 : 0;
             score -= (delta ?? 0) * 3;
@@ -221,6 +242,40 @@ public static partial class YouTubeMatcher
 
         static bool IsNumbering(string word)
             => word == "no" || word.All(char.IsDigit) || (word.Length <= 5 && word.All(c => "ivxlc".Contains(c, StringComparison.Ordinal)));
+    }
+
+    /// <summary>
+    /// Returns whether two names are written in different alphabets: one only in Latin letters,
+    /// the other mostly in another script (Cyrillic, Greek, CJK…).
+    /// </summary>
+    internal static bool WrittenInOtherScript(string? a, string? b)
+    {
+        static bool? IsLatin(string? value)
+        {
+            var letters = (value ?? string.Empty).Where(char.IsLetter).ToList();
+            if (letters.Count == 0)
+            {
+                return null;
+            }
+
+            var latin = letters.Count(c => c < 0x250);
+            return latin == letters.Count ? true : latin * 2 < letters.Count ? false : null;
+        }
+
+        var la = IsLatin(a);
+        var lb = IsLatin(b);
+        return la.HasValue && lb.HasValue && la.Value != lb.Value;
+    }
+
+    /// <summary>
+    /// Returns whether two album names name the same release, ignoring case, punctuation and
+    /// edition labels such as " - Single".
+    /// </summary>
+    private static bool AlbumsMatch(string? a, string? b)
+    {
+        var keyA = Normalize(TrackMetadataCleaner.CleanAlbum(a) ?? string.Empty);
+        var keyB = Normalize(TrackMetadataCleaner.CleanAlbum(b) ?? string.Empty);
+        return keyA.Length > 0 && keyA == keyB;
     }
 
     private static List<string> GetArtistKeys(string? artist)

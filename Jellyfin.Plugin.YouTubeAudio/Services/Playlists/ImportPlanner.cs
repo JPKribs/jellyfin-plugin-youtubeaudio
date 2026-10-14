@@ -16,6 +16,12 @@ public sealed class ImportPlan
     /// <summary>Gets the queue items to remove because a better version of the song replaces them.</summary>
     public List<string> QueueIdsToRemove { get; } = new();
 
+    /// <summary>
+    /// Gets the queued or failed rows for songs the library now has; they no longer need
+    /// downloading and are removed.
+    /// </summary>
+    public List<string> StaleQueueIds { get; } = new();
+
     /// <summary>Gets or sets the number of songs skipped because the library already has them.</summary>
     public int AlreadyInLibrary { get; set; }
 
@@ -141,6 +147,7 @@ public static class ImportPlanner
                 // Matched on the movement alone: the library copy is used as it is, never upgraded.
                 plan.LibraryAliases[key] = libraryKey;
                 plan.AlreadyInLibrary++;
+                AddStaleRows(plan, queuedSongs, key);
                 continue;
             }
 
@@ -153,6 +160,7 @@ public static class ImportPlanner
                 if (!upgrade)
                 {
                     plan.AlreadyInLibrary++;
+                    AddStaleRows(plan, queuedSongs, key);
                     continue;
                 }
 
@@ -191,6 +199,18 @@ public static class ImportPlanner
         }
 
         return plan;
+    }
+
+    /// <summary>
+    /// Marks a song's queued or failed rows as stale once the library has the song. Rows
+    /// downloading or already downloaded are left alone.
+    /// </summary>
+    private static void AddStaleRows(ImportPlan plan, Dictionary<string, List<QueuedTrack>> queuedSongs, string key)
+    {
+        if (queuedSongs.TryGetValue(key, out var rows))
+        {
+            plan.StaleQueueIds.AddRange(rows.Where(q => q.Status is QueueStatus.Queued or QueueStatus.Error).Select(q => q.Id));
+        }
     }
 
     /// <summary>
