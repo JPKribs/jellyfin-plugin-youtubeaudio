@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace Jellyfin.Plugin.YouTubeAudio.Models;
 
@@ -21,4 +22,8 @@ public class ImportResult
 
     /// <summary>Gets or sets the number of library files deleted because an imported album version replaced them.</summary>
     public int RemovedFiles { get; set; }
+
+    /// <summary>Gets the library files written or deleted by the import, so only they are rescanned.</summary>
+    [JsonIgnore]
+    public List<string> ChangedPaths { get; } = new();
 }

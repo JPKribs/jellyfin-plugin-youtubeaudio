@@ -1252,7 +1252,7 @@ public sealed class DownloadService : IDisposable
                 // An album version replaces the single (or other lesser version) already in the library.
                 if (item.SourceTrack?.ReplacesFiles is { Count: > 0 } replaced)
                 {
-                    var removed = RemoveReplacedFiles(replaced, destPath, libraryPath);
+                    var removed = RemoveReplacedFiles(replaced, destPath, libraryPath, result.ChangedPaths);
                     result.RemovedFiles += removed;
 
                     // Playlists holding the deleted single should get the album version instead.
@@ -1274,6 +1274,7 @@ public sealed class DownloadService : IDisposable
                 db.MarkPlaylistEntriesImported(TrackMetadataCleaner.SongKey(item.Artist, item.Title));
                 db.DeleteItem(id);
                 result.ImportedIds.Add(id);
+                result.ChangedPaths.Add(destPath);
                 if (isDuplicate)
                 {
                     result.ReplacedIds.Add(id);
@@ -1333,7 +1334,7 @@ public sealed class DownloadService : IDisposable
     /// </summary>
     /// <returns>The number of files deleted.</returns>
     [SuppressMessage("Security", "CA3003:Review code for file path injection vulnerabilities", Justification = "Paths come from Jellyfin's own library items and are confined to the configured library root.")]
-    private int RemoveReplacedFiles(IEnumerable<string> paths, string keptPath, string libraryPath)
+    private int RemoveReplacedFiles(IEnumerable<string> paths, string keptPath, string libraryPath, List<string> changedPaths)
     {
         var root = Path.GetFullPath(libraryPath).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
         var kept = Path.GetFullPath(keptPath);
@@ -1350,6 +1351,7 @@ public sealed class DownloadService : IDisposable
                 }
 
                 File.Delete(full);
+                changedPaths.Add(full);
                 removed++;
                 _logger.LogInformation("Removed {Path}, replaced by the album version at {Kept}", full, kept);
 

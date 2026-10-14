@@ -19,3 +19,4 @@ artifacts:
 changelog:
   features:
   - YouTube matches must contain the song title, so another song by the same artist with a similar length is never downloaded instead.
+  - Importing rescans only the imported songs' folders instead of the whole library.

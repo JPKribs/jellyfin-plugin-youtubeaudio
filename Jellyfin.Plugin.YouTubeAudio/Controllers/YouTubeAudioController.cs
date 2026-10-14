@@ -435,10 +435,10 @@ public class YouTubeAudioController : ControllerBase
         {
             var result = await _downloadService.ImportToLibraryAsync(request.Ids, HttpContext.RequestAborted).ConfigureAwait(false);
 
-            // Kick a scan so the imported files show up without waiting for the schedule.
+            // Rescan just the imported files' folders so they show up without a full library scan.
             if (result.ImportedIds.Count > 0)
             {
-                _libraryService.QueueLibraryScan();
+                _libraryService.RefreshPaths(result.ChangedPaths);
 
                 // The scan's ItemAdded events trigger the playlist sync; this is the fallback.
                 _playlistSyncService.RequestSync(TimeSpan.FromMinutes(2));

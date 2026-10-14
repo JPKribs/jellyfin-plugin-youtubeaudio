@@ -18,6 +18,7 @@ namespace Jellyfin.Plugin.YouTubeAudio.Services;
 public class LibraryService
 {
     private readonly ILibraryManager _libraryManager;
+    private readonly ILibraryMonitor _libraryMonitor;
     private readonly ILogger<LibraryService> _logger;
 
     /// <summary>
@@ -25,9 +26,11 @@ public class LibraryService
     /// </summary>
     public LibraryService(
         ILibraryManager libraryManager,
+        ILibraryMonitor libraryMonitor,
         ILogger<LibraryService> logger)
     {
         _libraryManager = libraryManager;
+        _libraryMonitor = libraryMonitor;
         _logger = logger;
     }
 
@@ -53,6 +56,32 @@ public class LibraryService
         {
             _logger.LogWarning(ex, "Failed to get music libraries");
             return new List<LibraryInfo>();
+        }
+    }
+
+    /// <summary>
+    /// Rescans only the folders holding the given files, the way Jellyfin's real-time
+    /// monitoring does, instead of the whole library. Jellyfin batches changes that arrive
+    /// close together. Falls back to a full library scan if that fails.
+    /// </summary>
+    public void RefreshPaths(IEnumerable<string> paths)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+        try
+        {
+            var count = 0;
+            foreach (var path in paths.Distinct(StringComparer.Ordinal))
+            {
+                _libraryMonitor.ReportFileSystemChanged(path);
+                count++;
+            }
+
+            _logger.LogInformation("Asked Jellyfin to rescan {Count} imported files", count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Targeted rescan failed; scanning the whole library instead");
+            QueueLibraryScan();
         }
     }
 
