@@ -9,6 +9,14 @@
     "category": "Music",
     "versions": [
       {
+        "version": "12.2.3.0",
+        "changelog": "## Features\r\n- Import Spotify playlists exported with Exportify, one playlist as CSV or all of them as a ZIP.\r\n- Spotify imports embed Spotify's album cover and fill in the genre from Apple Music.\r\n- Playlist tracks with an ISRC are matched to their official YouTube upload by it first.\r\n- Generate a cover with the wand button on the Import tab; choose its text, order and colors in Settings → Album Art.\r\n- Composer credits are stored as separate composers.\r\n- Live, remix, cover, acoustic and instrumental versions are never matched unless the song's title names that version.",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/v12.2.3.0/jellyfin-plugin-youtubeaudio-12.2.3.0.zip",
+        "checksum": "19686815e47fbe440480b5ec0001ba10",
+        "timestamp": "2026-10-14T06:42:46Z"
+      },
+      {
         "version": "12.2.2.0",
         "changelog": "## Features\r\n- When Apple Music has no cover, the album cover from the official YouTube Music track is used.\r\n- Re-pitched, sped-up, 8D and nightcore uploads are never matched.\r\n- Artists YouTube Music credits in another alphabet (such as Cyrillic) are matched by album or exact length.\r\n- Re-importing a playlist removes queued or failed songs your library now has.",
         "targetAbi": "12.2.0.0",
