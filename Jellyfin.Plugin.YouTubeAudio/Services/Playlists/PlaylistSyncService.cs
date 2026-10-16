@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Data.Enums;
 using Jellyfin.Plugin.YouTubeAudio.Models;
+using JPKribs.Jellyfin.Base;
 using MediaBrowser.Controller.Entities.Audio;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Playlists;
@@ -154,7 +155,7 @@ public sealed class PlaylistSyncService : IHostedService, IDisposable
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    _logger.LogWarning(ex, "Failed to sync playlist {Name}", DownloadService.SanitizeForLog(target.Name));
+                    _logger.LogWarning(ex, "Failed to sync playlist {Name}", FormatUtilities.SanitizeForLog(target.Name));
                 }
             }
 
@@ -163,7 +164,7 @@ public sealed class PlaylistSyncService : IHostedService, IDisposable
             foreach (var target in targets.Where(t => !stillPending.Contains(t.Id)))
             {
                 db.DeletePlaylistTarget(target.Id);
-                _logger.LogInformation("Playlist import {Name} finished", DownloadService.SanitizeForLog(target.Name));
+                _logger.LogInformation("Playlist import {Name} finished", FormatUtilities.SanitizeForLog(target.Name));
             }
 
             _hasPending = stillPending.Count > 0;
@@ -299,7 +300,7 @@ public sealed class PlaylistSyncService : IHostedService, IDisposable
     {
         if (!Guid.TryParse(target.UserId, out var userId) || _userManager.GetUserById(userId) == null)
         {
-            _logger.LogWarning("Skipping playlist {Name}: its user no longer exists", DownloadService.SanitizeForLog(target.Name));
+            _logger.LogWarning("Skipping playlist {Name}: its user no longer exists", FormatUtilities.SanitizeForLog(target.Name));
             return 0;
         }
 
@@ -331,7 +332,7 @@ public sealed class PlaylistSyncService : IHostedService, IDisposable
                     Public = false
                 }).ConfigureAwait(false);
                 _dbProvider.Database.SetJellyfinPlaylistId(target.Id, created.Id);
-                _logger.LogInformation("Created playlist {Name} with {Count} songs", DownloadService.SanitizeForLog(target.Name), itemIds.Count);
+                _logger.LogInformation("Created playlist {Name} with {Count} songs", FormatUtilities.SanitizeForLog(target.Name), itemIds.Count);
             }
             else
             {
@@ -341,7 +342,7 @@ public sealed class PlaylistSyncService : IHostedService, IDisposable
                     _dbProvider.Database.SetJellyfinPlaylistId(target.Id, playlist.Id.ToString("N"));
                 }
 
-                _logger.LogInformation("Added {Count} songs to playlist {Name}", itemIds.Count, DownloadService.SanitizeForLog(target.Name));
+                _logger.LogInformation("Added {Count} songs to playlist {Name}", itemIds.Count, FormatUtilities.SanitizeForLog(target.Name));
             }
         }
 
@@ -403,7 +404,7 @@ public sealed class PlaylistSyncService : IHostedService, IDisposable
 
         if (moves > 0)
         {
-            _logger.LogInformation("Re-ordered {Count} songs in playlist {Name}", moves, DownloadService.SanitizeForLog(target.Name));
+            _logger.LogInformation("Re-ordered {Count} songs in playlist {Name}", moves, FormatUtilities.SanitizeForLog(target.Name));
         }
     }
 

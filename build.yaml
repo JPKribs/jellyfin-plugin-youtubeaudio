@@ -1,7 +1,7 @@
 ---
 name: "YouTube Audio"
 guid: "7323ea64-a200-4265-ab8f-e7ae27d06c38"
-version: "12.2.3.2"
+version: "12.2.3.3"
 targetAbi: "12.2.0.0"
 framework: "net10.0"
 overview: "Download YouTube audio directly to a Jellyfin Music Library."
@@ -17,7 +17,5 @@ artifacts:
 - "YoutubeDLSharp.dll"
 - "TagLibSharp.dll"
 changelog:
-  features:
-  - Replace a library song's audio with a different YouTube upload from the Download tab; it keeps the song's file, tags, cover and playlist places.
-  - Choosing an album already in the library on the Import tab takes that album's cover.
-  - Imports join existing artist and album folders whose names differ only in case, punctuation or year, and take that album's name and year.
+  developer:
+  - Updated JPKribs.Jellyfin.Base to 2026.10.16.

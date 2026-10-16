@@ -5,6 +5,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using Jellyfin.Plugin.YouTubeAudio.Models;
+using JPKribs.Jellyfin.Base;
 using MediaBrowser.Controller.Library;
 using Microsoft.Extensions.Logging;
 
@@ -169,7 +170,7 @@ public sealed class PlaylistImportService
             "Queued {Count} tracks from {Source} playlist(s) {Name}: {InLibrary} already in library, {Queued} already queued, {Duplicates} duplicates, {Upgrades} replacing library singles, {Skipped} unreadable",
             items.Count,
             source.Name,
-            DownloadService.SanitizeForLog(playlistName),
+            FormatUtilities.SanitizeForLog(playlistName),
             plan.AlreadyInLibrary,
             plan.AlreadyQueued,
             plan.Duplicates,

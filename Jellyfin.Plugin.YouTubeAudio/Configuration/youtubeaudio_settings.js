@@ -1,13 +1,10 @@
+import { createPage } from './configurationpage?name=youtubeaudio_shared.js';
+
 export default function (view) {
     'use strict';
 
-    var getTabs;
     var Shared = null;
     var _approvedUsers = null;
-    var _sharedPromise = import('/web/configurationpage?name=youtubeaudio_shared.js').then(function(mod) {
-        getTabs = mod.getTabs;
-        Shared = mod.createShared(view);
-    });
 
     // Approved-users picker: a base user multi-selector restricted to non-admins. Created once, reused.
     function ensureApprovedUsers() {
@@ -44,26 +41,24 @@ export default function (view) {
     }
 
     function loadConfig() {
-        _sharedPromise.then(function() {
-            // Each side request is isolated: a failure in one must not blank the whole page.
-            Promise.all([
-                Shared.getConfig(),
-                loadLibraries().catch(function () { /* leave the placeholder option */ })
-            ]).then(function(results) {
-                var config = results[0];
-                Shared.getEl('selAudioFormat').value = config.AudioFormat || 'Opus';
-                Shared.getEl('selMusicLibrary').value = config.MusicLibraryId || '';
-                Shared.getEl('txtLibraryPath').value = config.MusicLibraryPath || '';
-                Shared.getEl('chkReplaceDuplicates').checked = config.ReplaceDuplicates !== false;
-                Shared.getEl('chkLookUpCatalog').checked = config.LookUpCatalogMetadata !== false;
-                Shared.getEl('chkEmbedCoverArt').checked = config.EmbedCoverArt !== false;
-                renderCoverText(config.GeneratedCoverTextOrder, config.GeneratedCoverText);
-                Shared.getEl('selCoverColors').value = config.GeneratedCoverColors || 'Album';
-                Shared.getEl('txtCacheOverride').value = config.CacheDirectoryOverride || '';
-                Shared.getEl('txtYtDlpPath').value = config.YtDlpPath || '';
-                var picker = ensureApprovedUsers();
-                if (picker) picker.setValue(config.ApprovedUserIds || []);
-            });
+        // Each side request is isolated: a failure in one must not blank the whole page.
+        Promise.all([
+            Shared.getConfig(),
+            loadLibraries().catch(function () { /* leave the placeholder option */ })
+        ]).then(function(results) {
+            var config = results[0];
+            Shared.getEl('selAudioFormat').value = config.AudioFormat || 'Opus';
+            Shared.getEl('selMusicLibrary').value = config.MusicLibraryId || '';
+            Shared.getEl('txtLibraryPath').value = config.MusicLibraryPath || '';
+            Shared.getEl('chkReplaceDuplicates').checked = config.ReplaceDuplicates !== false;
+            Shared.getEl('chkLookUpCatalog').checked = config.LookUpCatalogMetadata !== false;
+            Shared.getEl('chkEmbedCoverArt').checked = config.EmbedCoverArt !== false;
+            renderCoverText(config.GeneratedCoverTextOrder, config.GeneratedCoverText);
+            Shared.getEl('selCoverColors').value = config.GeneratedCoverColors || 'Album';
+            Shared.getEl('txtCacheOverride').value = config.CacheDirectoryOverride || '';
+            Shared.getEl('txtYtDlpPath').value = config.YtDlpPath || '';
+            var picker = ensureApprovedUsers();
+            if (picker) picker.setValue(config.ApprovedUserIds || []);
         });
     }
 
@@ -85,24 +80,20 @@ export default function (view) {
     // ============================================
 
     function saveLibrary() {
-        _sharedPromise.then(function() {
-            Shared.getConfig().then(function(config) {
-                config.MusicLibraryId = Shared.getEl('selMusicLibrary').value || '';
-                config.MusicLibraryPath = Shared.getEl('txtLibraryPath').value || '';
-                Shared.saveConfig(config).then(function() {
-                    Dashboard.alert('Library settings saved.');
-                });
+        Shared.getConfig().then(function(config) {
+            config.MusicLibraryId = Shared.getEl('selMusicLibrary').value || '';
+            config.MusicLibraryPath = Shared.getEl('txtLibraryPath').value || '';
+            Shared.saveConfig(config).then(function() {
+                Dashboard.alert('Library settings saved.');
             });
         });
     }
 
     function saveFormat() {
-        _sharedPromise.then(function() {
-            Shared.getConfig().then(function(config) {
-                config.AudioFormat = Shared.getEl('selAudioFormat').value || 'Opus';
-                Shared.saveConfig(config).then(function() {
-                    Dashboard.alert('Audio format saved.');
-                });
+        Shared.getConfig().then(function(config) {
+            config.AudioFormat = Shared.getEl('selAudioFormat').value || 'Opus';
+            Shared.saveConfig(config).then(function() {
+                Dashboard.alert('Audio format saved.');
             });
         });
     }
@@ -142,61 +133,51 @@ export default function (view) {
     }
 
     function saveAlbumArt() {
-        _sharedPromise.then(function() {
-            Shared.getConfig().then(function(config) {
-                var text = readCoverText();
-                config.GeneratedCoverTextOrder = text.order;
-                config.GeneratedCoverText = text.shown;
-                config.GeneratedCoverColors = Shared.getEl('selCoverColors').value || 'Album';
-                Shared.saveConfig(config).then(function() {
-                    Dashboard.alert('Album art saved.');
-                });
+        Shared.getConfig().then(function(config) {
+            var text = readCoverText();
+            config.GeneratedCoverTextOrder = text.order;
+            config.GeneratedCoverText = text.shown;
+            config.GeneratedCoverColors = Shared.getEl('selCoverColors').value || 'Album';
+            Shared.saveConfig(config).then(function() {
+                Dashboard.alert('Album art saved.');
             });
         });
     }
 
     function saveImportBehavior() {
-        _sharedPromise.then(function() {
-            Shared.getConfig().then(function(config) {
-                config.ReplaceDuplicates = Shared.getEl('chkReplaceDuplicates').checked;
-                config.LookUpCatalogMetadata = Shared.getEl('chkLookUpCatalog').checked;
-                config.EmbedCoverArt = Shared.getEl('chkEmbedCoverArt').checked;
-                Shared.saveConfig(config).then(function() {
-                    Dashboard.alert('Import behavior saved.');
-                });
+        Shared.getConfig().then(function(config) {
+            config.ReplaceDuplicates = Shared.getEl('chkReplaceDuplicates').checked;
+            config.LookUpCatalogMetadata = Shared.getEl('chkLookUpCatalog').checked;
+            config.EmbedCoverArt = Shared.getEl('chkEmbedCoverArt').checked;
+            Shared.saveConfig(config).then(function() {
+                Dashboard.alert('Import behavior saved.');
             });
         });
     }
 
     function saveCache() {
-        _sharedPromise.then(function() {
-            Shared.getConfig().then(function(config) {
-                config.CacheDirectoryOverride = Shared.getEl('txtCacheOverride').value || '';
-                Shared.saveConfig(config).then(function() {
-                    Dashboard.alert('Cache settings saved.');
-                });
+        Shared.getConfig().then(function(config) {
+            config.CacheDirectoryOverride = Shared.getEl('txtCacheOverride').value || '';
+            Shared.saveConfig(config).then(function() {
+                Dashboard.alert('Cache settings saved.');
             });
         });
     }
 
     function saveYtDlp() {
-        _sharedPromise.then(function() {
-            Shared.getConfig().then(function(config) {
-                config.YtDlpPath = Shared.getEl('txtYtDlpPath').value || '';
-                Shared.saveConfig(config).then(function() {
-                    Dashboard.alert('yt-dlp settings saved.');
-                });
+        Shared.getConfig().then(function(config) {
+            config.YtDlpPath = Shared.getEl('txtYtDlpPath').value || '';
+            Shared.saveConfig(config).then(function() {
+                Dashboard.alert('yt-dlp settings saved.');
             });
         });
     }
 
     function saveApprovedUsers() {
-        _sharedPromise.then(function() {
-            Shared.getConfig().then(function(config) {
-                config.ApprovedUserIds = _approvedUsers ? _approvedUsers.getValue() : [];
-                Shared.saveConfig(config).then(function() {
-                    Dashboard.alert('Approved users saved.');
-                });
+        Shared.getConfig().then(function(config) {
+            config.ApprovedUserIds = _approvedUsers ? _approvedUsers.getValue() : [];
+            Shared.saveConfig(config).then(function() {
+                Dashboard.alert('Approved users saved.');
             });
         });
     }
@@ -221,31 +202,32 @@ export default function (view) {
     // ============================================
 
     function resetQueue() {
-        if (!confirm('Clear the entire download queue? This cannot be undone.')) return;
-        Shared.apiRequest('ResetQueue', 'POST')
-            .then(function() { Shared.setStatus('resetStatus', 'Queue reset successfully.', false); })
-            .catch(function() { Shared.setStatus('resetStatus', 'Failed to reset queue.', true); });
+        Shared.confirmDialog('Clear the entire download queue? This cannot be undone.', { destructive: true }).then(function(ok) {
+            if (!ok) return;
+            Shared.apiRequest('ResetQueue', 'POST')
+                .then(function() { Shared.setStatus('resetStatus', 'Queue reset successfully.', false); })
+                .catch(function() { Shared.setStatus('resetStatus', 'Failed to reset queue.', true); });
+        });
     }
 
     function resetCache() {
-        if (!confirm('Delete ALL cached audio files and reset the queue? This cannot be undone.')) return;
-        Shared.apiRequest('ResetCache', 'POST')
-            .then(function() { Shared.setStatus('resetStatus', 'Cache reset successfully.', false); })
-            .catch(function() { Shared.setStatus('resetStatus', 'Failed to reset cache.', true); });
+        Shared.confirmDialog('Delete ALL cached audio files and reset the queue? This cannot be undone.', { destructive: true }).then(function(ok) {
+            if (!ok) return;
+            Shared.apiRequest('ResetCache', 'POST')
+                .then(function() { Shared.setStatus('resetStatus', 'Cache reset successfully.', false); })
+                .catch(function() { Shared.setStatus('resetStatus', 'Failed to reset cache.', true); });
+        });
     }
 
     // ============================================
     // EVENT LISTENERS
     // ============================================
 
-    view.addEventListener('viewshow', function() {
-        _sharedPromise.then(function() {
-            LibraryMenu.setTabs('youtubeaudio', 2, getTabs);
-            loadConfig();
-        });
-    });
-
-    _sharedPromise.then(function() {
+    // bindEvents
+    // Wires the page's controls once, on the first viewshow.
+    //
+    // No parameters
+    function bindEvents() {
         // Initialize collapsible sections
         Shared.initCollapsibles();
 
@@ -306,5 +288,12 @@ export default function (view) {
 
         var btnResetCache = Shared.getEl('btnResetCache');
         if (btnResetCache) btnResetCache.addEventListener('click', resetCache);
+    }
+
+    var page = createPage(view, {
+        tabIndex: 2,
+        bind: bindEvents,
+        load: loadConfig
     });
+    Shared = page.shared;
 }

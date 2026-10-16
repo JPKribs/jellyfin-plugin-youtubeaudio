@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using JPKribs.Jellyfin.Base;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.YouTubeAudio.Services.Catalog;
@@ -126,7 +127,7 @@ public sealed class AppleCatalogClient : IDisposable
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
             {
                 // Not cached: a later lookup may succeed.
-                _logger.LogWarning("Apple catalog lookup failed for {Term}: {Message}", DownloadService.SanitizeForLog(term), ex.Message);
+                _logger.LogWarning("Apple catalog lookup failed for {Term}: {Message}", FormatUtilities.SanitizeForLog(term), ex.Message);
             }
             finally
             {

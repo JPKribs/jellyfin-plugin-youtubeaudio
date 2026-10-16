@@ -5,6 +5,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Jellyfin.Plugin.YouTubeAudio.Models;
+using JPKribs.Jellyfin.Base;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
@@ -18,6 +19,9 @@ namespace Jellyfin.Plugin.YouTubeAudio.Services;
 public sealed class QueueDatabase : IDisposable
 {
     private const int SchemaVersion = 5;
+
+    // Every migration so far only adds columns and tables, so any version can read what this one writes.
+    private const int MinReaderSchemaVersion = 1;
 
     // Playlist targets: one-time playlist imports in progress, filling a user's Jellyfin playlist
     // as songs reach the library. A target is deleted once nothing is left pending; re-importing
@@ -646,17 +650,25 @@ public sealed class QueueDatabase : IDisposable
             _connection.Open();
             ApplyConnectionPragmas();
 
-            var currentVersion = GetSchemaVersion();
+            var action = DatabaseSchema.Open(
+                _connection,
+                SchemaVersion,
+                MinReaderSchemaVersion,
+                _ => CreateSchema(),
+                (_, fromVersion) =>
+                {
+                    MigrateSchema(fromVersion);
+                    return true;
+                });
 
-            if (currentVersion == 0)
+            if (action is SchemaAction.TooNew or SchemaAction.MigrationFailed)
             {
-                CreateSchema();
-                SetSchemaVersion(SchemaVersion);
-            }
-            else if (currentVersion < SchemaVersion)
-            {
-                MigrateSchema(currentVersion);
-                SetSchemaVersion(SchemaVersion);
+                // A newer build wrote a database this one cannot read, or it could not be migrated. Keep it
+                // as a backup and start fresh.
+                _logger.LogWarning("Queue database at {DbPath} cannot be used by this version ({Action}), starting a new one", _dbPath, action);
+                CloseConnection();
+                DatabaseSchema.SetAside(_dbPath, action == SchemaAction.TooNew ? "newer" : "failed", 3, _logger);
+                OpenFreshDatabase();
             }
 
             ResetStaleDownloadingItems();
@@ -766,26 +778,26 @@ public sealed class QueueDatabase : IDisposable
         }
     }
 
-    private int GetSchemaVersion()
-    {
-        using var cmd = _connection!.CreateCommand();
-        cmd.CommandText = "PRAGMA user_version";
-        var result = cmd.ExecuteScalar();
-        return Convert.ToInt32(result, CultureInfo.InvariantCulture);
-    }
-
-    private void SetSchemaVersion(int version)
-    {
-        using var cmd = _connection!.CreateCommand();
-        cmd.CommandText = $"PRAGMA user_version = {version}";
-        cmd.ExecuteNonQuery();
-    }
-
-    private void RecreateDatabase()
+    private void CloseConnection()
     {
         _connection?.Close();
         _connection?.Dispose();
         _connection = null;
+    }
+
+    private void OpenFreshDatabase()
+    {
+        _connection = new SqliteConnection(BuildConnectionString());
+        _connection.Open();
+        ApplyConnectionPragmas();
+
+        CreateSchema();
+        DatabaseSchema.Stamp(_connection, SchemaVersion, MinReaderSchemaVersion);
+    }
+
+    private void RecreateDatabase()
+    {
+        CloseConnection();
 
         // Delete database and journal files
         if (File.Exists(_dbPath))
@@ -806,12 +818,7 @@ public sealed class QueueDatabase : IDisposable
         }
 
         // Reinitialize
-        _connection = new SqliteConnection(BuildConnectionString());
-        _connection.Open();
-        ApplyConnectionPragmas();
-
-        CreateSchema();
-        SetSchemaVersion(SchemaVersion);
+        OpenFreshDatabase();
 
         _logger.LogInformation("Queue database recreated successfully");
     }

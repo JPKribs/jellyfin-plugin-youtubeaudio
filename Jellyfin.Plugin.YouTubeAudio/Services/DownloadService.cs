@@ -15,6 +15,7 @@ using Jellyfin.Plugin.YouTubeAudio.Configuration;
 using Jellyfin.Plugin.YouTubeAudio.Models;
 using Jellyfin.Plugin.YouTubeAudio.Services.Catalog;
 using Jellyfin.Plugin.YouTubeAudio.Services.Playlists;
+using JPKribs.Jellyfin.Base;
 using MediaBrowser.Controller.MediaEncoding;
 using Microsoft.Extensions.Logging;
 using YoutubeDLSharp;
@@ -168,7 +169,7 @@ public sealed partial class DownloadService : IDisposable
                         createdItems.Add(item);
                     }
 
-                    _logger.LogInformation("Queued {Count} items from playlist {Url}", createdItems.Count, SanitizeForLog(url));
+                    _logger.LogInformation("Queued {Count} items from playlist {Url}", createdItems.Count, FormatUtilities.SanitizeForLog(url));
                 }
                 else
                 {
@@ -376,25 +377,25 @@ public sealed partial class DownloadService : IDisposable
                         await ApplyCatalogMetadataAsync(item, outputPath, cancellationToken).ConfigureAwait(false);
 
                         db.UpdateStatus(item.Id, QueueStatus.Downloaded);
-                        _logger.LogInformation("Downloaded {Url} as {FileName}", SanitizeForLog(item.Url), item.FileName);
+                        _logger.LogInformation("Downloaded {Url} as {FileName}", FormatUtilities.SanitizeForLog(item.Url), item.FileName);
                     }
                     else
                     {
                         var errors = string.Join("; ", runResult.ErrorOutput ?? Array.Empty<string>());
                         db.UpdateStatus(item.Id, QueueStatus.Error, "Download failed: " + errors);
-                        _logger.LogWarning("Download failed for {Url}: {Errors}", SanitizeForLog(item.Url), errors);
+                        _logger.LogWarning("Download failed for {Url}: {Errors}", FormatUtilities.SanitizeForLog(item.Url), errors);
                     }
                 }
                 catch (OperationCanceledException)
                 {
                     db.UpdateStatus(item.Id, QueueStatus.Queued); // Reset to queued so it can be retried
-                    _logger.LogInformation("Download cancelled for {Url}", SanitizeForLog(item.Url));
+                    _logger.LogInformation("Download cancelled for {Url}", FormatUtilities.SanitizeForLog(item.Url));
                     break;
                 }
                 catch (Exception ex)
                 {
                     db.UpdateStatus(item.Id, QueueStatus.Error, ex.Message);
-                    _logger.LogError(ex, "Error downloading {Url}", SanitizeForLog(item.Url));
+                    _logger.LogError(ex, "Error downloading {Url}", FormatUtilities.SanitizeForLog(item.Url));
                 }
             }
         }
@@ -472,7 +473,7 @@ public sealed partial class DownloadService : IDisposable
             SourceTrack = track
         };
         _dbProvider.Database.AddItem(item);
-        _logger.LogInformation("Queued {Url} to replace {Path}", SanitizeForLog(url), path);
+        _logger.LogInformation("Queued {Url} to replace {Path}", FormatUtilities.SanitizeForLog(url), path);
         return item.ToDto();
     }
 
@@ -509,7 +510,7 @@ public sealed partial class DownloadService : IDisposable
 
         db.UpdateResolvedUrl(item.Id, url, null);
         db.UpdateStatus(item.Id, QueueStatus.Queued);
-        _logger.LogInformation("Changed the YouTube link of {Id} to {Url}", id, SanitizeForLog(url));
+        _logger.LogInformation("Changed the YouTube link of {Id} to {Url}", id, FormatUtilities.SanitizeForLog(url));
 
         return db.GetItemById(id)!.ToDto();
     }
@@ -559,14 +560,14 @@ public sealed partial class DownloadService : IDisposable
         {
             var errors = string.Join("; ", search.ErrorOutput ?? Array.Empty<string>());
             db.UpdateStatus(item.Id, QueueStatus.Error, "YouTube search failed: " + errors);
-            _logger.LogWarning("YouTube search failed for {Query}: {Errors}", SanitizeForLog(query), errors);
+            _logger.LogWarning("YouTube search failed for {Query}: {Errors}", FormatUtilities.SanitizeForLog(query), errors);
             return false;
         }
 
         if (match == null)
         {
             db.UpdateStatus(item.Id, QueueStatus.Error, $"No matching YouTube upload found for \"{query}\".");
-            _logger.LogInformation("No YouTube match for {Query}", SanitizeForLog(query));
+            _logger.LogInformation("No YouTube match for {Query}", FormatUtilities.SanitizeForLog(query));
             return false;
         }
 
@@ -584,7 +585,7 @@ public sealed partial class DownloadService : IDisposable
         _dbProvider.Database.UpdateResolvedUrl(item.Id, url, note);
         item.Url = url;
         item.MatchNote = note;
-        _logger.LogInformation("Matched {Query} to {Url} ({Title})", SanitizeForLog(query), url, SanitizeForLog(match.Candidate.Title));
+        _logger.LogInformation("Matched {Query} to {Url} ({Title})", FormatUtilities.SanitizeForLog(query), url, FormatUtilities.SanitizeForLog(match.Candidate.Title));
     }
 
     /// <summary>
@@ -659,7 +660,7 @@ public sealed partial class DownloadService : IDisposable
         var match = YouTubeMatcher.PickBest(track, candidates);
         if (match != null)
         {
-            _logger.LogInformation("Found {Title} through YouTube Music", SanitizeForLog(track.Title));
+            _logger.LogInformation("Found {Title} through YouTube Music", FormatUtilities.SanitizeForLog(track.Title));
         }
 
         return match;
@@ -680,7 +681,7 @@ public sealed partial class DownloadService : IDisposable
                 break;
             }
 
-            _logger.LogInformation("Retrying {What} in {Seconds}s after a transient failure", SanitizeForLog(what), delay.TotalSeconds);
+            _logger.LogInformation("Retrying {What} in {Seconds}s after a transient failure", FormatUtilities.SanitizeForLog(what), delay.TotalSeconds);
             await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
             result = await run().ConfigureAwait(false);
         }
@@ -1045,7 +1046,7 @@ public sealed partial class DownloadService : IDisposable
         using var tagFile = TagLib.File.Create(file.Path);
         tagFile.Tag.Pictures = new TagLib.IPicture[] { CreateCover(cover, "image/jpeg") };
         tagFile.Save();
-        _logger.LogInformation("Cover of library album {Album} set for queue item {Id}", SanitizeForLog(album), id);
+        _logger.LogInformation("Cover of library album {Album} set for queue item {Id}", FormatUtilities.SanitizeForLog(album), id);
         return true;
     }
 
@@ -1067,7 +1068,7 @@ public sealed partial class DownloadService : IDisposable
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
         {
-            _logger.LogWarning("Could not download the cover {Url}: {Message}", SanitizeForLog(url), ex.Message);
+            _logger.LogWarning("Could not download the cover {Url}: {Message}", FormatUtilities.SanitizeForLog(url), ex.Message);
             return null;
         }
     }
@@ -1268,7 +1269,7 @@ public sealed partial class DownloadService : IDisposable
             var song = await _catalog.FindSongAsync(artist, title, duration, cancellationToken).ConfigureAwait(false);
             if (song == null)
             {
-                _logger.LogInformation("No Apple Music match for {Artist} - {Title}", SanitizeForLog(artist), SanitizeForLog(title));
+                _logger.LogInformation("No Apple Music match for {Artist} - {Title}", FormatUtilities.SanitizeForLog(artist), FormatUtilities.SanitizeForLog(title));
                 if (await EmbedYouTubeMusicCoverAsync(tag, info, cancellationToken).ConfigureAwait(false))
                 {
                     tagFile.Save();
@@ -1336,7 +1337,7 @@ public sealed partial class DownloadService : IDisposable
 
             await EmbedYouTubeMusicCoverAsync(tag, info, cancellationToken).ConfigureAwait(false);
             tagFile.Save();
-            _logger.LogInformation("Matched {Artist} - {Title} to {Album} ({Year}) on Apple Music", SanitizeForLog(artist), SanitizeForLog(title), SanitizeForLog(song.AlbumName), song.Year);
+            _logger.LogInformation("Matched {Artist} - {Title} to {Album} ({Year}) on Apple Music", FormatUtilities.SanitizeForLog(artist), FormatUtilities.SanitizeForLog(title), FormatUtilities.SanitizeForLog(song.AlbumName), song.Year);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -2813,17 +2814,6 @@ public sealed partial class DownloadService : IDisposable
         sanitized = sanitized.Trim('.', ' ', '-');
 
         return string.IsNullOrEmpty(sanitized) ? "Unknown" : sanitized;
-    }
-
-    internal static string SanitizeForLog(string? input)
-    {
-        if (string.IsNullOrEmpty(input))
-        {
-            return "[empty]";
-        }
-
-        var sanitized = new string(input.Where(c => !char.IsControl(c)).ToArray());
-        return sanitized.Length > 200 ? string.Concat(sanitized.AsSpan(0, 200), "...") : sanitized;
     }
 }
 

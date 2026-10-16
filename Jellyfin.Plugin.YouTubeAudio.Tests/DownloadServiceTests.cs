@@ -144,22 +144,4 @@ public class DownloadServiceTests
     [InlineData("  ", null)]
     public void ChannelToArtist_StripsTopicAndVevo(string channel, string? expected)
         => Assert.Equal(expected, DownloadService.ChannelToArtist(channel));
-
-    // MARK: Log sanitizing
-
-    [Fact]
-    public void SanitizeForLog_StripsControlChars()
-        => Assert.Equal("abc", DownloadService.SanitizeForLog("a\nb\tc"));
-
-    [Fact]
-    public void SanitizeForLog_NullOrEmpty_ReturnsPlaceholder()
-        => Assert.Equal("[empty]", DownloadService.SanitizeForLog(null));
-
-    [Fact]
-    public void SanitizeForLog_Truncates_LongInput()
-    {
-        var result = DownloadService.SanitizeForLog(new string('x', 500));
-        Assert.EndsWith("...", result);
-        Assert.Equal(203, result.Length); // 200 chars + "..."
-    }
 }

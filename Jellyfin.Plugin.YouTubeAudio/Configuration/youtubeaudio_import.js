@@ -1,12 +1,9 @@
+import { createPage } from './configurationpage?name=youtubeaudio_shared.js';
+
 export default function (view) {
     'use strict';
 
-    var getTabs;
     var Shared = null;
-    var _sharedPromise = import('/web/configurationpage?name=youtubeaudio_shared.js').then(function(mod) {
-        getTabs = mod.getTabs;
-        Shared = mod.createShared(view);
-    });
 
     var _downloads = [];
     var _artistSearch = null;
@@ -34,21 +31,19 @@ export default function (view) {
         var refreshBtn = view.querySelector('#btnRefreshDownloads');
         if (refreshBtn) refreshBtn.classList.add('spinning');
 
-        _sharedPromise.then(function() {
-            if (!_artistSearch) _artistSearch = Shared.createDebouncedSearch('Artists', 300);
+        if (!_artistSearch) _artistSearch = Shared.createDebouncedSearch('Artists', 300);
 
-            Shared.apiRequest('Downloads', 'GET')
-                .then(function(response) {
-                    _downloads = (response && response.Items) || response || [];
-                    renderImportList();
-                    if (refreshBtn) refreshBtn.classList.remove('spinning');
-                })
-                .catch(function() {
-                    _downloads = [];
-                    renderImportList();
-                    if (refreshBtn) refreshBtn.classList.remove('spinning');
-                });
-        });
+        Shared.apiRequest('Downloads', 'GET')
+            .then(function(response) {
+                _downloads = (response && response.Items) || response || [];
+                renderImportList();
+                if (refreshBtn) refreshBtn.classList.remove('spinning');
+            })
+            .catch(function() {
+                _downloads = [];
+                renderImportList();
+                if (refreshBtn) refreshBtn.classList.remove('spinning');
+            });
     }
 
     // ============================================
@@ -793,43 +788,45 @@ export default function (view) {
             return;
         }
 
-        if (!confirm('Delete ' + selectedIds.length + ' downloaded file(s)? This cannot be undone.')) return;
+        Shared.confirmDialog('Delete ' + selectedIds.length + ' downloaded file(s)? This cannot be undone.', { destructive: true }).then(function(ok) {
+            if (!ok) return;
 
-        Shared.setStatus('importStatus', 'Deleting ' + selectedIds.length + ' file(s)...', false);
+            Shared.setStatus('importStatus', 'Deleting ' + selectedIds.length + ' file(s)...', false);
 
-        Shared.apiRequest('Downloads/BatchDelete', 'POST', { Ids: selectedIds })
-            .then(function(result) {
-                var deleted = result && result.Deleted || 0;
-                var errCount = result && result.Errors || 0;
-                var msg = 'Deleted ' + deleted + ' file(s).';
-                if (errCount > 0) msg += ' ' + errCount + ' error(s).';
-                Shared.setStatus('importStatus', msg, errCount > 0);
-                loadDownloads();
-            })
-            .catch(function() {
-                Shared.setStatus('importStatus', 'Failed to delete files.', true);
-                loadDownloads();
-            });
+            Shared.apiRequest('Downloads/BatchDelete', 'POST', { Ids: selectedIds })
+                .then(function(result) {
+                    var deleted = result && result.Deleted || 0;
+                    var errCount = result && result.Errors || 0;
+                    var msg = 'Deleted ' + deleted + ' file(s).';
+                    if (errCount > 0) msg += ' ' + errCount + ' error(s).';
+                    Shared.setStatus('importStatus', msg, errCount > 0);
+                    loadDownloads();
+                })
+                .catch(function() {
+                    Shared.setStatus('importStatus', 'Failed to delete files.', true);
+                    loadDownloads();
+                });
+        });
     }
 
     // ============================================
     // EVENT LISTENERS
     // ============================================
 
-    view.addEventListener('viewshow', function() {
-        _sharedPromise.then(function() {
-            LibraryMenu.setTabs('youtubeaudio', 1, getTabs);
-            loadDownloads();
-            Shared.getConfig().then(function(config) { _coverSettings = config; }).catch(function() { /* defaults apply */ });
-        });
-    });
+    // loadPage
+    // Reloads the downloads and the cover settings each time the page shows.
+    //
+    // No parameters
+    function loadPage() {
+        loadDownloads();
+        Shared.getConfig().then(function(config) { _coverSettings = config; }).catch(function() { /* defaults apply */ });
+    }
 
-    view.addEventListener('viewhide', function() {
-        destroyActiveComboBoxes();
-        stopPreview();
-    });
-
-    _sharedPromise.then(function() {
+    // bindEvents
+    // Wires the bulk editor and the page's controls once, on the first viewshow.
+    //
+    // No parameters
+    function bindEvents() {
         // Initialize bulk artist combo-box
         if (!_artistSearch) _artistSearch = Shared.createDebouncedSearch('Artists', 300);
         var bulkArtistCell = view.querySelector('#bulkArtistCell');
@@ -887,5 +884,16 @@ export default function (view) {
                 updateSelectedCount();
             });
         }
+    }
+
+    var page = createPage(view, {
+        tabIndex: 1,
+        bind: bindEvents,
+        load: loadPage,
+        onHide: function() {
+            destroyActiveComboBoxes();
+            stopPreview();
+        }
     });
+    Shared = page.shared;
 }

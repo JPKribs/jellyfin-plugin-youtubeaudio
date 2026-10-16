@@ -90,6 +90,86 @@ public sealed class QueueDatabaseTests : IDisposable
         Assert.Equal("applemusic", db.GetItemById(item.Id)!.Source);
     }
 
+    private string DbPath => Path.Combine(_dataPath, "youtubeaudio", "queue.db");
+
+    private static long Scalar(string dbPath, string sql)
+    {
+        using var conn = new SqliteConnection($"Data Source={dbPath};Pooling=False");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = sql;
+        return Convert.ToInt64(cmd.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private static void Execute(string dbPath, string sql)
+    {
+        using var conn = new SqliteConnection($"Data Source={dbPath};Pooling=False");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = sql;
+        cmd.ExecuteNonQuery();
+    }
+
+    [Fact]
+    public void ExistingV5Database_KeepsRowsAndVersion()
+    {
+        var item = NewItem();
+        using (var db = Open())
+        {
+            db.AddItem(item);
+        }
+
+        // Make it look like a database from a build before the reader marker.
+        Execute(DbPath, "DROP TABLE SchemaInfo");
+
+        using (var db = Open())
+        {
+            Assert.NotNull(db.GetItemById(item.Id));
+        }
+
+        Assert.Equal(5, Scalar(DbPath, "PRAGMA user_version"));
+        Assert.Equal(1, Scalar(DbPath, "SELECT Value FROM SchemaInfo WHERE Key = 'MinReaderVersion'"));
+    }
+
+    [Fact]
+    public void NewerReadableDatabase_IsUsedUntouched()
+    {
+        var item = NewItem();
+        using (var db = Open())
+        {
+            db.AddItem(item);
+        }
+
+        Execute(DbPath, "PRAGMA user_version = 9; UPDATE SchemaInfo SET Value = 4");
+
+        using (var db = Open())
+        {
+            Assert.NotNull(db.GetItemById(item.Id));
+        }
+
+        Assert.Equal(9, Scalar(DbPath, "PRAGMA user_version"));
+    }
+
+    [Fact]
+    public void NewerUnreadableDatabase_IsSetAsideAndReplaced()
+    {
+        var item = NewItem();
+        using (var db = Open())
+        {
+            db.AddItem(item);
+        }
+
+        Execute(DbPath, "PRAGMA user_version = 9; UPDATE SchemaInfo SET Value = 8");
+
+        using (var db = Open())
+        {
+            Assert.Null(db.GetItemById(item.Id));
+        }
+
+        Assert.Equal(5, Scalar(DbPath, "PRAGMA user_version"));
+        Assert.Single(Directory.GetFiles(Path.GetDirectoryName(DbPath)!, "queue.db.newer-*"), f => !f.EndsWith("-wal", StringComparison.Ordinal) && !f.EndsWith("-shm", StringComparison.Ordinal));
+    }
+
     // MARK: Playlist targets
 
     private static PlaylistEntry Entry(string key, string title, int position = 0) => new() { SongKey = key, Title = title, Position = position };

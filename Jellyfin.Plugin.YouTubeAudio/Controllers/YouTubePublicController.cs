@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Data;
@@ -33,11 +32,6 @@ public class YouTubePublicController : ControllerBase
 
     private static string? _pageHtml;
     private static string? _queuePageHtml;
-
-    private static readonly object _faviconLock = new();
-    private static bool _faviconResolved;
-    private static byte[]? _faviconBytes;
-    private static string _faviconContentType = "image/x-icon";
 
     private readonly DownloadService _downloadService;
     private readonly LibraryService _libraryService;
@@ -79,16 +73,14 @@ public class YouTubePublicController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ContentResult Page()
     {
-        ApplyHardeningHeaders();
-        var html = TemplateLoader.Fill("status", new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["TITLE"] = "Download",
-            ["HEADING"] = "Loading…",
-            ["MESSAGE"] = string.Empty,
-            ["SPINNER"] = "<div class=\"jpk-spinner\" role=\"status\" aria-label=\"Loading\"></div>",
-            ["BUTTON"] = string.Empty,
-            ["CONTENT"] = GetContentFragment()
-        });
+        PublicPage.ApplyHardeningHeaders(Response);
+        var html = StatusPage.Render(
+            "Loading…",
+            string.Empty,
+            title: "Download",
+            buttonText: null,
+            showSpinner: true,
+            content: GetContentFragment());
         return Content(html, "text/html");
     }
 
@@ -100,16 +92,14 @@ public class YouTubePublicController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ContentResult QueuePage()
     {
-        ApplyHardeningHeaders();
-        var html = TemplateLoader.Fill("status", new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["TITLE"] = "Queue",
-            ["HEADING"] = "Loading…",
-            ["MESSAGE"] = string.Empty,
-            ["SPINNER"] = "<div class=\"jpk-spinner\" role=\"status\" aria-label=\"Loading\"></div>",
-            ["BUTTON"] = string.Empty,
-            ["CONTENT"] = _queuePageHtml ??= ReadResource("youtubeaudio_queue_public.html", "Queue page unavailable.")
-        });
+        PublicPage.ApplyHardeningHeaders(Response);
+        var html = StatusPage.Render(
+            "Loading…",
+            string.Empty,
+            title: "Queue",
+            buttonText: null,
+            showSpinner: true,
+            content: _queuePageHtml ??= ReadResource("youtubeaudio_queue_public.html", "Queue page unavailable."));
         return Content(html, "text/html");
     }
 
@@ -123,7 +113,7 @@ public class YouTubePublicController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult<List<PublicQueueItem>> QueueItems()
     {
-        ApplyHardeningHeaders();
+        PublicPage.ApplyHardeningHeaders(Response);
         var sourceNames = _playlistImportService.GetSources().ToDictionary(s => s.Id, s => s.Name, StringComparer.Ordinal);
         return Ok(_downloadService.GetPublicQueue(sourceNames));
     }
@@ -134,17 +124,7 @@ public class YouTubePublicController : ControllerBase
     [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public ActionResult Favicon()
-    {
-        var favicon = GetFavicon();
-        if (favicon is null)
-        {
-            return NotFound();
-        }
-
-        Response.Headers["Cache-Control"] = "public, max-age=86400";
-        return File(favicon.Value.Bytes, favicon.Value.ContentType);
-    }
+    public IActionResult Favicon() => PublicPage.Favicon(_paths, Response);
 
     /// <summary>Reports whether the signed-in user may submit downloads.</summary>
     /// <returns>An object with an Approved flag.</returns>
@@ -153,7 +133,7 @@ public class YouTubePublicController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult Info()
     {
-        ApplyHardeningHeaders();
+        PublicPage.ApplyHardeningHeaders(Response);
         return Ok(new { Approved = IsAllowed() });
     }
 
@@ -166,7 +146,7 @@ public class YouTubePublicController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult> Submit([FromBody] SubmitRequest request, CancellationToken cancellationToken)
     {
-        ApplyHardeningHeaders();
+        PublicPage.ApplyHardeningHeaders(Response);
 
         if (!IsAllowed())
         {
@@ -216,7 +196,7 @@ public class YouTubePublicController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult<List<string>> Artists([FromQuery] string query)
     {
-        ApplyHardeningHeaders();
+        PublicPage.ApplyHardeningHeaders(Response);
         if (!IsAllowed())
         {
             return StatusCode(StatusCodes.Status403Forbidden);
@@ -234,7 +214,7 @@ public class YouTubePublicController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult<List<string>> Albums([FromQuery] string query, [FromQuery] string? artist = null)
     {
-        ApplyHardeningHeaders();
+        PublicPage.ApplyHardeningHeaders(Response);
         if (!IsAllowed())
         {
             return StatusCode(StatusCodes.Status403Forbidden);
@@ -270,13 +250,6 @@ public class YouTubePublicController : ControllerBase
     private static string NormalizeId(string id)
         => Guid.TryParse(id, out var g) ? g.ToString("N") : id;
 
-    private void ApplyHardeningHeaders()
-    {
-        Response.Headers["Referrer-Policy"] = "no-referrer";
-        Response.Headers["Cache-Control"] = "no-store";
-        Response.Headers["X-Robots-Tag"] = "noindex, nofollow";
-    }
-
     private static string GetContentFragment()
         => _pageHtml ??= ReadResource("youtubeaudio_download_public.html", "Download page unavailable.");
 
@@ -292,70 +265,5 @@ public class YouTubePublicController : ControllerBase
 
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
-    }
-
-    private (byte[] Bytes, string ContentType)? GetFavicon()
-    {
-        lock (_faviconLock)
-        {
-            if (!_faviconResolved)
-            {
-                ResolveFavicon();
-                _faviconResolved = true;
-            }
-        }
-
-        return _faviconBytes is null ? null : (_faviconBytes, _faviconContentType);
-    }
-
-    private void ResolveFavicon()
-    {
-        try
-        {
-            var web = _paths.WebPath;
-            if (string.IsNullOrEmpty(web) || !Directory.Exists(web))
-            {
-                return;
-            }
-
-            var root = Path.GetFullPath(web);
-            var rootPrefix = root.EndsWith(Path.DirectorySeparatorChar) ? root : root + Path.DirectorySeparatorChar;
-            string? file = null;
-
-            var indexPath = Path.Combine(root, "index.html");
-            if (System.IO.File.Exists(indexPath))
-            {
-                var match = Regex.Match(
-                    System.IO.File.ReadAllText(indexPath),
-                    "rel=\"(?:shortcut )?icon\"[^>]*href=\"([^\"]+)\"",
-                    RegexOptions.IgnoreCase);
-                if (match.Success)
-                {
-                    var href = match.Groups[1].Value.Replace('/', Path.DirectorySeparatorChar).TrimStart(Path.DirectorySeparatorChar);
-                    var candidate = Path.GetFullPath(Path.Combine(root, href));
-                    if (candidate.StartsWith(rootPrefix, StringComparison.Ordinal) && System.IO.File.Exists(candidate))
-                    {
-                        file = candidate;
-                    }
-                }
-            }
-
-            file ??= Directory.EnumerateFiles(root, "favicon*.ico").FirstOrDefault();
-            if (file is null)
-            {
-                return;
-            }
-
-            _faviconBytes = System.IO.File.ReadAllBytes(file);
-            _faviconContentType = file.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ? "image/png" : "image/x-icon";
-        }
-        catch (IOException)
-        {
-            // Leave the favicon unresolved; the endpoint returns 404 and the browser falls back.
-        }
-        catch (UnauthorizedAccessException)
-        {
-            // Leave the favicon unresolved; the endpoint returns 404 and the browser falls back.
-        }
     }
 }

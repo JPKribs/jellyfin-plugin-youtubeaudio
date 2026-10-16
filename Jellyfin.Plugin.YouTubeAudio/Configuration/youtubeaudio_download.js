@@ -1,18 +1,15 @@
+import { createPage } from './configurationpage?name=youtubeaudio_shared.js';
+
 export default function (view) {
     'use strict';
 
-    var getTabs;
     var Shared = null;
-    var _sharedPromise = import('/web/configurationpage?name=youtubeaudio_shared.js').then(function(mod) {
-        getTabs = mod.getTabs;
-        Shared = mod.createShared(view);
-    });
 
     var _allItems = [];
     var _sourceNames = { replace: 'Replacement' };
     var _pendingUpload = null;
     var _ownerSelector = null;
-    var _pollInterval = null;
+    var _poller = null;
     var _processingGraceUntil = 0;
     var _replaceSongId = null;
     var _replaceSearch = 0;
@@ -25,19 +22,17 @@ export default function (view) {
         var refreshBtn = view.querySelector('#btnRefreshQueue');
         if (refreshBtn) refreshBtn.classList.add('spinning');
 
-        _sharedPromise.then(function() {
-            Shared.apiRequest('Queue', 'GET')
-                .then(function(response) {
-                    _allItems = (response && response.Items) || response || [];
-                    renderQueue();
-                    if (refreshBtn) refreshBtn.classList.remove('spinning');
-                })
-                .catch(function() {
-                    _allItems = [];
-                    renderQueue();
-                    if (refreshBtn) refreshBtn.classList.remove('spinning');
-                });
-        });
+        return Shared.apiRequest('Queue', 'GET')
+            .then(function(response) {
+                _allItems = (response && response.Items) || response || [];
+                renderQueue();
+                if (refreshBtn) refreshBtn.classList.remove('spinning');
+            })
+            .catch(function() {
+                _allItems = [];
+                renderQueue();
+                if (refreshBtn) refreshBtn.classList.remove('spinning');
+            });
     }
 
     // ============================================
@@ -153,11 +148,9 @@ export default function (view) {
         // shows as Downloading.
         var shouldPoll = _allItems.some(function(i) { return i.StatusCode === 1; })
             || Date.now() < _processingGraceUntil;
-        if (shouldPoll && !_pollInterval) {
-            _pollInterval = setInterval(loadQueue, 3000);
-        } else if (!shouldPoll && _pollInterval) {
-            clearInterval(_pollInterval);
-            _pollInterval = null;
+        if (_poller) {
+            if (shouldPoll) _poller.start(false);
+            else _poller.stop();
         }
     }
 
@@ -324,23 +317,25 @@ export default function (view) {
             return;
         }
 
-        if (!confirm('Remove ' + selectedIds.length + ' item(s) from the queue? This cannot be undone.')) return;
+        Shared.confirmDialog('Remove ' + selectedIds.length + ' item(s) from the queue? This cannot be undone.', { destructive: true }).then(function(ok) {
+            if (!ok) return;
 
-        Shared.setStatus('queueStatus', 'Deleting ' + selectedIds.length + ' item(s)...', false);
+            Shared.setStatus('queueStatus', 'Deleting ' + selectedIds.length + ' item(s)...', false);
 
-        Shared.apiRequest('Queue/BatchDelete', 'POST', { Ids: selectedIds })
-            .then(function(result) {
-                var deleted = result && result.Deleted || 0;
-                var errors = result && result.Errors || 0;
-                var msg = 'Removed ' + deleted + ' item(s).';
-                if (errors > 0) msg += ' ' + errors + ' error(s).';
-                Shared.setStatus('queueStatus', msg, errors > 0);
-                loadQueue();
-            })
-            .catch(function() {
-                Shared.setStatus('queueStatus', 'Failed to delete items.', true);
-                loadQueue();
-            });
+            Shared.apiRequest('Queue/BatchDelete', 'POST', { Ids: selectedIds })
+                .then(function(result) {
+                    var deleted = result && result.Deleted || 0;
+                    var errors = result && result.Errors || 0;
+                    var msg = 'Removed ' + deleted + ' item(s).';
+                    if (errors > 0) msg += ' ' + errors + ' error(s).';
+                    Shared.setStatus('queueStatus', msg, errors > 0);
+                    loadQueue();
+                })
+                .catch(function() {
+                    Shared.setStatus('queueStatus', 'Failed to delete items.', true);
+                    loadQueue();
+                });
+        });
     }
 
     // ============================================
@@ -633,9 +628,11 @@ export default function (view) {
 
                 body.querySelectorAll('.yta-playlist-forget').forEach(function(btn) {
                     btn.addEventListener('click', function() {
-                        if (!confirm('Stop adding songs to this playlist? The Jellyfin playlist and its songs are kept.')) return;
-                        Shared.apiRequest('Playlists/' + encodeURIComponent(btn.getAttribute('data-id')), 'DELETE')
-                            .then(loadPlaylistTargets);
+                        Shared.confirmDialog('Stop adding songs to this playlist? The Jellyfin playlist and its songs are kept.').then(function(ok) {
+                            if (!ok) return;
+                            Shared.apiRequest('Playlists/' + encodeURIComponent(btn.getAttribute('data-id')), 'DELETE')
+                                .then(loadPlaylistTargets);
+                        });
                     });
                 });
             })
@@ -691,14 +688,18 @@ export default function (view) {
     // EVENT LISTENERS
     // ============================================
 
-    view.addEventListener('viewshow', function() {
-        _sharedPromise.then(function() {
-            LibraryMenu.setTabs('youtubeaudio', 0, getTabs);
-            loadQueue();
-            loadPlaylistSources();
-            loadPlaylistTargets();
-        });
-    });
+    // loadPage
+    // Reloads the queue and playlist progress each time the page shows, with a fresh poller that the
+    // page stops on viewhide.
+    //
+    // Param: shared | the page's helper bag
+    // Param: page   | the page handle
+    function loadPage(shared, page) {
+        _poller = page.createPoller(loadQueue, 3000);
+        loadQueue();
+        loadPlaylistSources();
+        loadPlaylistTargets();
+    }
 
     // bindSourceTabs
     // Shows the form for the chosen source card (YouTube, Apple Music) and remembers the last
@@ -728,14 +729,11 @@ export default function (view) {
         show(initial);
     }
 
-    view.addEventListener('viewhide', function() {
-        if (_pollInterval) {
-            clearInterval(_pollInterval);
-            _pollInterval = null;
-        }
-    });
-
-    _sharedPromise.then(function() {
+    // bindEvents
+    // Wires the page's controls once, on the first viewshow.
+    //
+    // No parameters
+    function bindEvents() {
         bindSourceTabs();
 
         var btnQueue = Shared.getEl('btnQueue');
@@ -752,11 +750,7 @@ export default function (view) {
 
         var replaceSearch = Shared.getEl('txtReplaceSearch');
         if (replaceSearch) {
-            var replaceTimeout = null;
-            replaceSearch.addEventListener('input', function() {
-                if (replaceTimeout) clearTimeout(replaceTimeout);
-                replaceTimeout = setTimeout(searchReplaceSongs, 250);
-            });
+            replaceSearch.addEventListener('input', Shared.debounce(searchReplaceSongs, 250));
             replaceSearch.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') e.preventDefault();
             });
@@ -818,16 +812,21 @@ export default function (view) {
         // Search and filter handlers
         var searchInput = view.querySelector('#queueSearch');
         if (searchInput) {
-            var searchTimeout = null;
-            searchInput.addEventListener('input', function() {
-                if (searchTimeout) clearTimeout(searchTimeout);
-                searchTimeout = setTimeout(renderQueue, 200);
-            });
+            searchInput.addEventListener('input', Shared.debounce(renderQueue, 200));
         }
 
         var filterSelect = view.querySelector('#queueFilter');
         if (filterSelect) {
             filterSelect.addEventListener('change', renderQueue);
         }
+    }
+
+    var page = createPage(view, {
+        tabIndex: 0,
+        bind: bindEvents,
+        load: loadPage,
+        // The page's poller is already stopped; drop it so a late response does not start it again.
+        onHide: function() { _poller = null; }
     });
+    Shared = page.shared;
 }
