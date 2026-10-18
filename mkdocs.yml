@@ -1,0 +1,55 @@
+site_name: YouTube Audio
+site_description: A Jellyfin plugin to download audio tracks from YouTube URLs or playlists and import them into a Jellyfin music library.
+site_url: https://jpkribs.github.io/jellyfin-plugin-youtubeaudio/
+repo_url: https://github.com/JPKribs/jellyfin-plugin-youtubeaudio
+repo_name: JPKribs/jellyfin-plugin-youtubeaudio
+edit_uri: edit/master/docs/
+docs_dir: docs
+
+theme:
+  name: material
+  logo: assets/icon.png
+  favicon: assets/icon.png
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: light blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: light blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.highlight
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Overview: index.md
+  - Installation: Installation.md
+  - Getting Started:
+      - Settings: Settings.md
+      - Download: Download.md
+      - Import: Import.md
+      - Public Queue: PublicQueue.md
+      - Approved User Downloads: ApprovedUserDownloads.md
+  - Development:
+      - End-to-End Test: Testing.md
+  - Reference:
+      - Versioning: Versioning.md
