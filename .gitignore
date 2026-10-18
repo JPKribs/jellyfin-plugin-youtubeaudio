@@ -38,3 +38,9 @@ packages/
 # Docker end-to-end test scratch folder (test library, server config, throwaway logins)
 e2e/.work/
 __pycache__/
+
+# Local AI assistant files, never committed
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+.mcp.json
