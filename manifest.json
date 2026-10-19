@@ -9,6 +9,14 @@
     "category": "Music",
     "versions": [
       {
+        "version": "12.2.4.0",
+        "changelog": "\n## Developer\n- Still built for Jellyfin 12.2 (target ABI 12.2.0.0, unchanged).\n- Updated test dependencies (Microsoft.NET.Test.Sdk 18.11, NSubstitute 6.2, xunit 2.9.3, xunit.runner.visualstudio 4.0.1).\n- Microsoft.Data.Sqlite.Core is now compiled against 10.0.11, the version Jellyfin 12.2 ships. It is not bundled, so nothing changes at runtime.\n- No user-facing changes in this release; the plugin works the same as 12.2.3.4.",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/v12.2.4.0/jellyfin-plugin-youtubeaudio-12.2.4.0.zip",
+        "checksum": "c2b84b3784dc1f03adef5c5f126e9ea3",
+        "timestamp": "2026-10-19T23:14:34Z"
+      },
+      {
         "version": "12.2.3.4",
         "changelog": "\n## Security\n- yt-dlp and Deno downloads are checked against the SHA-256 checksums their releases publish, and a file that does not match is deleted instead of run.\n- YouTube links containing spaces, quotes or other characters that could add extra arguments to yt-dlp are refused, and only the cleaned-up link is passed to yt-dlp.\n- Approved users can queue at most 200 videos from one playlist link by default; change the limit under Settings > Approved Users.\n\n## Fixed\n- Importing a different song with the same title as one already on the album, such as a second \"Interlude\" with its own track number, no longer overwrites it; it is saved as \"Title (2)\".\n- Downloads can be cancelled from the Download tab, which also lets Update yt-dlp run without waiting for a large playlist to finish.\n- Failed and cancelled downloads no longer leave partial files in the cache, and leftovers are cleaned up when the server starts.\n- Reset Queue now deletes the cached files of the items it removes, and both resets stop running downloads first.\n- Deno is now kept up to date along with yt-dlp, on the same schedule and with the Update yt-dlp button.\n- Repairing a downloaded file with ffmpeg can no longer hang.\n- On Alpine and other musl-based systems the plugin downloads the musl build of yt-dlp, which runs there.\n- A yt-dlp or Deno copy that cannot start no longer makes every download fail; the update check logs it and carries on.\n- A damaged song in an album folder no longer stops other songs from being imported into it.\n\n## Developer\n- The publish workflow passes the release notes to the shell through environment variables.\n- The test project uses SQLitePCLRaw 2.1.13, which fixes a known SQLite vulnerability.\n- Updated JPKribs.Jellyfin.Base to 2026.10.19.",
         "targetAbi": "12.2.0.0",
