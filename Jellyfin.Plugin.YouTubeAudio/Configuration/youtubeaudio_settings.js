@@ -59,6 +59,7 @@ export default function (view) {
             Shared.getEl('txtYtDlpPath').value = config.YtDlpPath || '';
             var picker = ensureApprovedUsers();
             if (picker) picker.setValue(config.ApprovedUserIds || []);
+            Shared.getEl('txtMaxPublicPlaylistItems').value = typeof config.MaxPublicPlaylistItems === 'number' ? config.MaxPublicPlaylistItems : 200;
         });
     }
 
@@ -176,6 +177,8 @@ export default function (view) {
     function saveApprovedUsers() {
         Shared.getConfig().then(function(config) {
             config.ApprovedUserIds = _approvedUsers ? _approvedUsers.getValue() : [];
+            var limit = parseInt(Shared.getEl('txtMaxPublicPlaylistItems').value, 10);
+            if (!isNaN(limit) && limit >= 0) config.MaxPublicPlaylistItems = limit;
             Shared.saveConfig(config).then(function() {
                 Dashboard.alert('Approved users saved.');
             });
@@ -202,11 +205,11 @@ export default function (view) {
     // ============================================
 
     function resetQueue() {
-        Shared.confirmDialog('Clear the entire download queue? This cannot be undone.', { destructive: true }).then(function(ok) {
+        Shared.confirmDialog('Stop running downloads and clear the entire download queue, deleting its cached files? This cannot be undone.', { destructive: true }).then(function(ok) {
             if (!ok) return;
             Shared.apiRequest('ResetQueue', 'POST')
                 .then(function() { Shared.setStatus('resetStatus', 'Queue reset successfully.', false); })
-                .catch(function() { Shared.setStatus('resetStatus', 'Failed to reset queue.', true); });
+                .catch(function(err) { Shared.setStatus('resetStatus', (err && err.Error) || 'Failed to reset queue.', true); });
         });
     }
 
@@ -215,7 +218,7 @@ export default function (view) {
             if (!ok) return;
             Shared.apiRequest('ResetCache', 'POST')
                 .then(function() { Shared.setStatus('resetStatus', 'Cache reset successfully.', false); })
-                .catch(function() { Shared.setStatus('resetStatus', 'Failed to reset cache.', true); });
+                .catch(function(err) { Shared.setStatus('resetStatus', (err && err.Error) || 'Failed to reset cache.', true); });
         });
     }
 

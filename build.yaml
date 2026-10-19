@@ -1,7 +1,7 @@
 ---
 name: "YouTube Audio"
 guid: "7323ea64-a200-4265-ab8f-e7ae27d06c38"
-version: "12.2.3.3"
+version: "12.2.3.4"
 targetAbi: "12.2.0.0"
 framework: "net10.0"
 overview: "Download YouTube audio directly to a Jellyfin Music Library."
@@ -17,5 +17,21 @@ artifacts:
 - "YoutubeDLSharp.dll"
 - "TagLibSharp.dll"
 changelog:
+  security:
+  - yt-dlp and Deno downloads are checked against the SHA-256 checksums their releases publish, and a file that does not match is deleted instead of run.
+  - YouTube links containing spaces, quotes or other characters that could add extra arguments to yt-dlp are refused, and only the cleaned-up link is passed to yt-dlp.
+  - Approved users can queue at most 200 videos from one playlist link by default; change the limit under Settings > Approved Users.
+  fixed:
+  - Importing a different song with the same title as one already on the album, such as a second "Interlude" with its own track number, no longer overwrites it; it is saved as "Title (2)".
+  - Downloads can be cancelled from the Download tab, which also lets Update yt-dlp run without waiting for a large playlist to finish.
+  - Failed and cancelled downloads no longer leave partial files in the cache, and leftovers are cleaned up when the server starts.
+  - Reset Queue now deletes the cached files of the items it removes, and both resets stop running downloads first.
+  - Deno is now kept up to date along with yt-dlp, on the same schedule and with the Update yt-dlp button.
+  - Repairing a downloaded file with ffmpeg can no longer hang.
+  - On Alpine and other musl-based systems the plugin downloads the musl build of yt-dlp, which runs there.
+  - A yt-dlp or Deno copy that cannot start no longer makes every download fail; the update check logs it and carries on.
+  - A damaged song in an album folder no longer stops other songs from being imported into it.
   developer:
-  - Updated JPKribs.Jellyfin.Base to 2026.10.16.
+  - The publish workflow passes the release notes to the shell through environment variables.
+  - The test project uses SQLitePCLRaw 2.1.13, which fixes a known SQLite vulnerability.
+  - Updated JPKribs.Jellyfin.Base to 2026.10.19.

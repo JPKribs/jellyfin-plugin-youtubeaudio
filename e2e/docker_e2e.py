@@ -33,6 +33,8 @@ parser.add_argument("--name", default="yta-e2e", help="container name (default: 
 parser.add_argument("--workdir", default=os.path.join(REPO, "e2e", ".work"), help="scratch folder, wiped on start (default: e2e/.work)")
 parser.add_argument("--plugin-dir", default=os.path.join(REPO, "Jellyfin.Plugin.YouTubeAudio", "bin", "Release", "net10.0"),
                     help="folder holding the built plugin DLLs (default: Release build output)")
+parser.add_argument("--zip", help="install the plugin from this release ZIP (as written by build.sh) instead of --plugin-dir, "
+                                     "so a dependency missing from build.yaml's artifacts fails the run")
 parser.add_argument("--keep", action="store_true", help="leave the container running afterwards for manual inspection")
 ARGS = parser.parse_args()
 
@@ -190,16 +192,27 @@ def apple_library_export():
 def main():
     global TOKEN
     sh("docker", "rm", "-f", NAME, check=False)
-    for f in ("Jellyfin.Plugin.YouTubeAudio.dll", "YoutubeDLSharp.dll", "TagLibSharp.dll"):
-        if not os.path.isfile(os.path.join(PLUGIN_DIR, f)):
-            raise SystemExit(f"{f} not found in {PLUGIN_DIR}; build the plugin first (see --help)")
-    print(f"image {IMAGE}, plugin {PLUGIN_DIR}")
+    if ARGS.zip:
+        if not os.path.isfile(ARGS.zip):
+            raise SystemExit(f"{ARGS.zip} not found; run ./build.sh first")
+    else:
+        for f in ("Jellyfin.Plugin.YouTubeAudio.dll", "YoutubeDLSharp.dll", "TagLibSharp.dll"):
+            if not os.path.isfile(os.path.join(PLUGIN_DIR, f)):
+                raise SystemExit(f"{f} not found in {PLUGIN_DIR}; build the plugin first (see --help)")
+    print(f"image {IMAGE}, plugin {os.path.abspath(ARGS.zip) if ARGS.zip else PLUGIN_DIR}")
     subprocess.run(["docker", "pull", "-q", IMAGE], check=True, capture_output=True)
     shutil.rmtree(WORK, ignore_errors=True)
     for d in ("config/plugins/YouTubeAudio", "cache", "music"):
         os.makedirs(os.path.join(WORK, d), exist_ok=True)
-    for f in ("Jellyfin.Plugin.YouTubeAudio.dll", "YoutubeDLSharp.dll", "TagLibSharp.dll"):
-        shutil.copy(os.path.join(PLUGIN_DIR, f), os.path.join(WORK, "config/plugins/YouTubeAudio", f))
+    if ARGS.zip:
+        # Exactly what a server installs from the repository: the ZIP's files, nothing else.
+        import zipfile
+        with zipfile.ZipFile(ARGS.zip) as z:
+            z.extractall(os.path.join(WORK, "config/plugins/YouTubeAudio"))
+        print("  installed from ZIP:", sorted(os.listdir(os.path.join(WORK, "config/plugins/YouTubeAudio"))))
+    else:
+        for f in ("Jellyfin.Plugin.YouTubeAudio.dll", "YoutubeDLSharp.dll", "TagLibSharp.dll"):
+            shutil.copy(os.path.join(PLUGIN_DIR, f), os.path.join(WORK, "config/plugins/YouTubeAudio", f))
 
     print("== Pre-existing library")
     tag(ALBUM_DIR + OWNED + ".opus", OWNED, ARTIST, LIBRARY_ALBUM, YEAR, 2)
@@ -305,6 +318,7 @@ def main():
     plugin_files = os.listdir(os.path.join(WORK, "config/plugins/YouTubeAudio"))
     check("yt-dlp and the Deno runtime were provisioned in the plugin folder",
           "deno" in plugin_files and any(f.startswith("yt-dlp_linux") for f in plugin_files), str(sorted(plugin_files)))
+    check("no unverified or half-written tool downloads left behind", not any(f.endswith(".download") for f in plugin_files), str(sorted(plugin_files)))
     check("library untouched by downloading", snapshot() == before)
 
     downloads = {d["MetadataTitle"]: d for d in call("GET", "/YouTubeAudio/Downloads")["Items"]}
@@ -333,6 +347,47 @@ def main():
     leaked = {k for i in pub for k in i if k in ("Url", "ErrorMessage", "FileName", "Id", "MatchNote")}
     check("public queue leaks no URLs, file names, ids or errors", not leaked, str(leaked))
 
+    print("== 3c. Link checks, cancel, and the approved-user playlist limit")
+    def status_of(method, path, body, token=None):
+        try:
+            call(method, path, body, token=token)
+            return 200
+        except urllib.error.HTTPError as ex:
+            return ex.code
+    injected = 'https://www.youtube.com/watch?v=noW9fM9vgJs" --exec "touch /tmp/pwned'
+    n_before = len(queue())
+    check("a link carrying extra yt-dlp arguments is refused", status_of("POST", "/YouTubeAudio/Queue", {"Url": injected}) == 400 and len(queue()) == n_before)
+    check("a lookalike host is refused", status_of("POST", "/YouTubeAudio/Queue", {"Url": "https://www.youtube.com.evil.example/watch?v=x"}) == 400)
+    idle = call("POST", "/YouTubeAudio/Queue/Cancel")
+    check("cancel with nothing running reports so", idle == {"Success": True, "Cancelled": False}, json.dumps(idle))
+
+    cfg = call("GET", f"/Plugins/{PLUGIN_ID}/Configuration")
+    check("playlist limit defaults to 200", cfg.get("MaxPublicPlaylistItems") == 200, str(cfg.get("MaxPublicPlaylistItems")))
+    cfg.update({"ApprovedUserIds": [listener_id], "MaxPublicPlaylistItems": 2})
+    call("POST", f"/Plugins/{PLUGIN_ID}/Configuration", cfg)
+    submit = {"Artist": "Yo-Yo Ma", "Album": "Limit Test", "Year": 2020}
+    check("approved user: a link carrying extra arguments is refused",
+          status_of("POST", "/YouTube/Download/Submit", {**submit, "Url": injected}, token=listener_token) == 400)
+    ytdlp = next(f for f in plugin_files if f.startswith("yt-dlp_linux") and not f.endswith(".download"))
+    channel = sh("docker", "exec", NAME, f"/config/plugins/YouTubeAudio/{ytdlp}", "--js-runtimes", "deno:/config/plugins/YouTubeAudio/deno",
+                 "--no-cache-dir", "--skip-download", "--print", "channel_id", FIX_URL, check=False).strip().splitlines()
+    if channel and channel[-1].startswith("UC"):
+        uploads = "https://www.youtube.com/playlist?list=UU" + channel[-1][2:]
+        n_before = len(queue())
+        try:
+            call("POST", "/YouTube/Download/Submit", {**submit, "Url": uploads}, token=listener_token)
+            limit_status, limit_error = 200, ""
+        except urllib.error.HTTPError as ex:
+            limit_status, limit_error = ex.code, ex.read().decode()
+        # The playlist must be read (YoutubeDLSharp parses yt-dlp's JSON with Newtonsoft.Json) to be refused.
+        check("approved user: a playlist over the limit is refused, nothing queued",
+              limit_status == 400 and "more than 2 videos" in limit_error and len(queue()) == n_before, f"{limit_status} {limit_error}")
+    else:
+        check("found the test channel's uploads playlist", False, str(channel))
+    cfg = call("GET", f"/Plugins/{PLUGIN_ID}/Configuration")
+    cfg.update({"ApprovedUserIds": [], "MaxPublicPlaylistItems": 200})
+    call("POST", f"/Plugins/{PLUGIN_ID}/Configuration", cfg)
+
     print("== 4. Failed songs can be retried or given a new link; restart persists state")
     call("POST", "/YouTubeAudio/Playlists/Sync")
     targets = {t["Name"]: t for t in call("GET", "/YouTubeAudio/Playlists")}
@@ -357,10 +412,20 @@ def main():
           fixed["StatusCode"] == 2 and fixed["Title"] == UNMATCHABLE and fixed["Artist"] == "Nonexistent Ensemble Qqqq", fixed.get("ErrorMessage"))
     targets = {t["Name"]: t for t in call("GET", "/YouTubeAudio/Playlists")}
     check("all three playlist imports still in progress", {"Piano Favourites", "Singles", "Ghost"} <= set(targets), str({k: (v["Added"], v["Total"]) for k, v in targets.items()}))
+    cache_dir = os.path.join(WORK, "config/data/youtubeaudio/cache")
+    orphan = os.path.join(cache_dir, "0123456789abcdef0123456789abcdef.webm.part")
+    stranger = os.path.join(cache_dir, "not-a-plugin-file.txt")
+    for f in (orphan, stranger):
+        open(f, "wb").write(b"leftover")
     sh("docker", "restart", NAME)
     time.sleep(5)
     wait(lambda: (call("GET", "/System/Info/Public") or {}).get("Version") and call("GET", "/YouTubeAudio/Queue"), "server after restart", 180)
     check("queue survived restart", sum(1 for i in queue() if i["StatusCode"] == 2) == 3)
+    wait(lambda: not os.path.exists(orphan), "startup cache sweep", 60, 2)
+    check("startup sweep removed a partial download no item owns, kept other files",
+          not os.path.exists(orphan) and os.path.exists(stranger)
+          and all(os.path.exists(os.path.join(cache_dir, i["FileName"])) for i in queue() if i["StatusCode"] == 2))
+    os.remove(stranger)
     check("playlist imports survived restart", {"Piano Favourites", "Singles", "Ghost"} <= {t["Name"] for t in call("GET", "/YouTubeAudio/Playlists")})
 
     print("== 5. Import into the library")
@@ -548,8 +613,41 @@ def main():
     check("the song keeps its library item", any(i["Id"] == owned["Id"] for i in call("GET", "/Items?includeItemTypes=Audio&recursive=true")["Items"]))
     check("the song stays in its playlist", [t for t, _ in ltitles(favourites)] == [NEW, OWNED, UPGRADE, TITLE_TRACK], str([t for t, _ in ltitles(favourites)]))
 
+    print("== 11. Cancel a running download; Reset Queue removes cached files")
+    cid = call("POST", "/YouTubeAudio/Queue", {"Url": FIX_URL})[0]["Id"]
+    call("POST", "/YouTubeAudio/Queue/Process", {"Ids": [cid]})
+    state = wait(lambda: next((i["StatusCode"] for i in queue() if i["Id"] == cid and i["StatusCode"] != 0), None), "download to start", 120, 0.2)
+    if state == 1:
+        res = call("POST", "/YouTubeAudio/Queue/Cancel")
+        item = wait(lambda: next((i for i in queue() if i["Id"] == cid and i["StatusCode"] != 1), None), "cancelled download to settle", 60, 0.5)
+        stem = item["FileName"].split(".")[0]
+        time.sleep(2)
+        left = [f for f in os.listdir(cache_dir) if f.startswith(stem)]
+        check("cancelling stops the download, puts the song back in the queue and deletes its partial files",
+              res["Cancelled"] is True and item["StatusCode"] == 0 and not left, json.dumps({"res": res, "status": item["StatusCode"], "left": left}))
+        # The image has no ps; read /proc for any yt-dlp or ffmpeg still working on the cache.
+        procs = sh("docker", "exec", NAME, "sh", "-c",
+                   'for p in /proc/[0-9]*; do c=$(tr "\\0" " " < "$p/cmdline" 2>/dev/null); [ -n "$c" ] && echo "$c"; done', check=False)
+        survivors = [l for l in procs.splitlines() if "youtubeaudio" in l and ("yt-dlp" in l or "ffmpeg" in l)]
+        check("no yt-dlp or ffmpeg process survives the cancel", not survivors, "\n".join(survivors)[:500])
+        time.sleep(5)
+        late = [f for f in os.listdir(cache_dir) if f.startswith(stem)]
+        check("nothing reappears in the cache 5 seconds later", not late, str(late))
+    else:
+        print(f"  (download finished before it could be cancelled: status {state}; cancel not exercised)")
+    call("POST", "/YouTubeAudio/Queue/Process", {"Ids": [cid]})
+    item = wait(lambda: next((i for i in queue() if i["Id"] == cid and i["StatusCode"] in (2, 4)), None), "download after cancel", 300, 3)
+    check("a cancelled song downloads normally when started again", item["StatusCode"] == 2, item.get("ErrorMessage"))
+    stem = item["FileName"].split(".")[0]
+    check("downloaded file and info.json are in the cache", sorted(f for f in os.listdir(cache_dir) if f.startswith(stem)) == sorted([item["FileName"], stem + ".info.json"]),
+          str([f for f in os.listdir(cache_dir) if f.startswith(stem)]))
+    call("POST", "/YouTubeAudio/ResetQueue")
+    check("Reset Queue empties the queue and deletes its cached files", queue() == [] and not [f for f in os.listdir(cache_dir) if f.startswith(stem)],
+          str(os.listdir(cache_dir)))
+
     logs = sh("docker", "logs", NAME, check=False) + subprocess.run(["docker", "logs", NAME], capture_output=True, text=True).stderr
     errs = [l for l in logs.splitlines() if "YouTubeAudio" in l and ("[ERR]" in l or "[FTL]" in l)]
+    check("no checksum mismatches or rejected tool downloads", "Checksum mismatch" not in logs and "lists no checksum" not in logs)
     check("no plugin errors in server log", not errs, "\n".join(errs[:5]))
     print("\n  plugin log:")
     for l in logs.splitlines():

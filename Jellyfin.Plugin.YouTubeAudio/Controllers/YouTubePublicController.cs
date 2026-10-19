@@ -148,7 +148,8 @@ public class YouTubePublicController : ControllerBase
     {
         PublicPage.ApplyHardeningHeaders(Response);
 
-        if (!IsAllowed())
+        var access = CheckAccess();
+        if (!access.Allowed)
         {
             return StatusCode(StatusCodes.Status403Forbidden);
         }
@@ -164,12 +165,15 @@ public class YouTubePublicController : ControllerBase
 
         try
         {
+            // Approved users may queue only so much from one playlist link; admins are not limited.
+            var maxPlaylistItems = access.IsAdministrator ? 0 : Math.Max(0, Plugin.Instance?.Configuration.MaxPublicPlaylistItems ?? 0);
             var items = await _downloadService.QueueUrlAsync(
                 request.Url,
                 request.Artist,
                 request.Album,
                 request.Year,
                 request.Title,
+                maxPlaylistItems,
                 cancellationToken).ConfigureAwait(false);
 
             var ids = items.Select(i => i.Id).ToList();
@@ -223,28 +227,34 @@ public class YouTubePublicController : ControllerBase
         return Ok(_libraryService.SearchAlbums(query ?? string.Empty, artist));
     }
 
-    private bool IsAllowed()
+    internal bool IsAllowed() => CheckAccess().Allowed;
+
+    /// <summary>
+    /// Works out whether the signed-in user may submit downloads: administrators always, other
+    /// users only when approved in Settings.
+    /// </summary>
+    internal (bool Allowed, bool IsAdministrator) CheckAccess()
     {
         var raw = User.FindFirst(UserIdClaim)?.Value;
         if (string.IsNullOrEmpty(raw) || !Guid.TryParse(raw, out var userId))
         {
-            return false;
+            return (false, false);
         }
 
         var user = _userManager.GetUserById(userId);
         if (user == null)
         {
-            return false;
+            return (false, false);
         }
 
         if (user.HasPermission(PermissionKind.IsAdministrator))
         {
-            return true;
+            return (true, true);
         }
 
         var approved = Plugin.Instance?.Configuration.ApprovedUserIds ?? new List<string>();
         var normalized = userId.ToString("N");
-        return approved.Any(id => string.Equals(NormalizeId(id), normalized, StringComparison.OrdinalIgnoreCase));
+        return (approved.Any(id => string.Equals(NormalizeId(id), normalized, StringComparison.OrdinalIgnoreCase)), false);
     }
 
     private static string NormalizeId(string id)

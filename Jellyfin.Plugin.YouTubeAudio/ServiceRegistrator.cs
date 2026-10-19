@@ -24,6 +24,9 @@ public class ServiceRegistrator : IPluginServiceRegistrator
         // Singleton: download service (owns SemaphoreSlim for download serialization)
         serviceCollection.AddSingleton<DownloadService>();
 
+        // Removes leftover cache files once at startup
+        serviceCollection.AddHostedService<CacheCleanupService>();
+
         // Playlist export formats. Add a source here to support another service's exports.
         serviceCollection.AddSingleton<IPlaylistSource, AppleMusicPlaylistSource>();
         serviceCollection.AddSingleton<IPlaylistSource, AppleMusicLibrarySource>();

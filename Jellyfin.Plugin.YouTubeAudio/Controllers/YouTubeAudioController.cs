@@ -288,6 +288,27 @@ public class YouTubeAudioController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Cancels running and waiting downloads. The song being downloaded goes back to Queued and
+    /// its partial files are deleted; songs that had not started stay queued.
+    /// </summary>
+    /// <returns>Whether any downloads were running.</returns>
+    [HttpPost("Queue/Cancel")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult CancelDownloads()
+    {
+        try
+        {
+            var cancelled = _downloadService.CancelDownloads();
+            return Ok(new { Success = true, Cancelled = cancelled });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in CancelDownloads endpoint");
+            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+        }
+    }
+
     // ===== Import Tab Endpoints =====
 
     /// <summary>
@@ -296,11 +317,11 @@ public class YouTubeAudioController : ControllerBase
     /// <returns>List of downloaded items with total count.</returns>
     [HttpGet("Downloads")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public ActionResult<QueueListResponse> GetDownloads()
+    public async Task<ActionResult<QueueListResponse>> GetDownloads()
     {
         try
         {
-            var items = _downloadService.GetDownloadedItems();
+            var items = await _downloadService.GetDownloadedItemsAsync(HttpContext.RequestAborted).ConfigureAwait(false);
             return Ok(new QueueListResponse { Items = items, TotalCount = items.Count });
         }
         catch (Exception ex)
@@ -458,11 +479,11 @@ public class YouTubeAudioController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public ActionResult SaveTags([FromBody] TagUpdateRequest request)
+    public async Task<ActionResult> SaveTags([FromBody] TagUpdateRequest request)
     {
         try
         {
-            _downloadService.SaveTags(request);
+            await _downloadService.SaveTagsAsync(request, HttpContext.RequestAborted).ConfigureAwait(false);
             return Ok(new { Success = true });
         }
         catch (FileNotFoundException ex)
@@ -651,7 +672,7 @@ public class YouTubeAudioController : ControllerBase
     {
         try
         {
-            var message = await _downloadService.UpdateYtDlpAsync().ConfigureAwait(false);
+            var message = await _downloadService.UpdateYtDlpAsync(HttpContext.RequestAborted).ConfigureAwait(false);
             return Ok(new { Success = true, Message = message });
         }
         catch (InvalidOperationException ex)
@@ -666,17 +687,22 @@ public class YouTubeAudioController : ControllerBase
     }
 
     /// <summary>
-    /// Resets the download queue (database only).
+    /// Resets the download queue: stops downloads, deletes the queued items' cached files and
+    /// clears the queue.
     /// </summary>
     /// <returns>Success status.</returns>
     [HttpPost("ResetQueue")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public ActionResult ResetQueue()
+    public async Task<ActionResult> ResetQueue()
     {
         try
         {
-            _downloadService.ResetQueue();
+            await _downloadService.ResetQueueAsync(HttpContext.RequestAborted).ConfigureAwait(false);
             return Ok(new { Success = true });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(StatusCodes.Status409Conflict, new { Error = ex.Message });
         }
         catch (Exception ex)
         {
@@ -686,17 +712,21 @@ public class YouTubeAudioController : ControllerBase
     }
 
     /// <summary>
-    /// Resets the cache: deletes all cached files and resets the queue.
+    /// Resets the cache: stops downloads, deletes all cached files and resets the queue.
     /// </summary>
     /// <returns>Success status.</returns>
     [HttpPost("ResetCache")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public ActionResult ResetCache()
+    public async Task<ActionResult> ResetCache()
     {
         try
         {
-            _downloadService.ResetCache();
+            await _downloadService.ResetCacheAsync(HttpContext.RequestAborted).ConfigureAwait(false);
             return Ok(new { Success = true });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(StatusCodes.Status409Conflict, new { Error = ex.Message });
         }
         catch (Exception ex)
         {

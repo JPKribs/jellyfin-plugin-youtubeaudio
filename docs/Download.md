@@ -10,6 +10,12 @@ Queue up audio for download.
 2. Click **Queue** to add it to the download queue.
 3. From the queue, select the items you want to download and click **Download**, or remove any you don't want with **Delete**.
 
+Only `youtube.com`, `www.youtube.com`, `m.youtube.com`, `music.youtube.com` and `youtu.be` links are accepted, and a link containing spaces or quotes is refused.
+
+## Cancel Downloads
+
+While downloads are running, **Cancel Downloads** appears above the queue. It stops yt-dlp, deletes the partial files of the song it was downloading and puts that song back in the queue. Songs that had not started stay queued, so you can start them again later. Use it, for example, to stop a large playlist so you can run **Update yt-dlp** in [Settings](Settings.md).
+
 ## Import a Playlist From Another Service
 
 1. Choose **Apple Music** or **Spotify** on the Download tab, then export:

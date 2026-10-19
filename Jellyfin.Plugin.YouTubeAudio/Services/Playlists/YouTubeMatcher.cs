@@ -73,8 +73,9 @@ public static partial class YouTubeMatcher
             ? track.Title
             : track.Artist + " - " + track.Title;
 
-        // yt-dlp receives the query on its command line; quotes would break the argument.
-        return query.Replace("\"", string.Empty, StringComparison.Ordinal).Trim();
+        // yt-dlp receives the query on its command line; quotes (or a backslash escaping the
+        // closing quote) would break the argument.
+        return query.Replace("\"", string.Empty, StringComparison.Ordinal).Replace("\\", string.Empty, StringComparison.Ordinal).Trim();
     }
 
     /// <summary>

@@ -9,3 +9,5 @@ e2e/run.sh
 ```
 
 This builds the plugin in Release and runs `e2e/docker_e2e.py` against the stable Jellyfin 12.2 image. Options such as `--image`, `--port` and `--keep` (leave the server running to inspect it) are listed by `python3 e2e/docker_e2e.py --help`. Scratch files, including the run's throwaway logins, go to the git ignored `e2e/.work/`.
+
+To test the release package rather than the build folder, run `./build.sh` and pass the ZIP it writes, for example `python3 e2e/docker_e2e.py --zip dist/jellyfin-plugin-youtubeaudio-<version>.zip`. The server then installs exactly the files the ZIP holds, which catches a dependency missing from `build.yaml`'s artifacts.

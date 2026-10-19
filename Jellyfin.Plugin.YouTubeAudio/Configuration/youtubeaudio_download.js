@@ -146,8 +146,10 @@ export default function (view) {
         // Auto-poll while downloads are active, plus a grace window right after starting a
         // batch — the background run may still be provisioning yt-dlp before anything
         // shows as Downloading.
-        var shouldPoll = _allItems.some(function(i) { return i.StatusCode === 1; })
-            || Date.now() < _processingGraceUntil;
+        var downloading = _allItems.some(function(i) { return i.StatusCode === 1; });
+        var shouldPoll = downloading || Date.now() < _processingGraceUntil;
+        var cancelBtn = view.querySelector('#btnCancelDownloads');
+        if (cancelBtn) cancelBtn.style.display = shouldPoll ? '' : 'none';
         if (_poller) {
             if (shouldPoll) _poller.start(false);
             else _poller.stop();
@@ -684,6 +686,26 @@ export default function (view) {
             });
     }
 
+    // cancelDownloads
+    // Stops the running download batch. The song being downloaded goes back to Queued and the
+    // rest stay queued, so they can be started again later.
+    //
+    // No parameters
+    function cancelDownloads() {
+        Shared.confirmDialog('Stop the downloads that are running? Songs that have not finished stay in the queue.', { destructive: true }).then(function(ok) {
+            if (!ok) return;
+            Shared.apiRequest('Queue/Cancel', 'POST')
+                .then(function(result) {
+                    _processingGraceUntil = 0;
+                    Shared.setStatus('queueStatus', result && result.Cancelled ? 'Downloads cancelled.' : 'No downloads were running.', false);
+                    loadQueue();
+                })
+                .catch(function(err) {
+                    Shared.setStatus('queueStatus', (err && err.Error) || 'Failed to cancel downloads.', true);
+                });
+        });
+    }
+
     // ============================================
     // EVENT LISTENERS
     // ============================================
@@ -782,6 +804,9 @@ export default function (view) {
 
         var btnProcess = Shared.getEl('btnProcess');
         if (btnProcess) btnProcess.addEventListener('click', processQueue);
+
+        var btnCancelDownloads = Shared.getEl('btnCancelDownloads');
+        if (btnCancelDownloads) btnCancelDownloads.addEventListener('click', cancelDownloads);
 
         var btnRefresh = Shared.getEl('btnRefreshQueue');
         if (btnRefresh) btnRefresh.addEventListener('click', loadQueue);

@@ -23,13 +23,15 @@ jobs:
 
       - name: Get Release Info
         id: release_info
+        env:
+          TAG: ${{ github.event.release.tag_name }}
         run: |
           # Extract version and targetAbi from build.yaml
           BUILD_VERSION=$(grep '^version:' build.yaml | sed 's/version: *"\?\([^"]*\)"\?.*/\1/' | tr -d '"')
           TARGET_ABI=$(grep '^targetAbi:' build.yaml | sed 's/targetAbi: *"\?\([^"]*\)"\?.*/\1/' | tr -d '"')
 
           # Try to download the checksum file from the release assets
-          ASSET_URL="https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/${{ github.event.release.tag_name }}/jellyfin-plugin-youtubeaudio-${BUILD_VERSION}.zip.md5"
+          ASSET_URL="https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/${TAG}/jellyfin-plugin-youtubeaudio-${BUILD_VERSION}.zip.md5"
           echo "Trying to download checksum from: ${ASSET_URL}"
 
           CHECKSUM=$(curl -sfL "${ASSET_URL}" 2>/dev/null || echo "")
@@ -37,7 +39,7 @@ jobs:
           # If curl failed or returned empty, calculate checksum ourselves
           if [ -z "$CHECKSUM" ]; then
             echo "Checksum download failed, calculating from ZIP file..."
-            ZIP_URL="https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/${{ github.event.release.tag_name }}/jellyfin-plugin-youtubeaudio-${BUILD_VERSION}.zip"
+            ZIP_URL="https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/${TAG}/jellyfin-plugin-youtubeaudio-${BUILD_VERSION}.zip"
             curl -L -o temp_plugin.zip "${ZIP_URL}"
             CHECKSUM=$(md5sum temp_plugin.zip | cut -d' ' -f1)
             rm temp_plugin.zip
@@ -55,18 +57,28 @@ jobs:
           echo "timestamp=${TIMESTAMP}" >> $GITHUB_OUTPUT
 
       - name: Update Manifest
+        env:
+          # The release body and every other value reach the shell only through environment
+          # variables, never through template interpolation, so quotes or $() in a changelog
+          # cannot execute or break the job.
+          RELEASE_BODY: ${{ github.event.release.body }}
+          TAG: ${{ github.event.release.tag_name }}
+          BUILD_VERSION: ${{ steps.release_info.outputs.build_version }}
+          TARGET_ABI: ${{ steps.release_info.outputs.target_abi }}
+          CHECKSUM: ${{ steps.release_info.outputs.checksum }}
+          TIMESTAMP: ${{ steps.release_info.outputs.timestamp }}
         run: |
           # Sanitize changelog by removing backticks
-          SANITIZED_CHANGELOG=$(echo "${{ github.event.release.body }}" | tr -d '\`')
+          SANITIZED_CHANGELOG=$(printf '%s' "$RELEASE_BODY" | tr -d '`')
 
           # Use jq to safely construct the JSON object
           NEW_VERSION=$(jq -n \
-            --arg version "${{ steps.release_info.outputs.build_version }}" \
+            --arg version "$BUILD_VERSION" \
             --arg changelog "$SANITIZED_CHANGELOG" \
-            --arg targetAbi "${{ steps.release_info.outputs.target_abi }}" \
-            --arg sourceUrl "https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/${{ github.event.release.tag_name }}/jellyfin-plugin-youtubeaudio-${{ steps.release_info.outputs.build_version }}.zip" \
-            --arg checksum "${{ steps.release_info.outputs.checksum }}" \
-            --arg timestamp "${{ steps.release_info.outputs.timestamp }}" \
+            --arg targetAbi "$TARGET_ABI" \
+            --arg sourceUrl "https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/${TAG}/jellyfin-plugin-youtubeaudio-${BUILD_VERSION}.zip" \
+            --arg checksum "$CHECKSUM" \
+            --arg timestamp "$TIMESTAMP" \
             '{
               version: $version,
               changelog: $changelog,
@@ -81,9 +93,11 @@ jobs:
           mv manifest_temp.json manifest.json
 
       - name: Commit Changes
+        env:
+          TAG: ${{ github.event.release.tag_name }}
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add manifest.json
-          git commit -m "Update manifest for release ${{ github.event.release.tag_name }}" || exit 0
+          git commit -m "Update manifest for release ${TAG}" || exit 0
           git push origin HEAD:master

@@ -11,7 +11,8 @@ public class PluginConfiguration : BasePluginConfiguration
 {
     /// <summary>
     /// Gets or sets an optional override path for the yt-dlp binary.
-    /// When empty, the plugin searches the system PATH and common install locations automatically.
+    /// When empty, the plugin downloads and updates its own copy in the plugin folder, and only
+    /// falls back to a system install when that download is impossible.
     /// </summary>
     public string YtDlpPath { get; set; } = string.Empty;
 
@@ -69,4 +70,10 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Approved users can queue downloads but cannot import into the library.
     /// </summary>
     public List<string> ApprovedUserIds { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the most videos an approved user may queue from one playlist link; larger
+    /// playlists are refused. 0 means no limit. Administrators are never limited.
+    /// </summary>
+    public int MaxPublicPlaylistItems { get; set; } = 200;
 }

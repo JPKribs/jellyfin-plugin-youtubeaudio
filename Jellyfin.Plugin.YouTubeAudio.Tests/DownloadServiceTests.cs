@@ -39,6 +39,44 @@ public class DownloadServiceTests
     public void IsValidYouTubeUrl_RejectsNonHttpSchemes(string url)
         => Assert.False(DownloadService.IsValidYouTubeUrl(url));
 
+    [Theory]
+    [InlineData("https://www.youtube.com/watch?v=abc\" --exec \"touch /tmp/pwned")]
+    [InlineData("https://www.youtube.com/watch?v=abc\" \"https://169.254.169.254/latest/meta-data")]
+    [InlineData("https://www.youtube.com/watch?v=abc --exec touch")]
+    [InlineData("https://www.youtube.com/watch?v=abc\t--exec")]
+    [InlineData("https://www.youtube.com/watch?v=abc\n--exec")]
+    [InlineData("https://www.youtube.com/watch?v=abc'")]
+    [InlineData("https://www.youtube.com/watch?v=abc`id`")]
+    [InlineData("https://www.youtube.com/watch?v=abc\\")]
+    [InlineData("https://www.youtube.com/watch?v=abc\u0000")]
+    [InlineData("https://user@www.youtube.com/watch?v=abc")]
+    [InlineData("https://www.youtube.com:8443/watch?v=abc")]
+    [InlineData("https://gaming.youtube.com/watch?v=abc")]
+    [InlineData("https://youtube.com./watch?v=abc")]
+    public void IsValidYouTubeUrl_RejectsLinksThatCouldSplitIntoExtraArguments(string url)
+        => Assert.False(DownloadService.IsValidYouTubeUrl(url));
+
+    [Theory]
+    [InlineData("  https://WWW.YouTube.com/watch?v=abc&list=PL1  ", "https://www.youtube.com/watch?v=abc&list=PL1")]
+    [InlineData("https://youtu.be/abc?si=xyz", "https://youtu.be/abc?si=xyz")]
+    [InlineData("http://music.youtube.com/playlist?list=OLAK5uy_x", "http://music.youtube.com/playlist?list=OLAK5uy_x")]
+    [InlineData("https://www.youtube.com/results?search_query=a%20b", "https://www.youtube.com/results?search_query=a%20b")]
+    public void TryNormalizeYouTubeUrl_ReturnsTheAbsoluteLink(string url, string expected)
+    {
+        Assert.True(DownloadService.TryNormalizeYouTubeUrl(url, out var normalized));
+        Assert.Equal(expected, normalized);
+    }
+
+    [Theory]
+    [InlineData("noW9fM9vgJs", true)]
+    [InlineData("a-b_C", true)]
+    [InlineData("abc\"", false)]
+    [InlineData("abc def", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void IsValidVideoId_AcceptsOnlyIdCharacters(string? id, bool expected)
+        => Assert.Equal(expected, DownloadService.IsValidVideoId(id));
+
     // MARK: Format mapping
 
     [Theory]
