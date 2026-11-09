@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Jellyfin.Data.Enums;
 using Jellyfin.Plugin.YouTubeAudio.Models;
+using JPKribs.Jellyfin.Base;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Audio;
 using MediaBrowser.Controller.Library;
@@ -242,7 +243,7 @@ public class LibraryService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to look up the cover of album {Album}", album);
+            _logger.LogWarning(ex, "Failed to look up the cover of album {Album}", FormatUtilities.SanitizeForLog(album));
             return null;
         }
     }
@@ -269,7 +270,7 @@ public class LibraryService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to search artists for query: {Query}", query);
+            _logger.LogWarning(ex, "Failed to search artists for query: {Query}", FormatUtilities.SanitizeForLog(query));
             return new List<string>();
         }
     }
@@ -309,7 +310,7 @@ public class LibraryService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to search albums for query: {Query}", query);
+            _logger.LogWarning(ex, "Failed to search albums for query: {Query}", FormatUtilities.SanitizeForLog(query));
             return new List<string>();
         }
     }

@@ -283,7 +283,7 @@ export default function (view) {
                 loadQueue();
             })
             .catch(function(err) {
-                error.textContent = (err && err.Error) || 'Could not use that link.';
+                Shared.errorText(err, 'Could not use that link.').then(function(text) { error.textContent = text; });
             });
     }
 
@@ -362,7 +362,7 @@ export default function (view) {
                 loadQueue();
             })
             .catch(function(err) {
-                Shared.setStatus('queueStatus', (err && err.Error) || 'Failed to add.', true);
+                Shared.errorText(err, 'Failed to add.').then(function(text) { Shared.setStatus('queueStatus', text, true); });
             });
     }
 
@@ -460,7 +460,7 @@ export default function (view) {
                 loadQueue();
             })
             .catch(function(err) {
-                Shared.setStatus('queueStatus', (err && err.Error) || 'Failed to queue the replacement.', true);
+                Shared.errorText(err, 'Failed to queue the replacement.').then(function(text) { Shared.setStatus('queueStatus', text, true); });
                 updateReplaceButton();
             });
     }
@@ -597,7 +597,7 @@ export default function (view) {
                 loadPlaylistTargets();
             })
             .catch(function(err) {
-                Shared.setStatus('queueStatus', (err && err.Error) || 'Failed to import the playlist.', true);
+                Shared.errorText(err, 'Failed to import the playlist.').then(function(text) { Shared.setStatus('queueStatus', text, true); });
                 if (btn) btn.disabled = false;
             });
     }
@@ -681,7 +681,7 @@ export default function (view) {
                 loadQueue();
             })
             .catch(function(err) {
-                Shared.setStatus('queueStatus', (err && err.Error) || 'Failed to start download.', true);
+                Shared.errorText(err, 'Failed to start download.').then(function(text) { Shared.setStatus('queueStatus', text, true); });
                 loadQueue();
             });
     }
@@ -701,7 +701,7 @@ export default function (view) {
                     loadQueue();
                 })
                 .catch(function(err) {
-                    Shared.setStatus('queueStatus', (err && err.Error) || 'Failed to cancel downloads.', true);
+                    Shared.errorText(err, 'Failed to cancel downloads.').then(function(text) { Shared.setStatus('queueStatus', text, true); });
                 });
         });
     }

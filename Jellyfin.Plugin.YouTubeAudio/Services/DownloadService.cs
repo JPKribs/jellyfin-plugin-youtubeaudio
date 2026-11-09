@@ -466,7 +466,7 @@ public sealed partial class DownloadService : IDisposable
     /// <param name="itemId">The Jellyfin item ID of the song.</param>
     /// <param name="url">The YouTube link with the correct audio.</param>
     /// <returns>The queued item.</returns>
-    /// <exception cref="ArgumentException">The link is not a YouTube link.</exception>
+    /// <exception cref="ArgumentException">The link is not a YouTube link, or the song's file cannot be read.</exception>
     /// <exception cref="FileNotFoundException">The song or its file is not in the library.</exception>
     [SuppressMessage("Security", "CA3003:Review code for file path injection vulnerabilities", Justification = "The path is Jellyfin's own library item path.")]
     public QueueItemDto QueueReplacement(Guid itemId, string url)
@@ -484,8 +484,19 @@ public sealed partial class DownloadService : IDisposable
             throw new FileNotFoundException("That song's file was not found in the library.");
         }
 
+        TagLib.File tagFile;
+        try
+        {
+            tagFile = TagLib.File.Create(path);
+        }
+        catch (Exception ex)
+        {
+            // TagLib throws all sorts for a damaged or unsupported file.
+            throw new ArgumentException("That song's file could not be read.", ex);
+        }
+
         PlaylistTrack track;
-        using (var tagFile = TagLib.File.Create(path))
+        using (tagFile)
         {
             var tag = tagFile.Tag;
             var performers = tag.Performers ?? Array.Empty<string>();
@@ -1407,11 +1418,14 @@ public sealed partial class DownloadService : IDisposable
                 if (string.IsNullOrWhiteSpace(item.Artist))
                 {
                     var (_, titleFeatured) = TrackMetadataCleaner.ExtractFeatured(song.TrackName);
-                    var performers = await ResolveCreditAsync(song.ArtistName, null, cancellationToken).ConfigureAwait(false);
+
+                    // One library read for both credits: it lists every song in the library.
+                    var spellings = _libraryService.GetArtistSpellings();
+                    var performers = await ResolveCreditAsync(song.ArtistName, spellings, cancellationToken).ConfigureAwait(false);
                     tag.Performers = performers.Concat(titleFeatured)
                         .DistinctBy(TrackMetadataCleaner.Normalize, StringComparer.Ordinal)
                         .ToArray();
-                    tag.AlbumArtists = new[] { await ResolveAlbumArtistAsync(song.AlbumArtist, null, cancellationToken).ConfigureAwait(false) };
+                    tag.AlbumArtists = new[] { await ResolveAlbumArtistAsync(song.AlbumArtist, spellings, cancellationToken).ConfigureAwait(false) };
                 }
 
                 if (string.IsNullOrWhiteSpace(item.Album))
@@ -1463,9 +1477,8 @@ public sealed partial class DownloadService : IDisposable
     /// Splits a joint artist credit into its artists, keeping names the library or Apple knows
     /// as a single act whole, and spells each one the way the library already does.
     /// </summary>
-    private async Task<List<string>> ResolveCreditAsync(string credit, Dictionary<string, string>? spellings, CancellationToken cancellationToken)
+    private async Task<List<string>> ResolveCreditAsync(string credit, Dictionary<string, string> spellings, CancellationToken cancellationToken)
     {
-        spellings ??= _libraryService.GetArtistSpellings();
         if (!Config.LookUpCatalogMetadata)
         {
             // Without Apple's artist list, "Simon & Garfunkel" cannot be told from a joint
@@ -1501,7 +1514,7 @@ public sealed partial class DownloadService : IDisposable
     /// Gets the album artist for a credit: "Various Artists" stays, a joint credit is filed
     /// under its first artist, and the library's spelling is used.
     /// </summary>
-    private async Task<string> ResolveAlbumArtistAsync(string credit, Dictionary<string, string>? spellings, CancellationToken cancellationToken)
+    private async Task<string> ResolveAlbumArtistAsync(string credit, Dictionary<string, string> spellings, CancellationToken cancellationToken)
     {
         if (string.Equals(credit, "Various Artists", StringComparison.OrdinalIgnoreCase))
         {

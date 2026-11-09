@@ -416,7 +416,7 @@ export default function (view) {
                 btn.classList.add('success');
                 setTimeout(function() { btn.classList.remove('success'); }, 1000);
             })
-            .catch(function(err) { Dashboard.alert((err && err.Error) || 'Failed to save tags.'); });
+            .catch(function(err) { Shared.errorText(err, 'Failed to save tags.').then(function(text) { Dashboard.alert(text); }); });
     }
 
     function applyBulkEdit() {
@@ -555,7 +555,7 @@ export default function (view) {
                 loadDownloads();
             })
             .catch(function(err) {
-                Shared.setStatus('importStatus', (err && err.Error) || 'Import failed.', true);
+                Shared.errorText(err, 'Import failed.').then(function(text) { Shared.setStatus('importStatus', text, true); });
             });
     }
 

@@ -196,7 +196,7 @@ export default function (view) {
             })
             .catch(function(err) {
                 if (btn) btn.disabled = false;
-                Shared.setStatus('ytdlpStatus', (err && err.Error) || 'Failed to update yt-dlp.', true);
+                Shared.errorText(err, 'Failed to update yt-dlp.').then(function(text) { Shared.setStatus('ytdlpStatus', text, true); });
             });
     }
 
@@ -209,7 +209,7 @@ export default function (view) {
             if (!ok) return;
             Shared.apiRequest('ResetQueue', 'POST')
                 .then(function() { Shared.setStatus('resetStatus', 'Queue reset successfully.', false); })
-                .catch(function(err) { Shared.setStatus('resetStatus', (err && err.Error) || 'Failed to reset queue.', true); });
+                .catch(function(err) { Shared.errorText(err, 'Failed to reset queue.').then(function(text) { Shared.setStatus('resetStatus', text, true); }); });
         });
     }
 
@@ -218,7 +218,7 @@ export default function (view) {
             if (!ok) return;
             Shared.apiRequest('ResetCache', 'POST')
                 .then(function() { Shared.setStatus('resetStatus', 'Cache reset successfully.', false); })
-                .catch(function(err) { Shared.setStatus('resetStatus', (err && err.Error) || 'Failed to reset cache.', true); });
+                .catch(function(err) { Shared.errorText(err, 'Failed to reset cache.').then(function(text) { Shared.setStatus('resetStatus', text, true); }); });
         });
     }
 

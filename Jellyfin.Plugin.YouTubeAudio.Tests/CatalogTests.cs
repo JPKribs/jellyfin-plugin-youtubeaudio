@@ -5,6 +5,7 @@ using Jellyfin.Plugin.YouTubeAudio.Models;
 using Jellyfin.Plugin.YouTubeAudio.Services;
 using Jellyfin.Plugin.YouTubeAudio.Services.Catalog;
 using Jellyfin.Plugin.YouTubeAudio.Services.Playlists;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Jellyfin.Plugin.YouTubeAudio.Tests;
@@ -123,6 +124,21 @@ public class CatalogTests
         => Assert.Equal(
             "https://is1-ssl.mzstatic.com/image/thumb/Music/v4/a/cover.jpg/1200x1200cc.jpg",
             CatalogMatcher.GetArtworkUrl("https://is1-ssl.mzstatic.com/image/thumb/Music/v4/a/cover.jpg/100x100bb.jpg", 1200));
+
+    // MARK: Cache
+
+    [Fact]
+    public void SearchCache_StaysBounded()
+    {
+        using var client = new AppleCatalogClient(NullLogger<AppleCatalogClient>.Instance);
+
+        for (var i = 0; i < AppleCatalogClient.MaxCachedSearches * 3; i++)
+        {
+            client.Remember($"https://itunes.apple.com/search?term={i}", "{}");
+        }
+
+        Assert.InRange(client.CachedSearchCount, 1, AppleCatalogClient.MaxCachedSearches);
+    }
 
     // MARK: Images
 

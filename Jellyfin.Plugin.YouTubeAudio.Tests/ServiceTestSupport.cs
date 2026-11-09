@@ -52,9 +52,9 @@ internal sealed class ServiceFixture : IDisposable
         Plugin.UpdateConfiguration(config);
 
         Provider = new QueueDatabaseProvider(NullLoggerFactory.Instance, paths);
-        var libraryManager = Substitute.For<ILibraryManager>();
-        libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem>());
-        var library = new LibraryService(libraryManager, Substitute.For<ILibraryMonitor>(), NullLogger<LibraryService>.Instance);
+        LibraryManager = Substitute.For<ILibraryManager>();
+        LibraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem>());
+        var library = new LibraryService(LibraryManager, Substitute.For<ILibraryMonitor>(), NullLogger<LibraryService>.Instance);
         Encoder = Substitute.For<IMediaEncoder>();
         Encoder.EncoderPath.Returns(string.Empty);
         Catalog = new AppleCatalogClient(NullLogger<AppleCatalogClient>.Instance);
@@ -70,6 +70,8 @@ internal sealed class ServiceFixture : IDisposable
     public QueueDatabaseProvider Provider { get; }
 
     public IMediaEncoder Encoder { get; }
+
+    public ILibraryManager LibraryManager { get; }
 
     public AppleCatalogClient Catalog { get; }
 

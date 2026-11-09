@@ -12,11 +12,14 @@ namespace Jellyfin.Plugin.YouTubeAudio.Services.Catalog;
 /// <summary>
 /// Looks songs and artists up in Apple's public music catalog (the iTunes Search API, which
 /// needs no account or key). Requests are spaced out to stay inside Apple's rate limit, and
-/// answers are cached for the life of the server process. Failures are logged and treated as
+/// answers are cached, up to <see cref="MaxCachedSearches"/> of them. Failures are logged and treated as
 /// "no match", so a lookup never stops a download.
 /// </summary>
 public sealed class AppleCatalogClient : IDisposable
 {
+    /// <summary>Most search answers kept in memory. Each is tens of kilobytes of JSON.</summary>
+    internal const int MaxCachedSearches = 1000;
+
     private const string SearchUrl = "https://itunes.apple.com/search";
 
     // Apple allows roughly 20 searches a minute.
@@ -87,6 +90,23 @@ public sealed class AppleCatalogClient : IDisposable
     /// <inheritdoc />
     public void Dispose() => _gate.Dispose();
 
+    /// <summary>Gets the number of search answers held in the cache.</summary>
+    internal int CachedSearchCount => _cache.Count;
+
+    /// <summary>
+    /// Caches a search answer. Repeat lookups happen within one batch of downloads, so a full
+    /// cache is simply emptied.
+    /// </summary>
+    internal void Remember(string url, string json)
+    {
+        if (_cache.Count >= MaxCachedSearches)
+        {
+            _cache.Clear();
+        }
+
+        _cache[url] = json;
+    }
+
     private async Task<string?> SearchAsync(string term, string entity, int limit, CancellationToken cancellationToken)
     {
         var query = new Dictionary<string, string>
@@ -122,7 +142,7 @@ public sealed class AppleCatalogClient : IDisposable
             try
             {
                 json = await _httpClient.GetStringAsync(new Uri(url), cancellationToken).ConfigureAwait(false);
-                _cache[url] = json;
+                Remember(url, json);
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
             {

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.YouTubeAudio.Models;
 using Jellyfin.Plugin.YouTubeAudio.Services;
+using MediaBrowser.Controller.Entities.Audio;
 using NSubstitute;
 using Xunit;
 using YoutubeDLSharp;
@@ -314,6 +315,22 @@ public sealed class QueueProcessingTests : IDisposable
     }
 
     // MARK: Cache maintenance
+
+    [Fact]
+    public void QueueReplacement_OfAnUnreadableSong_IsRefusedWithAReason()
+    {
+        using var fx = new ServiceFixture();
+        var path = Path.Combine(fx.Library, "Lang Lang", "Piano Book (2019)", "Clair de lune.opus");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, "not audio");
+        var itemId = Guid.NewGuid();
+        fx.LibraryManager.GetItemById(itemId).Returns(new Audio { Path = path });
+
+        var ex = Assert.Throws<ArgumentException>(() => fx.Service.QueueReplacement(itemId, "https://youtu.be/abc"));
+
+        Assert.Equal("That song's file could not be read.", ex.Message);
+        Assert.Empty(fx.Db.GetAllItems());
+    }
 
     [Fact]
     public void DeleteCachedFile_RemovesEveryFileOfTheItemOnly()
