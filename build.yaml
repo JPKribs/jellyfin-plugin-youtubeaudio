@@ -1,7 +1,7 @@
 ---
 name: "YouTube Audio"
 guid: "7323ea64-a200-4265-ab8f-e7ae27d06c38"
-version: "12.2.4.0"
+version: "12.2.4.1"
 targetAbi: "12.2.0.0"
 framework: "net10.0"
 overview: "Download YouTube audio directly to a Jellyfin Music Library."
@@ -17,8 +17,10 @@ artifacts:
 - "YoutubeDLSharp.dll"
 - "TagLibSharp.dll"
 changelog:
+  fixed:
+  - Admin pages show the reason the server gives for a refused action
+  - Replacing a song whose file cannot be read is refused with a reason
+  - Faster metadata matching after each download
+  - The Apple Music search cache stays bounded
   developer:
-  - Still built for Jellyfin 12.2 (target ABI 12.2.0.0, unchanged).
-  - Updated test dependencies (Microsoft.NET.Test.Sdk 18.11, NSubstitute 6.2, xunit 2.9.3, xunit.runner.visualstudio 4.0.1).
-  - Microsoft.Data.Sqlite.Core is now compiled against 10.0.11, the version Jellyfin 12.2 ships. It is not bundled, so nothing changes at runtime.
-  - No user-facing changes in this release; the plugin works the same as 12.2.3.4.
+  - Built with JPKribs.Jellyfin.Base 2026.10.28.
