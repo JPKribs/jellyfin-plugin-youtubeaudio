@@ -23,11 +23,11 @@ Exit code 0 when every check passes.
 import argparse, base64, hashlib, json, os, plistlib, secrets, shutil, subprocess, sys, time, unicodedata, urllib.error, urllib.parse, urllib.request
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_IMAGE = "jellyfin/jellyfin:12.2.20261005-225228"  # stable 12.2 (no plain "12.2.0" tag exists)
+DEFAULT_IMAGE = "jellyfin/jellyfin:12.4.20261026-211555"  # stable 12.4 (no plain "12.4.0" tag exists)
 
 parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0], formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("--image", default=DEFAULT_IMAGE, help="Jellyfin image to test against (default: %(default)s)")
-parser.add_argument("--expect-version", default="12.2.0", help="server version the image must report; empty to skip (default: %(default)s)")
+parser.add_argument("--expect-version", default="12.4.0", help="server version the image must report; empty to skip (default: %(default)s)")
 parser.add_argument("--port", type=int, default=8097, help="host port for the test server (default: %(default)s)")
 parser.add_argument("--name", default="yta-e2e", help="container name (default: %(default)s)")
 parser.add_argument("--workdir", default=os.path.join(REPO, "e2e", ".work"), help="scratch folder, wiped on start (default: e2e/.work)")
