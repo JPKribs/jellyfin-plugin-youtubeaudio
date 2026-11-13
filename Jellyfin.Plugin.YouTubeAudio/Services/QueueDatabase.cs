@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Globalization;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -618,7 +619,7 @@ public sealed class QueueDatabase : IDisposable
 
     private void EnsureConnection()
     {
-        if (_connection?.State != System.Data.ConnectionState.Open)
+        if (_connection?.State != ConnectionState.Open)
         {
             _connection?.Dispose();
             _connection = new SqliteConnection(BuildConnectionString());
@@ -817,7 +818,6 @@ public sealed class QueueDatabase : IDisposable
             File.Delete(shmPath);
         }
 
-        // Reinitialize
         OpenFreshDatabase();
 
         _logger.LogInformation("Queue database recreated successfully");

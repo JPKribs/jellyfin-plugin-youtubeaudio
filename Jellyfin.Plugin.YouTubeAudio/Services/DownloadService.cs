@@ -60,7 +60,7 @@ public sealed partial class DownloadService : IDisposable
     internal const string ReplacementSource = "replace";
 
     /// <summary>File extensions of songs, for reading an album folder's existing tags.</summary>
-    private static readonly HashSet<string> AudioExtensions = new(StringComparer.OrdinalIgnoreCase) { ".opus", ".ogg", ".mp3", ".m4a", ".flac", ".wav", ".aac", ".wma" };
+    private static readonly HashSet<string> _audioExtensions = new(StringComparer.OrdinalIgnoreCase) { ".opus", ".ogg", ".mp3", ".m4a", ".flac", ".wav", ".aac", ".wma" };
 
     /// <summary>Embedded cover art size, in pixels (always square).</summary>
     private const int CoverArtSize = 1200;
@@ -342,8 +342,8 @@ public sealed partial class DownloadService : IDisposable
                     break;
                 }
 
-                // Re-check under the lock: another caller may have processed this item while we
-                // waited for the semaphore, and re-downloading would clobber edited tags.
+                // Re-check under the lock: another caller may have processed this item while this
+                // run waited for the semaphore, and re-downloading would clobber edited tags.
                 var item = db.GetItemById(candidate.Id);
                 if (item == null || item.Status != QueueStatus.Queued)
                 {
@@ -1858,7 +1858,7 @@ public sealed partial class DownloadService : IDisposable
     [SuppressMessage("Security", "CA3003:Review code for file path injection vulnerabilities", Justification = "Files inside the configured music library.")]
     internal static bool AdoptAlbumTags(TagLib.Tag tag, string albumDir)
     {
-        foreach (var file in Directory.EnumerateFiles(albumDir).Where(f => AudioExtensions.Contains(Path.GetExtension(f))).Order(StringComparer.Ordinal))
+        foreach (var file in Directory.EnumerateFiles(albumDir).Where(f => _audioExtensions.Contains(Path.GetExtension(f))).Order(StringComparer.Ordinal))
         {
             try
             {
@@ -2006,7 +2006,7 @@ public sealed partial class DownloadService : IDisposable
         }
         catch (Exception)
         {
-            // TagLib throws all sorts for a damaged file; treat it as the same track, as before.
+            // TagLib throws all sorts for a damaged file; treat it as the same track.
             return false;
         }
     }
@@ -2259,7 +2259,7 @@ public sealed partial class DownloadService : IDisposable
 
     // ===== Private Helpers =====
 
-    private static QueueItem CreateSingleQueueItem(string url, string ext, string now, string? artist = null, string? album = null, int? year = null, string? title = null)
+    private static QueueItem CreateSingleQueueItem(string url, string ext, string now, string? artist, string? album, int? year, string? title)
     {
         var userTitle = string.IsNullOrWhiteSpace(title) ? null : title;
         return new QueueItem
@@ -2277,7 +2277,6 @@ public sealed partial class DownloadService : IDisposable
             Year = year
         };
     }
-
 
     /// <summary>
     /// Ensures yt-dlp is available. Unless a path is set in Settings, the plugin uses its own
@@ -2756,7 +2755,8 @@ public sealed partial class DownloadService : IDisposable
 
     /// <summary>
     /// Runs a process and returns its combined output flattened to one line, killing it after the
-    /// timeout. Used only for short yt-dlp maintenance commands (-U, --version).
+    /// timeout. Used only for short commands: yt-dlp -U, yt-dlp and Deno --version, and the
+    /// ffmpeg cover crop.
     /// </summary>
     private static async Task<string> RunProcessAsync(string fileName, IReadOnlyList<string> args, TimeSpan timeout)
     {
@@ -2823,7 +2823,6 @@ public sealed partial class DownloadService : IDisposable
     /// multiple genres. Never join them back into a single value.
     /// </summary>
     internal static string[] ParseGenres(string? genre) => TrackMetadataCleaner.CleanGenres(genre);
-
 
     internal static AudioConversionFormat MapToAudioConversionFormat(AudioFormat format)
     {
@@ -2957,7 +2956,7 @@ public sealed partial class DownloadService : IDisposable
             // The tag title is either user-saved or was cleaned when written — show it verbatim.
             dto.MetadataTitle = tagFile.Tag.Title ?? string.Empty;
 
-            // Album artist: first AlbumArtists entry, or fall back to primary artist
+            // Album artist: first AlbumArtists entry, or empty when there is none
             var albumArtists = tagFile.Tag.AlbumArtists ?? Array.Empty<string>();
             dto.AlbumArtist = albumArtists.Length > 0 ? albumArtists[0] : string.Empty;
 
@@ -2965,7 +2964,6 @@ public sealed partial class DownloadService : IDisposable
             dto.TrackNumber = tagFile.Tag.Track > 0 ? (int)tagFile.Tag.Track : null;
             dto.Year = tagFile.Tag.Year > 0 ? (int)tagFile.Tag.Year : null;
 
-            // Join all genres with semicolons
             var genres = tagFile.Tag.Genres ?? Array.Empty<string>();
             dto.Genre = genres.Length > 0 ? string.Join("; ", genres) : string.Empty;
 
@@ -3013,7 +3011,7 @@ public sealed partial class DownloadService : IDisposable
             }
 
             // Only fill fields from info.json when the file tags had no value.
-            // This prevents overwriting user-edited metadata saved via SaveTags.
+            // This prevents overwriting user-edited metadata saved via SaveTagsAsync.
             if (string.IsNullOrEmpty(dto.Album))
             {
                 dto.Album = TrackMetadataCleaner.CleanAlbum(GetJsonString(root, "album")) ?? dto.Album;

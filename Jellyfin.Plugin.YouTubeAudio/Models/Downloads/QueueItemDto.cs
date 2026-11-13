@@ -1,7 +1,7 @@
 namespace Jellyfin.Plugin.YouTubeAudio.Models;
 
 /// <summary>
-/// API response model for a queue item. Extends database model with metadata.
+/// API response model for a queue item: the database fields plus the downloaded file's metadata.
 /// </summary>
 public class QueueItemDto
 {

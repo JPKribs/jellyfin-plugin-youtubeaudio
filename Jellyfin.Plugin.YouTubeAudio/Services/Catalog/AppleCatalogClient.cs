@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,8 +13,8 @@ namespace Jellyfin.Plugin.YouTubeAudio.Services.Catalog;
 /// <summary>
 /// Looks songs and artists up in Apple's public music catalog (the iTunes Search API, which
 /// needs no account or key). Requests are spaced out to stay inside Apple's rate limit, and
-/// answers are cached, up to <see cref="MaxCachedSearches"/> of them. Failures are logged and treated as
-/// "no match", so a lookup never stops a download.
+/// answers are cached, up to <see cref="MaxCachedSearches"/> of them. Failures are logged and
+/// treated as "no match", so a lookup never stops a download.
 /// </summary>
 public sealed class AppleCatalogClient : IDisposable
 {
@@ -114,7 +115,7 @@ public sealed class AppleCatalogClient : IDisposable
             ["term"] = term,
             ["media"] = "music",
             ["entity"] = entity,
-            ["limit"] = limit.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["limit"] = limit.ToString(CultureInfo.InvariantCulture),
             ["country"] = "US"
         };
         using var content = new FormUrlEncodedContent(query);

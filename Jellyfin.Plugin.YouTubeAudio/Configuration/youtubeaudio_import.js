@@ -168,7 +168,7 @@ export default function (view) {
             cb.addEventListener('change', updateSelectedCount);
         });
 
-        // Bind preview controls
+        // Bind cover and preview controls
         body.querySelectorAll('.jpk-table-row').forEach(function(row) {
             var id = row.getAttribute('data-id');
             row.querySelector('.yta-cover-btn').addEventListener('click', function(e) {
@@ -285,7 +285,7 @@ export default function (view) {
             if (!active || !_player) return;
             var duration = isFinite(_player.duration) ? _player.duration : 0;
             var seek = bar.querySelector('.yta-preview-seek');
-            seek.max = duration || 0;
+            seek.max = duration;
             if (document.activeElement !== seek) seek.value = _player.currentTime || 0;
             bar.querySelector('.yta-preview-time').textContent = formatTime(_player.currentTime) + ' / ' + formatTime(duration);
         });
@@ -303,7 +303,7 @@ export default function (view) {
     function renderImportRow(d) {
         var esc = Shared.escapeHtml;
         return '<div class="jpk-table-row jpk-edit-row" data-id="' + esc(d.Id) + '">'
-            // Line 1: Checkbox | Preview (button, then seek bar while playing) | Size | Save
+            // Line 1: Checkbox | Cover | Generate cover | Preview (button, then seek bar while playing) | In library | Size | Save
             + '<div class="jpk-edit-line">'
             + '<label class="emby-checkbox-label"><input type="checkbox" is="emby-checkbox" class="jpk-table-row-checkbox yta-file-check" data-id="' + esc(d.Id) + '" /><span class="checkboxLabel"></span></label>'
             + '<button type="button" class="yta-cover-btn" title="Set cover art" aria-label="Set cover art">' + renderCover(d.Id, d.HasCover) + '</button>'
@@ -372,14 +372,13 @@ export default function (view) {
             countEl.textContent = checked > 0 ? checked + ' selected' : '';
         }
 
-        // Toggle Import/Delete button visibility
         var importBtn = view.querySelector('#btnImportSelected');
         if (importBtn) importBtn.style.visibility = checked > 0 ? '' : 'hidden';
 
         var deleteBtn = view.querySelector('#btnDeleteSelected');
         if (deleteBtn) deleteBtn.style.visibility = checked > 0 ? '' : 'hidden';
 
-        // Disable Apply to Selected when nothing selected
+        // Bulk actions need a selection.
         var applyBtn = view.querySelector('#btnApplyBulk');
         if (applyBtn) applyBtn.disabled = checked === 0;
         var coverBtn = view.querySelector('#btnBulkCover');
@@ -433,7 +432,6 @@ export default function (view) {
         var bulkGenre = normalizeGenre(view.querySelector('#bulkGenre').value);
         var bulkYear = view.querySelector('#bulkYear').value;
 
-        // Only apply fields that have values
         if (!bulkArtist && !bulkFeat && !bulkAlbumArtist && !bulkAlbum && !bulkGenre && !bulkYear) {
             Shared.setStatus('importStatus', 'Enter at least one bulk value to apply.', true);
             return;
@@ -628,7 +626,7 @@ export default function (view) {
         var settings = _coverSettings || {};
         var values = { Artist: albumArtist, Album: album, Year: year };
         var order = String(settings.GeneratedCoverTextOrder || 'Album,Artist,Year').split(',');
-        var shown = String(settings.GeneratedCoverText === undefined || settings.GeneratedCoverText === null ? 'Album' : settings.GeneratedCoverText).split(',');
+        var shown = String(settings.GeneratedCoverText == null ? 'Album' : settings.GeneratedCoverText).split(',');
         var lines = order.filter(function(k) { return shown.indexOf(k) !== -1 && values[k]; }).map(function(k) { return values[k]; });
 
         var colors = settings.GeneratedCoverColors || 'Album';

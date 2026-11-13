@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace Jellyfin.Plugin.YouTubeAudio.Models;
 
 /// <summary>
-/// Response wrapper for paginated queue item lists.
+/// Response wrapper for queue item lists.
 /// </summary>
 public class QueueListResponse
 {

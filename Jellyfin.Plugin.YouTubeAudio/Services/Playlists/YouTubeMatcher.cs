@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using Jellyfin.Plugin.YouTubeAudio.Models;
 
 namespace Jellyfin.Plugin.YouTubeAudio.Services.Playlists;
@@ -94,8 +95,9 @@ public static partial class YouTubeMatcher
     /// <summary>
     /// Returns the best candidate, or null when none is acceptable. A candidate must be close
     /// in length (when both lengths are known) and come from the artist's channel, or name the
-    /// artist in a title that carries the track title (or, for classical titles, the movement). Among the rest, the artist's own channel and the closest length win;
-    /// alternate versions (slowed, live, cover…) lose unless the source title asks for them.
+    /// artist in a title that carries the track title (or, for classical titles, the movement).
+    /// Among the rest, the artist's own channel and the closest length win; alternate versions
+    /// (slowed, live, cover…) lose unless the source title asks for them.
     /// </summary>
     public static MatchResult? PickBest(PlaylistTrack track, IEnumerable<MatchCandidate> candidates)
     {
@@ -166,6 +168,7 @@ public static partial class YouTubeMatcher
             {
                 continue;
             }
+
             var alternateVersion = _alternateVersionWords.Any(word =>
                 candidateTitleText.Contains(" " + word + " ", StringComparison.Ordinal)
                 && !sourceTitleText.Contains(" " + word + " ", StringComparison.Ordinal));
@@ -400,6 +403,6 @@ public static partial class YouTubeMatcher
         return words;
     }
 
-    [System.Text.RegularExpressions.GeneratedRegex(@"[\(\[][^\)\]]*[\)\]]")]
-    private static partial System.Text.RegularExpressions.Regex TitleBracketRegex();
+    [GeneratedRegex(@"[\(\[][^\)\]]*[\)\]]")]
+    private static partial Regex TitleBracketRegex();
 }

@@ -45,13 +45,11 @@ export default function (view) {
         searchVal = searchVal.toLowerCase();
 
         return _allItems.filter(function(item) {
-            // Filter out Imported items (they move to Import tab)
+            // Imported items move to the Import tab.
             if (item.StatusCode === 3) return false;
 
-            // Status filter
             if (filterVal && String(item.StatusCode) !== filterVal) return false;
 
-            // Search filter
             if (searchVal) {
                 var haystack = [item.Title, item.Artist, item.Url].join(' ').toLowerCase();
                 if (haystack.indexOf(searchVal) === -1) return false;
@@ -132,7 +130,6 @@ export default function (view) {
                 var editingRow = body.querySelector('.jpk-table-row[data-id="' + editingId.replace(/"/g, '') + '"]');
                 if (editingRow && editingRow.querySelector('.yta-link-btn')) openLinkEditor(editingRow, editingValue);
             }
-
         }
 
         updateQueueSelectedCount();
@@ -724,8 +721,10 @@ export default function (view) {
     }
 
     // bindSourceTabs
-    // Shows the form for the chosen source card (YouTube, Apple Music) and remembers the last
-    // one used in this browser.
+    // Shows the form for the chosen source card (YouTube, Apple Music, Spotify, Replace a Song)
+    // and remembers the last one used in this browser.
+    //
+    // No parameters
     function bindSourceTabs() {
         var group = view.querySelector('#sourceChoices');
         if (!group) return;
@@ -834,7 +833,6 @@ export default function (view) {
             });
         }
 
-        // Search and filter handlers
         var searchInput = view.querySelector('#queueSearch');
         if (searchInput) {
             searchInput.addEventListener('input', Shared.debounce(renderQueue, 200));

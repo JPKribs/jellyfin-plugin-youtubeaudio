@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using Jellyfin.Plugin.YouTubeAudio.Models;
 
 namespace Jellyfin.Plugin.YouTubeAudio.Services.Playlists;
@@ -22,7 +23,7 @@ public sealed partial class SpotifyPlaylistSource : IPlaylistSource
     // Joining words left lowercase in a rebuilt playlist name unless they start it.
     private static readonly HashSet<string> _smallWords = new(StringComparer.Ordinal) { "a", "an", "and", "as", "at", "but", "by", "for", "in", "of", "on", "or", "the", "to", "with" };
 
-    /// <summary>The playlist ID used for Liked Songs, which is treated like a whole library.</summary>
+    /// <summary>The file name of the Liked Songs export, which is treated like a whole library.</summary>
     internal const string LikedSongsFile = "liked.csv";
 
     /// <inheritdoc />
@@ -255,6 +256,6 @@ public sealed partial class SpotifyPlaylistSource : IPlaylistSource
     private static int? ParsePositiveInt(string? value)
         => int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number) && number > 0 ? number : null;
 
-    [System.Text.RegularExpressions.GeneratedRegex(@"(?<!\\), ")]
-    private static partial System.Text.RegularExpressions.Regex EscapedCommaSplitRegex();
+    [GeneratedRegex(@"(?<!\\), ")]
+    private static partial Regex EscapedCommaSplitRegex();
 }

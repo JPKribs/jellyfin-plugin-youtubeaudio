@@ -349,10 +349,6 @@ public sealed class PlaylistSyncService : IHostedService, IDisposable
         if (doneKeys.Count > 0)
         {
             _dbProvider.Database.MarkPlaylistEntriesAdded(target.Id, doneKeys);
-        }
-
-        if (doneKeys.Count > 0)
-        {
             await ReorderAsync(target, userId).ConfigureAwait(false);
         }
 

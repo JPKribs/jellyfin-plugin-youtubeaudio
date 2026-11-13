@@ -74,7 +74,6 @@
 
         var el = function (id) { return document.getElementById(id); };
         function show(id) { el(id).classList.remove('hidden'); }
-        function hide(id) { el(id).classList.add('hidden'); }
         function val(id) { return (el(id).value || '').trim(); }
         // Shows the result banner: kind is 'info', 'success' or 'error'; an empty message hides it.
         function status(message, kind) {
@@ -83,7 +82,7 @@
             m.className = 'yta-msg' + (message ? ' ' + (kind || 'info') : '');
         }
 
-        // Hide the base card's loading heading + spinner when leaving the loading state.
+        // Hide the base card's loading heading and spinner when leaving the loading state.
         function leaveLoading() {
             var h = document.querySelector('.jpk-status-card > h1');
             var s = document.querySelector('.jpk-status-card > .jpk-spinner');

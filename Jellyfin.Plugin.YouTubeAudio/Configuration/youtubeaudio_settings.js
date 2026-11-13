@@ -112,7 +112,7 @@ export default function (view) {
         if (!list) return;
         var keys = String(order || 'Album,Artist,Year').split(',').filter(function(k) { return COVER_TEXT_NAMES[k]; });
         Object.keys(COVER_TEXT_NAMES).forEach(function(k) { if (keys.indexOf(k) === -1) keys.push(k); });
-        var on = String(shown === undefined || shown === null ? 'Album' : shown).split(',');
+        var on = String(shown == null ? 'Album' : shown).split(',');
         list.innerHTML = keys.map(function(k, i) {
             return '<li data-key="' + k + '">'
                 + '<label class="emby-checkbox-label"><input type="checkbox" is="emby-checkbox"' + (on.indexOf(k) !== -1 ? ' checked' : '') + ' />'
@@ -231,7 +231,6 @@ export default function (view) {
     //
     // No parameters
     function bindEvents() {
-        // Initialize collapsible sections
         Shared.initCollapsibles();
 
         // Library dropdown change -> update path field

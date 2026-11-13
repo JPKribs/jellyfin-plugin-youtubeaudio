@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Jellyfin.Data.Enums;
 using Jellyfin.Plugin.YouTubeAudio.Models;
+using Jellyfin.Plugin.YouTubeAudio.Services.Playlists;
 using JPKribs.Jellyfin.Base;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Audio;
@@ -14,7 +15,7 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.YouTubeAudio.Services;
 
 /// <summary>
-/// Queries the local Jellyfin library for artists, albums, and music libraries.
+/// Queries the local Jellyfin music libraries for artists, albums, songs, and covers, and asks for rescans.
 /// </summary>
 public class LibraryService
 {
@@ -171,7 +172,7 @@ public class LibraryService
         => names
             .Where(n => !string.IsNullOrWhiteSpace(n))
             .Select(n => n.Trim())
-            .GroupBy(Services.Playlists.TrackMetadataCleaner.Normalize, StringComparer.Ordinal)
+            .GroupBy(TrackMetadataCleaner.Normalize, StringComparer.Ordinal)
             .Where(g => g.Key.Length > 0)
             .ToDictionary(
                 g => g.Key,

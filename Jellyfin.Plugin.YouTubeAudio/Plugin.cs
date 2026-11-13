@@ -87,7 +87,7 @@ public class Plugin : PluginBase<Plugin, PluginConfiguration>
             EmbeddedResourcePath = $"{ns}.Configuration.youtubeaudio_settings.js"
         };
 
-        // Plugin specific shared JS layered on top of the base kit (all shared CSS now lives in the base package).
+        // Plugin-specific shared JS layered on top of the base kit (all shared CSS lives in the base package).
         yield return new PluginPageInfo
         {
             Name = "youtubeaudio_shared.js",
