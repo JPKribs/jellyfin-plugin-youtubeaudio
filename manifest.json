@@ -9,6 +9,14 @@
     "category": "Music",
     "versions": [
       {
+        "version": "12.4.4.2",
+        "changelog": "\n## Changed\n- The code and documentation are cleaned up with no change to what the plugin does\n- Built for Jellyfin 12.4. Servers on an earlier Jellyfin keep the previous release.\n\n## Developer\n- Removed unused copies of the screenshots from the plugin's Assets folder",
+        "targetAbi": "12.4.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/v12.4.4.2/jellyfin-plugin-youtubeaudio-12.4.4.2.zip",
+        "checksum": "40c2f92326082835a74d61928ae2031e",
+        "timestamp": "2026-11-13T08:37:13Z"
+      },
+      {
         "version": "12.2.4.1",
         "changelog": "\n## Fixed\n- Admin pages show the reason the server gives for a refused action\n- Replacing a song whose file cannot be read is refused with a reason\n- Faster metadata matching after each download\n- The Apple Music search cache stays bounded\n\n## Developer\n- Built with JPKribs.Jellyfin.Base 2026.10.28.",
         "targetAbi": "12.2.0.0",
