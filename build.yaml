@@ -1,7 +1,7 @@
 ---
 name: "YouTube Audio"
 guid: "7323ea64-a200-4265-ab8f-e7ae27d06c38"
-version: "12.4.4.3"
+version: "12.4.4.4"
 targetAbi: "12.4.0.0"
 framework: "net10.0"
 overview: "Download YouTube audio directly to a Jellyfin Music Library."
@@ -17,7 +17,7 @@ artifacts:
 - "YoutubeDLSharp.dll"
 - "TagLibSharp.dll"
 changelog:
-  changed:
-  - No change to what the plugin does. It writes no activity log entries, so none needed the new shared shape.
+  fixed:
+  - The arrows on collapsible sections are back to their usual size
   developer:
-  - Uses JPKribs.Jellyfin.Base 2026.11.13.2
+  - Uses JPKribs.Jellyfin.Base 2026.11.13.3
