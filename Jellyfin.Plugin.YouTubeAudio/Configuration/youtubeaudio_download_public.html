@@ -1,21 +1,4 @@
 <!-- Content fragment injected into the base JPKribs.Jellyfin.Base status card. -->
-<link rel="stylesheet" href="../web/configurationpage?name=youtubeaudio_jpkribs_shared.css" />
-<style>
-    .yta-hint { margin: 6px 0 0; font-size: 0.82rem; line-height: 1.4; color: rgba(255,255,255,0.5); text-align: left; }
-    .yta-optional { font-weight: 400; color: rgba(255,255,255,0.45); }
-    /* No spinner on the year field: it is typed, not stepped. */
-    #year { -moz-appearance: textfield; appearance: textfield; }
-    #year::-webkit-outer-spin-button, #year::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-    /* Result banner: only shown when there is something to say. */
-    .yta-msg { display: none; margin-top: 14px; padding: 10px 12px; border-radius: 8px; font-size: 0.9rem; line-height: 1.4; text-align: left; }
-    .yta-msg.info { display: block; background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.75); }
-    .yta-msg.success { display: block; background: rgba(76,175,80,0.15); border: 1px solid rgba(76,175,80,0.45); color: #a5d6a7; }
-    .yta-msg.error { display: block; background: rgba(244,67,54,0.13); border: 1px solid rgba(244,67,54,0.45); color: #ef9a9a; }
-    /* Outlined secondary button: full width like Submit, without competing with it. */
-    .yta-secondary { display: block; box-sizing: border-box; width: 100%; margin-top: 12px; padding: 0.8em; border-radius: 8px;
-        border: 1px solid rgba(255,255,255,0.25); color: #fff; font-size: 0.95rem; font-weight: 600; text-align: center; text-decoration: none; }
-    .yta-secondary:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.4); }
-</style>
 
 <div id="signin" class="hidden">
     <h1>Sign in required</h1>
@@ -31,34 +14,35 @@
 
 <form id="form" class="hidden" autocomplete="off" novalidate>
     <h1>Request a Download</h1>
-    <p>Paste a YouTube link to a song or a playlist.</p>
+    <p>Paste a YouTube link to a song or a playlist. Audio-only or lyric uploads work best.</p>
 
     <div class="base-fields">
         <label for="url">YouTube Link</label>
-        <input type="url" id="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=…" />
-        <p class="yta-hint">Audio-only or lyric uploads work best.</p>
+        <input type="url" id="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ" />
 
         <label for="artist">Artist</label>
-        <div id="artistBox"></div>
+        <input type="text" id="artist" list="artistList" placeholder="Artist" />
+        <datalist id="artistList"></datalist>
 
         <label for="album">Album</label>
-        <div id="albumBox"></div>
+        <input type="text" id="album" list="albumList" placeholder="Album" />
+        <datalist id="albumList"></datalist>
 
         <div class="base-field-pair">
             <div>
                 <label for="year">Year</label>
-                <input type="number" id="year" inputmode="numeric" min="1500" max="3000" step="1" placeholder="e.g. 2018" />
+                <input type="text" id="year" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="2018" />
             </div>
             <div>
-                <label for="title">Title <span class="yta-optional">(optional)</span></label>
+                <label for="title">Title <span class="base-hint">(optional)</span></label>
                 <input type="text" id="title" placeholder="From the video if empty" />
             </div>
         </div>
     </div>
 
     <button type="submit" id="submit" class="base-submit">Submit</button>
-    <div id="msg" class="yta-msg" role="status" aria-live="polite"></div>
-    <a id="queueLink" class="yta-secondary" href="Queue">View the Queue</a>
+    <p id="msg" class="base-note" role="status" aria-live="polite"></p>
+    <a id="queueLink" class="base-btn" href="Queue">View the Queue</a>
 </form>
 
 <script>
@@ -75,19 +59,17 @@
         var el = function (id) { return document.getElementById(id); };
         function show(id) { el(id).classList.remove('hidden'); }
         function val(id) { return (el(id).value || '').trim(); }
-        // Shows the result banner: kind is 'info', 'success' or 'error'; an empty message hides it.
-        function status(message, kind) {
-            var m = el('msg');
-            m.textContent = message || '';
-            m.className = 'yta-msg' + (message ? ' ' + (kind || 'info') : '');
+        // Shows a result under the form. An empty message clears it.
+        function status(message) {
+            el('msg').textContent = message || '';
         }
 
         // Hide the base card's loading heading and spinner when leaving the loading state.
         function leaveLoading() {
             var h = document.querySelector('.base-status-card > h1');
             var s = document.querySelector('.base-status-card > .base-spinner');
-            if (h) h.style.display = 'none';
-            if (s) s.style.display = 'none';
+            if (h) h.classList.add('hidden');
+            if (s) s.classList.add('hidden');
         }
 
         ['signinLink', 'deniedLink'].forEach(function (id) { var a = el(id); if (a) a.href = root; });
@@ -125,64 +107,59 @@
 
         var token = getToken();
         var authHeader = 'MediaBrowser Token="' + token + '"';
-        var artistControl = null;
-        var albumControl = null;
 
         if (!token) { leaveLoading(); show('signin'); return; }
 
-        function lookup(kind, getArtist) {
+        // suggest
+        // Fills a field's list of suggestions from the library as the user types, after a short pause.
+        //
+        // Inputs
+        // inputId [string]: The field.
+        // listId [string]: Its datalist.
+        // kind [string]: Artists or Albums.
+        // getArtist [function]: Returns the artist that limits an album search [optional].
+        function suggest(inputId, listId, kind, getArtist) {
             var t = null;
-            return function (query, cb) {
+            el(inputId).addEventListener('input', function () {
                 if (t) clearTimeout(t);
-                if (!query || query.length < 2) { cb([]); return; }
+                var query = val(inputId);
+                if (query.length < 2) { el(listId).innerHTML = ''; return; }
                 t = setTimeout(function () {
                     var u = path + '/' + kind + '?query=' + encodeURIComponent(query);
                     if (getArtist) { var a = getArtist(); if (a) { u += '&artist=' + encodeURIComponent(a); } }
                     fetch(u, { headers: { 'Authorization': authHeader, 'Accept': 'application/json' } })
                         .then(function (r) { return r.ok ? r.json() : []; })
-                        .then(function (res) { cb(res || []); })
-                        .catch(function () { cb([]); });
+                        .then(function (res) {
+                            var list = el(listId);
+                            list.innerHTML = '';
+                            (res || []).forEach(function (name) {
+                                var opt = document.createElement('option');
+                                opt.value = name;
+                                list.appendChild(opt);
+                            });
+                        })
+                        .catch(function () { return null; });
                 }, 300);
-            };
+            });
         }
 
-        function makeControl(boxId, placeholder, searchFn, shared) {
-            var box = el(boxId);
-            if (shared && searchFn) {
-                var combo = shared.createSearchableComboBox({ placeholder: placeholder, searchFn: searchFn });
-                box.appendChild(combo.element);
-                return combo;
-            }
-            var input = document.createElement('input');
-            input.type = 'text';
-            input.placeholder = placeholder;
-            box.appendChild(input);
-            return { getValue: function () { return input.value; }, setValue: function (v) { input.value = v || ''; } };
-        }
-
-        function buildControls(shared) {
-            artistControl = makeControl('artistBox', 'Type to search artists…', lookup('Artists'), shared);
-            albumControl = makeControl('albumBox', 'Type to search albums…', lookup('Albums', function () { return artistControl.getValue(); }), shared);
-        }
-
-        function gate(shared) {
-            fetch(infoUrl, { headers: { 'Authorization': authHeader, 'Accept': 'application/json' } })
-                .then(function (r) {
-                    if (r.status === 401) { leaveLoading(); show('signin'); return null; }
-                    return r.json();
-                })
-                .then(function (info) {
-                    if (info === null) return;
-                    leaveLoading();
-                    if (info && info.Approved) { buildControls(shared); show('form'); } else { show('denied'); }
-                })
-                .catch(function () { leaveLoading(); show('denied'); });
-        }
-
-        // createSearchableComboBox lives on the shared bag, not the module — build it from createShared.
-        import(prefix + '/web/configurationpage?name=youtubeaudio_jpkribs_shared.js')
-            .then(function (mod) { gate(mod.createShared(document, '7323ea64-a200-4265-ab8f-e7ae27d06c38', 'YouTube')); })
-            .catch(function () { gate(null); });
+        fetch(infoUrl, { headers: { 'Authorization': authHeader, 'Accept': 'application/json' } })
+            .then(function (r) {
+                if (r.status === 401) { leaveLoading(); show('signin'); return null; }
+                return r.json();
+            })
+            .then(function (info) {
+                if (info === null) return;
+                leaveLoading();
+                if (info && info.Approved) {
+                    suggest('artist', 'artistList', 'Artists');
+                    suggest('album', 'albumList', 'Albums', function () { return val('artist'); });
+                    show('form');
+                } else {
+                    show('denied');
+                }
+            })
+            .catch(function () { leaveLoading(); show('denied'); });
 
         // A playlist link downloads many tracks, so a single title doesn't apply — disable the field for playlists.
         function syncTitleForPlaylist() {
@@ -199,18 +176,18 @@
             e.preventDefault();
 
             var url = val('url');
-            var artist = (artistControl ? artistControl.getValue() : '').trim();
-            var album = (albumControl ? albumControl.getValue() : '').trim();
+            var artist = val('artist');
+            var album = val('album');
             var yearRaw = val('year');
             var title = val('title');
 
-            if (!url || !artist || !album || !yearRaw) { status('Add the YouTube link, artist, album and year.', 'error'); return; }
+            if (!url || !artist || !album || !yearRaw) { status('Add the YouTube link, artist, album and year.'); return; }
             var year = parseInt(yearRaw, 10);
-            if (isNaN(year)) { status('Enter the year as a number, like 2018.', 'error'); return; }
+            if (isNaN(year)) { status('Enter the year as a number, like 2018.'); return; }
 
             var btn = el('submit');
             btn.disabled = true;
-            status('Submitting…', 'info');
+            status('Submitting…');
 
             fetch(submitUrl, {
                 method: 'POST',
@@ -223,14 +200,12 @@
                 })
                 .then(function (res) {
                     btn.disabled = false;
-                    if (!res.ok) { status((res.data && res.data.Error) || 'The request could not be submitted.', 'error'); return; }
+                    if (!res.ok) { status((res.data && res.data.Error) || 'The request could not be submitted.'); return; }
                     var n = (res.data && res.data.Queued) || 0;
-                    status('Queued ' + n + ' track' + (n === 1 ? '' : 's') + ' for download.', 'success');
+                    status('Queued ' + n + ' track' + (n === 1 ? '' : 's') + ' for download.');
                     el('form').reset();
-                    if (artistControl && artistControl.setValue) artistControl.setValue('');
-                    if (albumControl && albumControl.setValue) albumControl.setValue('');
                 })
-                .catch(function () { btn.disabled = false; status('Could not reach the server. Please try again.', 'error'); });
+                .catch(function () { btn.disabled = false; status('Could not reach the server. Please try again.'); });
         });
     })();
 </script>
