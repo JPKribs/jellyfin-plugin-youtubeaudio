@@ -151,10 +151,10 @@ export function createPage(view, opts) {
 ### CSS
 
 ```css
-/* yta-cover-btn */
-/* A square button that shows a file's cover, or an add picture icon. */
-/* Example: <button class="yta-cover-btn"><img alt="" src="cover.jpg" /></button> */
-.yta-cover-btn { ... }
+/* yta-import-body */
+/* A file's cover picker beside its tag fields, wrapping under them on a narrow screen. */
+/* Example: <div class="yta-import-body"><div class="yta-cover-cell"></div><div class="yta-import-fields"></div></div> */
+.yta-import-body { ... }
 ```
 
 * Three lines above each component, the name, what it looks like, and one example.

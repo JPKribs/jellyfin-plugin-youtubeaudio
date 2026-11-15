@@ -456,14 +456,13 @@ grep -o "export function create[A-Za-z]*" ~/.nuget/packages/jpkribs.jellyfin.bas
 
 ## Hand Built Pieces
 
-These pieces are still built by hand in this plugin while Base has a component for them. Replace each when its page is next changed, and delete its `yta-` styles in the same commit. Add nothing to this list.
+Every list, row, card, badge, picker, player, and button in this plugin is a Base component or Base markup. These small pieces work around an option Base lacks. Delete each in the commit that moves to the Base version with the option. Add nothing to this list.
 
-| Hand built today | Replace with |
+| Piece | Missing Base option |
 | :--- | :--- |
-| `.yta-cover-btn` on each Import row | `createImagePicker` |
-| `.yta-preview*`, the play button, seek bar, and clock on each Import row | `createAudioPlayer` |
-| `.yta-q-*` pills and rows on the Public Queue | `createFilteredList` with a `pills` filter |
-| `.yta-hint`, `.yta-msg`, and `.yta-secondary` on the user page | `fieldDescription`, `base-status-text`, and `base-button secondary` |
+| `.yta-cover-cell .base-image-picker-remove` hides Remove on each Import row's cover, since an embedded cover can only be replaced | An Image Picker option to leave out Remove, such as `removable: false` |
+| A downloading queue row has no Change Link action, so its status sits nearer the edge than on the other rows | A `disabled` flag on a Media Card action, or a Media Card option that keeps the actions column's width with no actions |
+| The user page shows its result as a `base-note` line and suggests names through a plain `datalist`, since the status template loads no icon font | Status template classes for a status line and an error line, and a search field that draws no icon glyph |
 
 ## Checklist
 

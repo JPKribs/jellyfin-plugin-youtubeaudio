@@ -38,7 +38,7 @@ By default, downloaded files are cached in the Jellyfin data directory. Override
 
 ## Approved Users
 
-By default, only users with access to the Admin Dashboard can download and import tracks. Enabling a user here allows select users to download tracks into your queue, which you can then approve and import into your library. See [Approved User Downloads](ApprovedUserDownloads.md).
+By default, only users with access to the Admin Dashboard can download and import tracks. Enabling a user here allows select users to download tracks into your queue from the Download page at `/YouTube/Download`, which you can then approve and import into your library. They cannot import themselves. See [Approved User Downloads](ApprovedUserDownloads.md). Any signed in user can follow the queue at `/YouTube/Queue`, as described in [Public Queue](PublicQueue.md).
 
 **Playlist Limit** caps how many videos an approved user can queue from one playlist link (200 by default). A larger playlist is refused with a message asking them to have an administrator add it. Set it to 0 for no limit. Administrators are never limited.
 

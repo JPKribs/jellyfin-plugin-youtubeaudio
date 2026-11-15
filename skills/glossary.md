@@ -74,7 +74,7 @@ The agreed name for every concept in this plugin. The UI, the docs, messages, an
 | Download Format | Opus, MP3, or M4A | `AudioFormat` | Codec, file type |
 | Download cache | The folder downloaded files wait in until they are imported | `QueueDatabaseProvider.GetAudioCacheDirectory` | Staging, temp |
 | Cache Directory Override | A folder for the download cache instead of the Jellyfin data folder | `CacheDirectoryOverride` | Cache path |
-| Approved users | Users who may queue downloads from the user page | `ApprovedUserIds` | Allowed users, whitelist |
+| Approved users | Users who may queue downloads from the user page, set in the Approved Users section of Settings | `ApprovedUserIds` | Allowed users, whitelist |
 | User page | The page at `/YouTube/Download` where approved users queue links | `youtubeaudio_download_public.html` | Public download page, portal |
 | Public Queue | The read only queue at `/YouTube/Queue` for any signed in user | `youtubeaudio_queue_public.html`, `PublicQueueItem` | Status page, queue viewer |
 | Playlist Limit | The most videos an approved user can queue from one playlist link | `MaxPublicPlaylistItems` | Cap, max items |

@@ -23,9 +23,16 @@ changelog:
   - Playlist exports are chosen with a drop zone, and a library export lists its playlists with Select All
   - The Import tab selects files with the list's own Select All, Import, and Delete
   - Each Settings section reports its save beside its Save button, and the Album Art text order uses move buttons
+  - Queue rows on the Download tab are media cards with their status in one column and Change Link in the top corner, and the playlist imports and the library song search match them
+  - Add Library Songs sits beside the Playlist Imports in Progress list
+  - Each file on the Import tab has its own audio player with a seek bar and time, and its cover in a picker with Set Cover and Replace
+  - Bulk Updates on the Import tab has a Cover picker for Set Cover on Selected
+  - The user page and Public Queue addresses are described in the documentation rather than listed in Settings
+  - The user page suggests library artists and albums as you type, and the Public Queue filters by status with pills and lists songs in boxed rows
   fixed:
   - The arrows on collapsible sections are back to their usual size
   developer:
   - Uses JPKribs.Jellyfin.Base 2026.11.17, with its base- class names, Filtered List, List, Checkbox List, Ordered List, File Picker, and Prompt Dialog in place of the hand built queue, import list, playlist picker, cover text list, file input, and link editor
+  - Uses Base's Media Card, Audio Player, Image Picker, Checkbox, Record List, and Pill Group in place of the hand built queue rows, preview player, cover button, cover text checkboxes, and Public Queue pills and rows
   - Stored times are written with Base's UtcTime
   - Adds starthere.md and the guides in skills/

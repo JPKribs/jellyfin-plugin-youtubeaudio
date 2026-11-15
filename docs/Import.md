@@ -8,9 +8,10 @@ Tag your downloaded files and bring them into your library.
 
 1. Review and edit metadata for each downloaded file (title, artist, album artist, featured artists, album, year, genre, track number). Songs your library already has are marked **In Library**, so you can skip a second copy.
 2. To apply the same metadata to multiple files at once, fill in the bulk fields at the top and click **Apply to Selected**.
-3. To add or replace cover art, click the picture square on a row, or select several files and click **Set Cover on Selected**, then choose an image. Pictures are cropped to a centred square. Choosing an album your library already has takes that album's cover. For an album with no art, click the wand beside the picture square to generate a cover: a soft blend of three colours drawn from the album name, with the name in the middle.
-4. Remember to save any unsaved changes on individual tracks before importing (look for the save icon).
-5. Select the files you want to import and click **Import**.
+3. To listen to a file before you tag it, click the play button at the top of its row. The seek bar and the time sit beside it, and starting one file pauses any other.
+4. To add or replace cover art, click **Set Cover** or **Replace** under a row's cover, or drop a picture on it. To give several files the same cover, choose it under **Cover** in Bulk Updates, select the files, and click **Set Cover on Selected**. Pictures are cropped to a centred square of at most 1200 pixels. Choosing an album your library already has takes that album's cover. For an album with no art, click the wand at the top of the row to generate a cover: a soft blend of three colours drawn from the album name, with the name in the middle.
+5. Remember to save any unsaved changes on individual tracks before importing (look for the save icon).
+6. Select the files you want to import and click **Import**.
 
 ## Where Files Go
 
