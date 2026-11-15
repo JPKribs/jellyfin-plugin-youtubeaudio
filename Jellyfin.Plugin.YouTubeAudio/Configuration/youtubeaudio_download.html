@@ -1,6 +1,6 @@
 <div id="YouTubeAudioDownloadPage" data-role="page"
      class="page type-interior pluginConfigurationPage withTabs"
-     data-require="emby-input,emby-button,emby-select,emby-checkbox"
+     data-require="emby-input,emby-button"
      data-controller="__plugin/youtubeaudio_download.js">
     <div data-role="content">
         <div class="content-primary">
@@ -10,151 +10,103 @@
                     <div class="sectionTitleContainer flex align-items-center">
                         <h1 class="sectionTitle">Download</h1>
                     </div>
-                    <div class="fieldDescription">Queue songs to download as audio, then tag and import them from the Import tab.</div>
+                    <div class="fieldDescription">Queues songs to download as audio, ready to tag and import on the Import tab.</div>
 
-                    <!-- Sources: pick where songs come from; that source's form shows below -->
-                    <div class="jpk-choice-group yta-source-choices" id="sourceChoices" role="radiogroup" aria-label="Source">
-                        <label class="jpk-choice">
+                    <!-- Sources -->
+                    <!-- Picks where songs come from, and shows that source's form below. -->
+                    <div class="base-choice-group yta-source-choices" id="sourceChoices" role="radiogroup" aria-label="Source">
+                        <label class="base-choice">
                             <input type="radio" name="downloadSource" value="youtube" />
-                            <span class="jpk-choice-name">YouTube</span>
-                            <span class="jpk-choice-text">Paste a link to a video or a playlist.</span>
+                            <span class="base-choice-name">YouTube</span>
+                            <span class="base-choice-text">Paste a link to a video or a playlist.</span>
                         </label>
-                        <label class="jpk-choice">
+                        <label class="base-choice">
                             <input type="radio" name="downloadSource" value="applemusic" />
-                            <span class="jpk-choice-name">Apple Music</span>
-                            <span class="jpk-choice-text">Upload a playlist or library exported from the Music app.</span>
+                            <span class="base-choice-name">Apple Music</span>
+                            <span class="base-choice-text">Upload a playlist or library exported from the Music app.</span>
                         </label>
-                        <label class="jpk-choice">
+                        <label class="base-choice">
                             <input type="radio" name="downloadSource" value="spotify" />
-                            <span class="jpk-choice-name">Spotify</span>
-                            <span class="jpk-choice-text">Upload playlists exported with Exportify.</span>
+                            <span class="base-choice-name">Spotify</span>
+                            <span class="base-choice-text">Upload playlists exported with Exportify.</span>
                         </label>
-                        <label class="jpk-choice">
+                        <label class="base-choice">
                             <input type="radio" name="downloadSource" value="replace" />
-                            <span class="jpk-choice-name">Replace a Song</span>
-                            <span class="jpk-choice-text">Swap a library song's audio for a different YouTube upload.</span>
+                            <span class="base-choice-name">Replace a Song</span>
+                            <span class="base-choice-text">Swap a library song's audio for a different YouTube upload.</span>
                         </label>
                     </div>
 
                     <!-- YouTube -->
                     <div class="yta-source-panel" id="panelYouTube" data-source="youtube">
                         <div class="inputContainer">
-                            <label for="txtYouTubeUrl">YouTube URL:</label>
-                            <input is="emby-input" type="text" id="txtYouTubeUrl"
-                                   placeholder="https://www.youtube.com/watch..." />
-                            <div class="fieldDescription">A YouTube video or playlist link. Each video is queued to download as audio.</div>
+                            <label for="txtYouTubeUrl">YouTube URL</label>
+                            <input is="emby-input" type="text" id="txtYouTubeUrl" placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ" />
+                            <div class="fieldDescription">A video or playlist link. Each video is queued to download as audio.</div>
                         </div>
-                        <button is="emby-button" type="button" id="btnQueue" class="raised jpk-button-submit jpk-button-small" disabled>
+                        <button is="emby-button" type="button" id="btnQueue" class="raised base-button primary small" disabled>
                             <span>Queue</span>
                         </button>
                     </div>
 
-                    <!-- Apple Music and Spotify: one export form, with each service's own instructions -->
+                    <!-- Apple Music and Spotify -->
+                    <!-- One export form, with each service's own instructions. -->
                     <div class="yta-source-panel" id="panelPlaylist" data-source="applemusic spotify" hidden>
-                        <div class="inputContainer yta-playlist-import">
-                            <label for="filePlaylist">Playlist Export:</label>
-                            <input type="file" id="filePlaylist" class="yta-file-input" accept=".txt,.xml" />
-                            <div class="fieldDescription yta-source-help" data-source="applemusic">In the Music app, choose File &rarr; Library &rarr; Export Library&hellip; to pick from all your playlists, or export one playlist as XML or text.</div>
-                            <div class="fieldDescription yta-source-help" data-source="spotify" hidden>Export your playlists with <a href="https://github.com/watsonbox/exportify" target="_blank" rel="noopener">Exportify</a>: one playlist as a CSV file, or all of them as a ZIP. Liked Songs is offered like a whole library and does not become a playlist.</div>
-                            <div class="fieldDescription">Each track is matched to a YouTube upload when it downloads, and keeps the export's title, artist, album and track details as its tags.</div>
-                            <div id="playlistChoices" class="yta-playlist-choices" hidden></div>
+                        <div class="inputContainer">
+                            <label>Playlist Export</label>
+                            <div id="playlistFile"></div>
+                            <div class="fieldDescription yta-source-help" data-source="applemusic">In the Music app, select File &gt; Library &gt; Export Library to pick from every playlist, or export one playlist as XML or text.</div>
+                            <div class="fieldDescription yta-source-help" data-source="spotify" hidden>Export one playlist as a CSV file, or all of them as a ZIP, with <a href="https://github.com/watsonbox/exportify" target="_blank" rel="noopener">Exportify</a>. Liked Songs downloads its songs without becoming a playlist.</div>
+                            <div class="fieldDescription">Each track is matched to a YouTube upload when it downloads, and keeps the export's details as its tags.</div>
+                            <div id="playlistChoices" hidden></div>
                         </div>
                         <div class="selectContainer">
-                            <label>Playlist Owner:</label>
+                            <label>Playlist Owner</label>
                             <div id="playlistOwner"></div>
-                            <div class="fieldDescription">Each imported playlist becomes a private Jellyfin playlist with the same name, owned by this user, filled as its songs reach the library. If the user already has a playlist with that name, missing songs are added to it.</div>
+                            <div class="fieldDescription">Each playlist becomes a private Jellyfin playlist of this user, filled as its songs reach the library. A playlist the user already has with that name gets the songs it is missing.</div>
                         </div>
-                        <button is="emby-button" type="button" id="btnImportPlaylist" class="raised jpk-button-submit jpk-button-small" disabled>
+                        <button is="emby-button" type="button" id="btnImportPlaylist" class="raised base-button primary small" disabled>
                             <span>Queue Playlist</span>
                         </button>
 
-                        <!-- Playlists being filled -->
+                        <!-- Playlist Imports -->
+                        <!-- Jellyfin playlists that fill as their songs reach the library. -->
                         <div id="playlistTargetsSection" class="yta-playlist-targets" hidden>
                             <div class="yta-subheading">
-                                <h3>Playlist Imports in Progress</h3>
-                                <button type="button" class="jpk-table-reload-btn" id="btnSyncPlaylists" title="Add songs that are in the library now">
-                                    <span class="material-icons jpk-table-reload-icon">sync</span>
+                                <h3 class="base-subsection-title">Playlist Imports in Progress</h3>
+                                <button type="button" class="base-row-btn" id="btnSyncPlaylists" title="Add Library Songs" aria-label="Add Library Songs">
+                                    <span class="material-icons" aria-hidden="true">sync</span>
                                 </button>
                             </div>
-                            <div class="jpk-table-body" id="playlistTargets"></div>
+                            <div id="playlistTargets"></div>
                         </div>
                     </div>
 
-                    <!-- Replace a library song with a different upload -->
+                    <!-- Replace a Song -->
+                    <!-- Swaps a library song's audio for a different upload. -->
                     <div class="yta-source-panel" id="panelReplace" data-source="replace" hidden>
                         <div class="inputContainer">
-                            <label for="txtReplaceSearch">Library Song:</label>
-                            <input is="emby-input" type="text" id="txtReplaceSearch" placeholder="Search by title..." autocomplete="off" />
-                            <div id="replaceResults" class="yta-replace-results"></div>
-                            <div class="fieldDescription">The song whose audio is wrong. Its file keeps its place in the library, its tags and its cover.</div>
+                            <label>Library Song</label>
+                            <div id="replaceResults"></div>
+                            <div class="fieldDescription">The song whose audio is wrong. Its file keeps its place in the library, its tags, and its cover.</div>
                         </div>
                         <div class="inputContainer">
-                            <label for="txtReplaceUrl">YouTube URL:</label>
-                            <input is="emby-input" type="text" id="txtReplaceUrl" placeholder="https://www.youtube.com/watch..." />
-                            <div class="fieldDescription">The video with the right audio. It downloads, then waits on the Import tab; importing it overwrites the song's file.</div>
+                            <label for="txtReplaceUrl">YouTube URL</label>
+                            <input is="emby-input" type="text" id="txtReplaceUrl" placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ" />
+                            <div class="fieldDescription">The video with the right audio. Importing it on the Import tab overwrites the song's file.</div>
                         </div>
-                        <button is="emby-button" type="button" id="btnReplace" class="raised jpk-button-submit jpk-button-small" disabled>
+                        <button is="emby-button" type="button" id="btnReplace" class="raised base-button primary small" disabled>
                             <span>Queue Replacement</span>
                         </button>
                     </div>
 
-                    <!-- Queue List (PaginatedTable pattern) -->
-                    <div class="jpk-table-wrapper" id="queueWrapper">
-
-                        <div class="sectionTitleContainer flex align-items-center yta-section-heading">
-                            <h1 class="sectionTitle">Queue</h1>
-                        </div>
-
-                        <!-- Status count cards -->
-                        <div id="queueMetrics" class="jpk-cards"></div>
-
-                        <span id="queueStatus" class="jpk-status-text"></span>
-
-                        <!-- Controls: Search + Filter + Reload -->
-                        <div class="jpk-table-controls">
-                            <input type="text" id="queueSearch" class="jpk-table-search" placeholder="Search queue..." />
-                            <div class="jpk-table-filter-wrapper">
-                                <select id="queueFilter" class="jpk-table-filter">
-                                    <option value="">All</option>
-                                    <option value="0">Queued</option>
-                                    <option value="1">Downloading</option>
-                                    <option value="2">Downloaded</option>
-                                    <option value="4">Error</option>
-                                </select>
-                                <span class="material-icons jpk-table-filter-arrow" aria-hidden="true">expand_more</span>
-                            </div>
-                        </div>
-
-                        <!-- Selection Header -->
-                        <div class="jpk-table-selection-header">
-                            <label class="emby-checkbox-label">
-                                <input type="checkbox" is="emby-checkbox" id="chkSelectAllQueue" />
-                                <span class="checkboxLabel">Select all</span>
-                            </label>
-                            <span class="jpk-table-selected-count" id="queueSelectedCount"></span>
-                            <span class="jpk-table-header-spacer"></span>
-                            <div class="jpk-table-bulk-actions">
-                                <button is="emby-button" type="button" id="btnProcess" class="raised jpk-button-submit" style="visibility: hidden;">
-                                    <span>Download</span>
-                                </button>
-                                <button is="emby-button" type="button" id="btnDeleteSelectedQueue" class="raised jpk-button-destructive" style="visibility: hidden;">
-                                    <span>Delete</span>
-                                </button>
-                                <button is="emby-button" type="button" id="btnCancelDownloads" class="raised jpk-button-destructive" style="display: none;" title="Stop the downloads that are running">
-                                    <span>Cancel Downloads</span>
-                                </button>
-                                <button type="button" class="jpk-table-reload-btn" id="btnRefreshQueue" title="Refresh">
-                                    <span class="material-icons jpk-table-reload-icon">refresh</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Queue Body -->
-                        <div class="jpk-table-body" id="queueBody"></div>
-
-                        <!-- Footer -->
-                        <div class="jpk-table-footer" id="queueFooter"></div>
+                    <!-- Queue -->
+                    <!-- Songs waiting to download, downloading, downloaded, or failed. -->
+                    <div class="sectionTitleContainer flex align-items-center yta-section-heading">
+                        <h1 class="sectionTitle">Queue</h1>
                     </div>
+                    <span id="queueStatus" class="base-status-text" role="status"></span>
+                    <div id="queueList"></div>
 
                 </div>
             </form>
@@ -163,34 +115,29 @@
 
     <link rel="stylesheet" href="configurationpage?name=youtubeaudio_jpkribs_shared.css">
     <style>
-        /* Space every section after the first evenly. Specific enough to beat Jellyfin's
-           ".sectionTitleContainer:first-child" reset, since the Queue heading opens its wrapper. */
+        /* yta-section-heading */
+        /* Spaces a page heading that follows the forms above it. */
+        /* Example: <div class="sectionTitleContainer yta-section-heading"><h1 class="sectionTitle">Queue</h1></div> */
         .sectionTitleContainer.yta-section-heading,
         .sectionTitleContainer.yta-section-heading:first-child { margin-top: 2em; }
-        .yta-file-input { display: block; margin: 0.5em 0; color: inherit; font: inherit; }
-        .yta-playlist-choices { margin-top: 1em; }
-        .yta-playlist-choices .emby-checkbox-label { display: flex; margin: 0.3em 0; }
-        .yta-status-cell { display: flex; align-items: center; gap: 8px; }
-        .yta-link-editor:not([hidden]) { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
-        .yta-link-input { flex: 1 1 260px; min-width: 0; padding: 6px 10px; border-radius: 4px; font: inherit; color: inherit;
-            background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.18); }
-        .yta-link-editor .emby-button { margin: 0; }
-        .yta-link-error { flex-basis: 100%; color: #ef9a9a; font-size: 0.85em; }
-        .yta-link-error:empty { display: none; }
-        .yta-match-note { color: #ff9800; font-size: 0.85em; margin-top: 0.2em; }
-        /* Source choice cards, then the chosen source's form. */
-        .yta-source-choices { margin-top: 1.5em; }
-        .yta-source-panel { margin-top: 1.2em; }
-        .yta-source-help a { color: #00a4dc; }
-        .yta-playlist-targets { margin-top: 1.8em; }
-        .yta-subheading { display: flex; align-items: center; gap: 8px; margin-bottom: 0.5em; }
-        .yta-replace-results { margin-top: 0.5em; }
-        .yta-replace-result { display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 6px 10px; margin: 2px 0; text-align: left;
-            border-radius: 4px; border: 1px solid transparent; background: rgba(255,255,255,0.04); color: inherit; font: inherit; cursor: pointer; }
-        .yta-replace-result:hover { background: rgba(255,255,255,0.1); }
-        .yta-replace-result.selected { border-color: #00a4dc; background: rgba(0,164,220,0.15); }
-        .yta-replace-result-sub { opacity: 0.7; font-size: 0.9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .yta-replace-empty { opacity: 0.7; font-size: 0.9em; padding: 4px 0; }
-        .yta-subheading h3 { margin: 0; font-size: 1.1em; font-weight: 500; }
+
+        /* yta-source-panel */
+        /* The chosen source's form, under the source cards. */
+        /* Example: <div class="yta-source-panel" data-source="youtube"></div> */
+        .yta-source-choices { margin-top: var(--base-gap-wide); }
+        .yta-source-panel { margin-top: var(--base-gap-wide); }
+
+        /* yta-playlist-targets */
+        /* The playlists being filled, with a sync button beside the heading. */
+        /* Example: <div class="yta-playlist-targets"><div class="yta-subheading"><h3>Imports</h3></div></div> */
+        .yta-playlist-targets { margin-top: var(--base-gap-wide); }
+        .yta-subheading { display: flex; align-items: center; gap: var(--base-gap-narrow); }
+
+        /* yta-queue-row */
+        /* One queue item, its details beside its link button and status badge. */
+        /* Example: <div class="yta-queue-row"><div class="base-table-item-info"></div><div class="yta-queue-status"></div></div> */
+        .yta-queue-row { display: flex; align-items: center; gap: var(--base-gap-narrow); min-width: 0; }
+        .yta-queue-row > .base-table-item-info { flex: 1 1 auto; min-width: 0; }
+        .yta-queue-status { display: flex; align-items: center; gap: var(--base-gap-narrow); flex: none; }
     </style>
 </div>

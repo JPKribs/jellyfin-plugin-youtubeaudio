@@ -1,4 +1,58 @@
-import { createPage } from './configurationpage?name=youtubeaudio_shared.js';
+// youtubeaudio_import.js
+// Drives the Import tab, where downloaded songs are tagged, given covers, and imported into the library.
+
+import { createPage, createFilteredList, confirmDialog } from './configurationpage?name=youtubeaudio_shared.js';
+
+// normalizeGenre
+// Puts one space after every ";" in a genre list. The server splits on ";" either way.
+//
+// Inputs
+// value [string]: The genre text.
+//
+// Output
+// [string]: The tidied text.
+function normalizeGenre(value) {
+    return (value || '').replace(/\s*;\s*/g, '; ').replace(/;\s*$/, '').trim();
+}
+
+// countLabel
+// Names a count with the right plural.
+//
+// Inputs
+// count [number]: How many.
+// one [string]: The word for one.
+// many [string]: The word for several.
+//
+// Output
+// [string]: Such as "1 file" or "3 files".
+function countLabel(count, one, many) {
+    return count + ' ' + (count === 1 ? one : many);
+}
+
+// importResultMessage
+// Says what an import did.
+//
+// Inputs
+// result [object]: The server's ImportResult.
+//
+// Output
+// [string]: The status message.
+function importResultMessage(result) {
+    result = result || {};
+    var imported = result.ImportedIds ? result.ImportedIds.length : 0;
+    var replaced = result.ReplacedIds ? result.ReplacedIds.length : 0;
+    var skipped = result.SkippedIds ? result.SkippedIds.length : 0;
+    var errors = result.Errors ? result.Errors.length : 0;
+    var parts = [];
+    if (imported - replaced > 0) parts.push((imported - replaced) + ' imported');
+    if (replaced > 0) parts.push(replaced + ' replaced');
+    if (skipped > 0) parts.push(skipped + ' skipped as duplicates');
+    if (result.RemovedFiles > 0) parts.push(countLabel(result.RemovedFiles, 'library single', 'library singles') + ' replaced by the album version');
+    if (errors > 0) parts.push(errors + ' could not be imported');
+    if (!parts.length) return 'No files imported.';
+    var text = parts.join(', ') + '.';
+    return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
 export default function (view) {
     'use strict';
@@ -6,204 +60,132 @@ export default function (view) {
     var Shared = null;
 
     var _downloads = [];
+    var _list = null;
     var _artistSearch = null;
     var _bulkArtistCombo = null;
     var _bulkAlbumCombo = null;
     var _coverTargets = [];
     var _coverSettings = null;
-    var _activeComboBoxes = []; // Track all combo-boxes for cleanup
+    var _rowCombos = {};
 
     // One shared player previews the downloaded file of whichever row is playing.
     var _player = null;
     var _playingId = null;
 
-    // Tidy genre display so every ";" is followed by one space ("Rock;Pop" -> "Rock; Pop").
-    // Cosmetic only; the server splits on ";" and writes one GENRE field per genre regardless.
-    function normalizeGenre(value) {
-        return (value || '').replace(/\s*;\s*/g, '; ').replace(/;\s*$/, '').trim();
-    }
-
-    // ============================================
-    // DATA LOADING
-    // ============================================
-
+    // loadDownloads
+    // Reads the downloaded files and hands them to the list.
     function loadDownloads() {
-        var refreshBtn = view.querySelector('#btnRefreshDownloads');
-        if (refreshBtn) refreshBtn.classList.add('spinning');
-
         if (!_artistSearch) _artistSearch = Shared.createDebouncedSearch('Artists', 300);
 
         Shared.apiRequest('Downloads', 'GET')
-            .then(function(response) {
-                _downloads = (response && response.Items) || response || [];
-                renderImportList();
-                if (refreshBtn) refreshBtn.classList.remove('spinning');
-            })
-            .catch(function() {
-                _downloads = [];
-                renderImportList();
-                if (refreshBtn) refreshBtn.classList.remove('spinning');
-            });
+            .then(function (response) { _downloads = (response && response.Items) || response || []; })
+            .catch(function () { _downloads = []; })
+            .then(renderImportList);
     }
 
-    // ============================================
-    // ALBUM SEARCH (filtered by artist)
-    // ============================================
-
+    // createAlbumSearchForArtist
+    // Builds a combo box search of library albums, limited to one artist when there is one.
+    //
+    // Inputs
+    // getArtistFn [function]: Returns the artist to limit the search to.
+    //
+    // Output
+    // [function]: The searchFn for a combo box.
     function createAlbumSearchForArtist(getArtistFn) {
         var timeout = null;
-        return function(query, callback) {
+        return function (query, callback) {
             if (timeout) clearTimeout(timeout);
             if (!query || query.length < 2) {
                 callback([]);
                 return;
             }
-            timeout = setTimeout(function() {
+            timeout = setTimeout(function () {
                 var artist = getArtistFn();
                 var endpoint = 'Albums?query=' + encodeURIComponent(query);
-                if (artist) {
-                    endpoint += '&artist=' + encodeURIComponent(artist);
-                }
+                if (artist) endpoint += '&artist=' + encodeURIComponent(artist);
                 Shared.apiRequest(endpoint, 'GET')
-                    .then(function(results) { callback(results || []); })
-                    .catch(function() { callback([]); });
+                    .then(function (results) { callback(results || []); })
+                    .catch(function () { callback([]); });
             }, 300);
         };
     }
 
-    // ============================================
-    // COMBO-BOX CLEANUP
-    // ============================================
-
-    function destroyActiveComboBoxes() {
-        for (var i = 0; i < _activeComboBoxes.length; i++) {
-            _activeComboBoxes[i].destroy();
-        }
-        _activeComboBoxes = [];
+    // destroyRowCombos
+    // Destroys the combo boxes of one row, or of every row.
+    //
+    // Inputs
+    // id [string]: The row, or nothing for every row.
+    function destroyRowCombos(id) {
+        Object.keys(_rowCombos).forEach(function (key) {
+            if (id && key !== id) return;
+            _rowCombos[key].forEach(function (combo) { combo.destroy(); });
+            delete _rowCombos[key];
+        });
     }
 
-    // ============================================
-    // RENDERING (two-line card layout per row)
-    // ============================================
+    // rowFor
+    // Finds the drawn row of a downloaded file.
+    //
+    // Inputs
+    // id [string]: The file's queue item id.
+    //
+    // Output
+    // [HTMLElement]: The row, or null.
+    function rowFor(id) {
+        return view.querySelector('.yta-import-row[data-id="' + CSS.escape(id) + '"]');
+    }
 
+    // selectedRows
+    // Returns the drawn rows of the selected files.
+    //
+    // Output
+    // [HTMLElement[]]: The rows.
+    function selectedRows() {
+        return (_list ? _list.getSelected() : []).map(rowFor).filter(Boolean);
+    }
+
+    // buildList
+    // Builds the files as a Base Filtered List with selection, Import and Delete.
+    function buildList() {
+        var host = Shared.getEl('importList');
+        if (!host || _list) return;
+        _list = createFilteredList({
+            items: [],
+            rowKey: 'Id',
+            render: renderImportRow,
+            search: false,
+            selectable: 'multiple',
+            bulkActions: [
+                { id: 'import', label: 'Import', icon: 'library_add', variant: 'primary', onClick: importSelected },
+                { id: 'delete', label: 'Delete', icon: 'delete', variant: 'destructive', onClick: deleteSelected }
+            ],
+            actions: [{ id: 'refresh', label: 'Refresh', icon: 'refresh', onClick: loadDownloads }],
+            emptyText: 'No downloaded files yet. Download songs on the Download tab.',
+            label: 'Downloaded files',
+            onSelectionChange: updateBulkButtons
+        });
+        host.appendChild(_list.element);
+    }
+
+    // renderImportList
+    // Hands the files to the list, drops the combo boxes of files that are gone, and stops a preview whose file is gone.
     function renderImportList() {
-        var body = view.querySelector('#importBody');
-        var footer = view.querySelector('#importFooter');
-        if (!body) return;
-
-        // Destroy previous combo-boxes before re-rendering
-        destroyActiveComboBoxes();
-
-        if (_downloads.length === 0) {
-            body.innerHTML = '<div class="jpk-table-empty">No downloaded files ready for import. Download some audio first.</div>';
-            if (footer) footer.textContent = '';
-            updateSelectedCount();
-            return;
-        }
-
-        var html = '';
-        for (var i = 0; i < _downloads.length; i++) {
-            html += renderImportRow(_downloads[i]);
-        }
-        body.innerHTML = html;
-        if (footer) footer.textContent = _downloads.length + ' file' + (_downloads.length !== 1 ? 's' : '');
-
-        // Initialize combo-boxes for each row
-        body.querySelectorAll('.jpk-table-row').forEach(function(row) {
-            var artistCell = row.querySelector('.yta-artist-cell');
-            var albumCell = row.querySelector('.yta-album-cell');
-            var saveBtn = row.querySelector('.jpk-row-btn.save');
-            function markDirty() { if (saveBtn) saveBtn.classList.add('dirty'); }
-
-            // Artist combo-box
-            var artistCombo = Shared.createSearchableComboBox({
-                placeholder: 'Type to search artists...',
-                searchFn: _artistSearch,
-                onInput: markDirty
-            });
-            artistCombo.setValue(artistCell.getAttribute('data-value'));
-            artistCell.appendChild(artistCombo.element);
-            artistCell._combo = artistCombo;
-            _activeComboBoxes.push(artistCombo);
-
-            // Album combo-box (filtered by artist in this row)
-            var albumSearchFn = createAlbumSearchForArtist(function() {
-                return artistCombo.getValue();
-            });
-            var albumCombo = Shared.createSearchableComboBox({
-                placeholder: 'Type to search albums...',
-                searchFn: albumSearchFn,
-                onInput: markDirty,
-                onSelect: function(value) {
-                    markDirty();
-                    takeAlbumCover(row, value);
-                }
-            });
-            albumCombo.setValue(albumCell.getAttribute('data-value'));
-            albumCell.appendChild(albumCombo.element);
-            albumCell._combo = albumCombo;
-            _activeComboBoxes.push(albumCombo);
-        });
-
-        // Bind save handlers and dirty-state tracking
-        body.querySelectorAll('.jpk-table-row').forEach(function(row) {
-            var saveBtn = row.querySelector('.jpk-row-btn.save');
-            if (saveBtn) {
-                saveBtn.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    saveRowTags(row);
-                });
-            }
-
-            // Mark save button dirty on any input change
-            row.querySelectorAll('.jpk-edit-input').forEach(function(input) {
-                input.addEventListener('input', function() {
-                    if (saveBtn) saveBtn.classList.add('dirty');
-                });
-            });
-        });
-
-        // Bind row checkboxes
-        body.querySelectorAll('.jpk-table-row-checkbox').forEach(function(cb) {
-            cb.addEventListener('change', updateSelectedCount);
-        });
-
-        // Bind cover and preview controls
-        body.querySelectorAll('.jpk-table-row').forEach(function(row) {
-            var id = row.getAttribute('data-id');
-            row.querySelector('.yta-cover-btn').addEventListener('click', function(e) {
-                e.stopPropagation();
-                pickCover([id]);
-            });
-            row.querySelector('.yta-wand-btn').addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                generateCoverFor(row);
-            });
-            row.querySelector('.yta-preview-btn').addEventListener('click', function(e) {
-                e.stopPropagation();
-                togglePreview(id);
-            });
-            row.querySelector('.yta-preview-seek').addEventListener('input', function(e) {
-                if (_player && _playingId === id) _player.currentTime = parseFloat(e.target.value) || 0;
-            });
-        });
-
-        // A row that was playing and has since been imported or deleted stops playing.
-        if (_playingId && !_downloads.some(function(d) { return d.Id === _playingId; })) stopPreview();
+        var ids = _downloads.map(function (d) { return d.Id; });
+        Object.keys(_rowCombos).forEach(function (id) { if (ids.indexOf(id) === -1) destroyRowCombos(id); });
+        if (_list) _list.setItems(_downloads);
+        if (_playingId && ids.indexOf(_playingId) === -1) stopPreview();
         updatePreviewUi();
-
-        updateSelectedCount();
+        updateBulkButtons();
     }
-
-    // ============================================
-    // PREVIEW
-    // ============================================
 
     // formatTime
     // Formats seconds as m:ss for the preview clock.
     //
-    // Param: seconds | position or duration in seconds
+    // Inputs
+    // seconds [number]: A position or a length.
+    //
+    // Output
+    // [string]: Such as 3:07.
     function formatTime(seconds) {
         if (!isFinite(seconds) || seconds < 0) seconds = 0;
         var s = Math.floor(seconds);
@@ -211,9 +193,10 @@ export default function (view) {
     }
 
     // ensurePlayer
-    // Creates the shared audio element on first use and keeps the rows in sync with it.
+    // Creates the shared audio element on first use and keeps the rows in step with it.
     //
-    // No parameters
+    // Output
+    // [HTMLAudioElement]: The player.
     function ensurePlayer() {
         if (_player) return _player;
         _player = new Audio();
@@ -228,15 +211,16 @@ export default function (view) {
         _player.addEventListener('error', function() {
             if (!_playingId) return;
             stopPreview();
-            Dashboard.alert('This file could not be played in this browser.');
+            Shared.setStatus('importStatus', 'Could not play this file in this browser.', true);
         });
         return _player;
     }
 
     // togglePreview
-    // Plays or pauses a row's downloaded file; starting another row stops the current one.
+    // Plays or pauses a row's downloaded file. The token rides in the query, since an audio element cannot send headers.
     //
-    // Param: id | queue item id of the row
+    // Inputs
+    // id [string]: The file's queue item id.
     function togglePreview(id) {
         var player = ensurePlayer();
         if (_playingId === id) {
@@ -245,8 +229,6 @@ export default function (view) {
         }
 
         _playingId = id;
-        // An <audio> element cannot send headers, so the token rides in the query (ApiKey; the
-        // older api_key is rejected by current Jellyfin).
         player.src = ApiClient.getUrl('YouTubeAudio/Downloads/' + encodeURIComponent(id) + '/Audio', { ApiKey: ApiClient.accessToken() });
         player.play().catch(function() {});
         updatePreviewUi();
@@ -254,8 +236,6 @@ export default function (view) {
 
     // stopPreview
     // Stops playback and releases the current file.
-    //
-    // No parameters
     function stopPreview() {
         _playingId = null;
         if (_player) {
@@ -267,17 +247,16 @@ export default function (view) {
     }
 
     // updatePreviewUi
-    // Shows play/pause on every row, and the seek bar and clock on the row that is playing.
-    //
-    // No parameters
+    // Shows play or pause on every row, and the seek bar and clock on the row that is playing.
     function updatePreviewUi() {
-        view.querySelectorAll('#importBody .jpk-table-row').forEach(function(row) {
+        view.querySelectorAll('.yta-import-row').forEach(function(row) {
             var active = row.getAttribute('data-id') === _playingId;
             var playing = active && _player && !_player.paused;
             var btn = row.querySelector('.yta-preview-btn');
             if (!btn) return;
             btn.querySelector('.material-icons').textContent = playing ? 'pause' : 'play_arrow';
-            btn.title = playing ? 'Pause preview' : 'Play preview';
+            btn.title = playing ? 'Pause' : 'Play';
+            btn.setAttribute('aria-label', btn.title);
             btn.classList.toggle('active', active);
 
             var bar = row.querySelector('.yta-preview');
@@ -292,277 +271,273 @@ export default function (view) {
     }
 
     // renderCover
-    // The row's cover thumbnail, or an "add picture" icon when the file has none. An <img>
-    // cannot send headers, so the token rides in the query, like the audio preview.
+    // Draws a row's cover thumbnail, or an add picture icon when the file has none. The token rides in the query, since an image cannot send headers.
+    //
+    // Inputs
+    // id [string]: The file's queue item id.
+    // hasCover [boolean]: Whether the file has a cover.
+    //
+    // Output
+    // [string]: The HTML.
     function renderCover(id, hasCover) {
-        if (!hasCover) return '<span class="material-icons">add_photo_alternate</span>';
+        if (!hasCover) return '<span class="material-icons" aria-hidden="true">add_photo_alternate</span>';
         var url = ApiClient.getUrl('YouTubeAudio/Downloads/' + encodeURIComponent(id) + '/Cover', { ApiKey: ApiClient.accessToken(), v: Date.now() });
         return '<img alt="" src="' + Shared.escapeHtml(url) + '" />';
     }
 
-    function renderImportRow(d) {
+    // renderImportRow
+    // Draws one file as an edit row of its tags, with its cover, preview, and save controls, and wires them.
+    //
+    // Inputs
+    // d [object]: The downloaded file.
+    // index [number]: Its place in the list.
+    // check [HTMLInputElement]: The row's selection checkbox, placed at the start of the first line.
+    //
+    // Output
+    // [HTMLElement]: The row.
+    function renderImportRow(d, index, check) {
         var esc = Shared.escapeHtml;
-        return '<div class="jpk-table-row jpk-edit-row" data-id="' + esc(d.Id) + '">'
-            // Line 1: Checkbox | Cover | Generate cover | Preview (button, then seek bar while playing) | In library | Size | Save
-            + '<div class="jpk-edit-line">'
-            + '<label class="emby-checkbox-label"><input type="checkbox" is="emby-checkbox" class="jpk-table-row-checkbox yta-file-check" data-id="' + esc(d.Id) + '" /><span class="checkboxLabel"></span></label>'
-            + '<button type="button" class="yta-cover-btn" title="Set cover art" aria-label="Set cover art">' + renderCover(d.Id, d.HasCover) + '</button>'
-            + '<button type="button" class="jpk-row-btn yta-wand-btn" title="Generate cover art" aria-label="Generate cover art"><span class="material-icons">auto_fix_high</span></button>'
+        var row = document.createElement('div');
+        row.className = 'base-edit-row yta-import-row';
+        row.setAttribute('data-id', d.Id);
+        row.innerHTML =
+            '<div class="base-edit-line yta-import-head">'
+            + '<button type="button" class="yta-cover-btn" title="Set Cover" aria-label="Set Cover">' + renderCover(d.Id, d.HasCover) + '</button>'
+            + '<button type="button" class="base-row-btn yta-wand-btn" title="Generate Cover" aria-label="Generate Cover"><span class="material-icons" aria-hidden="true">auto_fix_high</span></button>'
             + '<div class="yta-preview-group">'
-            + '<button type="button" class="jpk-row-btn yta-preview-btn" title="Play preview"><span class="material-icons">play_arrow</span></button>'
+            + '<button type="button" class="base-row-btn yta-preview-btn" title="Play" aria-label="Play"><span class="material-icons" aria-hidden="true">play_arrow</span></button>'
             + '<div class="yta-preview" hidden>'
             + '<input type="range" class="yta-preview-seek" min="0" max="0" step="0.1" value="0" aria-label="Seek" />'
             + '<span class="yta-preview-time">0:00 / 0:00</span>'
             + '</div>'
             + '</div>'
-            + (d.InLibrary ? '<span class="yta-in-library" title="This song is already in your music library. Importing it adds a second copy.">Already in your library</span>' : '')
-            + '<span class="jpk-edit-secondary">' + Shared.formatSize(d.FileSize) + '</span>'
-            + '<button type="button" class="jpk-row-btn save" title="Save tags"><span class="material-icons">save</span></button>'
+            + (d.InLibrary ? '<span title="The library already has this song. Importing it adds a second copy.">' + Shared.badge('orange', 'In Library') + '</span>' : '')
+            + '<span class="base-edit-secondary">' + esc(Shared.formatSize(d.FileSize)) + '</span>'
+            + '<button type="button" class="base-row-btn save" title="Save Tags" aria-label="Save Tags"><span class="material-icons" aria-hidden="true">save</span></button>'
             + '</div>'
-            // Line 2: Title (6/7) | Track # (1/7)
-            + '<div class="jpk-edit-line">'
-            + '<div class="jpk-field" style="flex:6">'
-            + '<label>Title</label>'
-            + '<input type="text" class="jpk-edit-input yta-field-title" value="' + esc(d.MetadataTitle) + '" placeholder="Title" />'
+            + '<div class="base-edit-line">'
+            + '<div class="base-field yta-grow-6"><label>Title</label>'
+            + '<input type="text" class="base-edit-input yta-field-title" value="' + esc(d.MetadataTitle) + '" placeholder="Title" aria-label="Title" /></div>'
+            + '<div class="base-field yta-grow-1"><label>Track</label>'
+            + '<input type="number" class="base-edit-input yta-field-trackNumber" value="' + esc(d.TrackNumber || '') + '" placeholder="1" aria-label="Track" /></div>'
             + '</div>'
-            + '<div class="jpk-field" style="flex:1">'
-            + '<label>Track #</label>'
-            + '<input type="number" class="jpk-edit-input yta-field-trackNumber" value="' + (d.TrackNumber || '') + '" placeholder="#" />'
+            + '<div class="base-edit-line">'
+            + '<div class="base-field yta-artist-cell"><label>Artist</label></div>'
+            + '<div class="base-field"><label>Album Artist</label>'
+            + '<input type="text" class="base-edit-input yta-field-albumArtist" value="' + esc(d.AlbumArtist) + '" placeholder="Artist" aria-label="Album Artist" /></div>'
+            + '<div class="base-field"><label>Featured Artists</label>'
+            + '<input type="text" class="base-edit-input yta-field-feat" value="' + esc(d.FeaturedArtist) + '" placeholder="Artist B; Artist C" aria-label="Featured Artists" /></div>'
             + '</div>'
-            + '</div>'
-            // Line 3: Artist | Album Artist | Feat. Artists (equal) — matches the bulk-edit bar order
-            + '<div class="jpk-edit-line">'
-            + '<div class="jpk-field yta-artist-cell" data-value="' + esc(d.Artist) + '">'
-            + '<label>Artist</label>'
-            + '</div>'
-            + '<div class="jpk-field">'
-            + '<label>Album Artist</label>'
-            + '<input type="text" class="jpk-edit-input yta-field-albumArtist" value="' + esc(d.AlbumArtist) + '" placeholder="Defaults to Artist" />'
-            + '</div>'
-            + '<div class="jpk-field">'
-            + '<label>Feat. Artists</label>'
-            + '<input type="text" class="jpk-edit-input yta-field-feat" value="' + esc(d.FeaturedArtist) + '" placeholder="Artist B; Artist C" />'
-            + '</div>'
-            + '</div>'
-            // Line 4: Album (3/7) | Year (1/7) | Genre (3/7)
-            + '<div class="jpk-edit-line">'
-            + '<div class="jpk-field yta-album-cell" style="flex:3" data-value="' + esc(d.Album) + '">'
-            + '<label>Album</label>'
-            + '</div>'
-            + '<div class="jpk-field" style="flex:1">'
-            + '<label>Year</label>'
-            + '<input type="number" class="jpk-edit-input yta-field-year" value="' + (d.Year || '') + '" placeholder="Year" />'
-            + '</div>'
-            + '<div class="jpk-field" style="flex:3">'
-            + '<label>Genre</label>'
-            + '<input type="text" class="jpk-edit-input yta-field-genre" value="' + esc(d.Genre) + '" placeholder="Classical; Baroque" />'
-            + '</div>'
-            + '</div>'
+            + '<div class="base-edit-line">'
+            + '<div class="base-field yta-album-cell yta-grow-3"><label>Album</label></div>'
+            + '<div class="base-field yta-grow-1"><label>Year</label>'
+            + '<input type="number" class="base-edit-input yta-field-year" value="' + esc(d.Year || '') + '" placeholder="2024" aria-label="Year" /></div>'
+            + '<div class="base-field yta-grow-3"><label>Genre</label>'
+            + '<input type="text" class="base-edit-input yta-field-genre" value="' + esc(d.Genre) + '" placeholder="Classical; Baroque" aria-label="Genre" /></div>'
             + '</div>';
+
+        var head = row.querySelector('.yta-import-head');
+        if (check) head.insertBefore(check, head.firstChild);
+
+        var saveBtn = row.querySelector('.base-row-btn.save');
+        function markDirty() { saveBtn.classList.add('dirty'); }
+
+        destroyRowCombos(d.Id);
+        var artistCell = row.querySelector('.yta-artist-cell');
+        var artistCombo = Shared.createSearchableComboBox({
+            placeholder: 'Search artists',
+            searchFn: _artistSearch,
+            onInput: markDirty
+        });
+        artistCombo.setValue(d.Artist || '');
+        artistCell.appendChild(artistCombo.element);
+        artistCell._combo = artistCombo;
+
+        var albumCell = row.querySelector('.yta-album-cell');
+        var albumCombo = Shared.createSearchableComboBox({
+            placeholder: 'Search albums',
+            searchFn: createAlbumSearchForArtist(function () { return artistCombo.getValue(); }),
+            onInput: markDirty,
+            onSelect: function (value) {
+                markDirty();
+                takeAlbumCover(row, value);
+            }
+        });
+        albumCombo.setValue(d.Album || '');
+        albumCell.appendChild(albumCombo.element);
+        albumCell._combo = albumCombo;
+        _rowCombos[d.Id] = [artistCombo, albumCombo];
+
+        saveBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            saveRowTags(row);
+        });
+        row.querySelectorAll('.base-edit-input').forEach(function (input) {
+            input.addEventListener('input', markDirty);
+        });
+        row.querySelector('.yta-cover-btn').addEventListener('click', function (e) {
+            e.stopPropagation();
+            pickCover([d.Id]);
+        });
+        row.querySelector('.yta-wand-btn').addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            generateCoverFor(row);
+        });
+        row.querySelector('.yta-preview-btn').addEventListener('click', function (e) {
+            e.stopPropagation();
+            togglePreview(d.Id);
+        });
+        row.querySelector('.yta-preview-seek').addEventListener('input', function (e) {
+            if (_player && _playingId === d.Id) _player.currentTime = parseFloat(e.target.value) || 0;
+        });
+
+        return row;
     }
 
-    // ============================================
-    // SELECTION
-    // ============================================
-
-    function updateSelectedCount() {
-        var checked = view.querySelectorAll('.yta-file-check:checked').length;
-        var countEl = view.querySelector('#selectedCount');
-        if (countEl) {
-            countEl.textContent = checked > 0 ? checked + ' selected' : '';
-        }
-
-        var importBtn = view.querySelector('#btnImportSelected');
-        if (importBtn) importBtn.style.visibility = checked > 0 ? '' : 'hidden';
-
-        var deleteBtn = view.querySelector('#btnDeleteSelected');
-        if (deleteBtn) deleteBtn.style.visibility = checked > 0 ? '' : 'hidden';
-
-        // Bulk actions need a selection.
-        var applyBtn = view.querySelector('#btnApplyBulk');
-        if (applyBtn) applyBtn.disabled = checked === 0;
-        var coverBtn = view.querySelector('#btnBulkCover');
-        if (coverBtn) coverBtn.disabled = checked === 0;
+    // updateBulkButtons
+    // Turns the bulk edit buttons on while files are selected.
+    function updateBulkButtons() {
+        var none = !_list || _list.getSelected().length === 0;
+        var applyBtn = Shared.getEl('btnApplyBulk');
+        if (applyBtn) applyBtn.disabled = none;
+        var coverBtn = Shared.getEl('btnBulkCover');
+        if (coverBtn) coverBtn.disabled = none;
     }
 
-    // ============================================
-    // ACTIONS
-    // ============================================
-
-    function saveRowTags(row) {
-        if (!row) return;
-        var id = row.getAttribute('data-id');
+    // readRowTags
+    // Reads a row's tag fields into the shape the Tags route takes, and tidies its genre field.
+    //
+    // Inputs
+    // row [HTMLElement]: The file's row.
+    //
+    // Output
+    // [object]: The TagUpdateRequest.
+    function readRowTags(row) {
         var artistCell = row.querySelector('.yta-artist-cell');
         var albumCell = row.querySelector('.yta-album-cell');
-
         var data = {
-            Id: id,
+            Id: row.getAttribute('data-id'),
             Title: row.querySelector('.yta-field-title').value,
             Artist: artistCell._combo ? artistCell._combo.getValue() : '',
             FeaturedArtist: row.querySelector('.yta-field-feat').value || '',
             AlbumArtist: row.querySelector('.yta-field-albumArtist').value || '',
             Album: albumCell._combo ? albumCell._combo.getValue() : '',
-            TrackNumber: parseInt(row.querySelector('.yta-field-trackNumber').value) || null,
-            Year: parseInt(row.querySelector('.yta-field-year').value) || null,
+            TrackNumber: parseInt(row.querySelector('.yta-field-trackNumber').value, 10) || null,
+            Year: parseInt(row.querySelector('.yta-field-year').value, 10) || null,
             Genre: normalizeGenre(row.querySelector('.yta-field-genre').value)
         };
         row.querySelector('.yta-field-genre').value = data.Genre;
-
-        Shared.apiRequest('Tags', 'POST', data)
-            .then(function() {
-                var btn = row.querySelector('.jpk-row-btn.save');
-                btn.classList.remove('dirty');
-                btn.classList.add('success');
-                setTimeout(function() { btn.classList.remove('success'); }, 1000);
-            })
-            .catch(function(err) { Shared.errorText(err, 'Failed to save tags.').then(function(text) { Dashboard.alert(text); }); });
+        return data;
     }
 
-    function applyBulkEdit() {
-        var checkboxes = view.querySelectorAll('.yta-file-check:checked');
-        if (checkboxes.length === 0) {
-            Shared.setStatus('importStatus', 'Select at least one file.', true);
-            return;
-        }
-
-        var bulkArtist = _bulkArtistCombo ? _bulkArtistCombo.getValue() : '';
-        var bulkFeat = view.querySelector('#bulkFeat').value;
-        var bulkAlbumArtist = view.querySelector('#bulkAlbumArtist').value;
-        var bulkAlbum = _bulkAlbumCombo ? _bulkAlbumCombo.getValue() : '';
-        var bulkGenre = normalizeGenre(view.querySelector('#bulkGenre').value);
-        var bulkYear = view.querySelector('#bulkYear').value;
-
-        if (!bulkArtist && !bulkFeat && !bulkAlbumArtist && !bulkAlbum && !bulkGenre && !bulkYear) {
-            Shared.setStatus('importStatus', 'Enter at least one bulk value to apply.', true);
-            return;
-        }
-
-        var rows = [];
-        checkboxes.forEach(function(cb) {
-            var row = cb.closest('.jpk-table-row');
-            if (row) rows.push(row);
-        });
-
-        // Update UI fields in each selected row
-        rows.forEach(function(row) {
-            if (bulkArtist) {
-                var artistCell = row.querySelector('.yta-artist-cell');
-                if (artistCell && artistCell._combo) artistCell._combo.setValue(bulkArtist);
-            }
-            if (bulkFeat) {
-                var featInput = row.querySelector('.yta-field-feat');
-                if (featInput) featInput.value = bulkFeat;
-            }
-            if (bulkAlbumArtist) {
-                var albumArtistInput = row.querySelector('.yta-field-albumArtist');
-                if (albumArtistInput) albumArtistInput.value = bulkAlbumArtist;
-            }
-            if (bulkAlbum) {
-                var albumCell = row.querySelector('.yta-album-cell');
-                if (albumCell && albumCell._combo) albumCell._combo.setValue(bulkAlbum);
-            }
-            if (bulkGenre) {
-                var genreInput = row.querySelector('.yta-field-genre');
-                if (genreInput) genreInput.value = bulkGenre;
-            }
-            if (bulkYear) {
-                var yearInput = row.querySelector('.yta-field-year');
-                if (yearInput) yearInput.value = bulkYear;
-            }
-        });
-
-        // Save tags for each selected row sequentially
-        var saved = 0;
-        var errors = 0;
-
-        function saveNext(index) {
-            if (index >= rows.length) {
-                var msg = 'Applied to ' + saved + ' file(s).';
-                if (errors > 0) msg += ' ' + errors + ' error(s).';
-                Shared.setStatus('importStatus', msg, errors > 0);
-                return;
-            }
-
-            var row = rows[index];
-            var id = row.getAttribute('data-id');
-            var artistCell = row.querySelector('.yta-artist-cell');
-            var albumCell = row.querySelector('.yta-album-cell');
-
-            var data = {
-                Id: id,
-                Title: row.querySelector('.yta-field-title').value,
-                Artist: artistCell._combo ? artistCell._combo.getValue() : '',
-                FeaturedArtist: row.querySelector('.yta-field-feat').value || '',
-                AlbumArtist: row.querySelector('.yta-field-albumArtist').value || '',
-                Album: albumCell._combo ? albumCell._combo.getValue() : '',
-                TrackNumber: parseInt(row.querySelector('.yta-field-trackNumber').value) || null,
-                Year: parseInt(row.querySelector('.yta-field-year').value) || null,
-                Genre: normalizeGenre(row.querySelector('.yta-field-genre').value)
-            };
-            row.querySelector('.yta-field-genre').value = data.Genre;
-
-            Shared.apiRequest('Tags', 'POST', data)
-                .then(function() {
-                    saved++;
-                    var btn = row.querySelector('.jpk-row-btn.save');
-                    if (btn) {
-                        btn.classList.add('success');
-                        setTimeout(function() { btn.classList.remove('success'); }, 1000);
-                    }
-                    saveNext(index + 1);
-                })
-                .catch(function() {
-                    errors++;
-                    saveNext(index + 1);
-                });
-        }
-
-        Shared.setStatus('importStatus', 'Applying to ' + rows.length + ' file(s)...', false);
-        saveNext(0);
+    // flashSaved
+    // Marks a row's save button as saved for a moment.
+    //
+    // Inputs
+    // row [HTMLElement]: The file's row.
+    function flashSaved(row) {
+        var btn = row.querySelector('.base-row-btn.save');
+        if (!btn) return;
+        btn.classList.remove('dirty');
+        btn.classList.add('success');
+        setTimeout(function () { btn.classList.remove('success'); }, 1000);
     }
 
-    function importSelected() {
-        var checkboxes = view.querySelectorAll('.yta-file-check:checked');
-        var selectedIds = [];
-        checkboxes.forEach(function(cb) { selectedIds.push(cb.getAttribute('data-id')); });
-
-        if (selectedIds.length === 0) {
-            Shared.setStatus('importStatus', 'Select at least one file to import.', true);
-            return;
-        }
-
-        Shared.setStatus('importStatus', 'Importing ' + selectedIds.length + ' file(s)...', false);
-
-        Shared.apiRequest('Import', 'POST', { Ids: selectedIds })
-            .then(function(result) {
-                var imported = result && result.ImportedIds ? result.ImportedIds.length : 0;
-                var replaced = result && result.ReplacedIds ? result.ReplacedIds.length : 0;
-                var skipped = result && result.SkippedIds ? result.SkippedIds.length : 0;
-                var errCount = result && result.Errors ? result.Errors.length : 0;
-                var parts = [];
-                if (imported > 0) {
-                    var fresh = imported - replaced;
-                    if (fresh > 0) parts.push(fresh + ' imported');
-                    if (replaced > 0) parts.push(replaced + ' replaced');
-                }
-                if (skipped > 0) parts.push(skipped + ' skipped (duplicate)');
-                if (result && result.RemovedFiles > 0) parts.push(result.RemovedFiles + ' single(s) in the library replaced by the album version');
-                if (errCount > 0) parts.push(errCount + ' error(s)');
-                var msg = parts.length > 0 ? parts.join(', ') + '.' : 'No files imported.';
-                Shared.setStatus('importStatus', msg, errCount > 0 || skipped > 0);
-                loadDownloads();
-            })
-            .catch(function(err) {
-                Shared.errorText(err, 'Import failed.').then(function(text) { Shared.setStatus('importStatus', text, true); });
+    // saveRowTags
+    // Writes one row's tags to its file.
+    //
+    // Inputs
+    // row [HTMLElement]: The file's row.
+    function saveRowTags(row) {
+        Shared.apiRequest('Tags', 'POST', readRowTags(row))
+            .then(function () { flashSaved(row); })
+            .catch(function (err) {
+                Shared.errorText(err, 'Could not save the tags.').then(function (text) { Shared.setStatus('importStatus', text, true); });
             });
     }
 
-    // ============================================
-    // COVER ART
-    // ============================================
+    // applyBulkEdit
+    // Copies every filled bulk field into the selected rows, then saves each row in turn.
+    function applyBulkEdit() {
+        var rows = selectedRows();
+        if (rows.length === 0) {
+            Shared.setStatus('importStatus', 'Select the files to change.', true);
+            return;
+        }
+
+        var bulk = {
+            artist: _bulkArtistCombo ? _bulkArtistCombo.getValue() : '',
+            feat: Shared.getEl('bulkFeat').value,
+            albumArtist: Shared.getEl('bulkAlbumArtist').value,
+            album: _bulkAlbumCombo ? _bulkAlbumCombo.getValue() : '',
+            genre: normalizeGenre(Shared.getEl('bulkGenre').value),
+            year: Shared.getEl('bulkYear').value
+        };
+        if (!bulk.artist && !bulk.feat && !bulk.albumArtist && !bulk.album && !bulk.genre && !bulk.year) {
+            Shared.setStatus('importStatus', 'Enter a value to apply.', true);
+            return;
+        }
+
+        rows.forEach(function (row) {
+            if (bulk.artist) row.querySelector('.yta-artist-cell')._combo.setValue(bulk.artist);
+            if (bulk.feat) row.querySelector('.yta-field-feat').value = bulk.feat;
+            if (bulk.albumArtist) row.querySelector('.yta-field-albumArtist').value = bulk.albumArtist;
+            if (bulk.album) row.querySelector('.yta-album-cell')._combo.setValue(bulk.album);
+            if (bulk.genre) row.querySelector('.yta-field-genre').value = bulk.genre;
+            if (bulk.year) row.querySelector('.yta-field-year').value = bulk.year;
+        });
+
+        var saved = 0;
+        var errors = 0;
+        function saveNext(index) {
+            if (index >= rows.length) {
+                var msg = 'Applied to ' + countLabel(saved, 'file', 'files') + '.';
+                if (errors > 0) msg += ' Could not save ' + countLabel(errors, 'file', 'files') + '.';
+                Shared.setStatus('importStatus', msg, errors > 0);
+                return;
+            }
+            var row = rows[index];
+            Shared.apiRequest('Tags', 'POST', readRowTags(row))
+                .then(function () {
+                    saved++;
+                    flashSaved(row);
+                })
+                .catch(function () { errors++; })
+                .then(function () { saveNext(index + 1); });
+        }
+
+        Shared.setStatus('importStatus', 'Applying…', false, { timeout: 0 });
+        saveNext(0);
+    }
+
+    // importSelected
+    // Imports the selected files into the library.
+    //
+    // Inputs
+    // items [object[]]: The selected files.
+    function importSelected(items) {
+        var ids = items.map(function (d) { return d.Id; });
+        if (!ids.length) return;
+        Shared.setStatus('importStatus', 'Importing…', false, { timeout: 0 });
+        Shared.apiRequest('Import', 'POST', { Ids: ids })
+            .then(function (result) {
+                var skipped = result && result.SkippedIds ? result.SkippedIds.length : 0;
+                var errors = result && result.Errors ? result.Errors.length : 0;
+                Shared.setStatus('importStatus', importResultMessage(result), errors > 0 || skipped > 0);
+                _list.clearSelection();
+                loadDownloads();
+            })
+            .catch(function (err) {
+                Shared.errorText(err, 'Could not import the files.').then(function (text) { Shared.setStatus('importStatus', text, true); });
+            });
+    }
 
     // pickCover
-    // Opens the file picker; the chosen picture becomes the cover of the given files.
+    // Opens the file chooser, whose picture becomes the cover of the given files.
+    //
+    // Inputs
+    // ids [string[]]: The files to set the cover on.
     function pickCover(ids) {
         var input = view.querySelector('#coverFileInput');
         if (!input || ids.length === 0) return;
@@ -572,12 +547,17 @@ export default function (view) {
     }
 
     // squareCover
-    // Crops a picture to a centred square (at most 1200 px) and returns it as base64 JPEG, so
-    // every cover is 1:1 whatever shape was uploaded.
+    // Crops a picture to a centered square of at most 1200 px, so every cover is square whatever its shape.
+    //
+    // Inputs
+    // file [File]: The chosen picture.
+    //
+    // Output
+    // [Promise<string>]: The cover as base64 JPEG.
     function squareCover(file) {
         return new Promise(function(resolve, reject) {
             if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
-                reject(new Error('Choose a JPEG, PNG or WebP picture.'));
+                reject(new Error('Select a JPEG, PNG, or WebP picture.'));
                 return;
             }
             var url = URL.createObjectURL(file);
@@ -594,7 +574,7 @@ export default function (view) {
             };
             img.onerror = function() {
                 URL.revokeObjectURL(url);
-                reject(new Error('That file could not be opened as a picture.'));
+                reject(new Error('Could not open that file as a picture.'));
             };
             img.src = url;
         });
@@ -602,6 +582,9 @@ export default function (view) {
 
     // uploadCover
     // Embeds the chosen picture in each target file.
+    //
+    // Inputs
+    // file [File]: The chosen picture.
     function uploadCover(file) {
         var ids = _coverTargets.slice();
         _coverTargets = [];
@@ -613,8 +596,10 @@ export default function (view) {
     }
 
     // generateCoverFor
-    // Draws a cover from the row's fields, as chosen in Settings → Album Art (which text lines,
-    // in what order, and what the colors come from), and embeds it.
+    // Draws a cover from the row's fields, with the text and colors set under Album Art in Settings, and embeds it.
+    //
+    // Inputs
+    // row [HTMLElement]: The file's row.
     function generateCoverFor(row) {
         var albumCell = row.querySelector('.yta-album-cell');
         var artistCell = row.querySelector('.yta-artist-cell');
@@ -643,15 +628,16 @@ export default function (view) {
     }
 
     // generateCover
-    // Draws a square cover for an album with no art: three colors derived from a hash of
-    // colorKey, blended into a soft blur, with the text lines centred on top (the first large,
-    // the rest smaller). The same key always gives the same colors.
+    // Draws a square cover from three colors hashed from colorKey, blended softly, with the text lines centered on top. The same key always gives the same colors.
     //
-    // Param: lines | the text lines, top to bottom (may be empty)
-    // Param: colorKey | the text the colors are drawn from
-    // Param: size | the side length in pixels
+    // Inputs
+    // lines [string[]]: The text lines, top to bottom, which may be empty.
+    // colorKey [string]: The text the colors are drawn from.
+    // size [number]: The side length in pixels.
+    //
+    // Output
+    // [HTMLCanvasElement]: The cover.
     function generateCover(lines, colorKey, size) {
-        // FNV-1a hash of the lowercased key, then xorshift for further stable numbers.
         var hash = 2166136261;
         var key = String(colorKey || '').toLowerCase();
         for (var i = 0; i < key.length; i++) {
@@ -685,7 +671,6 @@ export default function (view) {
         ctx.filter = 'none';
         if (!lines || lines.length === 0) return canvas;
 
-        // Wrap every line to the width, shrinking the type until all of it fits.
         var maxWidth = size * 0.78;
         var maxHeight = size * 0.72;
         var scale = 1;
@@ -731,8 +716,11 @@ export default function (view) {
     }
 
     // takeAlbumCover
-    // When an album already in the library is picked, its cover goes into this file too, so
-    // the new song matches the rest of the album.
+    // Copies the cover of a picked library album into this file, so the new song matches the rest of the album.
+    //
+    // Inputs
+    // row [HTMLElement]: The file's row.
+    // album [string]: The picked album.
     function takeAlbumCover(row, album) {
         var id = row.getAttribute('data-id');
         var artistCell = row.querySelector('.yta-artist-cell');
@@ -747,25 +735,29 @@ export default function (view) {
                 if (d) d.HasCover = true;
                 Shared.setStatus('importStatus', 'Cover taken from the library album "' + album + '".', false);
             })
-            .catch(function() { /* keep the current cover */ });
+            .catch(function() { return null; });
     }
 
     // embedCover
-    // Embeds a square base64 JPEG in each target file, one at a time, and refreshes their
-    // thumbnails in place (re-rendering would drop unsaved edits).
+    // Embeds a square cover in each target file in turn, and refreshes the thumbnails in place so unsaved edits stay.
+    //
+    // Inputs
+    // ids [string[]]: The files.
+    // data [string]: The cover as base64 JPEG.
     function embedCover(ids, data) {
-        Shared.setStatus('importStatus', 'Setting cover art on ' + ids.length + ' file(s)...', false);
+        Shared.setStatus('importStatus', 'Setting covers…', false, { timeout: 0 });
         var failed = 0;
         function next(index) {
             if (index >= ids.length) {
                 var done = ids.length - failed;
-                Shared.setStatus('importStatus', 'Cover art set on ' + done + ' file(s).' + (failed ? ' ' + failed + ' failed.' : ''), failed > 0);
+                Shared.setStatus('importStatus', 'Cover set on ' + countLabel(done, 'file', 'files') + '.' + (failed ? ' Could not set it on ' + countLabel(failed, 'file', 'files') + '.' : ''), failed > 0);
                 return;
             }
             var id = ids[index];
             Shared.apiRequest('Downloads/' + encodeURIComponent(id) + '/Cover', 'POST', { Data: data })
                 .then(function() {
-                    var btn = view.querySelector('.jpk-table-row[data-id="' + CSS.escape(id) + '"] .yta-cover-btn');
+                    var drawn = rowFor(id);
+                    var btn = drawn && drawn.querySelector('.yta-cover-btn');
                     if (btn) btn.innerHTML = renderCover(id, true);
                     var d = _downloads.find(function(x) { return x.Id === id; });
                     if (d) d.HasCover = true;
@@ -776,120 +768,82 @@ export default function (view) {
         next(0);
     }
 
-    function deleteSelected() {
-        var checkboxes = view.querySelectorAll('.yta-file-check:checked');
-        var selectedIds = [];
-        checkboxes.forEach(function(cb) { selectedIds.push(cb.getAttribute('data-id')); });
-
-        if (selectedIds.length === 0) {
-            Shared.setStatus('importStatus', 'Select at least one file to delete.', true);
-            return;
-        }
-
-        Shared.confirmDialog('Delete ' + selectedIds.length + ' downloaded file(s)? This cannot be undone.', { destructive: true }).then(function(ok) {
+    // deleteSelected
+    // Deletes the selected downloaded files, after a confirm.
+    //
+    // Inputs
+    // items [object[]]: The selected files.
+    function deleteSelected(items) {
+        var ids = items.map(function (d) { return d.Id; });
+        if (!ids.length) return;
+        confirmDialog('Delete ' + countLabel(ids.length, 'downloaded file', 'downloaded files') + '? This cannot be undone.', {
+            title: 'Delete Files',
+            confirmText: 'Delete',
+            destructive: true
+        }).then(function (ok) {
             if (!ok) return;
-
-            Shared.setStatus('importStatus', 'Deleting ' + selectedIds.length + ' file(s)...', false);
-
-            Shared.apiRequest('Downloads/BatchDelete', 'POST', { Ids: selectedIds })
-                .then(function(result) {
-                    var deleted = result && result.Deleted || 0;
-                    var errCount = result && result.Errors || 0;
-                    var msg = 'Deleted ' + deleted + ' file(s).';
-                    if (errCount > 0) msg += ' ' + errCount + ' error(s).';
-                    Shared.setStatus('importStatus', msg, errCount > 0);
-                    loadDownloads();
+            Shared.setStatus('importStatus', 'Deleting…', false, { timeout: 0 });
+            Shared.apiRequest('Downloads/BatchDelete', 'POST', { Ids: ids })
+                .then(function (result) {
+                    var deleted = (result && result.Deleted) || 0;
+                    var errors = (result && result.Errors) || 0;
+                    var msg = 'Deleted ' + countLabel(deleted, 'file', 'files') + '.';
+                    if (errors > 0) msg += ' Could not delete ' + countLabel(errors, 'file', 'files') + '.';
+                    Shared.setStatus('importStatus', msg, errors > 0);
+                    _list.clearSelection();
                 })
-                .catch(function() {
-                    Shared.setStatus('importStatus', 'Failed to delete files.', true);
-                    loadDownloads();
-                });
+                .catch(function (err) {
+                    return Shared.errorText(err, 'Could not delete the files.').then(function (text) { Shared.setStatus('importStatus', text, true); });
+                })
+                .then(loadDownloads);
         });
     }
 
-    // ============================================
-    // EVENT LISTENERS
-    // ============================================
-
     // loadPage
-    // Reloads the downloads and the cover settings each time the page shows.
-    //
-    // No parameters
+    // Reloads the files and the cover settings each time the page shows.
     function loadPage() {
         loadDownloads();
-        Shared.getConfig().then(function(config) { _coverSettings = config; }).catch(function() { /* defaults apply */ });
+        Shared.getConfig().then(function (config) { _coverSettings = config; }).catch(function () { return null; });
     }
 
     // bindEvents
-    // Wires the bulk editor and the page's controls once, on the first viewshow.
-    //
-    // No parameters
+    // Builds the list and the bulk editor, and wires the page's controls, once on the first viewshow.
     function bindEvents() {
-        // Initialize bulk artist combo-box
         if (!_artistSearch) _artistSearch = Shared.createDebouncedSearch('Artists', 300);
-        var bulkArtistCell = view.querySelector('#bulkArtistCell');
+        buildList();
+
+        var bulkArtistCell = Shared.getEl('bulkArtistCell');
         if (bulkArtistCell && !_bulkArtistCombo) {
             _bulkArtistCombo = Shared.createSearchableComboBox({
-                placeholder: 'Type to search artists...',
+                placeholder: 'Search artists',
                 searchFn: _artistSearch
             });
             bulkArtistCell.appendChild(_bulkArtistCombo.element);
         }
 
-        // Initialize bulk album combo-box (filtered by bulk artist)
-        var bulkAlbumCell = view.querySelector('#bulkAlbumCell');
+        var bulkAlbumCell = Shared.getEl('bulkAlbumCell');
         if (bulkAlbumCell && !_bulkAlbumCombo) {
-            var bulkAlbumSearchFn = createAlbumSearchForArtist(function() {
-                return _bulkArtistCombo ? _bulkArtistCombo.getValue() : '';
-            });
             _bulkAlbumCombo = Shared.createSearchableComboBox({
-                placeholder: 'Type to search albums...',
-                searchFn: bulkAlbumSearchFn
+                placeholder: 'Search albums',
+                searchFn: createAlbumSearchForArtist(function () { return _bulkArtistCombo ? _bulkArtistCombo.getValue() : ''; })
             });
             bulkAlbumCell.appendChild(_bulkAlbumCombo.element);
         }
 
-        var btnApplyBulk = Shared.getEl('btnApplyBulk');
-        if (btnApplyBulk) btnApplyBulk.addEventListener('click', applyBulkEdit);
-
-        var btnBulkCover = Shared.getEl('btnBulkCover');
-        if (btnBulkCover) btnBulkCover.addEventListener('click', function() {
-            var ids = [];
-            view.querySelectorAll('.yta-file-check:checked').forEach(function(cb) { ids.push(cb.getAttribute('data-id')); });
-            pickCover(ids);
-        });
+        Shared.bindClick('btnApplyBulk', applyBulkEdit);
+        Shared.bindClick('btnBulkCover', function () { pickCover(_list ? _list.getSelected() : []); });
 
         var coverInput = Shared.getEl('coverFileInput');
-        if (coverInput) coverInput.addEventListener('change', function() {
+        if (coverInput) coverInput.addEventListener('change', function () {
             if (coverInput.files && coverInput.files[0]) uploadCover(coverInput.files[0]);
         });
-
-        var btnImport = Shared.getEl('btnImportSelected');
-        if (btnImport) btnImport.addEventListener('click', importSelected);
-
-        var btnDelete = Shared.getEl('btnDeleteSelected');
-        if (btnDelete) btnDelete.addEventListener('click', deleteSelected);
-
-        var btnRefresh = Shared.getEl('btnRefreshDownloads');
-        if (btnRefresh) btnRefresh.addEventListener('click', loadDownloads);
-
-        var chkSelectAll = Shared.getEl('chkSelectAll');
-        if (chkSelectAll) {
-            chkSelectAll.addEventListener('change', function() {
-                view.querySelectorAll('.yta-file-check').forEach(function(cb) {
-                    cb.checked = chkSelectAll.checked;
-                });
-                updateSelectedCount();
-            });
-        }
     }
 
     var page = createPage(view, {
         tabIndex: 1,
         bind: bindEvents,
         load: loadPage,
-        onHide: function() {
-            destroyActiveComboBoxes();
+        onHide: function () {
             stopPreview();
         }
     });
