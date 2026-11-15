@@ -79,10 +79,11 @@
         #YouTubeAudioImportPage .yta-import-list { margin-top: var(--base-gap-wide); }
 
         /* yta-import-body */
-        /* A file's cover picker beside its tag fields, wrapping under them on a narrow screen. */
+        /* A file's player and tools on one line, and its cover picker beside its tag fields, each wrapping on a narrow screen. */
         /* Example: <div class="yta-import-body"><div class="yta-cover-cell"></div><div class="yta-import-fields"></div></div> */
-        #YouTubeAudioImportPage .yta-import-head { align-items: center; }
-        #YouTubeAudioImportPage .yta-player-cell { flex: 1 1 auto; min-width: 0; }
+        #YouTubeAudioImportPage .yta-import-head { align-items: center; flex-wrap: wrap; }
+        #YouTubeAudioImportPage .yta-player-cell { flex: 1 1 12rem; min-width: 0; }
+        #YouTubeAudioImportPage .yta-import-tools { display: flex; align-items: center; gap: var(--base-gap-narrow); margin-left: auto; }
         #YouTubeAudioImportPage .yta-import-body { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--base-gap-wide); }
         #YouTubeAudioImportPage .yta-cover-cell { flex: 0 0 min-content; }
         #YouTubeAudioImportPage .yta-import-fields { flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: var(--base-gap-narrow); }

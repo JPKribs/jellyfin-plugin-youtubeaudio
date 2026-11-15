@@ -260,10 +260,12 @@ export default function (view) {
         row.innerHTML =
             '<div class="base-edit-line yta-import-head">'
             + '<div class="yta-player-cell"></div>'
+            + '<div class="yta-import-tools">'
             + (d.InLibrary ? '<span title="The library already has this song. Importing it adds a second copy.">' + Shared.badge('orange', 'In Library') + '</span>' : '')
             + '<span class="base-edit-secondary">' + esc(Shared.formatSize(d.FileSize)) + '</span>'
             + '<button type="button" class="base-row-btn yta-wand-btn" title="Generate Cover" aria-label="Generate Cover"><span class="material-icons" aria-hidden="true">auto_fix_high</span></button>'
             + '<button type="button" class="base-row-btn save" title="Save Tags" aria-label="Save Tags"><span class="material-icons" aria-hidden="true">save</span></button>'
+            + '</div>'
             + '</div>'
             + '<div class="yta-import-body">'
             + '<div class="yta-cover-cell"></div>'
