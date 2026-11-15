@@ -4,6 +4,7 @@
 import {
     createConfigPage,
     createAudioPlayer,
+    createCheckbox,
     createCheckboxList,
     createChoiceGroup,
     createFilePicker,
@@ -17,6 +18,7 @@ import {
 
 export {
     createAudioPlayer,
+    createCheckbox,
     createCheckboxList,
     createChoiceGroup,
     createFilePicker,

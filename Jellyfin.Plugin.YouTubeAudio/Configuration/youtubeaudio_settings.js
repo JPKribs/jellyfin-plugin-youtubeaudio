@@ -1,7 +1,7 @@
 // youtubeaudio_settings.js
 // Drives the Settings tab, where each section saves its own part of the plugin config.
 
-import { createPage, createOrderedList, confirmDialog } from './configurationpage?name=youtubeaudio_shared.js';
+import { createPage, createCheckbox, createOrderedList, confirmDialog } from './configurationpage?name=youtubeaudio_shared.js';
 
 // COVER_TEXT_NAMES
 // The text lines a generated cover can show, by stored key.
@@ -74,19 +74,11 @@ export default function (view) {
         if (!container) return null;
         _coverText = createOrderedList({
             render: function (row) {
-                var label = document.createElement('label');
-                label.className = 'emby-checkbox-label';
-                var box = document.createElement('input');
-                box.type = 'checkbox';
-                box.setAttribute('is', 'emby-checkbox');
-                box.checked = row.on;
-                box.addEventListener('change', function () { row.on = box.checked; });
-                var text = document.createElement('span');
-                text.className = 'checkboxLabel';
-                text.textContent = COVER_TEXT_NAMES[row.key];
-                label.appendChild(box);
-                label.appendChild(text);
-                return label;
+                return createCheckbox({
+                    label: COVER_TEXT_NAMES[row.key],
+                    checked: row.on,
+                    onChange: function (checked) { row.on = checked; }
+                }).element;
             },
             label: function (row) { return COVER_TEXT_NAMES[row.key]; }
         });
@@ -270,18 +262,6 @@ export default function (view) {
         });
 
         Shared.bindClick('btnUpdateYtDlp', updateYtDlp);
-
-        var origin = ((window.ApiClient && ApiClient.serverAddress) ? ApiClient.serverAddress() : window.location.origin).replace(/\/+$/, '');
-        var dlLink = Shared.getEl('publicDownloadUrl');
-        if (dlLink) {
-            dlLink.href = origin + '/YouTube/Download';
-            dlLink.textContent = dlLink.href;
-        }
-        var queueLink = Shared.getEl('publicQueueUrl');
-        if (queueLink) {
-            queueLink.href = origin + '/YouTube/Queue';
-            queueLink.textContent = queueLink.href;
-        }
 
         Shared.bindClick('btnResetQueue', resetQueue);
         Shared.bindClick('btnResetCache', resetCache);
