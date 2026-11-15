@@ -191,7 +191,7 @@ public sealed class QueueDatabase : IDisposable
             cmd.CommandText = "UPDATE QueueItems SET Status = @Status, ErrorMessage = @ErrorMessage, UpdatedAt = @UpdatedAt WHERE Id = @Id";
             cmd.Parameters.AddWithValue("@Status", (int)status);
             cmd.Parameters.AddWithValue("@ErrorMessage", (object?)errorMessage ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@UpdatedAt", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
+            cmd.Parameters.AddWithValue("@UpdatedAt", UtcTime.Format(DateTime.UtcNow));
             cmd.Parameters.AddWithValue("@Id", id);
             cmd.ExecuteNonQuery();
         }
@@ -210,7 +210,7 @@ public sealed class QueueDatabase : IDisposable
             using var cmd = _connection!.CreateCommand();
             cmd.CommandText = "UPDATE QueueItems SET Title = @Title, UpdatedAt = @UpdatedAt WHERE Id = @Id";
             cmd.Parameters.AddWithValue("@Title", title);
-            cmd.Parameters.AddWithValue("@UpdatedAt", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
+            cmd.Parameters.AddWithValue("@UpdatedAt", UtcTime.Format(DateTime.UtcNow));
             cmd.Parameters.AddWithValue("@Id", id);
             cmd.ExecuteNonQuery();
         }
@@ -230,7 +230,7 @@ public sealed class QueueDatabase : IDisposable
             cmd.CommandText = "UPDATE QueueItems SET Url = @Url, MatchNote = @MatchNote, UpdatedAt = @UpdatedAt WHERE Id = @Id";
             cmd.Parameters.AddWithValue("@Url", url);
             cmd.Parameters.AddWithValue("@MatchNote", (object?)matchNote ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@UpdatedAt", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
+            cmd.Parameters.AddWithValue("@UpdatedAt", UtcTime.Format(DateTime.UtcNow));
             cmd.Parameters.AddWithValue("@Id", id);
             cmd.ExecuteNonQuery();
         }
@@ -256,7 +256,7 @@ public sealed class QueueDatabase : IDisposable
                 insert.Parameters.AddWithValue("@UserId", userId);
                 insert.Parameters.AddWithValue("@Name", name);
                 insert.Parameters.AddWithValue("@Source", (object?)source ?? DBNull.Value);
-                insert.Parameters.AddWithValue("@CreatedAt", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
+                insert.Parameters.AddWithValue("@CreatedAt", UtcTime.Format(DateTime.UtcNow));
                 insert.ExecuteNonQuery();
             }
 
@@ -358,7 +358,7 @@ public sealed class QueueDatabase : IDisposable
 
             using var cmd = _connection!.CreateCommand();
             cmd.CommandText = "UPDATE PlaylistEntries SET ImportedAt = @Now WHERE SongKey = @SongKey AND AddedAt IS NULL";
-            cmd.Parameters.AddWithValue("@Now", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
+            cmd.Parameters.AddWithValue("@Now", UtcTime.Format(DateTime.UtcNow));
             cmd.Parameters.AddWithValue("@SongKey", songKey);
             cmd.ExecuteNonQuery();
         }
@@ -437,7 +437,7 @@ public sealed class QueueDatabase : IDisposable
             ThrowIfDisposed();
             EnsureConnection();
 
-            var now = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
+            var now = UtcTime.Format(DateTime.UtcNow);
             using var transaction = _connection!.BeginTransaction();
             foreach (var key in songKeys)
             {
@@ -467,7 +467,7 @@ public sealed class QueueDatabase : IDisposable
 
             using var cmd = _connection!.CreateCommand();
             cmd.CommandText = "UPDATE PlaylistEntries SET AddedAt = NULL, ImportedAt = @Now WHERE SongKey = @SongKey";
-            cmd.Parameters.AddWithValue("@Now", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
+            cmd.Parameters.AddWithValue("@Now", UtcTime.Format(DateTime.UtcNow));
             cmd.Parameters.AddWithValue("@SongKey", songKey);
             cmd.ExecuteNonQuery();
         }
@@ -702,7 +702,7 @@ public sealed class QueueDatabase : IDisposable
         cmd.CommandText = "UPDATE QueueItems SET Status = @Queued, UpdatedAt = @UpdatedAt WHERE Status = @Downloading";
         cmd.Parameters.AddWithValue("@Queued", (int)QueueStatus.Queued);
         cmd.Parameters.AddWithValue("@Downloading", (int)QueueStatus.Downloading);
-        cmd.Parameters.AddWithValue("@UpdatedAt", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
+        cmd.Parameters.AddWithValue("@UpdatedAt", UtcTime.Format(DateTime.UtcNow));
         var reset = cmd.ExecuteNonQuery();
         if (reset > 0)
         {

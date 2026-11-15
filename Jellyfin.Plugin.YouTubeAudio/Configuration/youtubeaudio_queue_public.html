@@ -2,8 +2,8 @@
 <link rel="stylesheet" href="../web/configurationpage?name=youtubeaudio_jpkribs_shared.css" />
 <style>
     /* The card never outgrows the window: the header and filters stay put and only the list scrolls. */
-    .jpk-status-card { max-width: 760px; width: 100%; max-height: calc(100dvh - 48px); display: flex; flex-direction: column; }
-    .jpk-status-card > .jpk-logo { align-self: center; flex: none; }
+    .base-status-card { max-width: 760px; width: 100%; max-height: calc(100dvh - 48px); display: flex; flex-direction: column; }
+    .base-status-card > .base-logo { align-self: center; flex: none; }
     #queue:not(.hidden) { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
     #queue > h1, #queue > p, .yta-q-summary, .yta-q-updated { flex: none; }
     .yta-q-summary { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 12px 0 16px; }
@@ -33,13 +33,13 @@
 <div id="signin" class="hidden">
     <h1>Sign in required</h1>
     <p>Sign in to your account to view this page.</p>
-    <a id="signinLink" class="jpk-btn" href="/">Sign in</a>
+    <a id="signinLink" class="base-btn" href="/">Sign in</a>
 </div>
 
 <div id="unavailable" class="hidden">
     <h1>Queue unavailable</h1>
     <p>The queue couldn't be loaded. Try again in a moment.</p>
-    <a id="unavailableLink" class="jpk-btn" href="/">Back to Jellyfin</a>
+    <a id="unavailableLink" class="base-btn" href="/">Back to Jellyfin</a>
 </div>
 
 <div id="queue" class="hidden">
@@ -80,8 +80,8 @@
 
         // Hide the base card's loading heading and spinner when leaving the loading state.
         function leaveLoading() {
-            var h = document.querySelector('.jpk-status-card > h1');
-            var s = document.querySelector('.jpk-status-card > .jpk-spinner');
+            var h = document.querySelector('.base-status-card > h1');
+            var s = document.querySelector('.base-status-card > .base-spinner');
             if (h) h.style.display = 'none';
             if (s) s.style.display = 'none';
         }

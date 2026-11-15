@@ -147,7 +147,7 @@ public sealed partial class DownloadService : IDisposable
         var ext = Config.AudioFormat.ToFileExtension();
         var db = _dbProvider.Database;
         var createdItems = new List<QueueItem>();
-        var now = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
+        var now = UtcTime.Format(DateTime.UtcNow);
 
         // Check if this is a playlist URL
         if (url.Contains("list=", StringComparison.OrdinalIgnoreCase))
@@ -253,7 +253,7 @@ public sealed partial class DownloadService : IDisposable
 
         var ext = Config.AudioFormat.ToFileExtension();
         var db = _dbProvider.Database;
-        var now = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
+        var now = UtcTime.Format(DateTime.UtcNow);
         var created = new List<QueueItemDto>(tracks.Count);
 
         foreach (var track in tracks)
@@ -520,7 +520,7 @@ public sealed partial class DownloadService : IDisposable
             };
         }
 
-        var now = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
+        var now = UtcTime.Format(DateTime.UtcNow);
         var item = new QueueItem
         {
             Id = Guid.NewGuid().ToString("N"),

@@ -20,20 +20,20 @@
 <div id="signin" class="hidden">
     <h1>Sign in required</h1>
     <p>Sign in to your account to view this page.</p>
-    <a id="signinLink" class="jpk-btn" href="/">Sign in</a>
+    <a id="signinLink" class="base-btn" href="/">Sign in</a>
 </div>
 
 <div id="denied" class="hidden">
     <h1>Not authorized</h1>
     <p>Your account doesn't have access to this page.</p>
-    <a id="deniedLink" class="jpk-btn" href="/">Back to Jellyfin</a>
+    <a id="deniedLink" class="base-btn" href="/">Back to Jellyfin</a>
 </div>
 
 <form id="form" class="hidden" autocomplete="off" novalidate>
     <h1>Request a Download</h1>
     <p>Paste a YouTube link to a song or a playlist.</p>
 
-    <div class="jpk-fields">
+    <div class="base-fields">
         <label for="url">YouTube Link</label>
         <input type="url" id="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=…" />
         <p class="yta-hint">Audio-only or lyric uploads work best.</p>
@@ -44,7 +44,7 @@
         <label for="album">Album</label>
         <div id="albumBox"></div>
 
-        <div class="jpk-field-pair">
+        <div class="base-field-pair">
             <div>
                 <label for="year">Year</label>
                 <input type="number" id="year" inputmode="numeric" min="1500" max="3000" step="1" placeholder="e.g. 2018" />
@@ -56,7 +56,7 @@
         </div>
     </div>
 
-    <button type="submit" id="submit" class="jpk-submit">Submit</button>
+    <button type="submit" id="submit" class="base-submit">Submit</button>
     <div id="msg" class="yta-msg" role="status" aria-live="polite"></div>
     <a id="queueLink" class="yta-secondary" href="Queue">View the Queue</a>
 </form>
@@ -84,8 +84,8 @@
 
         // Hide the base card's loading heading and spinner when leaving the loading state.
         function leaveLoading() {
-            var h = document.querySelector('.jpk-status-card > h1');
-            var s = document.querySelector('.jpk-status-card > .jpk-spinner');
+            var h = document.querySelector('.base-status-card > h1');
+            var s = document.querySelector('.base-status-card > .base-spinner');
             if (h) h.style.display = 'none';
             if (s) s.style.display = 'none';
         }
