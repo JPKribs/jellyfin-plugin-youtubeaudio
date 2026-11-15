@@ -13,7 +13,7 @@ Select your target Jellyfin music library and confirm the library path. This is 
 ```
 
 !!! important
-    Jellyfin must have write access to this directory for the audio to be copied successfully.
+    Jellyfin must have write access to this directory to copy the audio into it.
 
 ## Audio Format
 
@@ -27,10 +27,10 @@ Choose your preferred download format:
 
 ## Import Behavior
 
-Choose whether importing a song that is already in the library should overwrite the existing file or skip it, leaving the duplicate in the download cache. A file with the same name counts as a duplicate unless both songs carry track numbers and they differ: a different song that shares its title with one on the same album, like a second "Interlude" with its own track number, is imported beside it as "Title (2).ext" and never overwrites it. A re-download of the same song from another upload is still a duplicate. Two more options are on by default:
+**Replace Duplicate Files** decides whether importing a song that is already in the library overwrites the existing file or skips it, leaving the duplicate in the download cache. A file with the same name counts as a duplicate unless both songs carry track numbers and they differ: a different song that shares its title with one on the same album, like a second "Interlude" with its own track number, is imported beside it as "Title (2).ext" and never overwrites it. A re-download of the same song from another upload is still a duplicate. Two more options are on by default:
 
-* **Look up song details on Apple Music.** Each download is looked up in Apple's public music catalog (no account needed) to fill in its title, album, album artist, release year, track and disc numbers and genre. Only a confident match is used: the artist must match and the length must agree. Anything you entered when queueing the song is kept, and playlist imports keep their export's details.
-* **Embed cover art.** The album cover from Apple's catalog (as a 1200 × 1200 square) is added to each downloaded file, so Jellyfin shows it.
+* **Look Up Song Details on Apple Music.** Each download is looked up in Apple's public music catalog (no account needed) to fill in its title, album, album artist, release year, track and disc numbers and genre. Only a confident match is used: the artist must match and the length must agree. Anything you entered when queueing the song is kept, and playlist imports keep their export's details.
+* **Embed Cover Art.** The album cover from Apple's catalog (as a 1200 × 1200 square) is added to each downloaded file, so Jellyfin shows it.
 
 ## Cache Directory
 

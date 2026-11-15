@@ -17,7 +17,15 @@ artifacts:
 - "YoutubeDLSharp.dll"
 - "TagLibSharp.dll"
 changelog:
+  changed:
+  - The queue on the Download tab has count cards that filter it by status, and its search, selection, and Download and Delete buttons sit above the list
+  - Change Link opens a dialog for the new YouTube link, and a match worth checking shows a Check Match badge
+  - Playlist exports are chosen with a drop zone, and a library export lists its playlists with Select All
+  - The Import tab selects files with the list's own Select All, Import, and Delete
+  - Each Settings section reports its save beside its Save button, and the Album Art text order uses move buttons
   fixed:
   - The arrows on collapsible sections are back to their usual size
   developer:
-  - Uses JPKribs.Jellyfin.Base 2026.11.13.3
+  - Uses JPKribs.Jellyfin.Base 2026.11.17, with its base- class names, Filtered List, List, Checkbox List, Ordered List, File Picker, and Prompt Dialog in place of the hand built queue, import list, playlist picker, cover text list, file input, and link editor
+  - Stored times are written with Base's UtcTime
+  - Adds starthere.md and the guides in skills/
