@@ -3,22 +3,26 @@
 
 import {
     createConfigPage,
+    createAudioPlayer,
     createCheckboxList,
     createChoiceGroup,
     createFilePicker,
     createFilteredList,
-    createList,
+    createImagePicker,
+    createMediaCard,
     createOrderedList,
     confirmDialog,
     promptDialog
 } from './configurationpage?name=youtubeaudio_jpkribs_shared.js';
 
 export {
+    createAudioPlayer,
     createCheckboxList,
     createChoiceGroup,
     createFilePicker,
     createFilteredList,
-    createList,
+    createImagePicker,
+    createMediaCard,
     createOrderedList,
     confirmDialog,
     promptDialog

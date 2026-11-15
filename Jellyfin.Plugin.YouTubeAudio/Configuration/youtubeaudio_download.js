@@ -2,12 +2,13 @@
 // Drives the Download tab, where songs are queued from each source and the queue is downloaded.
 
 import {
+    STATUS_STATES,
     createPage,
     createChoiceGroup,
+    createMediaCard,
     createCheckboxList,
     createFilePicker,
     createFilteredList,
-    createList,
     confirmDialog,
     promptDialog
 } from './configurationpage?name=youtubeaudio_shared.js';
@@ -90,22 +91,6 @@ export default function (view) {
     var _processingGraceUntil = 0;
     var _replaceSongId = null;
 
-    // htmlNode
-    // Builds an element from HTML whose values are already escaped.
-    //
-    // Inputs
-    // className [string]: The element's class.
-    // html [string]: The escaped HTML inside it.
-    //
-    // Output
-    // [HTMLElement]: The element.
-    function htmlNode(className, html) {
-        var el = document.createElement('div');
-        el.className = className;
-        el.innerHTML = html;
-        return el;
-    }
-
     // reportError
     // Shows the server's reason, or a fallback, on the queue status line.
     //
@@ -148,15 +133,14 @@ export default function (view) {
     }
 
     // renderQueueRow
-    // Draws one queue item with its details, its link button, and its status.
+    // Draws one queue item as a Base media card with its status, its notes, and a Change Link action.
     //
     // Inputs
     // item [object]: The queue item.
     //
     // Output
-    // [HTMLElement]: The row.
+    // [object]: The media card handle.
     function renderQueueRow(item) {
-        var esc = Shared.escapeHtml;
         var title = item.Title || item.Url;
         var sub = item.Url;
 
@@ -167,27 +151,23 @@ export default function (view) {
             sub = sourceName + ' · ' + (item.Url || 'YouTube match is found when downloaded');
         }
 
-        var lines = '<div class="base-table-item-title" title="' + esc(sub) + '">' + esc(title) + '</div>'
-            + '<div class="base-table-item-sub">' + esc(sub) + '</div>';
-        if (item.MatchNote && item.StatusCode !== 4) {
-            lines += '<div class="base-table-item-sub" title="' + esc(item.MatchNote) + '">' + esc(item.MatchNote) + '</div>';
-        }
-        if (item.ReplacesFileCount > 0) {
-            lines += '<div class="base-table-item-sub">Replaces the single in the library when imported.</div>';
-        }
-        if (item.StatusCode === 4 && item.ErrorMessage) {
-            lines += '<div class="base-table-item-error" title="' + esc(item.ErrorMessage) + '">' + esc(item.ErrorMessage) + '</div>';
-        }
+        var failed = item.StatusCode === 4;
+        var notes = [];
+        if (item.MatchNote && !failed) notes.push(item.MatchNote);
+        if (item.ReplacesFileCount > 0) notes.push('Replaces the single in the library when imported.');
 
-        var status = '';
-        if (item.MatchNote && item.StatusCode !== 4) status += Shared.badge('orange', 'Check Match');
-        if (item.StatusCode !== 1) {
-            status += '<button type="button" class="base-row-btn yta-link-btn" data-id="' + esc(item.Id) + '" title="Change Link" aria-label="Change Link">'
-                + '<span class="material-icons" aria-hidden="true">link</span></button>';
-        }
-        status += Shared.getStatusBadge(item.StatusCode, item.Status);
-
-        return htmlNode('yta-queue-row', '<div class="base-table-item-info">' + lines + '</div><div class="yta-queue-status">' + status + '</div>');
+        return createMediaCard({
+            shape: 'square',
+            icon: 'music_note',
+            title: title,
+            subtitle: sub,
+            badges: item.MatchNote && !failed ? [{ label: 'Check Match', color: 'orange' }] : [],
+            status: { label: item.Status, color: STATUS_STATES[item.StatusCode] || 'Queued' },
+            detail: notes.join(' ') || null,
+            error: failed ? (item.ErrorMessage || null) : null,
+            actions: item.StatusCode !== 1 ? [{ label: 'Change Link', icon: 'link', value: 'link' }] : [],
+            onAction: function () { changeLink(item.Id); }
+        });
     }
 
     // buildQueueList
@@ -220,12 +200,6 @@ export default function (view) {
             label: 'Queue'
         });
         host.appendChild(_queueList.element);
-        _queueList.element.addEventListener('click', function (e) {
-            var btn = e.target.closest('.yta-link-btn');
-            if (!btn) return;
-            e.stopPropagation();
-            changeLink(btn.getAttribute('data-id'));
-        });
     }
 
     // changeLink
@@ -366,10 +340,13 @@ export default function (view) {
             immediate: false,
             rowKey: 'Id',
             render: function (song) {
-                var esc = Shared.escapeHtml;
-                var sub = [song.Artist, song.Album].filter(Boolean).join(' · ');
-                return htmlNode('base-table-item-info', '<div class="base-table-item-title" title="' + esc(song.Path || '') + '">' + esc(song.Title) + '</div>'
-                    + '<div class="base-table-item-sub">' + esc(sub) + '</div>');
+                return createMediaCard({
+                    shape: 'square',
+                    icon: 'music_note',
+                    itemId: song.Id,
+                    title: song.Title,
+                    subtitle: [song.Artist, song.Album].filter(Boolean).join(' · ')
+                });
             },
             search: { placeholder: 'Search songs', label: 'Library Song' },
             selectable: 'single',
@@ -563,22 +540,40 @@ export default function (view) {
     }
 
     // renderTarget
-    // Draws one playlist being filled, with its progress and a Stop button.
+    // Draws one playlist being filled as a Base media card, with its progress and a Stop action.
     //
     // Inputs
     // t [object]: The PlaylistTargetDto.
     //
     // Output
-    // [HTMLElement]: The row.
+    // [object]: The media card handle.
     function renderTarget(t) {
-        var esc = Shared.escapeHtml;
-        var waiting = (t.Total - t.Added) + ' waiting for download or import';
-        return htmlNode('yta-queue-row', '<div class="base-table-item-info">'
-            + '<div class="base-table-item-title">' + esc(t.Name) + '</div>'
-            + '<div class="base-table-item-sub">' + esc(t.UserName) + ' · ' + t.Added + ' of ' + countLabel(t.Total, 'song', 'songs') + ' · ' + esc(waiting) + '</div>'
-            + '</div><div class="yta-queue-status">'
-            + '<button is="emby-button" type="button" class="raised base-button destructive small yta-playlist-forget" data-id="' + esc(t.Id) + '"><span>Stop</span></button>'
-            + '</div>');
+        return createMediaCard({
+            shape: 'square',
+            icon: 'queue_music',
+            title: t.Name,
+            subtitle: t.UserName + ' · ' + t.Added + ' of ' + countLabel(t.Total, 'song', 'songs'),
+            detail: (t.Total - t.Added) + ' waiting for download or import',
+            actions: [{ label: 'Stop', icon: 'stop', value: 'stop' }],
+            onAction: function () { stopPlaylist(t.Id); }
+        });
+    }
+
+    // buildTargetList
+    // Builds the playlists being filled as a Base Filtered List, with Add Library Songs beside it.
+    function buildTargetList() {
+        var host = Shared.getEl('playlistTargets');
+        if (!host || _targetList) return;
+        _targetList = createFilteredList({
+            items: [],
+            rowKey: 'Id',
+            render: renderTarget,
+            search: false,
+            summary: false,
+            actions: [{ id: 'sync', label: 'Add Library Songs', icon: 'sync', onClick: syncPlaylists }],
+            label: 'Playlist Imports'
+        });
+        host.appendChild(_targetList.element);
     }
 
     // loadPlaylistTargets
@@ -588,18 +583,8 @@ export default function (view) {
             .then(function (targets) {
                 targets = targets || [];
                 var section = Shared.getEl('playlistTargetsSection');
-                var host = Shared.getEl('playlistTargets');
-                if (!section || !host) return;
-                section.hidden = targets.length === 0;
-                if (!_targetList) {
-                    _targetList = createList({ items: [], key: 'Id', render: renderTarget, label: 'Playlist Imports' });
-                    host.appendChild(_targetList.element);
-                    _targetList.element.addEventListener('click', function (e) {
-                        var btn = e.target.closest('.yta-playlist-forget');
-                        if (btn) stopPlaylist(btn.getAttribute('data-id'));
-                    });
-                }
-                _targetList.setItems(targets);
+                if (section) section.hidden = targets.length === 0;
+                if (_targetList) _targetList.setItems(targets);
             })
             .catch(function () { return null; });
     }
@@ -624,17 +609,12 @@ export default function (view) {
     // syncPlaylists
     // Adds playlist songs that are already in the library, without waiting for a scan.
     function syncPlaylists() {
-        var btn = Shared.getEl('btnSyncPlaylists');
-        if (btn) btn.disabled = true;
         Shared.apiRequest('Playlists/Sync', 'POST')
             .then(function (result) {
                 Shared.setStatus('queueStatus', 'Added ' + countLabel((result && result.Added) || 0, 'song', 'songs') + ' to playlists.', false);
             })
             .catch(function (err) { reportError(err, 'Could not add songs to the playlists.'); })
-            .then(function () {
-                if (btn) btn.disabled = false;
-                loadPlaylistTargets();
-            });
+            .then(loadPlaylistTargets);
     }
 
     // showSource
@@ -681,6 +661,7 @@ export default function (view) {
     function bindEvents() {
         buildQueueList();
         buildReplaceList();
+        buildTargetList();
         bindSourceChoices();
 
         var btnQueue = Shared.bindClick('btnQueue', queueUrl);
@@ -712,7 +693,6 @@ export default function (view) {
         }
 
         Shared.bindClick('btnReplace', queueReplacement);
-        Shared.bindClick('btnSyncPlaylists', syncPlaylists);
         Shared.bindClick('btnImportPlaylist', importPlaylist);
     }
 

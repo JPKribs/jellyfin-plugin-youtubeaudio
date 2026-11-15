@@ -71,13 +71,8 @@
 
                         <!-- Playlist Imports -->
                         <!-- Jellyfin playlists that fill as their songs reach the library. -->
-                        <div id="playlistTargetsSection" class="yta-playlist-targets" hidden>
-                            <div class="yta-subheading">
-                                <h3 class="base-subsection-title">Playlist Imports in Progress</h3>
-                                <button type="button" class="base-row-btn" id="btnSyncPlaylists" title="Add Library Songs" aria-label="Add Library Songs">
-                                    <span class="material-icons" aria-hidden="true">sync</span>
-                                </button>
-                            </div>
+                        <div id="playlistTargetsSection" hidden>
+                            <h3 class="base-subsection-title">Playlist Imports in Progress</h3>
                             <div id="playlistTargets"></div>
                         </div>
                     </div>
@@ -102,8 +97,8 @@
 
                     <!-- Queue -->
                     <!-- Songs waiting to download, downloading, downloaded, or failed. -->
-                    <div class="sectionTitleContainer flex align-items-center yta-section-heading">
-                        <h1 class="sectionTitle">Queue</h1>
+                    <div class="sectionTitleContainer flex align-items-center">
+                        <h2 class="sectionTitle">Queue</h2>
                     </div>
                     <span id="queueStatus" class="base-status-text" role="status"></span>
                     <div id="queueList"></div>
@@ -115,29 +110,10 @@
 
     <link rel="stylesheet" href="configurationpage?name=youtubeaudio_jpkribs_shared.css">
     <style>
-        /* yta-section-heading */
-        /* Spaces a page heading that follows the forms above it. */
-        /* Example: <div class="sectionTitleContainer yta-section-heading"><h1 class="sectionTitle">Queue</h1></div> */
-        .sectionTitleContainer.yta-section-heading,
-        .sectionTitleContainer.yta-section-heading:first-child { margin-top: 2em; }
-
         /* yta-source-panel */
-        /* The chosen source's form, under the source cards. */
+        /* Spaces the source cards and the chosen source's form under them. */
         /* Example: <div class="yta-source-panel" data-source="youtube"></div> */
-        .yta-source-choices { margin-top: var(--base-gap-wide); }
+        .yta-source-choices,
         .yta-source-panel { margin-top: var(--base-gap-wide); }
-
-        /* yta-playlist-targets */
-        /* The playlists being filled, with a sync button beside the heading. */
-        /* Example: <div class="yta-playlist-targets"><div class="yta-subheading"><h3>Imports</h3></div></div> */
-        .yta-playlist-targets { margin-top: var(--base-gap-wide); }
-        .yta-subheading { display: flex; align-items: center; gap: var(--base-gap-narrow); }
-
-        /* yta-queue-row */
-        /* One queue item, its details beside its link button and status badge. */
-        /* Example: <div class="yta-queue-row"><div class="base-table-item-info"></div><div class="yta-queue-status"></div></div> */
-        .yta-queue-row { display: flex; align-items: center; gap: var(--base-gap-narrow); min-width: 0; }
-        .yta-queue-row > .base-table-item-info { flex: 1 1 auto; min-width: 0; }
-        .yta-queue-status { display: flex; align-items: center; gap: var(--base-gap-narrow); flex: none; }
     </style>
 </div>
