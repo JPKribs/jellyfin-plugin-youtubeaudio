@@ -44,6 +44,7 @@
                                 <input type="text" class="base-edit-input" id="bulkGenre" placeholder="Classical; Baroque" />
                             </div>
                         </div>
+                        <div id="bulkCoverCell"></div>
                         <div class="base-edit-line">
                             <button is="emby-button" type="button" id="btnApplyBulk" class="raised base-button primary small" disabled>
                                 <span>Apply to Selected</span>
@@ -52,7 +53,6 @@
                                 <span>Set Cover on Selected</span>
                             </button>
                         </div>
-                        <input type="file" id="coverFileInput" accept="image/jpeg,image/png,image/webp" hidden />
                     </div>
 
                     <!-- Downloaded Files -->
@@ -78,52 +78,16 @@
         /* Example: <div class="yta-import-list"></div> */
         #YouTubeAudioImportPage .yta-import-list { margin-top: var(--base-gap-wide); }
 
-        /* yta-import-head */
-        /* The first line of a file's row, its controls centered on one line. */
-        /* Example: <div class="base-edit-line yta-import-head"><button class="yta-cover-btn"></button></div> */
+        /* yta-import-body */
+        /* A file's cover picker beside its tag fields, wrapping under them on a narrow screen. */
+        /* Example: <div class="yta-import-body"><div class="yta-cover-cell"></div><div class="yta-import-fields"></div></div> */
         #YouTubeAudioImportPage .yta-import-head { align-items: center; }
+        #YouTubeAudioImportPage .yta-player-cell { flex: 1 1 auto; min-width: 0; }
+        #YouTubeAudioImportPage .yta-import-body { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--base-gap-wide); }
+        #YouTubeAudioImportPage .yta-cover-cell { flex: 0 0 min-content; }
+        #YouTubeAudioImportPage .yta-import-fields { flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: var(--base-gap-narrow); }
 
-        /* yta-cover-btn */
-        /* A square button that shows a file's cover, or an add picture icon. */
-        /* Example: <button class="yta-cover-btn"><img alt="" src="cover.jpg" /></button> */
-        #YouTubeAudioImportPage .yta-cover-btn {
-            width: 40px;
-            height: 40px;
-            flex: 0 0 40px;
-            padding: 0;
-            border: 1px dashed var(--base-border);
-            border-radius: 4px;
-            background: transparent;
-            color: inherit;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-        }
-        #YouTubeAudioImportPage .yta-cover-btn:has(img) { border-style: solid; }
-        #YouTubeAudioImportPage .yta-cover-btn img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        #YouTubeAudioImportPage .yta-cover-btn:focus-visible { outline: 2px solid var(--base-accent); outline-offset: 2px; }
-
-        /* yta-preview-group */
-        /* The play button and, while playing, the seek bar and clock, taking the free width. */
-        /* Example: <div class="yta-preview-group"><button class="yta-preview-btn"></button><div class="yta-preview"></div></div> */
-        #YouTubeAudioImportPage .yta-preview-group {
-            display: flex;
-            align-items: center;
-            gap: var(--base-gap-narrow);
-            flex: 1 1 auto;
-            min-width: 0;
-        }
-        #YouTubeAudioImportPage .yta-preview-btn.active { color: var(--base-accent); }
-        #YouTubeAudioImportPage .yta-preview:not([hidden]) {
-            display: flex;
-            align-items: center;
-            gap: var(--base-gap-narrow);
-            flex: 1 1 auto;
-            min-width: 0;
-        }
-        #YouTubeAudioImportPage .yta-preview-seek { flex: 1 1 auto; min-width: 80px; accent-color: var(--base-accent); }
-        #YouTubeAudioImportPage .yta-preview-time { flex: none; font-size: 0.85em; font-variant-numeric: tabular-nums; opacity: 0.7; }
+        /* A file's cover has no Remove, since an embedded cover is only replaced. Base buttons set their display as important. */
+        #YouTubeAudioImportPage .yta-cover-cell .base-image-picker-remove { display: none !important; }
     </style>
 </div>

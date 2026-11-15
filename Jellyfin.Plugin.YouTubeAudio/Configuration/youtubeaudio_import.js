@@ -1,7 +1,7 @@
 // youtubeaudio_import.js
 // Drives the Import tab, where downloaded songs are tagged, given covers, and imported into the library.
 
-import { createPage, createFilteredList, confirmDialog } from './configurationpage?name=youtubeaudio_shared.js';
+import { createPage, createAudioPlayer, createFilteredList, createImagePicker, confirmDialog } from './configurationpage?name=youtubeaudio_shared.js';
 
 // normalizeGenre
 // Puts one space after every ";" in a genre list. The server splits on ";" either way.
@@ -64,13 +64,9 @@ export default function (view) {
     var _artistSearch = null;
     var _bulkArtistCombo = null;
     var _bulkAlbumCombo = null;
-    var _coverTargets = [];
+    var _bulkCover = null;
     var _coverSettings = null;
-    var _rowCombos = {};
-
-    // One shared player previews the downloaded file of whichever row is playing.
-    var _player = null;
-    var _playingId = null;
+    var _rowParts = {};
 
     // loadDownloads
     // Reads the downloaded files and hands them to the list.
@@ -110,16 +106,16 @@ export default function (view) {
         };
     }
 
-    // destroyRowCombos
-    // Destroys the combo boxes of one row, or of every row.
+    // destroyRowParts
+    // Destroys the Base controls of one row, or of every row, which pauses its player.
     //
     // Inputs
     // id [string]: The row, or nothing for every row.
-    function destroyRowCombos(id) {
-        Object.keys(_rowCombos).forEach(function (key) {
+    function destroyRowParts(id) {
+        Object.keys(_rowParts).forEach(function (key) {
             if (id && key !== id) return;
-            _rowCombos[key].forEach(function (combo) { combo.destroy(); });
-            delete _rowCombos[key];
+            _rowParts[key].forEach(function (part) { part.destroy(); });
+            delete _rowParts[key];
         });
     }
 
@@ -168,125 +164,86 @@ export default function (view) {
     }
 
     // renderImportList
-    // Hands the files to the list, drops the combo boxes of files that are gone, and stops a preview whose file is gone.
+    // Hands the files to the list, and drops the controls of files that are gone.
     function renderImportList() {
         var ids = _downloads.map(function (d) { return d.Id; });
-        Object.keys(_rowCombos).forEach(function (id) { if (ids.indexOf(id) === -1) destroyRowCombos(id); });
+        Object.keys(_rowParts).forEach(function (id) { if (ids.indexOf(id) === -1) destroyRowParts(id); });
         if (_list) _list.setItems(_downloads);
-        if (_playingId && ids.indexOf(_playingId) === -1) stopPreview();
-        updatePreviewUi();
         updateBulkButtons();
     }
 
-    // formatTime
-    // Formats seconds as m:ss for the preview clock.
-    //
-    // Inputs
-    // seconds [number]: A position or a length.
-    //
-    // Output
-    // [string]: Such as 3:07.
-    function formatTime(seconds) {
-        if (!isFinite(seconds) || seconds < 0) seconds = 0;
-        var s = Math.floor(seconds);
-        return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
-    }
-
-    // ensurePlayer
-    // Creates the shared audio element on first use and keeps the rows in step with it.
-    //
-    // Output
-    // [HTMLAudioElement]: The player.
-    function ensurePlayer() {
-        if (_player) return _player;
-        _player = new Audio();
-        _player.preload = 'auto';
-        ['play', 'pause', 'timeupdate', 'loadedmetadata', 'durationchange'].forEach(function(ev) {
-            _player.addEventListener(ev, updatePreviewUi);
-        });
-        _player.addEventListener('ended', function() {
-            _player.currentTime = 0;
-            updatePreviewUi();
-        });
-        _player.addEventListener('error', function() {
-            if (!_playingId) return;
-            stopPreview();
-            Shared.setStatus('importStatus', 'Could not play this file in this browser.', true);
-        });
-        return _player;
-    }
-
-    // togglePreview
-    // Plays or pauses a row's downloaded file. The token rides in the query, since an audio element cannot send headers.
+    // fileUrl
+    // Returns the address of a downloaded file's audio or cover. The token rides in the query, since audio and images cannot send headers.
     //
     // Inputs
     // id [string]: The file's queue item id.
-    function togglePreview(id) {
-        var player = ensurePlayer();
-        if (_playingId === id) {
-            if (player.paused) player.play().catch(function() {}); else player.pause();
-            return;
-        }
-
-        _playingId = id;
-        player.src = ApiClient.getUrl('YouTubeAudio/Downloads/' + encodeURIComponent(id) + '/Audio', { ApiKey: ApiClient.accessToken() });
-        player.play().catch(function() {});
-        updatePreviewUi();
+    // part [string]: Audio or Cover.
+    //
+    // Output
+    // [string]: The address.
+    function fileUrl(id, part) {
+        var query = { ApiKey: ApiClient.accessToken() };
+        if (part === 'Cover') query.v = Date.now();
+        return ApiClient.getUrl('YouTubeAudio/Downloads/' + encodeURIComponent(id) + '/' + part, query);
     }
 
-    // stopPreview
-    // Stops playback and releases the current file.
-    function stopPreview() {
-        _playingId = null;
-        if (_player) {
-            _player.pause();
-            _player.removeAttribute('src');
-            _player.load();
-        }
-        updatePreviewUi();
-    }
-
-    // updatePreviewUi
-    // Shows play or pause on every row, and the seek bar and clock on the row that is playing.
-    function updatePreviewUi() {
-        view.querySelectorAll('.yta-import-row').forEach(function(row) {
-            var active = row.getAttribute('data-id') === _playingId;
-            var playing = active && _player && !_player.paused;
-            var btn = row.querySelector('.yta-preview-btn');
-            if (!btn) return;
-            btn.querySelector('.material-icons').textContent = playing ? 'pause' : 'play_arrow';
-            btn.title = playing ? 'Pause' : 'Play';
-            btn.setAttribute('aria-label', btn.title);
-            btn.classList.toggle('active', active);
-
-            var bar = row.querySelector('.yta-preview');
-            bar.hidden = !active;
-            if (!active || !_player) return;
-            var duration = isFinite(_player.duration) ? _player.duration : 0;
-            var seek = bar.querySelector('.yta-preview-seek');
-            seek.max = duration;
-            if (document.activeElement !== seek) seek.value = _player.currentTime || 0;
-            bar.querySelector('.yta-preview-time').textContent = formatTime(_player.currentTime) + ' / ' + formatTime(duration);
-        });
-    }
-
-    // renderCover
-    // Draws a row's cover thumbnail, or an add picture icon when the file has none. The token rides in the query, since an image cannot send headers.
+    // showCover
+    // Shows a file's new cover in its row's picker, and remembers that the file has one.
     //
     // Inputs
     // id [string]: The file's queue item id.
-    // hasCover [boolean]: Whether the file has a cover.
+    function showCover(id) {
+        var row = rowFor(id);
+        if (row && row._cover) row._cover.setValue(fileUrl(id, 'Cover'));
+        var d = _downloads.find(function (x) { return x.Id === id; });
+        if (d) d.HasCover = true;
+    }
+
+    // coverData
+    // Returns a picked cover as base64 JPEG or PNG, the types the server embeds. Any other type is drawn again as JPEG.
+    //
+    // Inputs
+    // value [object]: The Image Picker's value.
     //
     // Output
-    // [string]: The HTML.
-    function renderCover(id, hasCover) {
-        if (!hasCover) return '<span class="material-icons" aria-hidden="true">add_photo_alternate</span>';
-        var url = ApiClient.getUrl('YouTubeAudio/Downloads/' + encodeURIComponent(id) + '/Cover', { ApiKey: ApiClient.accessToken(), v: Date.now() });
-        return '<img alt="" src="' + Shared.escapeHtml(url) + '" />';
+    // [Promise<string>]: The base64 data.
+    function coverData(value) {
+        if (/^image\/(jpeg|png)$/.test(value.type)) return Promise.resolve(value.base64);
+        return new Promise(function (resolve, reject) {
+            var img = new Image();
+            img.onload = function () {
+                var canvas = document.createElement('canvas');
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+                canvas.getContext('2d').drawImage(img, 0, 0);
+                resolve(canvas.toDataURL('image/jpeg', 0.9).split(',')[1]);
+            };
+            img.onerror = function () { reject(new Error('Could not open that file as a picture.')); };
+            img.src = value.dataUrl;
+        });
+    }
+
+    // createCoverPicker
+    // Builds a square Base Image Picker that crops a picked picture to its center at most 1200 px.
+    //
+    // Inputs
+    // opts [object]: Extra Image Picker options, such as value and onChange.
+    //
+    // Output
+    // [object]: The picker handle.
+    function createCoverPicker(opts) {
+        return createImagePicker(Object.assign({
+            shape: 'square',
+            crop: true,
+            maxSize: 1200,
+            accept: 'image/jpeg,image/png,image/webp',
+            maxBytes: 10485760,
+            wrongTypeText: 'Select a JPEG, PNG, or WebP picture.'
+        }, opts));
     }
 
     // renderImportRow
-    // Draws one file as an edit row of its tags, with its cover, preview, and save controls, and wires them.
+    // Draws one file as an edit row of its tags, with its preview player, its cover picker, and its save controls, and wires them.
     //
     // Inputs
     // d [object]: The downloaded file.
@@ -302,19 +259,15 @@ export default function (view) {
         row.setAttribute('data-id', d.Id);
         row.innerHTML =
             '<div class="base-edit-line yta-import-head">'
-            + '<button type="button" class="yta-cover-btn" title="Set Cover" aria-label="Set Cover">' + renderCover(d.Id, d.HasCover) + '</button>'
-            + '<button type="button" class="base-row-btn yta-wand-btn" title="Generate Cover" aria-label="Generate Cover"><span class="material-icons" aria-hidden="true">auto_fix_high</span></button>'
-            + '<div class="yta-preview-group">'
-            + '<button type="button" class="base-row-btn yta-preview-btn" title="Play" aria-label="Play"><span class="material-icons" aria-hidden="true">play_arrow</span></button>'
-            + '<div class="yta-preview" hidden>'
-            + '<input type="range" class="yta-preview-seek" min="0" max="0" step="0.1" value="0" aria-label="Seek" />'
-            + '<span class="yta-preview-time">0:00 / 0:00</span>'
-            + '</div>'
-            + '</div>'
+            + '<div class="yta-player-cell"></div>'
             + (d.InLibrary ? '<span title="The library already has this song. Importing it adds a second copy.">' + Shared.badge('orange', 'In Library') + '</span>' : '')
             + '<span class="base-edit-secondary">' + esc(Shared.formatSize(d.FileSize)) + '</span>'
+            + '<button type="button" class="base-row-btn yta-wand-btn" title="Generate Cover" aria-label="Generate Cover"><span class="material-icons" aria-hidden="true">auto_fix_high</span></button>'
             + '<button type="button" class="base-row-btn save" title="Save Tags" aria-label="Save Tags"><span class="material-icons" aria-hidden="true">save</span></button>'
             + '</div>'
+            + '<div class="yta-import-body">'
+            + '<div class="yta-cover-cell"></div>'
+            + '<div class="yta-import-fields">'
             + '<div class="base-edit-line">'
             + '<div class="base-field yta-grow-6"><label>Title</label>'
             + '<input type="text" class="base-edit-input yta-field-title" value="' + esc(d.MetadataTitle) + '" placeholder="Title" aria-label="Title" /></div>'
@@ -334,6 +287,8 @@ export default function (view) {
             + '<input type="number" class="base-edit-input yta-field-year" value="' + esc(d.Year || '') + '" placeholder="2024" aria-label="Year" /></div>'
             + '<div class="base-field yta-grow-3"><label>Genre</label>'
             + '<input type="text" class="base-edit-input yta-field-genre" value="' + esc(d.Genre) + '" placeholder="Classical; Baroque" aria-label="Genre" /></div>'
+            + '</div>'
+            + '</div>'
             + '</div>';
 
         var head = row.querySelector('.yta-import-head');
@@ -342,7 +297,28 @@ export default function (view) {
         var saveBtn = row.querySelector('.base-row-btn.save');
         function markDirty() { saveBtn.classList.add('dirty'); }
 
-        destroyRowCombos(d.Id);
+        destroyRowParts(d.Id);
+
+        var player = createAudioPlayer({
+            src: fileUrl(d.Id, 'Audio'),
+            size: 'small',
+            label: 'Preview',
+            errorText: 'Could not play this file in this browser.'
+        });
+        row.querySelector('.yta-player-cell').appendChild(player.element);
+
+        var cover = createCoverPicker({
+            value: d.HasCover ? fileUrl(d.Id, 'Cover') : null,
+            chooseText: 'Set Cover',
+            replaceText: 'Replace',
+            emptyText: 'No cover.',
+            onChange: function (value) {
+                if (value) embedCover([d.Id], value);
+            }
+        });
+        row.querySelector('.yta-cover-cell').appendChild(cover.element);
+        row._cover = cover;
+
         var artistCell = row.querySelector('.yta-artist-cell');
         var artistCombo = Shared.createSearchableComboBox({
             placeholder: 'Search artists',
@@ -366,7 +342,7 @@ export default function (view) {
         albumCombo.setValue(d.Album || '');
         albumCell.appendChild(albumCombo.element);
         albumCell._combo = albumCombo;
-        _rowCombos[d.Id] = [artistCombo, albumCombo];
+        _rowParts[d.Id] = [player, cover, artistCombo, albumCombo];
 
         saveBtn.addEventListener('click', function (e) {
             e.stopPropagation();
@@ -375,21 +351,10 @@ export default function (view) {
         row.querySelectorAll('.base-edit-input').forEach(function (input) {
             input.addEventListener('input', markDirty);
         });
-        row.querySelector('.yta-cover-btn').addEventListener('click', function (e) {
-            e.stopPropagation();
-            pickCover([d.Id]);
-        });
         row.querySelector('.yta-wand-btn').addEventListener('click', function (e) {
             e.preventDefault();
             e.stopPropagation();
             generateCoverFor(row);
-        });
-        row.querySelector('.yta-preview-btn').addEventListener('click', function (e) {
-            e.stopPropagation();
-            togglePreview(d.Id);
-        });
-        row.querySelector('.yta-preview-seek').addEventListener('input', function (e) {
-            if (_player && _playingId === d.Id) _player.currentTime = parseFloat(e.target.value) || 0;
         });
 
         return row;
@@ -402,7 +367,7 @@ export default function (view) {
         var applyBtn = Shared.getEl('btnApplyBulk');
         if (applyBtn) applyBtn.disabled = none;
         var coverBtn = Shared.getEl('btnBulkCover');
-        if (coverBtn) coverBtn.disabled = none;
+        if (coverBtn) coverBtn.disabled = none || !(_bulkCover && _bulkCover.getValue());
     }
 
     // readRowTags
@@ -533,66 +498,13 @@ export default function (view) {
             });
     }
 
-    // pickCover
-    // Opens the file chooser, whose picture becomes the cover of the given files.
-    //
-    // Inputs
-    // ids [string[]]: The files to set the cover on.
-    function pickCover(ids) {
-        var input = view.querySelector('#coverFileInput');
-        if (!input || ids.length === 0) return;
-        _coverTargets = ids;
-        input.value = '';
-        input.click();
-    }
-
-    // squareCover
-    // Crops a picture to a centered square of at most 1200 px, so every cover is square whatever its shape.
-    //
-    // Inputs
-    // file [File]: The chosen picture.
-    //
-    // Output
-    // [Promise<string>]: The cover as base64 JPEG.
-    function squareCover(file) {
-        return new Promise(function(resolve, reject) {
-            if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
-                reject(new Error('Select a JPEG, PNG, or WebP picture.'));
-                return;
-            }
-            var url = URL.createObjectURL(file);
-            var img = new Image();
-            img.onload = function() {
-                var side = Math.min(img.naturalWidth, img.naturalHeight);
-                var size = Math.min(side, 1200);
-                var canvas = document.createElement('canvas');
-                canvas.width = size;
-                canvas.height = size;
-                canvas.getContext('2d').drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, size, size);
-                URL.revokeObjectURL(url);
-                resolve(canvas.toDataURL('image/jpeg', 0.9).split(',')[1]);
-            };
-            img.onerror = function() {
-                URL.revokeObjectURL(url);
-                reject(new Error('Could not open that file as a picture.'));
-            };
-            img.src = url;
-        });
-    }
-
-    // uploadCover
-    // Embeds the chosen picture in each target file.
-    //
-    // Inputs
-    // file [File]: The chosen picture.
-    function uploadCover(file) {
-        var ids = _coverTargets.slice();
-        _coverTargets = [];
-        squareCover(file).then(function(data) {
-            embedCover(ids, data);
-        }).catch(function(err) {
-            Shared.setStatus('importStatus', err.message, true);
-        });
+    // setBulkCover
+    // Embeds the cover picked in Bulk Updates in every selected file.
+    function setBulkCover() {
+        var value = _bulkCover ? _bulkCover.getValue() : null;
+        var ids = _list ? _list.getSelected() : [];
+        if (!value || typeof value === 'string' || ids.length === 0) return;
+        embedCover(ids, value);
     }
 
     // generateCoverFor
@@ -624,7 +536,7 @@ export default function (view) {
         }
 
         var data = generateCover(lines, colorKey, 1200).toDataURL('image/jpeg', 0.92).split(',')[1];
-        embedCover([row.getAttribute('data-id')], data);
+        sendCover([row.getAttribute('data-id')], data);
     }
 
     // generateCover
@@ -729,22 +641,31 @@ export default function (view) {
         Shared.apiRequest('Downloads/' + encodeURIComponent(id) + '/Cover/FromAlbum', 'POST', { Album: album, AlbumArtist: albumArtist })
             .then(function(result) {
                 if (!result || !result.Found) return;
-                var btn = row.querySelector('.yta-cover-btn');
-                if (btn) btn.innerHTML = renderCover(id, true);
-                var d = _downloads.find(function(x) { return x.Id === id; });
-                if (d) d.HasCover = true;
+                showCover(id);
                 Shared.setStatus('importStatus', 'Cover taken from the library album "' + album + '".', false);
             })
             .catch(function() { return null; });
     }
 
     // embedCover
-    // Embeds a square cover in each target file in turn, and refreshes the thumbnails in place so unsaved edits stay.
+    // Embeds a picked cover in each target file.
     //
     // Inputs
     // ids [string[]]: The files.
-    // data [string]: The cover as base64 JPEG.
-    function embedCover(ids, data) {
+    // value [object]: The Image Picker's value.
+    function embedCover(ids, value) {
+        coverData(value)
+            .then(function (data) { sendCover(ids, data); })
+            .catch(function (err) { Shared.setStatus('importStatus', err.message, true); });
+    }
+
+    // sendCover
+    // Embeds a square cover in each target file in turn, and shows it in each row so unsaved edits stay.
+    //
+    // Inputs
+    // ids [string[]]: The files.
+    // data [string]: The cover as base64 JPEG or PNG.
+    function sendCover(ids, data) {
         Shared.setStatus('importStatus', 'Setting covers…', false, { timeout: 0 });
         var failed = 0;
         function next(index) {
@@ -755,15 +676,9 @@ export default function (view) {
             }
             var id = ids[index];
             Shared.apiRequest('Downloads/' + encodeURIComponent(id) + '/Cover', 'POST', { Data: data })
-                .then(function() {
-                    var drawn = rowFor(id);
-                    var btn = drawn && drawn.querySelector('.yta-cover-btn');
-                    if (btn) btn.innerHTML = renderCover(id, true);
-                    var d = _downloads.find(function(x) { return x.Id === id; });
-                    if (d) d.HasCover = true;
-                })
-                .catch(function() { failed++; })
-                .then(function() { next(index + 1); });
+                .then(function () { showCover(id); })
+                .catch(function () { failed++; })
+                .then(function () { next(index + 1); });
         }
         next(0);
     }
@@ -831,12 +746,13 @@ export default function (view) {
         }
 
         Shared.bindClick('btnApplyBulk', applyBulkEdit);
-        Shared.bindClick('btnBulkCover', function () { pickCover(_list ? _list.getSelected() : []); });
+        Shared.bindClick('btnBulkCover', setBulkCover);
 
-        var coverInput = Shared.getEl('coverFileInput');
-        if (coverInput) coverInput.addEventListener('change', function () {
-            if (coverInput.files && coverInput.files[0]) uploadCover(coverInput.files[0]);
-        });
+        var bulkCoverCell = Shared.getEl('bulkCoverCell');
+        if (bulkCoverCell && !_bulkCover) {
+            _bulkCover = createCoverPicker({ label: 'Cover', emptyText: 'No cover.', onChange: updateBulkButtons });
+            bulkCoverCell.appendChild(_bulkCover.element);
+        }
     }
 
     var page = createPage(view, {
@@ -844,7 +760,7 @@ export default function (view) {
         bind: bindEvents,
         load: loadPage,
         onHide: function () {
-            stopPreview();
+            Object.keys(_rowParts).forEach(function (id) { _rowParts[id][0].pause(); });
         }
     });
     Shared = page.shared;
