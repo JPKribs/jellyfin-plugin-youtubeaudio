@@ -368,22 +368,18 @@ def main():
     submit = {"Artist": "Yo-Yo Ma", "Album": "Limit Test", "Year": 2020}
     check("approved user: a link carrying extra arguments is refused",
           status_of("POST", "/YouTube/Download/Submit", {**submit, "Url": injected}, token=listener_token) == 400)
-    ytdlp = next(f for f in plugin_files if f.startswith("yt-dlp_linux") and not f.endswith(".download"))
-    channel = sh("docker", "exec", NAME, f"/config/plugins/YouTubeAudio/{ytdlp}", "--js-runtimes", "deno:/config/plugins/YouTubeAudio/deno",
-                 "--no-cache-dir", "--skip-download", "--print", "channel_id", FIX_URL, check=False).strip().splitlines()
-    if channel and channel[-1].startswith("UC"):
-        uploads = "https://www.youtube.com/playlist?list=UU" + channel[-1][2:]
-        n_before = len(queue())
-        try:
-            call("POST", "/YouTube/Download/Submit", {**submit, "Url": uploads}, token=listener_token)
-            limit_status, limit_error = 200, ""
-        except urllib.error.HTTPError as ex:
-            limit_status, limit_error = ex.code, ex.read().decode()
-        # The playlist must be read (YoutubeDLSharp parses yt-dlp's JSON with Newtonsoft.Json) to be refused.
-        check("approved user: a playlist over the limit is refused, nothing queued",
-              limit_status == 400 and "more than 2 videos" in limit_error and len(queue()) == n_before, f"{limit_status} {limit_error}")
-    else:
-        check("found the test channel's uploads playlist", False, str(channel))
+    # A public playlist on the test video's artist channel, far longer than 2. A channel's uploads list (UU...) can't be
+    # used, as YouTube says those no longer exist, and a mix (RD...) reads as its one video.
+    over_limit = "https://www.youtube.com/playlist?list=PLa2Nqyzs2sklUoKqXWqGqd74yibTDzMsu"  # Essential Yo-Yo Ma
+    n_before = len(queue())
+    try:
+        call("POST", "/YouTube/Download/Submit", {**submit, "Url": over_limit}, token=listener_token)
+        limit_status, limit_error = 200, ""
+    except urllib.error.HTTPError as ex:
+        limit_status, limit_error = ex.code, ex.read().decode()
+    # The playlist must be read (YoutubeDLSharp parses yt-dlp's JSON with Newtonsoft.Json) to be refused.
+    check("approved user: a playlist over the limit is refused, nothing queued",
+          limit_status == 400 and "more than 2 videos" in limit_error and len(queue()) == n_before, f"{limit_status} {limit_error}")
     cfg = call("GET", f"/Plugins/{PLUGIN_ID}/Configuration")
     cfg.update({"ApprovedUserIds": [], "MaxPublicPlaylistItems": 200})
     call("POST", f"/Plugins/{PLUGIN_ID}/Configuration", cfg)
