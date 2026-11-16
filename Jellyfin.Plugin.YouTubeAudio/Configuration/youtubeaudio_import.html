@@ -67,25 +67,49 @@
     <link rel="stylesheet" href="configurationpage?name=youtubeaudio_jpkribs_shared.css">
     <style>
         /* yta-grow */
-        /* Shares an edit line's width between its fields in a fixed ratio. A number field keeps room for four digits beside its arrows. */
+        /* Shares a Bulk Updates line's width between its fields in a fixed ratio. A number field keeps room for four digits beside its arrows. */
         /* Example: <div class="base-field yta-grow-3"></div> */
         #YouTubeAudioImportPage .yta-grow-1 { flex: 1 1 0; min-width: 6.5rem; }
         #YouTubeAudioImportPage .yta-grow-3 { flex: 3 1 0; }
-        #YouTubeAudioImportPage .yta-grow-6 { flex: 6 1 0; }
 
         /* yta-import-list */
         /* The downloaded files, spaced from the bulk editor above them. */
         /* Example: <div class="yta-import-list"></div> */
         #YouTubeAudioImportPage .yta-import-list { margin-top: var(--base-gap-wide); }
 
+        /* yta-import-head */
+        /* A file panel's header, with the checkbox and name at the start and the size, badge, and buttons at the end, which move to a line of their own on a phone. */
+        /* Example: <div class="base-panel-header yta-import-head"><span class="yta-import-name"></span><div class="yta-import-tools"></div></div> */
+        #YouTubeAudioImportPage .yta-import-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--base-gap-narrow); }
+        #YouTubeAudioImportPage .yta-import-name { flex: 1 1 12rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #YouTubeAudioImportPage .yta-import-tools { display: flex; align-items: center; gap: var(--base-gap-narrow); margin-left: auto; font-weight: normal; }
+
         /* yta-import-body */
-        /* A file's player and tools on one line, and its cover picker beside its tag fields, each wrapping on a narrow screen. */
-        /* Example: <div class="yta-import-body"><div class="yta-cover-cell"></div><div class="yta-import-fields"></div></div> */
-        #YouTubeAudioImportPage .yta-import-head { align-items: center; flex-wrap: wrap; }
-        #YouTubeAudioImportPage .yta-player-cell { flex: 1 1 12rem; min-width: 0; }
-        #YouTubeAudioImportPage .yta-import-tools { display: flex; align-items: center; gap: var(--base-gap-narrow); margin-left: auto; }
-        #YouTubeAudioImportPage .yta-import-body { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--base-gap-wide); }
-        #YouTubeAudioImportPage .yta-cover-cell { flex: 0 0 min-content; }
-        #YouTubeAudioImportPage .yta-import-fields { flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: var(--base-gap-narrow); }
+        /* A file panel's cover beside its tag fields, with its player across the full width under both. The cover cell is as wide as the cover, so Set Cover sits under it, and it takes back the Image Picker's bottom margin, so the cover is one gap from the fields under it. The fields share columns, three equal ones with Track and Year in a narrow last column that keeps four digits. On a tablet the cover moves on top, and on a phone each field takes its own line. */
+        /* Example: <div class="base-panel-body yta-import-body"><div class="yta-cover-cell"></div><div class="yta-import-fields"></div><div class="yta-player-cell"></div></div> */
+        #YouTubeAudioImportPage .yta-import-body { display: grid; grid-template-columns: min-content minmax(0, 1fr); gap: var(--base-gap-wide); align-items: start; }
+        #YouTubeAudioImportPage .yta-cover-cell { width: min-content; margin-bottom: calc(-1 * var(--base-gap-wide)); }
+        #YouTubeAudioImportPage .yta-player-cell { grid-column: 1 / -1; min-width: 0; }
+        #YouTubeAudioImportPage .yta-import-fields {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, calc((100% - 2 * var(--base-gap-wide)) / 3 - var(--base-gap-wide) - 6.5rem)) 6.5rem;
+            grid-template-areas: "title title title track" "artist album-artist feat feat" "album genre genre year";
+            gap: var(--base-gap-wide);
+        }
+        #YouTubeAudioImportPage .yta-import-title { grid-area: title; }
+        #YouTubeAudioImportPage .yta-import-track { grid-area: track; }
+        #YouTubeAudioImportPage .yta-import-artist { grid-area: artist; }
+        #YouTubeAudioImportPage .yta-import-album-artist { grid-area: album-artist; }
+        #YouTubeAudioImportPage .yta-import-feat { grid-area: feat; }
+        #YouTubeAudioImportPage .yta-import-album { grid-area: album; }
+        #YouTubeAudioImportPage .yta-import-genre { grid-area: genre; }
+        #YouTubeAudioImportPage .yta-import-year { grid-area: year; }
+        @media (max-width: 768px) {
+            #YouTubeAudioImportPage .yta-import-body { grid-template-columns: minmax(0, 1fr); }
+        }
+        @media (max-width: 600px) {
+            #YouTubeAudioImportPage .yta-import-tools { flex: 1 0 100%; justify-content: flex-end; }
+            #YouTubeAudioImportPage .yta-import-fields { grid-template-columns: minmax(0, 1fr); grid-template-areas: "title" "track" "artist" "album-artist" "feat" "album" "genre" "year"; }
+        }
     </style>
 </div>

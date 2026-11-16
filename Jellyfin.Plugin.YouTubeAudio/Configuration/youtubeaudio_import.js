@@ -141,7 +141,7 @@ export default function (view) {
     }
 
     // buildList
-    // Builds the files as a Base Filtered List with selection, Import and Delete.
+    // Builds the files as a Base Filtered List with selection, Import and Delete, drawn as one panel per file.
     function buildList() {
         var host = Shared.getEl('importList');
         if (!host || _list) return;
@@ -151,6 +151,7 @@ export default function (view) {
             render: renderImportRow,
             search: false,
             selectable: 'multiple',
+            layout: 'plain',
             bulkActions: [
                 { id: 'import', label: 'Import', icon: 'library_add', variant: 'primary', onClick: importSelected },
                 { id: 'delete', label: 'Delete', icon: 'delete', variant: 'destructive', onClick: deleteSelected }
@@ -243,55 +244,55 @@ export default function (view) {
     }
 
     // renderImportRow
-    // Draws one file as an edit row of its tags, with its preview player, its cover picker, and its save controls, and wires them.
+    // Draws one file as a panel, with its name, size, and save controls on top, its cover beside its tag fields, and its preview player under them, and wires them.
     //
     // Inputs
     // d [object]: The downloaded file.
     // index [number]: Its place in the list.
-    // check [HTMLInputElement]: The row's selection checkbox, placed at the start of the first line.
+    // check [HTMLInputElement]: The row's selection checkbox, placed at the start of the header.
     //
     // Output
     // [HTMLElement]: The row.
     function renderImportRow(d, index, check) {
         var esc = Shared.escapeHtml;
+        var key = 'yta-' + String(d.Id).replace(/[^A-Za-z0-9_-]/g, '');
+        function field(name, area, label, type, value, placeholder) {
+            return '<div class="base-field yta-import-' + area + '"><label for="' + key + '-' + name + '">' + label + '</label>'
+                + '<input type="' + type + '" id="' + key + '-' + name + '" class="base-edit-input yta-field-' + name + '" value="' + esc(value) + '" placeholder="' + placeholder + '" /></div>';
+        }
         var row = document.createElement('div');
-        row.className = 'base-edit-row yta-import-row';
+        row.className = 'base-panel yta-import-row';
         row.setAttribute('data-id', d.Id);
         row.innerHTML =
-            '<div class="base-edit-line yta-import-head">'
-            + '<div class="yta-player-cell"></div>'
+            '<div class="base-panel-header yta-import-head">'
+            + '<span class="yta-import-name"></span>'
             + '<div class="yta-import-tools">'
-            + (d.InLibrary ? '<span title="The library already has this song. Importing it adds a second copy.">' + Shared.badge('orange', 'In Library') + '</span>' : '')
             + '<span class="base-edit-secondary">' + esc(Shared.formatSize(d.FileSize)) + '</span>'
+            + (d.InLibrary ? '<span title="The library already has this song. Importing it adds a second copy.">' + Shared.badge('orange', 'In Library') + '</span>' : '')
             + '<button type="button" class="base-row-btn yta-wand-btn" title="Generate Cover" aria-label="Generate Cover"><span class="material-icons" aria-hidden="true">auto_fix_high</span></button>'
             + '<button type="button" class="base-row-btn save" title="Save Tags" aria-label="Save Tags"><span class="material-icons" aria-hidden="true">save</span></button>'
             + '</div>'
             + '</div>'
-            + '<div class="yta-import-body">'
+            + '<div class="base-panel-body yta-import-body">'
             + '<div class="yta-cover-cell"></div>'
             + '<div class="yta-import-fields">'
-            + '<div class="base-edit-line">'
-            + '<div class="base-field yta-grow-6"><label>Title</label>'
-            + '<input type="text" class="base-edit-input yta-field-title" value="' + esc(d.MetadataTitle) + '" placeholder="Title" aria-label="Title" /></div>'
-            + '<div class="base-field yta-grow-1"><label>Track</label>'
-            + '<input type="number" class="base-edit-input yta-field-trackNumber" value="' + esc(d.TrackNumber || '') + '" placeholder="1" aria-label="Track" /></div>'
+            + field('title', 'title', 'Title', 'text', d.MetadataTitle, 'Title')
+            + field('trackNumber', 'track', 'Track', 'number', d.TrackNumber || '', '1')
+            + '<div class="base-field yta-import-artist yta-artist-cell"><label>Artist</label></div>'
+            + field('albumArtist', 'album-artist', 'Album Artist', 'text', d.AlbumArtist, 'Artist')
+            + field('feat', 'feat', 'Featured Artists', 'text', d.FeaturedArtist, 'Artist B; Artist C')
+            + '<div class="base-field yta-import-album yta-album-cell"><label>Album</label></div>'
+            + field('genre', 'genre', 'Genre', 'text', d.Genre, 'Classical; Baroque')
+            + field('year', 'year', 'Year', 'number', d.Year || '', '2024')
             + '</div>'
-            + '<div class="base-edit-line">'
-            + '<div class="base-field yta-artist-cell"><label>Artist</label></div>'
-            + '<div class="base-field"><label>Album Artist</label>'
-            + '<input type="text" class="base-edit-input yta-field-albumArtist" value="' + esc(d.AlbumArtist) + '" placeholder="Artist" aria-label="Album Artist" /></div>'
-            + '<div class="base-field"><label>Featured Artists</label>'
-            + '<input type="text" class="base-edit-input yta-field-feat" value="' + esc(d.FeaturedArtist) + '" placeholder="Artist B; Artist C" aria-label="Featured Artists" /></div>'
-            + '</div>'
-            + '<div class="base-edit-line">'
-            + '<div class="base-field yta-album-cell yta-grow-3"><label>Album</label></div>'
-            + '<div class="base-field yta-grow-1"><label>Year</label>'
-            + '<input type="number" class="base-edit-input yta-field-year" value="' + esc(d.Year || '') + '" placeholder="2024" aria-label="Year" /></div>'
-            + '<div class="base-field yta-grow-3"><label>Genre</label>'
-            + '<input type="text" class="base-edit-input yta-field-genre" value="' + esc(d.Genre) + '" placeholder="Classical; Baroque" aria-label="Genre" /></div>'
-            + '</div>'
-            + '</div>'
+            + '<div class="yta-player-cell"></div>'
             + '</div>';
+
+        var name = row.querySelector('.yta-import-name');
+        var titleInput = row.querySelector('.yta-field-title');
+        function showName() { name.textContent = titleInput.value.trim() || d.FileName || ''; }
+        showName();
+        titleInput.addEventListener('input', showName);
 
         var head = row.querySelector('.yta-import-head');
         if (check) head.insertBefore(check, head.firstChild);
