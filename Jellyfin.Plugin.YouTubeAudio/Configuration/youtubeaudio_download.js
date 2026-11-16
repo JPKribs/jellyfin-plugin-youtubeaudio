@@ -165,7 +165,8 @@ export default function (view) {
             status: { label: item.Status, color: STATUS_STATES[item.StatusCode] || 'Queued' },
             detail: notes.join(' ') || null,
             error: failed ? (item.ErrorMessage || null) : null,
-            actions: item.StatusCode !== 1 ? [{ label: 'Change Link', icon: 'link', value: 'link' }] : [],
+            // A song downloading now keeps its link until it finishes.
+            actions: [{ label: 'Change Link', icon: 'link', value: 'link', disabled: item.StatusCode === 1 }],
             onAction: function () { changeLink(item.Id); }
         });
     }

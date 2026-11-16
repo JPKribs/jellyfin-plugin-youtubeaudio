@@ -314,6 +314,8 @@ export default function (view) {
             chooseText: 'Set Cover',
             replaceText: 'Replace',
             emptyText: 'No cover.',
+            // An embedded cover is only replaced, so the picker offers no Remove.
+            removable: false,
             onChange: function (value) {
                 if (value) embedCover([d.Id], value);
             }

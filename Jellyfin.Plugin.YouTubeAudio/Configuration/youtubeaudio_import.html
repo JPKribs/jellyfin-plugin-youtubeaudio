@@ -67,9 +67,9 @@
     <link rel="stylesheet" href="configurationpage?name=youtubeaudio_jpkribs_shared.css">
     <style>
         /* yta-grow */
-        /* Shares an edit line's width between its fields in a fixed ratio. */
+        /* Shares an edit line's width between its fields in a fixed ratio. A number field keeps room for four digits beside its arrows. */
         /* Example: <div class="base-field yta-grow-3"></div> */
-        #YouTubeAudioImportPage .yta-grow-1 { flex: 1 1 0; }
+        #YouTubeAudioImportPage .yta-grow-1 { flex: 1 1 0; min-width: 6.5rem; }
         #YouTubeAudioImportPage .yta-grow-3 { flex: 3 1 0; }
         #YouTubeAudioImportPage .yta-grow-6 { flex: 6 1 0; }
 
@@ -87,8 +87,5 @@
         #YouTubeAudioImportPage .yta-import-body { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--base-gap-wide); }
         #YouTubeAudioImportPage .yta-cover-cell { flex: 0 0 min-content; }
         #YouTubeAudioImportPage .yta-import-fields { flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: var(--base-gap-narrow); }
-
-        /* A file's cover has no Remove, since an embedded cover is only replaced. Base buttons set their display as important. */
-        #YouTubeAudioImportPage .yta-cover-cell .base-image-picker-remove { display: none !important; }
     </style>
 </div>

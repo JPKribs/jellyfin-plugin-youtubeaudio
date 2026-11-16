@@ -30,11 +30,13 @@ changelog:
   - The user page and Public Queue addresses are described in the documentation rather than listed in Settings
   - The user page suggests library artists and albums as you type, and the Public Queue filters by status with pills and lists songs in boxed rows
   - Every Save is the same full width Save Bar, with any other actions in a full width row above it
+  - A song that is downloading shows Change Link turned off, so its status lines up with the other rows
   fixed:
   - The arrows on collapsible sections are back to their usual size
   - The playlist checkboxes and the library song search on the Download tab keep their own widths
+  - The Track and Year fields on the Import tab show four digits on a phone
   developer:
-  - Uses JPKribs.Jellyfin.Base 2026.11.17, with its base- class names, Filtered List, List, Checkbox List, Ordered List, File Picker, and Prompt Dialog in place of the hand built queue, import list, playlist picker, cover text list, file input, and link editor
+  - Uses JPKribs.Jellyfin.Base 2026.11.18, with its base- class names, Filtered List, List, Checkbox List, Ordered List, File Picker, and Prompt Dialog in place of the hand built queue, import list, playlist picker, cover text list, file input, and link editor, and its Image Picker without Remove and disabled Media Card actions in place of the hidden Remove button and the missing Change Link
   - Uses Base's Media Card, Audio Player, Image Picker, Checkbox, Record List, and Pill Group in place of the hand built queue rows, preview player, cover button, cover text checkboxes, and Public Queue pills and rows
   - Stored times are written with Base's UtcTime
   - Adds starthere.md and the guides in skills/
