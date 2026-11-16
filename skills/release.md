@@ -48,7 +48,7 @@ Raising a part sets every part after it to `0`. `12.4.4.4` becomes `12.4.5.0` fo
 
 6. **Pages.** Install the zip on a test server and open each tab and both public pages.
 
-7. **Docs.** Every page describes this release. Retake any screenshot whose subject changed, and all of them when the Base version changed. Update [Versioning](../docs/Versioning.md) when the schema reader or the upgrade path changed.
+7. **Docs.** Every page describes this release. Retake any screenshot whose subject changed, and all of them when the Base version changed, with the [screenshot kit](documentation.md#screenshot-kit). Open each new PNG and look at it. Update [Versioning](../docs/Versioning.md) when the schema reader or the upgrade path changed.
 
     ```bash
     mkdocs build --strict
@@ -61,11 +61,19 @@ Raising a part sets every part after it to `0`. `12.4.4.4` becomes `12.4.5.0` fo
 Edit `build.yaml`.
 
 1. Set `version` to the new version.
-2. Replace the whole `changelog` with this release's entries. Each release lists only its own changes. See [documentation.md](documentation.md#release-notes) for how to write them.
+2. Replace the whole `changelog` with this release's entries. Each release lists only its own changes, so drop every line that shipped in the last release and every line a later change in this release replaced. See [documentation.md](documentation.md#release-notes) for how to write them.
 3. Name the Base version in `developer` when it changed, such as "Uses JPKribs.Jellyfin.Base 2026.11.17", with what it replaced locally.
 4. Keep `description` and `overview` true for this release. `manifest.json` takes its own description, so update both together.
 
-Commit it on its own.
+Merge the release branch into `master` first, so every change for the release is on it. Then commit the version on its own, on `master`.
+
+```bash
+git checkout master
+```
+
+```bash
+git merge --ff-only <branch>
+```
 
 ```bash
 git commit -am "Set the release to 12.4.5.0"
@@ -77,16 +85,29 @@ git push
 
 ## Publish
 
-1. **Draft.** The **Create/Update Release Draft** workflow builds the zip and writes a draft release named `v<version>` with the changelog as its notes. A push that only changes `build.yaml` does not start it, so start it from the Actions tab.
-2. **Check.** Open the draft on GitHub. The notes must match `build.yaml`, and the zip and its `.md5` must be attached.
-3. **Release.** Publish the draft. The **Publish Plugin** workflow takes the attached zip's checksum, adds the version to `manifest.json`, and commits "Update manifest for release v<version>".
-4. **Pull.**
+Follow these steps in order, and skip none.
+
+1. **Draft.** The **Create/Update Release Draft** workflow builds the zip and writes a draft release named `v<version>` with the changelog as its notes. A push to `master` that carries any file besides `build.yaml`, Markdown, `docs/`, `mkdocs.yml`, `.github/`, and `.gitignore` starts it. A push that only changes those does not, so start it from the Actions tab only then.
 
     ```bash
-    git pull
+    gh run list -L 8
     ```
 
-5. **Verify.** On a test server, add the repository URL, install the release from the catalog, restart, and open each tab.
+2. **Check.** List the releases and open the draft on GitHub. The notes must match `build.yaml`, and the zip and its `.md5` must be attached. A push can start the workflow while another run, from an earlier push or from the Actions tab, writes a draft too. That leaves a second draft named `v<version>` with no files.
+
+    ```bash
+    gh release list -L 5
+    ```
+
+3. **Release.** Publish the draft that has the zip and `.md5`, never the empty one, and delete the empty draft afterward. The **Publish Plugin** workflow takes the attached zip's checksum, adds the version to `manifest.json`, and commits "Update manifest for release v<version>".
+4. **Confirm.** Check that the manifest commit landed and that the checksum of the new version in `manifest.json` matches the `.md5` on the release.
+5. **Pull.**
+
+    ```bash
+    git pull --ff-only
+    ```
+
+6. **Verify.** On a test server, add the repository URL, install the release from the catalog, restart, and open each tab.
 
 ## When a Release Is Wrong
 
@@ -104,5 +125,5 @@ git push
 * [ ] Docs, screenshots, and Versioning describe this release.
 * [ ] `mkdocs build --strict` passes.
 * [ ] The changelog lists only this release, in the four keys.
-* [ ] The draft matches `build.yaml` before it is published.
-* [ ] The manifest commit is pulled.
+* [ ] The draft that was published has the notes, the zip, and the `.md5`, and no empty draft is left.
+* [ ] The manifest commit landed with the release's checksum, and it is pulled.

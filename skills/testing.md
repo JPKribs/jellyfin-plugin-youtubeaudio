@@ -18,6 +18,7 @@ Test each behavior at the lowest layer that can prove it. Go up a layer only for
 | Controller | A route's status codes, guards, and response shape | `dotnet test` | Seconds |
 | Download | yt-dlp downloads and matches against real YouTube | `YTA_RUN_INTEGRATION=1 dotnet test` | Minutes |
 | End to end | The whole pipeline on a throwaway Jellyfin in Docker | `e2e/run.sh` | Minutes |
+| Harness | A tab or a user page draws and behaves right under Jellyfin's real CSS | The [harness](#harness) in headless Chromium | Minutes |
 | Page | A config page draws, reads, and saves as it should | By hand, on a test server | Minutes |
 
 | A change to | Needs |
@@ -28,7 +29,7 @@ Test each behavior at the lowest layer that can prove it. Go up a layer only for
 | A controller or route attribute | Controller |
 | How yt-dlp is run, or how a match is searched | Download |
 | Anything that moves or deletes library files, or the public queue | End to end |
-| A config page or a public page | Page |
+| A config page or a public page | Harness and Page |
 
 ## Layout
 
@@ -119,11 +120,28 @@ python3 e2e/docker_e2e.py --zip dist/jellyfin-plugin-youtubeaudio-<version>.zip
 * Scratch files and the run's throwaway logins go to the ignored `e2e/.work/`.
 * Run it for any change that moves or deletes library files, and before every release.
 
+## Harness
+
+The harness is the page the [screenshot kit](documentation.md#screenshot-kit) serves. It loads a tab the way the dashboard does, with no Jellyfin server behind it.
+
+* It loads Jellyfin's real stylesheets from the installed jellyfin-web, `index.html`'s first two, then the dark theme and the chunks. It leaves out the chunks that shrink the root font, `66923` and `84501`. Base's CSS alone hides real bugs, such as Jellyfin's `.card` rule or its widened inputs.
+* It mimics the upgrade of each `emby-*` element in `upgrade.js`, so labels, select arrows, and checkboxes are drawn as the dashboard draws them.
+* It serves the tab's HTML and JS from the repository and Base's assets from the NuGet package the plugin builds against, with stub API answers and generic data.
+* It renders the user pages through Base's status template, as the controller does, so they get only the template's styles.
+
+Click through each changed page like a user, at 1280 and at 375 px wide.
+
+* Type real keystrokes into every picker and lookup, such as part of an artist's name, and check that the list fills.
+* Open every tab, every collapsible, and every dialog, such as **Change Link** and **Delete Files**.
+* Take a screenshot of each state and look at it.
+
+A harness run never makes a change done. It finds problems before the test server does.
+
 ## Pages
 
-The config pages and the public pages have no automated tests. Check every changed page by hand on a test server.
+The config pages and the public pages have no automated tests. After the harness, check every changed page by hand on a test server.
 
-* Install the build, restart, and reload the dashboard, since it caches scripts.
+* Install the build, restart, and hard reload the dashboard, since it caches scripts.
 * Open every changed tab, and use every control the change touched.
 * Check the page at 375 px wide.
 * Check the browser console for errors.
@@ -136,4 +154,5 @@ The config pages and the public pages have no automated tests. Check every chang
 * [ ] `dotnet test` passes.
 * [ ] The download tests pass for any change to how songs download.
 * [ ] The end to end test passes for any change to library files.
-* [ ] Every changed page was opened and used on a test server.
+* [ ] Every changed page was clicked through in the harness at 1280 and 375 px, and each screenshot was looked at.
+* [ ] Every changed page was opened and used on a test server after a hard reload.

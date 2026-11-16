@@ -15,6 +15,8 @@ How to write, comment, and test code in this plugin. It covers C#, JavaScript, H
 * Read Base from the package this plugin builds against. The C# source is in `~/.nuget/packages/jpkribs.jellyfin.base/<version>/src/`, and the JS typings are in `assets/jpkribs_shared.d.ts` beside it.
 * Treat the local Base checkout as read only. Base has its own owner and its own release, so report a gap and wait for the version that closes it.
 * When Base differs from the local code it replaces, keep the local behavior in a small step around the Base call, and cover it with a test.
+* Base comes first, but a component used wrong is worse than none. Look at the result on a real server, not just in the code.
+* Moving UI onto a Base component is UI work, even on a sensitive page. Only stored data, routes, auth, and secret handling are [stop and ask](../starthere.md#stop-and-ask).
 
 | Need | Use from Base |
 | :--- | :--- |

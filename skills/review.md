@@ -44,7 +44,9 @@ The check to run on your own changes before you call them done. People and AI as
 * [ ] Each component is the one [style.md](style.md#components) names for the need.
 * [ ] Colors come from Base tokens and keep their [meaning](style.md#meaning).
 * [ ] The page works at 375 px wide.
-* [ ] Every changed page was opened on a test server and looked at, after a reload.
+* [ ] Every changed page was clicked through in the [harness](testing.md#harness) at 1280 and 375 px, then opened on a test server after a hard reload. A harness run alone does not make it done.
+* [ ] Every lookup was typed into and filled its list, and every collapsible and dialog was opened.
+* [ ] The user pages use only the status template's classes and no icon glyphs, per [style.md](style.md#user-pages).
 * [ ] Every top level group on a page has the same header, and a section with nothing to show is hidden.
 * [ ] Results use `setStatus`, confirms use `confirmDialog`, and nothing uses `Dashboard.alert` or `window.confirm`.
 
@@ -66,7 +68,7 @@ The check to run on your own changes before you call them done. People and AI as
 
 * [ ] Every page the change affects describes the current release only.
 * [ ] Labels in the docs match the page exactly.
-* [ ] Screenshots of anything that changed are retaken.
+* [ ] Screenshots of anything that changed are retaken with the [screenshot kit](documentation.md#screenshot-kit), and all of them when the Base version changed. Each new PNG was opened and looked at.
 * [ ] `build.yaml` has a changelog entry for any change a user would notice.
 * [ ] `mkdocs build --strict` passes.
 

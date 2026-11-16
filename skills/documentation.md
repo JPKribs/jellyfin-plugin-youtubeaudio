@@ -170,21 +170,46 @@ Use `##` for README headings. Keep the README under 40 lines.
 
 ### What to Capture
 
-* Capture every page and dialog a docs page describes.
+* Capture every tab and user page a docs page describes, at the state the page explains.
 * Capture the dark theme only, which is Jellyfin's default.
-* Capture from the end to end container, run with `--keep`, so every name is generic.
-* Capture after a download has run so the queue, its counts, and its badges are filled.
-* Hide nothing with editing. When a value is private, change the test server data instead.
+* Capture from the [screenshot kit](#screenshot-kit) with its generic data. Never capture from a live server or its data.
+* Fill the queue, its status cards, the playlist imports, and the downloaded files first, so nothing shows empty unless the shot is of the empty state.
+* Use public domain songs credited to their composers, such as Debussy and Satie, and generic user names such as alex and taylor.
+* Hide nothing with editing. When a value is private, change the kit's data instead.
 
 ### Sizes
 
+Every capture is headless Chromium at 2x.
+
 | Kind | Size | How |
 | :--- | :--- | :--- |
-| Dialog | 800 wide | The browser at 800 px, cropped to the dialog |
-| Full page | 1920 wide | The browser at 1920 px, cropped to the content area |
-| Phone | 375 wide at 2x | The browser's device mode at 375 px |
+| Tab | 1720 wide | An 860 px window, from the top of the page to its last element, with no Jellyfin header |
+| User page | The status card's width | The status card alone. `User-Download.png` is 840 wide from a 960 px window, and `Queue.png` is 1184 wide from a 640 px window |
 
-Save every capture as PNG. Crop out the browser frame and the Jellyfin header unless the header is the subject.
+Keep each file's width when it is retaken. Its height follows the content.
+
+### Screenshot Kit
+
+The kit captures every screenshot in `docs/screenshots/` from the repository's own files, with no Jellyfin server. It lives outside the repository, in a `yta-docs/harness` folder.
+
+| File | Does |
+| :--- | :--- |
+| `server.py` | Serves the [harness](testing.md#harness), the tab HTML and JS from the repository, Base's assets from the NuGet package the csproj names, and jellyfin-web from the installed Jellyfin app. It renders `/YouTube/Download` and `/YouTube/Queue` through Base's status template the way the controller's `StatusPage.Render` does, and answers their API calls with generic songs |
+| `harness.html`, `upgrade.js`, `stub.js` | Load a tab under Jellyfin's real stylesheets, upgrade its `emby-*` elements, and answer its API calls with a generic queue, downloaded files, playlist imports, users, and covers |
+| `shoot.mjs` | Captures **Download**, **Import**, **Settings**, **Queue**, and **User-Download** into `out/` |
+| `probe.mjs` | Loads one page at 1x, runs a script on it, and prints its errors, for clicking through a state before it is shot |
+
+Point `server.py` at the Base version in the csproj, then run the kit from its folder.
+
+```bash
+python3 server.py 8857
+```
+
+```bash
+node shoot.mjs
+```
+
+`node shoot.mjs Import` retakes one shot. Each run prints the size and any page error of each shot. Open every PNG in `out/` and look at it before copying it over the one in `docs/screenshots/` with the same name. A shot that matches the committed one byte for byte needs no commit.
 
 ### Names and Placement
 
@@ -201,17 +226,17 @@ Save every capture as PNG. Crop out the browser frame and the Jellyfin header un
 
 ### When to Retake
 
-Retake a screenshot in the same commit as any change that alters what it shows, including a label, a tab, a layout, or the Jellyfin version in the header. A new Base version changes how every component looks, so retake every screenshot when it is raised. A screenshot that shows a tab or label the plugin no longer has is a bug.
+Retake a screenshot in the same commit as any change that alters what it shows, including a label, a tab, a layout, or a status card's color. A new Base version changes how every component looks, so retake every screenshot when it is raised. A screenshot that shows a tab or label the plugin does not have is a bug.
 
 ## The Test Server
 
-The end to end test can leave its Jellyfin running for screenshots and manual checks. Docker and the dotnet SDK must be on the path.
+The end to end test can leave its Jellyfin running for manual checks. Docker and the dotnet SDK must be on the path.
 
 ```bash
 e2e/run.sh --keep
 ```
 
-The server answers at http://localhost:8097, and the run's throwaway logins are in the ignored `e2e/.work/`. Stop it with `docker rm -f yta-e2e`. Take screenshots only after the run finishes. Reload the page after a new build, since the dashboard caches scripts.
+The server answers at http://localhost:8097, and the run's throwaway logins are in the ignored `e2e/.work/`. Stop it with `docker rm -f yta-e2e`. Hard reload the page after a new build, since the dashboard caches scripts.
 
 ## Installing a Build by Hand
 
@@ -256,6 +281,7 @@ changelog:
     - A playlist import could queue a song twice. Each song is queued once
 ```
 
+* List only this release. Drop every line that shipped in the last release and every line a later change in this release replaced.
 * This is the one place that may say "now", "no longer", and "was".
 * Write full sentences with no closing period.
 * Write one entry per change a user would notice. Fold internal steps into the change they serve.
@@ -276,7 +302,7 @@ changelog:
 * [ ] Every UI label matches the page exactly and is bold.
 * [ ] Every heading is Title Case.
 * [ ] No em dashes, semicolons, or contractions.
-* [ ] Every screenshot matches the current UI and uses test server data.
+* [ ] Every screenshot matches the current UI, came from the screenshot kit, and was looked at.
 * [ ] Every term matches [glossary.md](glossary.md).
 * [ ] `mkdocs build --strict` passes.
 * [ ] `build.yaml` has a changelog entry for any change a user would notice.

@@ -248,6 +248,17 @@ Every config page uses Jellyfin's page shell.
 * List `data-require` in the order `emby-input,emby-button,emby-select,emby-checkbox`, dropping any the page does not use.
 * Use no inline `style` attributes. Add a `yta-` class to the page's `<style>` block, or to Base when it is reusable.
 
+### User Pages
+
+`/YouTube/Download` and `/YouTube/Queue` are content fragments the controller renders through Base's status template with `StatusPage.Render`. The template loads no Material Icons and no Base script.
+
+* Use only the template's classes, `base-status-card`, `base-fields`, `base-field-pair`, `base-hint`, `base-submit`, `base-btn`, `base-btn-secondary`, `base-btn-stack`, `base-status-error`, `base-note`, `base-spinner`, and `base-logo`, and `hidden` to switch states.
+* Never use an icon ligature or glyph. The template has no icon font, so the icon's name shows as text.
+* Show a result in the line under the form. An error takes `base-status-error`, which is red and hides itself when empty, and any other result takes `base-note`.
+* A second action, such as **View the Queue**, is a `base-btn base-btn-secondary` link under the primary one.
+* The Public Queue imports Base's shared CSS and script itself, for its Record List, Pill Group, and status badges. It uses only components that draw no icons.
+* Hide the template's loading heading and spinner when the page leaves its loading state.
+
 ### Tabs
 
 * One registered page per tab, wired with `createConfigPage` and `setTabs`.
@@ -281,7 +292,7 @@ Every save is Base's `createSaveBar` with `fill: true`, and its button reads **S
 | One Save per section | Sections are independent and long | One Save Bar at the bottom of each section's content |
 | Editor dialog | Each record is edited on its own | **Done** in `openEditorDialog` |
 
-* The Save Bar is the last element of what it saves. Nothing sits beside it or below it in that section.
+* The Save Bar is the last element of what it saves. Nothing sits beside it or below it in that section, and no divider line sits above it.
 * Other actions that belong with the save, such as Update yt-dlp, go in one `base-button-row` directly above the Save Bar, each `raised base-button secondary fill`, or `destructive fill` for one that deletes or resets data. Base spaces that row. Its buttons have no margin of their own, so their edges line up with the Save Bar's, the row sits one `--base-gap-narrow` above the Save Bar, and its buttons use the same font weight as Save. A plugin adds no margin, gap, or weight of its own. The Save Bar's element goes directly after the row, never inside a wrapper, since Base spaces them as siblings.
 * Never hand place a Save button, use a `small` Save, or keep a status span beside one. The Save Bar shows the unsaved, saving, saved, and failed lines.
 * Call the bar's `setDirty(true)` when a field in what it saves changes, and clear it after the page loads.
@@ -304,6 +315,8 @@ grep -o "export function create[A-Za-z]*" ~/.nuget/packages/jpkribs.jellyfin.bas
 * Items to search, filter by status, select, and act on are a `createFilteredList`. Rows of fields with Add and Remove are a `createRepeater`. A list of checkboxes is a `createCheckboxList`. A short list the user ranks is a `createOrderedList`. A file to upload is a `createFilePicker`.
 * A hand built version of any of these is a defect, even when it looks the same.
 * When a Base component lacks one thing the page needs, use the component and report the gap to Base. Never fall back to building it by hand.
+* Never put a stand-in where Base has the option, and never keep a Base gap silently. Name the missing option in [Hand Built Pieces](#hand-built-pieces) and ask the Base owner for it.
+* A component used wrong is worse than none. Check the result on a real server, not just in the code.
 
 ### Fields
 
@@ -318,6 +331,11 @@ grep -o "export function create[A-Za-z]*" ~/.nuget/packages/jpkribs.jellyfin.bas
 | Many items from a long or searchable list | `createCheckboxList`, with `renderRow` giving each row a `label`, a `sublabel`, and an `image` loader |
 | A short list the user ranks | `createOrderedList` |
 | A file to upload | `createFilePicker` |
+| A picture, such as a cover | `createImagePicker`, with `removable: false` when the image can only be replaced |
+| One number on a range, such as an opacity | `createSliderField` |
+| A color | `createColorPicker` |
+| A code, path, or link to copy | `createCopyField` |
+| A name looked up from the library | `shared.createSearchableComboBox` |
 | Rows of several fields that are added and removed | `createRepeater` |
 | Pairs of a name and a value | `createKeyValueEditor` |
 | A list of plain text values | `createStringList` or `createTagInput` |
@@ -331,7 +349,10 @@ grep -o "export function create[A-Za-z]*" ~/.nuget/packages/jpkribs.jellyfin.bas
 
 * Use `emby-select`, never `base-selector-dropdown`, for a field. `base-selector-dropdown` is only for the record picker.
 * Every input has a `<label for>`.
-* Mount a Base component that holds its own inputs, such as a File Picker, Checkbox List, or Filtered List, in a `selectContainer` with its `<label>` and `fieldDescription`, never in an `inputContainer`. Base widens every text and file input in an `inputContainer` to the full width.
+* Mount a Base component that holds its own inputs, such as a File Picker, Checkbox List, or Filtered List, in a `selectContainer` with its `<label>` and `fieldDescription`, never in an `inputContainer`. Base widens every text and file input in an `inputContainer` to the full width, and exempts only checkboxes and radios.
+* Never hand roll a slider, a color picker, a copy field, or an image picker.
+* A lookup field must look up. Type part of a real name and see the list fill before calling it done.
+* Every row is visibly separate from the next, and every control says what it does beside it. A lone toggle word at the far edge of a row is not a label.
 
 ### Buttons
 
@@ -389,6 +410,7 @@ grep -o "export function create[A-Za-z]*" ~/.nuget/packages/jpkribs.jellyfin.bas
 | The state of one item | `shared.statusBadge(text, state)` |
 | A label on an item | `shared.badge(color, label)` |
 | Counts at the top of a page | `shared.renderCards` with `base-cards`, and `compact` for many counts on a phone |
+| Counts that filter a list | The Filtered List's `kind: 'cards'` filter, as the queue's status cards |
 | Label and value pairs | `base-record-card` |
 | A notice in the page | `base-info`, `base-success`, `base-warn`, `base-error`, `base-neutral` |
 | Raw failure text | `base-error-message` |
@@ -397,6 +419,7 @@ grep -o "export function create[A-Za-z]*" ~/.nuget/packages/jpkribs.jellyfin.bas
 
 * Never use `Dashboard.alert` for a result. It blocks the page. Use `setStatus`.
 * A notice holds one sentence. Use a callout for something the reader must know before acting, not for a result.
+* Count cards in one row each take their own color, and no two neighbors match. The queue's status cards are orange **Queued**, purple **Downloading**, green **Downloaded**, and red **Error**.
 
 ### Charts
 
@@ -413,6 +436,29 @@ grep -o "export function create[A-Za-z]*" ~/.nuget/packages/jpkribs.jellyfin.bas
 * Take colors from Base's series colors. Set a color only when it carries a [meaning](#meaning).
 * Give every chart a `label`, and an `emptyText` sentence for when it has nothing to draw.
 * Scope a chart to what the page shows.
+
+### Media
+
+| Need | Use |
+| :--- | :--- |
+| A song or file in a list, with its artwork, status, and actions | `createMediaCard`, with `shape: 'square'` and the `music_note` icon |
+| A player for a song | `createAudioPlayer`, with `size: 'small'` in a list |
+| A cover to set or replace | `createImagePicker` through the Import tab's `createCoverPicker` |
+
+* Every player is Base's Audio Player. Never use a bare `<audio>` element or a hand built play button.
+* A media card action that cannot run now stays in place with `disabled: true`, such as **Change Link** while its song downloads.
+* An embedded cover can only be replaced, so its Image Picker takes `removable: false` and shows no Remove.
+
+### Import Panel
+
+Each downloaded file on the Import tab is one `base-panel` drawn by `renderImportRow`.
+
+* The header holds the selection checkbox and the title at the start, then the size, the **In Library** badge, **Generate Cover**, and **Save Tags** at the end. On a phone the end group takes a line of its own.
+* The body is a grid with the cover cell first, as wide as the cover, so **Set Cover** sits under it. The cover cell takes back the Image Picker's bottom margin, so the cover is one gap from the fields.
+* The fields share three equal columns, with **Track** and **Year** in a narrow last column that keeps four digits. The rows are Title and Track, then Artist, Album Artist, and Featured Artists, then Album, Genre, and Year.
+* The Audio Player spans the full width under the cover and the fields.
+* At 768 px the cover moves above the fields. At 600 px each field takes its own line.
+* Size the columns in `rem` and `fr` from `--base-gap-wide`, never in pixels or `em`.
 
 ### Progress
 
@@ -441,6 +487,8 @@ grep -o "export function create[A-Za-z]*" ~/.nuget/packages/jpkribs.jellyfin.bas
 * Look at every changed page on a test server before calling it done. Reload the page after installing the build, since the dashboard caches scripts.
 * Spacing comes from `--base-gap-wide` and `--base-gap-narrow`. Never add margins between fields.
 * Never set a width in pixels on a field. Let it fill its container.
+* A list that can grow past one screen uses `height: 'fill'`, so it ends at the window bottom and scrolls inside.
+* Watch for class collisions with Jellyfin's own CSS. Base's card Repeater adds a bare `card` class, and Jellyfin's global `.card` rule gives it paint containment. A Base component that draws fixed popups never sits inside an element with `contain`, `transform`, or `filter`, since its dropdowns move off screen.
 
 ## Accessibility
 
