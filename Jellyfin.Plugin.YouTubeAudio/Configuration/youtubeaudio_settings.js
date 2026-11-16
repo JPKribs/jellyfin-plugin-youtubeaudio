@@ -1,7 +1,7 @@
 // youtubeaudio_settings.js
 // Drives the Settings tab, where each section saves its own part of the plugin config.
 
-import { createPage, createCheckbox, createOrderedList, confirmDialog } from './configurationpage?name=youtubeaudio_shared.js';
+import { createPage, createCheckbox, createOrderedList, createSaveBar, confirmDialog } from './configurationpage?name=youtubeaudio_shared.js';
 
 // COVER_TEXT_NAMES
 // The text lines a generated cover can show, by stored key.
@@ -44,6 +44,7 @@ export default function (view) {
     var Shared = null;
     var _approvedUsers = null;
     var _coverText = null;
+    var _saveBars = {};
 
     // ensureApprovedUsers
     // Builds the approved users picker once, limited to users who are not administrators.
@@ -73,6 +74,7 @@ export default function (view) {
         var container = Shared.getEl('coverTextList');
         if (!container) return null;
         _coverText = createOrderedList({
+            onMove: function () { markDirty('albumArtContent'); },
             render: function (row) {
                 return createCheckbox({
                     label: COVER_TEXT_NAMES[row.key],
@@ -130,6 +132,7 @@ export default function (view) {
             var picker = ensureApprovedUsers();
             if (picker) picker.setValue(config.ApprovedUserIds || []);
             Shared.getEl('txtMaxPublicPlaylistItems').value = typeof config.MaxPublicPlaylistItems === 'number' ? config.MaxPublicPlaylistItems : 200;
+            Object.keys(_saveBars).forEach(function (id) { _saveBars[id].setDirty(false); });
         });
     }
 
@@ -144,32 +147,51 @@ export default function (view) {
         pathInput.value = selectedOption && selectedOption.value && selectedOption.dataset.path ? selectedOption.dataset.path : '';
     }
 
-    // saveSection
-    // Saves one section's settings and reports the result beside its Save button.
+    // markDirty
+    // Shows the unsaved line on one section's Save Bar.
     //
     // Inputs
+    // contentId [string]: The section's content element.
+    function markDirty(contentId) {
+        if (_saveBars[contentId]) _saveBars[contentId].setDirty(true);
+    }
+
+    // addSaveBar
+    // Puts a full width Save Bar at the end of one section, which saves that section's settings.
+    //
+    // Inputs
+    // contentId [string]: The section's content element, which the bar ends.
+    // thing [string]: What is saved, such as "Library".
     // mutator [function]: Writes the section's fields into the config.
-    // statusId [string]: The status element beside the button.
-    // thing [string]: What was saved, such as "Library".
-    function saveSection(mutator, statusId, thing) {
-        Shared.saveConfigWith(mutator, statusId, {
-            success: thing + ' saved.',
-            error: 'Could not save the ' + thing.toLowerCase() + '.'
-        }).catch(function () { return null; });
+    function addSaveBar(contentId, thing, mutator) {
+        var content = Shared.getEl(contentId);
+        if (!content) return;
+        var bar = createSaveBar({
+            fill: true,
+            savedText: thing + ' saved.',
+            failedText: 'Could not save the ' + thing.toLowerCase() + '.',
+            onSave: function () { return Shared.saveConfigWith(mutator); }
+        });
+        _saveBars[contentId] = bar;
+        content.appendChild(bar.element);
+        // A field changed in the section marks it unsaved.
+        content.addEventListener('input', function () { markDirty(contentId); });
+        content.addEventListener('change', function () { markDirty(contentId); });
     }
 
     // updateYtDlp
-    // Updates yt-dlp and Deno now and reports what the server did.
+    // Updates yt-dlp and Deno now and reports what the server did on the yt-dlp section's Save Bar.
     function updateYtDlp() {
         var btn = Shared.getEl('btnUpdateYtDlp');
+        var bar = _saveBars.ytdlpContent;
         if (btn) btn.disabled = true;
-        Shared.setStatus('ytdlpStatus', 'Updating yt-dlp…', false, { timeout: 0 });
+        if (bar) bar.setState('saving', 'Updating yt-dlp…');
         Shared.apiRequest('UpdateYtDlp', 'POST')
             .then(function (result) {
-                Shared.setStatus('ytdlpStatus', (result && result.Message) || 'yt-dlp updated.', false);
+                if (bar) bar.setState('saved', (result && result.Message) || 'yt-dlp updated.');
             })
             .catch(function (err) {
-                return Shared.errorText(err, 'Could not update yt-dlp.').then(function (text) { Shared.setStatus('ytdlpStatus', text, true); });
+                return Shared.errorText(err, 'Could not update yt-dlp.').then(function (text) { if (bar) bar.setState('failed', text); });
             })
             .then(function () { if (btn) btn.disabled = false; });
     }
@@ -211,54 +233,40 @@ export default function (view) {
 
         Shared.bindEvent('selMusicLibrary', 'change', onLibrarySelectionChanged);
 
-        Shared.bindClick('btnSaveLibrary', function () {
-            saveSection(function (config) {
-                config.MusicLibraryId = Shared.getEl('selMusicLibrary').value || '';
-                config.MusicLibraryPath = Shared.getEl('txtLibraryPath').value || '';
-            }, 'saveLibraryStatus', 'Library');
+        addSaveBar('libraryContent', 'Library', function (config) {
+            config.MusicLibraryId = Shared.getEl('selMusicLibrary').value || '';
+            config.MusicLibraryPath = Shared.getEl('txtLibraryPath').value || '';
         });
 
-        Shared.bindClick('btnSaveFormat', function () {
-            saveSection(function (config) {
-                config.AudioFormat = Shared.getEl('selAudioFormat').value || 'Opus';
-            }, 'saveFormatStatus', 'Audio format');
+        addSaveBar('formatContent', 'Audio format', function (config) {
+            config.AudioFormat = Shared.getEl('selAudioFormat').value || 'Opus';
         });
 
-        Shared.bindClick('btnSaveImportBehavior', function () {
-            saveSection(function (config) {
-                config.ReplaceDuplicates = Shared.getEl('chkReplaceDuplicates').checked;
-                config.LookUpCatalogMetadata = Shared.getEl('chkLookUpCatalog').checked;
-                config.EmbedCoverArt = Shared.getEl('chkEmbedCoverArt').checked;
-            }, 'saveImportBehaviorStatus', 'Import behavior');
+        addSaveBar('importBehaviorContent', 'Import behavior', function (config) {
+            config.ReplaceDuplicates = Shared.getEl('chkReplaceDuplicates').checked;
+            config.LookUpCatalogMetadata = Shared.getEl('chkLookUpCatalog').checked;
+            config.EmbedCoverArt = Shared.getEl('chkEmbedCoverArt').checked;
         });
 
-        Shared.bindClick('btnSaveCache', function () {
-            saveSection(function (config) {
-                config.CacheDirectoryOverride = Shared.getEl('txtCacheOverride').value || '';
-            }, 'saveCacheStatus', 'Cache directory');
+        addSaveBar('cacheContent', 'Cache directory', function (config) {
+            config.CacheDirectoryOverride = Shared.getEl('txtCacheOverride').value || '';
         });
 
-        Shared.bindClick('btnSaveAlbumArt', function () {
-            saveSection(function (config) {
-                var text = formatCoverText(_coverText ? _coverText.getItems() : parseCoverText(config.GeneratedCoverTextOrder, config.GeneratedCoverText));
-                config.GeneratedCoverTextOrder = text.order;
-                config.GeneratedCoverText = text.shown;
-                config.GeneratedCoverColors = Shared.getEl('selCoverColors').value || 'Album';
-            }, 'saveAlbumArtStatus', 'Album art');
+        addSaveBar('albumArtContent', 'Album art', function (config) {
+            var text = formatCoverText(_coverText ? _coverText.getItems() : parseCoverText(config.GeneratedCoverTextOrder, config.GeneratedCoverText));
+            config.GeneratedCoverTextOrder = text.order;
+            config.GeneratedCoverText = text.shown;
+            config.GeneratedCoverColors = Shared.getEl('selCoverColors').value || 'Album';
         });
 
-        Shared.bindClick('btnSaveApprovedUsers', function () {
-            saveSection(function (config) {
-                config.ApprovedUserIds = _approvedUsers ? _approvedUsers.getValue() : [];
-                var limit = parseInt(Shared.getEl('txtMaxPublicPlaylistItems').value, 10);
-                if (!isNaN(limit) && limit >= 0) config.MaxPublicPlaylistItems = limit;
-            }, 'saveApprovedUsersStatus', 'Approved users');
+        addSaveBar('approvedUsersContent', 'Approved users', function (config) {
+            config.ApprovedUserIds = _approvedUsers ? _approvedUsers.getValue() : [];
+            var limit = parseInt(Shared.getEl('txtMaxPublicPlaylistItems').value, 10);
+            if (!isNaN(limit) && limit >= 0) config.MaxPublicPlaylistItems = limit;
         });
 
-        Shared.bindClick('btnSaveYtDlp', function () {
-            saveSection(function (config) {
-                config.YtDlpPath = Shared.getEl('txtYtDlpPath').value || '';
-            }, 'saveYtDlpStatus', 'yt-dlp path');
+        addSaveBar('ytdlpContent', 'yt-dlp path', function (config) {
+            config.YtDlpPath = Shared.getEl('txtYtDlpPath').value || '';
         });
 
         Shared.bindClick('btnUpdateYtDlp', updateYtDlp);

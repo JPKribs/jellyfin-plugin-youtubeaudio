@@ -273,18 +273,20 @@ Every config page uses Jellyfin's page shell.
 
 ### Saving
 
-Pick one model per page and keep it.
+Every save is Base's `createSaveBar` with `fill: true`, and its button reads **Save**. Pick one model per page and keep it.
 
-| Model | Use it when | Save button |
+| Model | Use it when | Save |
 | :--- | :--- | :--- |
-| One Save per page | Settings depend on each other | `raised base-button primary fill` at the bottom |
-| One Save per section | Sections are independent and long | `raised base-button primary small` in `base-collapsible-actions flush` |
+| One Save per page | Settings depend on each other | One Save Bar at the bottom of the page |
+| One Save per section | Sections are independent and long | One Save Bar at the bottom of each section's content |
 | Editor dialog | Each record is edited on its own | **Done** in `openEditorDialog` |
 
-* Track unsaved changes with `createChangeTracker` and the `base-unsaved` indicator, which reads "Unsaved".
+* The Save Bar is the last element of what it saves. Nothing sits beside it or below it in that section.
+* Other actions that belong with the save, such as Update yt-dlp, go in one `base-button-row` directly above the Save Bar, each `raised base-button secondary fill`, or `destructive fill` for one that deletes or resets data.
+* Never hand place a Save button, use a `small` Save, or keep a status span beside one. The Save Bar shows the unsaved, saving, saved, and failed lines.
+* Call the bar's `setDirty(true)` when a field in what it saves changes, and clear it after the page loads.
+* `onSave` returns the save promise, so the bar shows saved or failed. Use `shared.saveConfigWith` for get, change, and save. The Settings tab saves one section at a time this way.
 * Guard leaving the page with `page.guardUnsaved`.
-* Report the result with `shared.setStatus` next to the button.
-* Use `shared.saveConfigWith` for get, change, save, and report. The Settings tab saves one section at a time this way.
 
 ## Components
 
@@ -337,7 +339,9 @@ grep -o "export function create[A-Za-z]*" ~/.nuget/packages/jpkribs.jellyfin.bas
 | Primary action | `raised base-button primary` |
 | Destructive action | `raised base-button destructive` |
 | Secondary action | `raised base-button secondary` |
-| Compact action in a section | add `small` |
+| Compact action in a section, never in a save's action row | add `small` |
+| Save | `createSaveBar` with `fill: true`, never a hand placed button |
+| Action that belongs with a save | `raised base-button secondary fill` in the `base-button-row` above the Save Bar |
 | Icon and label in a toolbar | `raised base-button` holding a `material-icons` span and a label |
 | Icon only in a row | `base-row-btn`, with `.dirty` for unsaved and `.success` after saving |
 

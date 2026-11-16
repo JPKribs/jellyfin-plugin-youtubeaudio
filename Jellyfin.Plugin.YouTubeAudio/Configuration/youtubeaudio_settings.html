@@ -32,12 +32,6 @@
                                 <input is="emby-input" type="text" id="txtLibraryPath" placeholder="/media/music" />
                                 <div class="fieldDescription">Files are filed as Path / Artist / Album (Year) / Song.ext. Selecting a library fills in its first folder.</div>
                             </div>
-                            <div class="base-collapsible-actions flush">
-                                <button is="emby-button" type="button" id="btnSaveLibrary" class="raised base-button primary small">
-                                    <span>Save</span>
-                                </button>
-                                <span id="saveLibraryStatus" class="base-status-text" role="status"></span>
-                            </div>
                         </div>
                     </div>
 
@@ -57,12 +51,6 @@
                                     <option value="M4a">M4A (.m4a)</option>
                                 </select>
                                 <div class="fieldDescription">Opus gives the best quality for its size and MP3 plays everywhere. M4A suits Apple devices.</div>
-                            </div>
-                            <div class="base-collapsible-actions flush">
-                                <button is="emby-button" type="button" id="btnSaveFormat" class="raised base-button primary small">
-                                    <span>Save</span>
-                                </button>
-                                <span id="saveFormatStatus" class="base-status-text" role="status"></span>
                             </div>
                         </div>
                     </div>
@@ -96,12 +84,6 @@
                                 </label>
                                 <div class="fieldDescription checkboxFieldDescription">Adds the album cover from Apple's catalog to each downloaded file.</div>
                             </div>
-                            <div class="base-collapsible-actions flush">
-                                <button is="emby-button" type="button" id="btnSaveImportBehavior" class="raised base-button primary small">
-                                    <span>Save</span>
-                                </button>
-                                <span id="saveImportBehaviorStatus" class="base-status-text" role="status"></span>
-                            </div>
                         </div>
                     </div>
 
@@ -117,12 +99,6 @@
                                 <label for="txtCacheOverride">Cache Directory Override</label>
                                 <input is="emby-input" type="text" id="txtCacheOverride" placeholder="Default" />
                                 <div class="fieldDescription">Leave blank to cache files in the Jellyfin data directory.</div>
-                            </div>
-                            <div class="base-collapsible-actions flush">
-                                <button is="emby-button" type="button" id="btnSaveCache" class="raised base-button primary small">
-                                    <span>Save</span>
-                                </button>
-                                <span id="saveCacheStatus" class="base-status-text" role="status"></span>
                             </div>
                         </div>
                     </div>
@@ -146,12 +122,6 @@
                                 </select>
                                 <div class="fieldDescription">Draws the colors from these, so the same values always give the same colors.</div>
                             </div>
-                            <div class="base-collapsible-actions flush">
-                                <button is="emby-button" type="button" id="btnSaveAlbumArt" class="raised base-button primary small">
-                                    <span>Save</span>
-                                </button>
-                                <span id="saveAlbumArtStatus" class="base-status-text" role="status"></span>
-                            </div>
                         </div>
                     </div>
 
@@ -169,12 +139,6 @@
                                 <label for="txtMaxPublicPlaylistItems">Playlist Limit</label>
                                 <input is="emby-input" type="number" id="txtMaxPublicPlaylistItems" min="0" step="1" />
                                 <div class="fieldDescription">The most videos an approved user can queue from one playlist link. 0 is no limit, and administrators are never limited.</div>
-                            </div>
-                            <div class="base-collapsible-actions flush">
-                                <button is="emby-button" type="button" id="btnSaveApprovedUsers" class="raised base-button primary small">
-                                    <span>Save</span>
-                                </button>
-                                <span id="saveApprovedUsersStatus" class="base-status-text" role="status"></span>
                             </div>
                         </div>
                     </div>
@@ -201,19 +165,11 @@
                                 <input is="emby-input" type="text" id="txtYtDlpPath" placeholder="/opt/homebrew/bin/yt-dlp" />
                                 <div class="fieldDescription">The absolute path of your own yt-dlp. Leave blank to use the plugin's copy.</div>
                             </div>
-                            <div class="base-collapsible-actions flush">
-                                <button is="emby-button" type="button" id="btnSaveYtDlp" class="raised base-button primary small">
-                                    <span>Save</span>
-                                </button>
-                                <span id="saveYtDlpStatus" class="base-status-text" role="status"></span>
-                            </div>
-                            <h3 class="base-subsection-title">Update Now</h3>
-                            <div class="fieldDescription">Updates yt-dlp and Deno without waiting for the next check. It waits for running downloads, so cancel them on the Download tab to update now.</div>
-                            <div class="base-collapsible-actions flush">
-                                <button is="emby-button" type="button" id="btnUpdateYtDlp" class="raised base-button secondary small">
+                            <div class="fieldDescription">Update yt-dlp updates yt-dlp and Deno without waiting for the next check. It waits for running downloads, so cancel them on the Download tab to update now.</div>
+                            <div class="base-button-row">
+                                <button is="emby-button" type="button" id="btnUpdateYtDlp" class="raised base-button secondary fill">
                                     <span>Update yt-dlp</span>
                                 </button>
-                                <span id="ytdlpStatus" class="base-status-text" role="status"></span>
                             </div>
                         </div>
                     </div>

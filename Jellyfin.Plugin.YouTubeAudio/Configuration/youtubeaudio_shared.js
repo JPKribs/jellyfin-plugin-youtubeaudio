@@ -12,6 +12,7 @@ import {
     createImagePicker,
     createMediaCard,
     createOrderedList,
+    createSaveBar,
     confirmDialog,
     promptDialog
 } from './configurationpage?name=youtubeaudio_jpkribs_shared.js';
@@ -26,6 +27,7 @@ export {
     createImagePicker,
     createMediaCard,
     createOrderedList,
+    createSaveBar,
     confirmDialog,
     promptDialog
 };
