@@ -190,26 +190,22 @@ Keep each file's width when it is retaken. Its height follows the content.
 
 ### Screenshot Kit
 
-The kit captures every screenshot in `docs/screenshots/` from the repository's own files, with no Jellyfin server. It lives outside the repository, in a `yta-docs/harness` folder.
+The kit in `tools/screenshots/` captures every screenshot in `docs/screenshots/` from the repository's own files, with no Jellyfin server. Its [README](../tools/screenshots/README.md) lists its requirements and the commands to run it.
 
 | File | Does |
 | :--- | :--- |
 | `server.py` | Serves the [harness](testing.md#harness), the tab HTML and JS from the repository, Base's assets from the NuGet package the csproj names, and jellyfin-web from the installed Jellyfin app. It renders `/YouTube/Download` and `/YouTube/Queue` through Base's status template the way the controller's `StatusPage.Render` does, and answers their API calls with generic songs |
 | `harness.html`, `upgrade.js`, `stub.js` | Load a tab under Jellyfin's real stylesheets, upgrade its `emby-*` elements, and answer its API calls with a generic queue, downloaded files, playlist imports, users, and covers |
-| `shoot.mjs` | Captures **Download**, **Import**, **Settings**, **Queue**, and **User-Download** into `out/` |
-| `probe.mjs` | Loads one page at 1x, runs a script on it, and prints its errors, for clicking through a state before it is shot |
+| `shoot.mjs` | Captures **Download**, **Import**, **Settings**, **Queue**, and **User-Download** into `docs/screenshots/` |
 
-Point `server.py` at the Base version in the csproj, then run the kit from its folder.
-
-```bash
-python3 server.py 8857
-```
+Run the kit from its folder. Set `PLAYWRIGHT_CORE` to playwright-core's `index.mjs`, `CHROMIUM` to a Chromium binary, and `JELLYFIN_WEB` to a jellyfin-web folder other than the macOS app's when the defaults do not fit.
 
 ```bash
-node shoot.mjs
+python3 -I server.py 8857 &
+PLAYWRIGHT_CORE=/path/to/node_modules/playwright-core/index.mjs node shoot.mjs
 ```
 
-`node shoot.mjs Import` retakes one shot. Each run prints the size and any page error of each shot. Open every PNG in `out/` and look at it before copying it over the one in `docs/screenshots/` with the same name. A shot that matches the committed one byte for byte needs no commit.
+`node shoot.mjs Import` retakes one shot. Each run prints the size and any page error of each shot. Look at every PNG it writes before committing it. A shot that matches the committed one byte for byte, or differs only in the **Queue** card's update time, needs no commit.
 
 ### Names and Placement
 

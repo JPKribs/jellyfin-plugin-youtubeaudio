@@ -1,0 +1,34 @@
+<!doctype html><html dir="ltr" class="layout-desktop"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>YouTube Audio harness</title>
+<script>
+// jellyfin-web's stylesheets in the order the server lists them, ahead of the plugin's own.
+window.__styles = fetch('/stylesheets.json').then(function (r) { return r.json(); }).then(function (list) {
+    return Promise.all(list.map(function (name) {
+        return new Promise(function (done) {
+            var link = document.createElement('link');
+            link.rel = 'stylesheet'; link.href = '/jf/' + name; link.onload = link.onerror = done;
+            document.head.insertBefore(link, document.getElementById('afterJellyfin'));
+        });
+    }));
+});
+</script>
+<meta id="afterJellyfin">
+<link rel="stylesheet" href="/configurationpage?name=youtubeaudio_jpkribs_shared.css">
+<!-- Stands in for the link color the web client applies at runtime, as a real server shows it. -->
+<style>.content-primary a:not([class]){color:#00a4dc}</style>
+</head><body class="force-scroll"><div class="skinBody mainAnimatedPages" id="host"></div>
+<script src="upgrade.js"></script>
+<script src="stub.js"></script>
+<script type="module">
+await window.__styles;
+var page = new URLSearchParams(location.search).get('page') || 'youtubeaudio_settings';
+var html = await (await fetch('/configurationpage?name=' + page)).text();
+var host = document.getElementById('host');
+host.innerHTML = html;
+var view = host.firstElementChild;
+view.classList.add('mainAnimatedPage');
+var mod = await import('/configurationpage?name=' + page + '.js');
+mod.default(view);
+view.dispatchEvent(new CustomEvent('viewshow'));
+window.__view = view;
+window.__ready = true;
+</script></body></html>

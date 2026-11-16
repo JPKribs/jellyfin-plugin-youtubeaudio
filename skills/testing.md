@@ -124,7 +124,7 @@ python3 e2e/docker_e2e.py --zip dist/jellyfin-plugin-youtubeaudio-<version>.zip
 
 The harness is the page the [screenshot kit](documentation.md#screenshot-kit) serves. It loads a tab the way the dashboard does, with no Jellyfin server behind it.
 
-* It loads Jellyfin's real stylesheets from the installed jellyfin-web, `index.html`'s first two, then the dark theme and the chunks. It leaves out the chunks that shrink the root font, `66923` and `84501`. Base's CSS alone hides real bugs, such as Jellyfin's `.card` rule or its widened inputs.
+* It loads Jellyfin's real stylesheets from the installed jellyfin-web, `index.html`'s first two, then the dark theme and the chunks. It leaves out the chunks that set the root font to anything but the dashboard's 93%, which belong to other layouts such as TV. Base's CSS alone hides real bugs, such as Jellyfin's `.card` rule or its widened inputs.
 * It mimics the upgrade of each `emby-*` element in `upgrade.js`, so labels, select arrows, and checkboxes are drawn as the dashboard draws them.
 * It serves the tab's HTML and JS from the repository and Base's assets from the NuGet package the plugin builds against, with stub API answers and generic data.
 * It renders the user pages through Base's status template, as the controller does, so they get only the template's styles.
