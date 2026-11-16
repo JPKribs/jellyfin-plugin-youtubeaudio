@@ -1,7 +1,7 @@
 ---
 name: "YouTube Audio"
 guid: "7323ea64-a200-4265-ab8f-e7ae27d06c38"
-version: "12.4.4.4"
+version: "12.4.4.5"
 targetAbi: "12.4.0.0"
 framework: "net10.0"
 overview: "Download YouTube audio directly to a Jellyfin Music Library."
@@ -34,7 +34,6 @@ changelog:
   - A song that is downloading shows Change Link turned off, so its status lines up with the other rows
   - Each file on the Import tab is a panel with its name, size, In Library badge, and buttons in the header, its cover beside fields that line up in every panel, and its player across the bottom, with the cover on top and one field per line on a phone
   fixed:
-  - The arrows on collapsible sections are back to their usual size
   - The playlist checkboxes and the library song search on the Download tab keep their own widths
   - The Track and Year fields on the Import tab show four digits on a phone
   developer:
