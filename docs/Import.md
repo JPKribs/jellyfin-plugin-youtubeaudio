@@ -6,12 +6,18 @@ Tag your downloaded files and bring them into your library.
 
 ## Tag and Import
 
-1. Each downloaded file has its own panel. Its header shows the title, the file size, and the save and wand buttons, and the cover sits beside the fields for title, track, artist, album artist, featured artists, album, genre, and year. Songs your library already has are marked **In Library** in the header, so you can skip a second copy.
-2. To apply the same metadata to multiple files at once, fill in the bulk fields at the top and click **Apply to Selected**.
-3. To listen to a file before you tag it, click the play button across the bottom of its panel. The seek bar and the time sit beside it, and starting one file pauses any other.
-4. To add or replace cover art, click **Set Cover** or **Replace** under a file's cover, or drop a picture on it. To give several files the same cover, choose it under **Cover** in Bulk Updates, select the files, and click **Set Cover on Selected**. Pictures are cropped to a centered square of at most 1200 pixels. Choosing an album your library already has takes that album's cover. For an album with no art, click the wand in the panel's header to generate a cover. It is a soft blend of three colors drawn from the album name, with the name in the middle.
-5. Save each file's changes with the save button in its header before you import. The button turns orange while a file has unsaved changes.
-6. Select the files you want to import and click **Import**.
+1. Each downloaded file has its own panel.
+    * The header holds the file's checkbox and title, then its size, an **In Library** badge when your library already has the song, the wand that generates a cover, and the save button.
+    * The cover sits at the left, with **Set Cover**, or **Replace** once the file has a cover, under it.
+    * The fields sit beside the cover in three rows. **Title** and **Track**, then **Artist**, **Album Artist** and **Featured Artists**, then **Album**, **Genre** and **Year**. **Artist** and **Album** suggest names already in your library as you type.
+    * The player runs across the full width at the bottom of the panel.
+    * On a tablet the cover moves above the fields, and on a phone each field takes its own line.
+2. To listen to a file before you tag it, click the play button in its player. The seek bar and the time sit beside it, and starting one file pauses any other.
+3. To apply the same details to several files at once, fill in the fields under **Bulk Updates**, select the files, and click **Apply to Selected**.
+4. To add or replace a file's cover, click **Set Cover** or **Replace** under it, or drop a picture on it. A cover can be replaced but not removed. To give several files the same cover, choose it under **Cover** in **Bulk Updates**, select the files, and click **Set Cover on Selected**. Pictures are cropped to a centered square of at most 1200 pixels. Choosing an album your library already has takes that album's cover.
+5. For an album with no art, click the wand in the panel's header to generate a cover. It is a soft blend of three colors drawn from the album name, with the name in the middle. **Album Art** in [Settings](Settings.md#album-art) sets which text it shows and what its colors are drawn from.
+6. Save each file's changes with the save button in its header before you import. The button turns orange while a file has unsaved changes.
+7. Select the files you want to import, with their checkboxes or **Select all**, and click **Import**. **Delete** deletes the selected files from the download cache after you confirm, and **Refresh** reads the list again.
 
 ## Where Files Go
 

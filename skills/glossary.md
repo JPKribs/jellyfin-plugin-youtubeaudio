@@ -24,7 +24,8 @@ The agreed name for every concept in this plugin. The UI, the docs, messages, an
 | Term | Meaning | In Code | Not |
 | :--- | :--- | :--- | :--- |
 | Queue | The songs waiting to download, downloading, downloaded, or failed, on the **Download** tab | `QueueDatabase` | List, backlog |
-| Queue item | One song in the queue | `QueueItem` | Job, task, entry |
+| Queue item | One song in the queue, drawn as a media card with its status and **Change Link** | `QueueItem`, `renderQueueRow` | Job, task, entry |
+| Status cards | The cards above the queue, one per status with its count, that each show only songs with that status | `QUEUE_STATES` | Count cards, tiles, filters |
 | Download | Turns a queued song into an audio file in the download cache with yt-dlp | `DownloadService` | Fetch, rip |
 | Match | The YouTube upload a playlist track downloads from, found when it downloads | `YouTubeMatcher` | Hit, result |
 | Check Match | The badge on a queue item whose match is worth a look, with its note | `MatchNote` | Warning, low confidence |
@@ -42,6 +43,15 @@ The agreed name for every concept in this plugin. The UI, the docs, messages, an
 | Imported | Filed in the library, and shown on neither tab | `QueueStatus.Imported` |
 | Error | Failed, with the reason on the row | `QueueStatus.Error` |
 
+The [Public Queue](../docs/PublicQueue.md) names each status for any signed in user. Its pills read **Waiting**, **Downloading**, **Downloaded**, and **Failed**.
+
+| Status | Public Queue badge | In Code |
+| :--- | :--- | :--- |
+| Queued | Waiting to download | `DownloadService.GetPublicQueue` |
+| Downloading | Downloading | `DownloadService.GetPublicQueue` |
+| Downloaded | Downloaded, not yet added | `DownloadService.GetPublicQueue` |
+| Error | Could not be downloaded | `DownloadService.GetPublicQueue` |
+
 ## Importing
 
 | Term | Meaning | In Code | Not |
@@ -53,6 +63,7 @@ The agreed name for every concept in this plugin. The UI, the docs, messages, an
 | Featured Artists | Artists credited with "feat." on a song | `FeaturedArtist` | Feat. Artists, guests |
 | Cover | The picture embedded in a file | `HasCover`, `Downloads/{id}/Cover` | Artwork, thumbnail. **Album Art** names the Settings section for generated covers |
 | Generate Cover | The wand that draws a cover from the album's text and colors | | Auto cover, placeholder art |
+| Set Cover | The button under a file's cover that picks a picture, reading **Replace** once the file has one | `createCoverPicker` | Upload art, change image |
 | In Library | The badge on a downloaded file whose song the library already has | `InLibrary` | Duplicate, exists |
 | Duplicate | A file whose name an import would reuse in the library | `ReplaceDuplicates` | Clash, conflict |
 | Catalog lookup | Fills a song's details from Apple's public catalog | `AppleCatalogClient`, `CatalogMatcher` | Metadata provider, scrape |
@@ -72,6 +83,7 @@ The agreed name for every concept in this plugin. The UI, the docs, messages, an
 | Target Library | The music library imports are filed into | `MusicLibraryId` | Destination library |
 | Library Path | The folder in that library imports are filed under | `MusicLibraryPath` | Root, output folder |
 | Download Format | Opus, MP3, or M4A | `AudioFormat` | Codec, file type |
+| Album Art | The Settings section that sets a generated cover's text lines and **Colors From** | `GeneratedCoverText`, `GeneratedCoverTextOrder`, `GeneratedCoverColors` | Cover settings |
 | Download cache | The folder downloaded files wait in until they are imported | `QueueDatabaseProvider.GetAudioCacheDirectory` | Staging, temp |
 | Cache Directory Override | A folder for the download cache instead of the Jellyfin data folder | `CacheDirectoryOverride` | Cache path |
 | Approved users | Users who may queue downloads from the user page, set in the Approved Users section of Settings | `ApprovedUserIds` | Allowed users, whitelist |
@@ -81,6 +93,7 @@ The agreed name for every concept in this plugin. The UI, the docs, messages, an
 | yt-dlp | The downloader the plugin fetches and keeps up to date | `ToolDownloads`, `YtDlpRunner` | youtube-dl, the tool |
 | Deno | The JavaScript runtime yt-dlp needs for YouTube | `ToolDownloads` | Node |
 | yt-dlp Path Override | The user's own yt-dlp, used instead of the plugin's copy | `YtDlpPath` | Custom binary |
+| Update yt-dlp | Updates yt-dlp and Deno now instead of at the next check | `POST UpdateYtDlp` | Upgrade, refresh tools |
 
 ## Housekeeping
 
