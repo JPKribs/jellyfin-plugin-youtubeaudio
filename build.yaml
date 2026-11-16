@@ -18,6 +18,7 @@ artifacts:
 - "TagLibSharp.dll"
 changelog:
   changed:
+  - On the user download page a problem shows on a red error line, and View the Queue is a quieter button under Submit
   - The queue on the Download tab has count cards that filter it by status, and its search, selection, and Download and Delete buttons sit above the list
   - Change Link opens a dialog for the new YouTube link, and a match worth checking shows a Check Match badge
   - Playlist exports are chosen with a drop zone, and a library export lists its playlists with Select All
@@ -36,7 +37,7 @@ changelog:
   - The playlist checkboxes and the library song search on the Download tab keep their own widths
   - The Track and Year fields on the Import tab show four digits on a phone
   developer:
-  - Uses JPKribs.Jellyfin.Base 2026.11.18, with its base- class names, Filtered List, List, Checkbox List, Ordered List, File Picker, and Prompt Dialog in place of the hand built queue, import list, playlist picker, cover text list, file input, and link editor, and its Image Picker without Remove and disabled Media Card actions in place of the hidden Remove button and the missing Change Link
+  - Uses JPKribs.Jellyfin.Base 2026.11.19, with its base- class names, Filtered List, List, Checkbox List, Ordered List, File Picker, and Prompt Dialog in place of the hand built queue, import list, playlist picker, cover text list, file input, and link editor, and its Image Picker without Remove and disabled Media Card actions in place of the hidden Remove button and the missing Change Link
   - Uses Base's Media Card, Audio Player, Image Picker, Checkbox, Record List, and Pill Group in place of the hand built queue rows, preview player, cover button, cover text checkboxes, and Public Queue pills and rows
   - Stored times are written with Base's UtcTime
   - Adds starthere.md and the guides in skills/

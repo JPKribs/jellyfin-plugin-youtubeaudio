@@ -282,7 +282,7 @@ Every save is Base's `createSaveBar` with `fill: true`, and its button reads **S
 | Editor dialog | Each record is edited on its own | **Done** in `openEditorDialog` |
 
 * The Save Bar is the last element of what it saves. Nothing sits beside it or below it in that section.
-* Other actions that belong with the save, such as Update yt-dlp, go in one `base-button-row` directly above the Save Bar, each `raised base-button secondary fill`, or `destructive fill` for one that deletes or resets data. Base spaces that row. Its buttons have no margin of their own, so their edges line up with the Save Bar's, the row sits one `--base-gap-narrow` above the Save Bar, and its buttons use the same font weight as Save. A plugin adds no margin, gap, or weight of its own.
+* Other actions that belong with the save, such as Update yt-dlp, go in one `base-button-row` directly above the Save Bar, each `raised base-button secondary fill`, or `destructive fill` for one that deletes or resets data. Base spaces that row. Its buttons have no margin of their own, so their edges line up with the Save Bar's, the row sits one `--base-gap-narrow` above the Save Bar, and its buttons use the same font weight as Save. A plugin adds no margin, gap, or weight of its own. The Save Bar's element goes directly after the row, never inside a wrapper, since Base spaces them as siblings.
 * Never hand place a Save button, use a `small` Save, or keep a status span beside one. The Save Bar shows the unsaved, saving, saved, and failed lines.
 * Call the bar's `setDirty(true)` when a field in what it saves changes, and clear it after the page loads.
 * `onSave` returns the save promise, so the bar shows saved or failed. Use `shared.saveConfigWith` for get, change, and save. The Settings tab saves one section at a time this way.
@@ -465,7 +465,7 @@ Every list, row, card, badge, picker, player, and button in this plugin is a Bas
 
 | Piece | Missing Base option |
 | :--- | :--- |
-| The user page shows its result as a `base-note` line and suggests names through a plain `datalist` | None. Base has `base-status-error`, `base-btn-secondary`, and `createComboBox`, which draws no icon, and the user page has yet to use them |
+| The user page suggests artist and album names through a plain `datalist` | The status template loads no Base script, so `createComboBox` cannot run there |
 
 ## Checklist
 

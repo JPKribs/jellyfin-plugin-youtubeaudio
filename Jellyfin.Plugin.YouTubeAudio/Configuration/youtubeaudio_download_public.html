@@ -42,7 +42,7 @@
 
     <button type="submit" id="submit" class="base-submit">Submit</button>
     <p id="msg" class="base-note" role="status" aria-live="polite"></p>
-    <a id="queueLink" class="base-btn" href="Queue">View the Queue</a>
+    <a id="queueLink" class="base-btn base-btn-secondary" href="Queue">View the Queue</a>
 </form>
 
 <script>
@@ -59,8 +59,9 @@
         var el = function (id) { return document.getElementById(id); };
         function show(id) { el(id).classList.remove('hidden'); }
         function val(id) { return (el(id).value || '').trim(); }
-        // Shows a result under the form. An empty message clears it.
-        function status(message) {
+        // Shows a result under the form, in the card's red error line when it is an error. An empty message clears it.
+        function status(message, isError) {
+            el('msg').className = isError ? 'base-status-error' : 'base-note';
             el('msg').textContent = message || '';
         }
 
@@ -181,9 +182,9 @@
             var yearRaw = val('year');
             var title = val('title');
 
-            if (!url || !artist || !album || !yearRaw) { status('Add the YouTube link, artist, album and year.'); return; }
+            if (!url || !artist || !album || !yearRaw) { status('Add the YouTube link, artist, album and year.', true); return; }
             var year = parseInt(yearRaw, 10);
-            if (isNaN(year)) { status('Enter the year as a number, like 2018.'); return; }
+            if (isNaN(year)) { status('Enter the year as a number, like 2018.', true); return; }
 
             var btn = el('submit');
             btn.disabled = true;
@@ -200,12 +201,12 @@
                 })
                 .then(function (res) {
                     btn.disabled = false;
-                    if (!res.ok) { status((res.data && res.data.Error) || 'The request could not be submitted.'); return; }
+                    if (!res.ok) { status((res.data && res.data.Error) || 'The request could not be submitted.', true); return; }
                     var n = (res.data && res.data.Queued) || 0;
                     status('Queued ' + n + ' track' + (n === 1 ? '' : 's') + ' for download.');
                     el('form').reset();
                 })
-                .catch(function () { btn.disabled = false; status('Could not reach the server. Please try again.'); });
+                .catch(function () { btn.disabled = false; status('Could not reach the server. Try again.', true); });
         });
     })();
 </script>
