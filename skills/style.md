@@ -47,7 +47,7 @@ These rules apply to every string a user can see. That includes HTML, JS, C# mes
 | Activity log name | Title Case | 3 Songs Imported |
 | Description, message, placeholder sentence | Sentence case | Adds the album cover to each downloaded file. |
 
-Title Case capitalizes every word except short articles, conjunctions, and prepositions in the middle, such as "a", "and", "of", "to", and "in". Keep acronyms as written, such as "API Key", "URL", "Mbps", and "GB".
+Title Case capitalizes every word except short articles, conjunctions, and prepositions in the middle, such as "a", "and", "of", "to", and "in". Keep acronyms and names as written, such as "API Key", "URL", "GB", and "yt-dlp". Base shows every title exactly as written.
 
 ### Words to Use
 
@@ -488,7 +488,7 @@ Each downloaded file on the Import tab is one `base-panel` drawn by `renderImpor
 * Spacing comes from `--base-gap-wide` and `--base-gap-narrow`. Never add margins between fields.
 * Never set a width in pixels on a field. Let it fill its container.
 * A list that can grow past one screen uses `height: 'fill'`, so it ends at the window bottom and scrolls inside.
-* Watch for class collisions with Jellyfin's own CSS. Base's card Repeater adds a bare `card` class, and Jellyfin's global `.card` rule gives it paint containment. A Base component that draws fixed popups never sits inside an element with `contain`, `transform`, or `filter`, since its dropdowns move off screen.
+* Watch for class collisions with Jellyfin's own CSS, such as its global `.card` rule, which adds paint containment. A Base component that draws fixed popups never sits inside an element with `contain`, `transform`, or `filter`, since its dropdowns move off screen.
 
 ## Accessibility
 
