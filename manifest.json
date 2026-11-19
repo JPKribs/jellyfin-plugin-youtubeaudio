@@ -9,6 +9,14 @@
     "category": "Music",
     "versions": [
       {
+        "version": "12.4.4.8",
+        "changelog": "\n## Developer\n- Raises every GitHub Action in the workflows to its latest major version, pinned to a commit digest\n- Builds the docs with Python 3.15 and mkdocs-material 9.8.2\n- Renovate brings every update in one pull request, with Base on its own, and leaves the packages Jellyfin ships to the Jellyfin version",
+        "targetAbi": "12.4.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/v12.4.4.8/jellyfin-plugin-youtubeaudio-12.4.4.8.zip",
+        "checksum": "e4c8bfff3a125e35743648ec645e96fe",
+        "timestamp": "2026-11-19T21:57:03Z"
+      },
+      {
         "version": "12.4.4.7",
         "changelog": "\n## Developer\n- Uses JPKribs.Jellyfin.Base 2026.11.21, which keeps a scrolling Data Table's frame in view and an open card's body on the plain surface, with no local code to replace\n- Raises Microsoft.NET.Test.Sdk to 18.12.0, SQLitePCLRaw.bundle_e_sqlite3 to 2.1.14 and Xunit.SkippableFact to 1.5.85 in the tests\n- Pins every GitHub Action in the workflows to a commit digest",
         "targetAbi": "12.4.0.0",
