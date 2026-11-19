@@ -17,8 +17,7 @@ artifacts:
 - "YoutubeDLSharp.dll"
 - "TagLibSharp.dll"
 changelog:
-  fixed:
-  - The yt-dlp section on the Settings tab was titled Yt-dlp. It reads yt-dlp, as the tool spells it
   developer:
-  - Uses JPKribs.Jellyfin.Base 2026.11.20, which shows section and collapsible titles exactly as written in place of forced capitals, with no local copy to replace
-  - Adds the screenshot kit in tools/screenshots, which captures every docs screenshot from the repository's own files with no Jellyfin server
+  - Uses JPKribs.Jellyfin.Base 2026.11.21, which keeps a scrolling Data Table's frame in view and an open card's body on the plain surface, with no local code to replace
+  - Raises Microsoft.NET.Test.Sdk to 18.12.0, SQLitePCLRaw.bundle_e_sqlite3 to 2.1.14 and Xunit.SkippableFact to 1.5.85 in the tests
+  - Pins every GitHub Action in the workflows to a commit digest
