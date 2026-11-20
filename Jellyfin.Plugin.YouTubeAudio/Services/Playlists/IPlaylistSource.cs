@@ -6,7 +6,7 @@ namespace Jellyfin.Plugin.YouTubeAudio.Services.Playlists;
 /// <summary>
 /// A playlist export format the plugin can read. Implementations only turn a file into
 /// <see cref="PlaylistTrack"/>s; queueing, YouTube matching and tagging are shared. To support a
-/// new service, implement this and register it in <see cref="ServiceRegistrator"/>.
+/// new service, implement this and register it in <see cref="PluginServiceRegistrator"/>.
 /// </summary>
 public interface IPlaylistSource
 {

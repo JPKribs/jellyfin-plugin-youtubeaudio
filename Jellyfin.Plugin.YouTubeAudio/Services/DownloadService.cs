@@ -15,6 +15,7 @@ using Jellyfin.Plugin.YouTubeAudio.Configuration;
 using Jellyfin.Plugin.YouTubeAudio.Models;
 using Jellyfin.Plugin.YouTubeAudio.Services.Catalog;
 using Jellyfin.Plugin.YouTubeAudio.Services.Playlists;
+using Jellyfin.Plugin.YouTubeAudio.Utilities;
 using JPKribs.Jellyfin.Base;
 using MediaBrowser.Controller.MediaEncoding;
 using Microsoft.Extensions.Logging;

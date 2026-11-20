@@ -34,21 +34,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Download page -->
-    <EmbeddedResource Include="Configuration\youtubeaudio_download.html" />
-    <EmbeddedResource Include="Configuration\youtubeaudio_download.js" />
-    <!-- Import page -->
-    <EmbeddedResource Include="Configuration\youtubeaudio_import.html" />
-    <EmbeddedResource Include="Configuration\youtubeaudio_import.js" />
-    <!-- Settings page -->
-    <EmbeddedResource Include="Configuration\youtubeaudio_settings.html" />
-    <EmbeddedResource Include="Configuration\youtubeaudio_settings.js" />
-    <!-- Shared resources -->
-    <EmbeddedResource Include="Configuration\youtubeaudio_shared.js" />
-    <!-- Public approved-user download page -->
-    <EmbeddedResource Include="Configuration\youtubeaudio_download_public.html" />
-    <!-- Public read-only queue page -->
-    <EmbeddedResource Include="Configuration\youtubeaudio_queue_public.html" />
+    <!-- Config pages and public pages -->
+    <None Remove="Web\**\*" />
+    <EmbeddedResource Include="Web\**\*" />
   </ItemGroup>
 
 </Project>

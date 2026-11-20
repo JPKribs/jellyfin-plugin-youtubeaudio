@@ -1,4 +1,6 @@
-namespace Jellyfin.Plugin.YouTubeAudio.Models;
+using Jellyfin.Plugin.YouTubeAudio.Models;
+
+namespace Jellyfin.Plugin.YouTubeAudio.Utilities;
 
 /// <summary>
 /// Mapping helpers for <see cref="QueueItem"/>, kept on the model so callers do not duplicate the

@@ -61,6 +61,24 @@ Code belongs in Base when another plugin could use it unchanged. A helper with n
 
 Never commit this plugin against an unreleased Base package.
 
+## Layout
+
+Folder names are PascalCase inside the plugin project and lowercase at the repository root. Namespaces follow the folders.
+
+| Path | Holds | Namespace |
+| :--- | :--- | :--- |
+| `Plugin.cs` | The plugin class and its config pages. | root |
+| `PluginServiceRegistrator.cs` | DI registration. | root |
+| `Api/` | The operator controller and the public pages controller. | `.Api` |
+| `Configuration/` | `PluginConfiguration.cs` only. No web files. | `.Configuration` |
+| `Web/` | Every file served to a browser, the config pages and the public pages. Each is embedded and keeps its `youtubeaudio_<page>` name. | n/a |
+| `Assets/` | `Logo.png`. | n/a |
+| `Models/` | Requests, responses, queue items, playlists, and settings enums, grouped in subfolders. | `.Models` |
+| `Services/` | Downloads, the queue database, the library, the tools, and the `Catalog/` and `Playlists/` domains. | `.Services` |
+| `Utilities/` | Extension methods. | `.Utilities` |
+
+At the repository root, `docs/` holds the docs site, `skills/` the guides, and `tools/` everything for development that never ships, such as `tools/screenshots/` and `tools/e2e/`.
+
 ## Comments
 
 ### The Rules
@@ -182,7 +200,7 @@ export function createPage(view, opts) {
 * Catch a specific exception, or filter with `when`. Rethrow `OperationCanceledException` when the token was cancelled.
 * Read the clock once in a method and reuse the value. Two reads can straddle a second and disagree.
 * Take a `TimeProvider` wherever time decides an outcome, so a test can move it.
-* Register services in `ServiceRegistrator`.
+* Register services in `PluginServiceRegistrator`.
 
 ## JavaScript Conventions
 

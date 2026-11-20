@@ -10,7 +10,7 @@ namespace Jellyfin.Plugin.YouTubeAudio;
 /// <summary>
 /// Registers plugin services with the Jellyfin DI container.
 /// </summary>
-public class ServiceRegistrator : IPluginServiceRegistrator
+public class PluginServiceRegistrator : IPluginServiceRegistrator
 {
     /// <inheritdoc />
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)

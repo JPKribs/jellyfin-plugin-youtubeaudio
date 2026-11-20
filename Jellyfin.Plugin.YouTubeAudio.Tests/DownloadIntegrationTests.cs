@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.YouTubeAudio.Models;
 using Jellyfin.Plugin.YouTubeAudio.Services;
+using Jellyfin.Plugin.YouTubeAudio.Utilities;
 using Xunit;
 using YoutubeDLSharp;
 using YoutubeDLSharp.Options;

@@ -72,7 +72,7 @@ If the code shows the cause, a Tier 1 test is enough to prove it.
 
 Tier 2 needs data that is big enough to show the problem and no bigger.
 
-* Start the end to end container with `python3 e2e/docker_e2e.py --keep`, which leaves its server, library, and queue in place on port 8097.
+* Start the end to end container with `python3 tools/e2e/docker_e2e.py --keep`, which leaves its server, library, and queue in place on port 8097.
 * Add a library export or library songs only as large as the goal names, and scan once. Never reseed between runs.
 * Write down the data size in the report.
 * Never build a bigger seed to prove a scaling claim. Copy `queue.db` out and scale the copy at Tier 3.
@@ -175,7 +175,7 @@ The Jellyfin image is Linux and runs Jellyfin as process 1, as root. It is self 
 1. Start the container and leave it running. It builds the plugin in Release.
 
     ```bash
-    e2e/run.sh --keep
+    tools/e2e/run.sh --keep
     ```
 
 2. Install the tools in the container `yta-e2e`. Use the standalone Linux builds that match the container CPU, which `docker exec yta-e2e uname -m` prints. Use `linux-arm64` for `aarch64` and `linux-x64` for `x86_64` in the address.

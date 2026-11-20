@@ -229,10 +229,10 @@ Retake a screenshot in the same commit as any change that alters what it shows, 
 The end to end test can leave its Jellyfin running for manual checks. Docker and the dotnet SDK must be on the path.
 
 ```bash
-e2e/run.sh --keep
+tools/e2e/run.sh --keep
 ```
 
-The server answers at http://localhost:8097, and the run's throwaway logins are in the ignored `e2e/.work/`. Stop it with `docker rm -f yta-e2e`. Hard reload the page after a new build, since the dashboard caches scripts.
+The server answers at http://localhost:8097, and the run's throwaway logins are in the ignored `tools/e2e/.work/`. Stop it with `docker rm -f yta-e2e`. Hard reload the page after a new build, since the dashboard caches scripts.
 
 ## Installing a Build by Hand
 

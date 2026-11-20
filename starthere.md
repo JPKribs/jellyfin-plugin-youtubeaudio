@@ -59,10 +59,11 @@ Explain what you would change, why, and what it risks. Wait for an answer before
 
 | Path | What it holds |
 | :--- | :--- |
-| `Jellyfin.Plugin.YouTubeAudio/` | The plugin source. |
-| `Jellyfin.Plugin.YouTubeAudio/Configuration/` | The dashboard pages and the public pages, as HTML and JS. |
+| `Jellyfin.Plugin.YouTubeAudio/` | The plugin source, laid out as [Layout](skills/code.md#layout) shows. |
+| `Jellyfin.Plugin.YouTubeAudio/Web/` | The dashboard pages and the public pages, as HTML and JS. |
 | `Jellyfin.Plugin.YouTubeAudio.Tests/` | Unit, store, and controller tests, with the opt in download tests. |
-| `e2e/` | The Docker end to end test that runs the plugin on a throwaway Jellyfin. |
+| `tools/` | Development tools that never ship, such as the screenshot kit and the end to end test. |
+| `tools/e2e/` | The Docker end to end test that runs the plugin on a throwaway Jellyfin. |
 | `docs/` | The documentation site, built with MkDocs. |
 | `build.yaml` | The version, the artifacts, and the release notes. |
 | `build.sh` | Builds the release zip into `dist/`. |

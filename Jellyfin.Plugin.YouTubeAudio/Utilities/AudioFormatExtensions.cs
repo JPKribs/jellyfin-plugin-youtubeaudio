@@ -1,4 +1,6 @@
-namespace Jellyfin.Plugin.YouTubeAudio.Models;
+using Jellyfin.Plugin.YouTubeAudio.Models;
+
+namespace Jellyfin.Plugin.YouTubeAudio.Utilities;
 
 /// <summary>
 /// Helpers for <see cref="AudioFormat"/>.

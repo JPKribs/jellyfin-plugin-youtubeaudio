@@ -5,7 +5,7 @@ using Jellyfin.Data;
 using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Database.Implementations.Enums;
 using Jellyfin.Plugin.YouTubeAudio.Configuration;
-using Jellyfin.Plugin.YouTubeAudio.Controllers;
+using Jellyfin.Plugin.YouTubeAudio.Api;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Library;

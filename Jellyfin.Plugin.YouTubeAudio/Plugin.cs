@@ -48,7 +48,7 @@ public class Plugin : PluginBase<Plugin, PluginConfiguration>
         yield return new PluginPageInfo
         {
             Name = "youtubeaudio_download",
-            EmbeddedResourcePath = $"{ns}.Configuration.youtubeaudio_download.html",
+            EmbeddedResourcePath = $"{ns}.Web.youtubeaudio_download.html",
             MenuSection = "server",
             DisplayName = "YouTube Audio",
             EnableInMainMenu = true,
@@ -58,40 +58,40 @@ public class Plugin : PluginBase<Plugin, PluginConfiguration>
         yield return new PluginPageInfo
         {
             Name = "youtubeaudio_download.js",
-            EmbeddedResourcePath = $"{ns}.Configuration.youtubeaudio_download.js"
+            EmbeddedResourcePath = $"{ns}.Web.youtubeaudio_download.js"
         };
 
         // Tab 2: Import.
         yield return new PluginPageInfo
         {
             Name = "youtubeaudio_import",
-            EmbeddedResourcePath = $"{ns}.Configuration.youtubeaudio_import.html"
+            EmbeddedResourcePath = $"{ns}.Web.youtubeaudio_import.html"
         };
 
         yield return new PluginPageInfo
         {
             Name = "youtubeaudio_import.js",
-            EmbeddedResourcePath = $"{ns}.Configuration.youtubeaudio_import.js"
+            EmbeddedResourcePath = $"{ns}.Web.youtubeaudio_import.js"
         };
 
         // Tab 3: Settings.
         yield return new PluginPageInfo
         {
             Name = "youtubeaudio_settings",
-            EmbeddedResourcePath = $"{ns}.Configuration.youtubeaudio_settings.html"
+            EmbeddedResourcePath = $"{ns}.Web.youtubeaudio_settings.html"
         };
 
         yield return new PluginPageInfo
         {
             Name = "youtubeaudio_settings.js",
-            EmbeddedResourcePath = $"{ns}.Configuration.youtubeaudio_settings.js"
+            EmbeddedResourcePath = $"{ns}.Web.youtubeaudio_settings.js"
         };
 
         // Plugin-specific shared JS layered on top of the base kit (all shared CSS lives in the base package).
         yield return new PluginPageInfo
         {
             Name = "youtubeaudio_shared.js",
-            EmbeddedResourcePath = $"{ns}.Configuration.youtubeaudio_shared.js"
+            EmbeddedResourcePath = $"{ns}.Web.youtubeaudio_shared.js"
         };
 
         foreach (var page in GetSharedPages("youtubeaudio"))

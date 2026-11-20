@@ -1,6 +1,7 @@
 using System;
 using Jellyfin.Plugin.YouTubeAudio.Models;
 using Jellyfin.Plugin.YouTubeAudio.Services;
+using Jellyfin.Plugin.YouTubeAudio.Utilities;
 using Xunit;
 using YoutubeDLSharp.Options;
 

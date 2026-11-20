@@ -16,13 +16,13 @@ Needs Docker and network access (YouTube, GitHub for yt-dlp). Uses only the Pyth
 library; test audio is generated and tagged with the ffmpeg inside the Jellyfin image.
 
     dotnet build Jellyfin.Plugin.YouTubeAudio/Jellyfin.Plugin.YouTubeAudio.csproj -c Release
-    python3 e2e/docker_e2e.py            # or: e2e/run.sh
+    python3 tools/e2e/docker_e2e.py      # or: tools/e2e/run.sh
 
 Exit code 0 when every check passes.
 """
 import argparse, base64, hashlib, json, os, plistlib, secrets, shutil, subprocess, sys, time, unicodedata, urllib.error, urllib.parse, urllib.request
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DEFAULT_IMAGE = "jellyfin/jellyfin:12.4.20261026-211555"  # stable 12.4 (no plain "12.4.0" tag exists)
 
 parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0], formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -30,7 +30,7 @@ parser.add_argument("--image", default=DEFAULT_IMAGE, help="Jellyfin image to te
 parser.add_argument("--expect-version", default="12.4.0", help="server version the image must report; empty to skip (default: %(default)s)")
 parser.add_argument("--port", type=int, default=8097, help="host port for the test server (default: %(default)s)")
 parser.add_argument("--name", default="yta-e2e", help="container name (default: %(default)s)")
-parser.add_argument("--workdir", default=os.path.join(REPO, "e2e", ".work"), help="scratch folder, wiped on start (default: e2e/.work)")
+parser.add_argument("--workdir", default=os.path.join(REPO, "tools", "e2e", ".work"), help="scratch folder, wiped on start (default: tools/e2e/.work)")
 parser.add_argument("--plugin-dir", default=os.path.join(REPO, "Jellyfin.Plugin.YouTubeAudio", "bin", "Release", "net10.0"),
                     help="folder holding the built plugin DLLs (default: Release build output)")
 parser.add_argument("--zip", help="install the plugin from this release ZIP (as written by build.sh) instead of --plugin-dir, "

@@ -4,7 +4,7 @@ Captures every screenshot in `docs/screenshots/` from the repository's own files
 
 | File | Does |
 | :--- | :--- |
-| `server.py` | Serves the harness, the plugin's pages from `Jellyfin.Plugin.YouTubeAudio/Configuration`, Base's assets from the NuGet package the csproj names, and jellyfin-web. It renders `/YouTube/Download` and `/YouTube/Queue` through Base's status template the way `StatusPage.Render` does, and answers their API calls with generic songs |
+| `server.py` | Serves the harness, the plugin's pages from `Jellyfin.Plugin.YouTubeAudio/Web`, Base's assets from the NuGet package the csproj names, and jellyfin-web. It renders `/YouTube/Download` and `/YouTube/Queue` through Base's status template the way `StatusPage.Render` does, and answers their API calls with generic songs |
 | `harness.html` | Loads jellyfin-web's stylesheets in load order, then mounts one tab the way the dashboard does |
 | `upgrade.js` | Adds the classes and markup Jellyfin's `emby-*` elements add on upgrade, so the real CSS applies |
 | `stub.js` | A stand-in `ApiClient` with a generic queue, downloaded files, playlist imports, and users |

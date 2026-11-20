@@ -17,7 +17,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
-namespace Jellyfin.Plugin.YouTubeAudio.Controllers;
+namespace Jellyfin.Plugin.YouTubeAudio.Api;
 
 /// <summary>
 /// Public-facing surface that lets approved non-admin users submit download links.
@@ -266,7 +266,7 @@ public class YouTubePublicController : ControllerBase
     private static string ReadResource(string fileName, string fallback)
     {
         var assembly = typeof(Plugin).Assembly;
-        var resourceName = typeof(Plugin).Namespace + ".Configuration." + fileName;
+        var resourceName = typeof(Plugin).Namespace + ".Web." + fileName;
         using var stream = assembly.GetManifestResourceStream(resourceName);
         if (stream is null)
         {

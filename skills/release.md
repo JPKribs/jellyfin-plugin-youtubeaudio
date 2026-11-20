@@ -41,7 +41,7 @@ Raising a part sets every part after it to `0`. `12.4.4.4` becomes `12.4.5.0` fo
     ```
 
     ```bash
-    python3 e2e/docker_e2e.py --zip dist/jellyfin-plugin-youtubeaudio-<version>.zip
+    python3 tools/e2e/docker_e2e.py --zip dist/jellyfin-plugin-youtubeaudio-<version>.zip
     ```
 
     Every check must run on the commit that is released. Run them again after any later change.

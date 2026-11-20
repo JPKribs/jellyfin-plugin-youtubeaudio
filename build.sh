@@ -70,14 +70,14 @@ validate_resources() {
 
     local missing_files=()
     local config_files=(
-        "$PROJECT_DIR/Configuration/youtubeaudio_download.html"
-        "$PROJECT_DIR/Configuration/youtubeaudio_download.js"
-        "$PROJECT_DIR/Configuration/youtubeaudio_import.html"
-        "$PROJECT_DIR/Configuration/youtubeaudio_import.js"
-        "$PROJECT_DIR/Configuration/youtubeaudio_settings.html"
-        "$PROJECT_DIR/Configuration/youtubeaudio_settings.js"
-        "$PROJECT_DIR/Configuration/youtubeaudio_shared.js"
-        "$PROJECT_DIR/Configuration/youtubeaudio_download_public.html"
+        "$PROJECT_DIR/Web/youtubeaudio_download.html"
+        "$PROJECT_DIR/Web/youtubeaudio_download.js"
+        "$PROJECT_DIR/Web/youtubeaudio_import.html"
+        "$PROJECT_DIR/Web/youtubeaudio_import.js"
+        "$PROJECT_DIR/Web/youtubeaudio_settings.html"
+        "$PROJECT_DIR/Web/youtubeaudio_settings.js"
+        "$PROJECT_DIR/Web/youtubeaudio_shared.js"
+        "$PROJECT_DIR/Web/youtubeaudio_download_public.html"
     )
 
     for file in "${config_files[@]}"; do

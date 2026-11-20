@@ -8,7 +8,7 @@ import html, http.server, io, json, os, re, sys, urllib.parse, wave
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROJECT = os.path.join(HERE, '..', '..', 'Jellyfin.Plugin.YouTubeAudio')
-REPO = os.path.join(PROJECT, 'Configuration')
+REPO = os.path.join(PROJECT, 'Web')
 JF = os.environ.get('JELLYFIN_WEB', '/Applications/Jellyfin.app/Contents/Resources/jellyfin-web')
 
 

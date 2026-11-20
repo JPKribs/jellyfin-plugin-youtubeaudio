@@ -17,7 +17,7 @@ Test each behavior at the lowest layer that can prove it. Go up a layer only for
 | Service | A service against real files in a temp folder, such as tagging, filing, and import | `dotnet test` | Seconds |
 | Controller | A route's status codes, guards, and response shape | `dotnet test` | Seconds |
 | Download | yt-dlp downloads and matches against real YouTube | `YTA_RUN_INTEGRATION=1 dotnet test` | Minutes |
-| End to end | The whole pipeline on a throwaway Jellyfin in Docker | `e2e/run.sh` | Minutes |
+| End to end | The whole pipeline on a throwaway Jellyfin in Docker | `tools/e2e/run.sh` | Minutes |
 | Harness | A tab or a user page draws and behaves right under Jellyfin's real CSS | The [harness](#harness) in headless Chromium | Minutes |
 | Page | A config page draws, reads, and saves as it should | By hand, on a test server | Minutes |
 
@@ -39,7 +39,7 @@ The test project is one folder. Name each file after the area it covers.
 | :--- | :--- |
 | `Services/QueueDatabase.cs` | `QueueDatabaseTests.cs` |
 | `Services/Playlists/PlaylistSyncService.cs` | `PlaylistSyncTests.cs` |
-| `Controllers/YouTubePublicController.cs` | `PublicControllerTests.cs` |
+| `Api/YouTubePublicController.cs` | `PublicControllerTests.cs` |
 
 * Shared setup lives in `ServiceTestSupport.cs`, whose `ServiceFixture` builds the services over a temp folder.
 * Test files, such as catalog answers, exports, and a short Opus file, live in `TestData/`.
@@ -104,20 +104,20 @@ YTA_RUN_INTEGRATION=1 dotnet test --filter "Category=Integration"
 
 ## End to End Test
 
-`e2e/docker_e2e.py` runs the plugin on a throwaway Jellyfin container and drives the whole Apple Music import pipeline through the API, with real YouTube downloads. Every file in its test library is fingerprinted before and after each stage. See [Testing](../docs/Testing.md) for what it covers.
+`tools/e2e/docker_e2e.py` runs the plugin on a throwaway Jellyfin container and drives the whole Apple Music import pipeline through the API, with real YouTube downloads. Every file in its test library is fingerprinted before and after each stage. See [Testing](../docs/Testing.md) for what it covers.
 
 ```bash
-e2e/run.sh
+tools/e2e/run.sh
 ```
 
 ```bash
-python3 e2e/docker_e2e.py --zip dist/jellyfin-plugin-youtubeaudio-<version>.zip
+python3 tools/e2e/docker_e2e.py --zip dist/jellyfin-plugin-youtubeaudio-<version>.zip
 ```
 
 * Docker must be running, and the run needs network access.
 * `run.sh` builds the plugin in Release first. `--zip` installs the release zip instead, which catches a dependency missing from `build.yaml`'s artifacts.
 * `--keep` leaves the server running on port 8097 to look at.
-* Scratch files and the run's throwaway logins go to the ignored `e2e/.work/`.
+* Scratch files and the run's throwaway logins go to the ignored `tools/e2e/.work/`.
 * Run it for any change that moves or deletes library files, and before every release.
 
 ## Harness
