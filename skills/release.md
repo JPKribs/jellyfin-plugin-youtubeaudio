@@ -91,19 +91,19 @@ git push
 
 Follow these steps in order, and skip none.
 
-1. **Draft.** The **Create/Update Release Draft** workflow builds the zip and writes a draft release named `v<version>` with the changelog as its notes. A push to `master` that carries any file besides `build.yaml`, Markdown, `docs/`, `mkdocs.yml`, `.github/`, and `.gitignore` starts it. A push that only changes those does not, so start it from the Actions tab only then.
+1. **Draft.** The **Create/Update Release Draft** workflow builds the zip and writes a draft release named `v<version>` with the changelog as its notes. A push to `master` that carries any file besides `build.yaml`, Markdown, `docs/`, `mkdocs.yml`, `.github/`, and `.gitignore` starts it. A push that only changes those does not, so start it from the Actions tab only then. Draft builds run one at a time, so a push and a manual start that overlap build one after the other.
 
     ```bash
     gh run list -L 8
     ```
 
-2. **Check.** List the releases and open the draft on GitHub. The notes must match `build.yaml`, and the zip and its `.md5` must be attached. A push can start the workflow while another run, from an earlier push or from the Actions tab, writes a draft too. That leaves a second draft named `v<version>` with no files.
+2. **Check.** Wait until no draft build is queued or running, since each one replaces the zip. Then list the releases and open the draft on GitHub. The notes must match `build.yaml`, and the zip and its `.md5` must be attached.
 
     ```bash
     gh release list -L 5
     ```
 
-3. **Release.** Publish the draft that has the zip and `.md5`, never the empty one, and delete the empty draft afterward. The **Publish Plugin** workflow takes the attached zip's checksum, adds the version to `manifest.json`, and commits "Update manifest for release v<version>".
+3. **Release.** Publish the draft. The **Publish Plugin** workflow waits for any draft build still running, hashes the attached zip, checks it against the `.md5`, adds the version to `manifest.json`, and commits "Update manifest for release v<version>". A draft build never replaces the assets of a published release.
 4. **Confirm.** Check that the manifest commit landed and that the checksum of the new version in `manifest.json` matches the `.md5` on the release.
 5. **Pull.**
 
@@ -129,5 +129,5 @@ Follow these steps in order, and skip none.
 * [ ] Docs, screenshots, and Versioning describe this release.
 * [ ] `mkdocs build --strict` passes.
 * [ ] The changelog lists only this release, in the four keys.
-* [ ] The draft that was published has the notes, the zip, and the `.md5`, and no empty draft is left.
+* [ ] The draft that was published has the notes, the zip, and the `.md5`.
 * [ ] The manifest commit landed with the release's checksum, and it is pulled.
