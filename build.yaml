@@ -4,11 +4,9 @@ guid: "7323ea64-a200-4265-ab8f-e7ae27d06c38"
 version: "12.4.4.8"
 targetAbi: "12.4.0.0"
 framework: "net10.0"
-overview: "Download YouTube audio directly to a Jellyfin Music Library."
+overview: "Download YouTube audio into your music library."
 description: >
-  YouTube Audio lets you download YouTube audio (single videos or playlists) as Opus, MP3, or M4A files,
-  review and edit metadata in a staging area, then push files into your Jellyfin music library.
-  Uses yt-dlp for downloading and TagLibSharp for metadata tagging.
+  YouTube Audio downloads YouTube audio as Opus, MP3, or M4A, lets you review its tags, and adds it to your music library.
 category: "Music"
 imageUrl: "https://raw.githubusercontent.com/JPKribs/jellyfin-plugin-youtubeaudio/refs/heads/master/Jellyfin.Plugin.YouTubeAudio/Assets/Logo.png"
 owner: "JPKribs"
