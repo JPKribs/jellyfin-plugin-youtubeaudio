@@ -22,8 +22,8 @@ How to write, comment, and test code in this plugin. It covers C#, JavaScript, H
 | :--- | :--- |
 | Plugin class and config lock | `PluginBase<TPlugin, TConfiguration>` |
 | Scheduled task | `PluginScheduledTask` |
-| Outbound HTTP | `JpkHttp` and `HttpResult` |
-| HTTP handlers | `JpkRetryHandler` with `JpkRetryOptions`, and `RedirectRefusingHandler` |
+| Outbound HTTP | `BaseHttp` and `HttpResult` |
+| HTTP handlers | `BaseRetryHandler` with `BaseRetryOptions`, and `RedirectRefusingHandler` |
 | Addresses another server or a user supplied | `SsrfGuard`, with `requireHttpsForPublic: true` |
 | Retry and backoff | `RetryPolicy`, `BackoffPolicy`, `CircuitBreaker` |
 | Parallel work | `ConcurrentTaskRunner` |
