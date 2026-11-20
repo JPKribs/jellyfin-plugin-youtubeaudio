@@ -26,7 +26,7 @@
     </PackageReference>
     <PackageReference Include="YoutubeDLSharp" Version="1.2.0" />
     <PackageReference Include="TagLibSharp" Version="2.3.0" />
-    <PackageReference Include="JPKribs.Jellyfin.Base" Version="12.4.0" />
+    <PackageReference Include="JPKribs.Jellyfin.Base" Version="12.4.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -35,9 +35,6 @@
     <JellyfinString Include="AlbumArtist" />
     <JellyfinString Include="All" />
     <JellyfinString Include="Artist" />
-    <JellyfinString Include="ButtonCancel" />
-    <JellyfinString Include="ButtonPause" />
-    <JellyfinString Include="ButtonRemove" />
     <JellyfinString Include="ButtonSignIn" />
     <JellyfinString Include="ButtonStop" />
     <JellyfinString Include="ButtonSubmit" />
@@ -52,14 +49,9 @@
     <JellyfinString Include="LabelStatus" />
     <JellyfinString Include="LabelTitle" />
     <JellyfinString Include="LabelYear" />
-    <JellyfinString Include="Play" />
     <JellyfinString Include="Preview" />
     <JellyfinString Include="Refresh" />
     <JellyfinString Include="Reset" />
-    <JellyfinString Include="Save" />
-    <JellyfinString Include="Search" />
-    <JellyfinString Include="Select" />
-    <JellyfinString Include="SelectAll" />
     <JellyfinString Include="Settings" />
     <JellyfinString Include="Track" />
     <JellyfinString Include="TrackCount" />

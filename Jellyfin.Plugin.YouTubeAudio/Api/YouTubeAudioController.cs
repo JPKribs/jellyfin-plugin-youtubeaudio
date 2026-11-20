@@ -674,7 +674,7 @@ public class YouTubeAudioController : ControllerBase
     {
         try
         {
-            var message = await _downloadService.UpdateYtDlpAsync(UserMessages.Language(Request), HttpContext.RequestAborted).ConfigureAwait(false);
+            var message = await _downloadService.UpdateYtDlpAsync(BaseTranslations.RequestLanguage(Request), HttpContext.RequestAborted).ConfigureAwait(false);
             return Ok(new { Success = true, Message = message });
         }
         catch (InvalidOperationException ex)

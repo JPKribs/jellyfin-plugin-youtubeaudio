@@ -166,7 +166,7 @@
 
         var timer = null;
         function load(first) {
-            fetch(itemsUrl, { headers: { 'Authorization': authHeader, 'Accept': 'application/json' } })
+            fetch(itemsUrl, { headers: { 'Authorization': authHeader, 'Accept': 'application/json', 'X-Jellyfin-Plugin-Language': t.language } })
                 .then(function (r) {
                     if (r.status === 401) { leaveLoading(); hide('queue'); show('signin'); return null; }
                     if (!r.ok) throw new Error('HTTP ' + r.status);

@@ -12,7 +12,7 @@ using Xunit;
 namespace Jellyfin.Plugin.YouTubeAudio.Tests;
 
 /// <summary>
-/// Tests that every key the pages use has a string, and that server messages follow the viewer's language.
+/// Tests that every key the pages use has a string, and that server messages follow the page's language.
 /// </summary>
 public sealed class TranslationsTests
 {
@@ -76,18 +76,21 @@ public sealed class TranslationsTests
         Assert.Equal("plain", UserMessages.Text(new InvalidOperationException("plain"), "de"));
     }
 
-    [Theory]
-    [InlineData("de-DE,de;q=0.9,en;q=0.8", "de-DE")]
-    [InlineData("en;q=0.5,fr", "fr")]
-    [InlineData("*", null)]
-    [InlineData("", null)]
-    public void Language_IsTheHighestWeightedAcceptLanguage(string header, string? expected)
+    /// <summary>
+    /// An error body follows the language the page sends in Base's header, ahead of the browser's.
+    /// True: a page in German shows a server message in German.
+    /// False: a server message would follow the browser and not the page.
+    /// </summary>
+    [Fact]
+    public void MessageBody_FollowsThePageLanguageHeader()
     {
         var context = new DefaultHttpContext();
-        context.Request.Headers.AcceptLanguage = header;
+        context.Request.Headers.AcceptLanguage = "en-US";
+        context.Request.Headers[BaseTranslations.LanguageHeader] = "de";
 
-        Assert.Equal(expected, UserMessages.Language(context.Request));
-        Assert.Null(UserMessages.Language(null));
+        var body = UserMessages.MessageBody(TranslationKeys.Delete, context.Request);
+
+        Assert.Equal("{ Error = Löschen }", body.ToString());
     }
 
     private static string FindRepository()

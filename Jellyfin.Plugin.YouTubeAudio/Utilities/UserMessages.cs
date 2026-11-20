@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Linq;
 using JPKribs.Jellyfin.Base;
 using Microsoft.AspNetCore.Http;
 
@@ -78,36 +77,17 @@ internal static class UserMessages
     /// Builds the error body a page shows for an exception, in the viewer's language when it carries a translation key.
     /// </summary>
     /// <param name="exception">The exception.</param>
-    /// <param name="request">The request, read for the viewer's language.</param>
+    /// <param name="request">The request, read for the page's language with <see cref="BaseTranslations.RequestLanguage"/>.</param>
     /// <returns>An object with an Error message.</returns>
-    internal static object ErrorBody(Exception exception, HttpRequest? request) => new { Error = Text(exception, Language(request)) };
+    internal static object ErrorBody(Exception exception, HttpRequest request) => new { Error = Text(exception, BaseTranslations.RequestLanguage(request)) };
 
     /// <summary>
     /// Builds the error body a page shows for one translated message, in the viewer's language.
     /// </summary>
     /// <param name="key">The translation key, from <c>TranslationKeys</c>.</param>
-    /// <param name="request">The request, read for the viewer's language.</param>
+    /// <param name="request">The request, read for the page's language with <see cref="BaseTranslations.RequestLanguage"/>.</param>
     /// <returns>An object with an Error message.</returns>
-    internal static object MessageBody(string key, HttpRequest? request) => new { Error = BaseTranslations.Get(key, Language(request)) };
-
-    /// <summary>
-    /// Reads the viewer's language from the request's Accept-Language header, the browser's language the pages fall back to.
-    /// </summary>
-    /// <param name="request">The request, or <c>null</c> outside a request.</param>
-    /// <returns>The language with the highest weight, such as de, or <c>null</c> for US English.</returns>
-    internal static string? Language(HttpRequest? request)
-    {
-        if (request is null)
-        {
-            return null;
-        }
-
-        return request.GetTypedHeaders().AcceptLanguage
-            .Where(l => l.Value.HasValue && l.Value.Value != "*")
-            .OrderByDescending(l => l.Quality ?? 1)
-            .Select(l => l.Value.Value)
-            .FirstOrDefault();
-    }
+    internal static object MessageBody(string key, HttpRequest request) => new { Error = BaseTranslations.Get(key, BaseTranslations.RequestLanguage(request)) };
 
     /// <summary>
     /// Marks an exception of any type with a translation key, so a page shows it in the viewer's language.

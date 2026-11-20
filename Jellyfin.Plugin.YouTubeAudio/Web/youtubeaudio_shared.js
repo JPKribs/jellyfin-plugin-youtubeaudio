@@ -94,47 +94,6 @@ export function countText(t, count, oneKey, manyKey, ...rest) {
     return t.format(count === 1 ? oneKey : manyKey, count, ...rest);
 }
 
-// componentText
-// Gives the text options of each Base component the pages use, in the viewer's language.
-//
-// Inputs
-// t [object]: The translations handle.
-//
-// Output
-// [object]: Options by component, such as filteredList and saveBar, to merge into its options.
-export function componentText(t) {
-    return {
-        filteredList: {
-            selectAllText: t.tr('SelectAll'),
-            selectedText: t.tr('MessageCountSelected'),
-            selectText: t.tr('Select'),
-            allText: t.tr('All'),
-            summaryText: t.tr('MessageShowingCount')
-        },
-        checkboxList: { selectAllText: t.tr('SelectAll'), emptyMessage: t.tr('MessageNoItems') },
-        saveBar: { saveText: t.tr('Save'), pendingText: t.tr('MessageUnsavedChanges'), savingText: t.tr('MessageSaving') },
-        confirm: { cancelText: t.tr('ButtonCancel') },
-        imagePicker: {
-            chooseText: t.tr('ButtonSelectImage'),
-            replaceText: t.tr('ButtonReplace'),
-            removeText: t.tr('ButtonRemove'),
-            emptyText: t.tr('MessageNoCover'),
-            tooLargeText: t.tr('ErrorImageLargerThan'),
-            readErrorText: t.tr('ErrorReadFile')
-        },
-        audioPlayer: { playText: t.tr('Play'), pauseText: t.tr('ButtonPause'), seekText: t.tr('ButtonSeek'), resetText: t.tr('Reset') },
-        filePicker: {
-            dropText: t.tr('MessageDropFile'),
-            removeLabel: t.tr('ButtonRemoveValue'),
-            typeText: t.tr('ErrorFileType'),
-            sizeLimitText: t.tr('ErrorFileSize'),
-            singleText: t.tr('MessageSelectOneFile')
-        },
-        comboBox: { noResultsText: t.tr('MessageNoMatches'), errorText: t.tr('ErrorSearch') },
-        userMultiSelector: { placeholder: t.tr('Search'), selectAllText: t.tr('SelectAll'), adminText: t.tr('LabelAdmin') }
-    };
-}
-
 // fillLinks
 // Sets a sentence that holds links, putting each link in its {0}, {1} placeholder so the words stay in the language's order.
 //
@@ -165,14 +124,14 @@ export function getTabs() {
 
 // createPage
 // Wires a config page through Base's page lifecycle with the plugin's tabs. The page's bind and load wait for the strings,
-// which are applied to its markup first, and the helper bag gets the translations as t and the component text as text.
+// which are applied to its markup first, and the helper bag gets the translations as t.
 //
 // Inputs
 // view [HTMLElement]: The page the dashboard passes to the module's default export.
 // opts [object]: The page's createConfigPage options, such as tabIndex, bind, load, and onHide.
 //
 // Output
-// [object]: The page handle, whose shared bag also has t and text.
+// [object]: The page handle, whose shared bag also has t.
 export function createPage(view, opts) {
     var bound = null;
     return createConfigPage(view, Object.assign({
@@ -184,7 +143,6 @@ export function createPage(view, opts) {
         bind: function (shared, handle) {
             bound = TRANSLATIONS.then(function (t) {
                 shared.t = t;
-                shared.text = componentText(t);
                 t.apply(view);
                 if (opts.bind) opts.bind(shared, handle);
             });

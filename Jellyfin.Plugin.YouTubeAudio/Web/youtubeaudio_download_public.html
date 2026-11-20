@@ -214,7 +214,7 @@
 
             fetch(submitUrl, {
                 method: 'POST',
-                headers: { 'Authorization': authHeader, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                headers: { 'Authorization': authHeader, 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Jellyfin-Plugin-Language': t ? t.language : '' },
                 body: JSON.stringify({ Url: url, Artist: artist, Album: album, Year: year, Title: title || null })
             })
                 .then(function (r) {

@@ -174,7 +174,7 @@ export default function (view) {
     function buildQueueList() {
         var host = Shared.getEl('queueList');
         if (!host || _queueList) return;
-        _queueList = createFilteredList(Object.assign({}, Shared.text.filteredList, {
+        _queueList = createFilteredList({
             items: [],
             rowKey: 'Id',
             render: renderQueueRow,
@@ -197,7 +197,7 @@ export default function (view) {
             ],
             emptyText: t.tr('MessageNoSongsQueued'),
             label: t.tr('Queue')
-        }));
+        });
         host.appendChild(_queueList.element);
     }
 
@@ -213,7 +213,7 @@ export default function (view) {
             placeholder: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
             description: t.tr('ChangeLinkHelp'),
             required: true
-        }], Object.assign({}, Shared.text.confirm, { title: t.tr('HeaderChangeLink'), submitText: t.tr('ButtonUseLink') })).then(function (values) {
+        }], { title: t.tr('HeaderChangeLink'), submitText: t.tr('ButtonUseLink') }).then(function (values) {
             if (!values) return;
             Shared.apiRequest('Queue/' + encodeURIComponent(id) + '/Url', 'POST', { Url: (values.url || '').trim() })
                 .then(function () {
@@ -233,11 +233,11 @@ export default function (view) {
     function deleteSelectedQueue(items) {
         var ids = items.map(function (i) { return i.Id; });
         if (!ids.length) return;
-        confirmDialog(countText(t, ids.length, 'ConfirmDeleteItemsOne', 'ConfirmDeleteItemsMany'), Object.assign({}, Shared.text.confirm, {
+        confirmDialog(countText(t, ids.length, 'ConfirmDeleteItemsOne', 'ConfirmDeleteItemsMany'), {
             title: t.tr('HeaderDeleteItems'),
             confirmText: t.tr('Delete'),
             destructive: true
-        })).then(function (ok) {
+        }).then(function (ok) {
             if (!ok) return;
             Shared.setStatus('queueStatus', t.tr('MessageDeleting'), false, { timeout: 0 });
             Shared.apiRequest('Queue/BatchDelete', 'POST', { Ids: ids })
@@ -276,11 +276,11 @@ export default function (view) {
     // cancelDownloads
     // Stops the running batch, after a confirm. Songs not finished stay queued.
     function cancelDownloads() {
-        confirmDialog(t.tr('ConfirmCancelDownloads'), Object.assign({}, Shared.text.confirm, {
+        confirmDialog(t.tr('ConfirmCancelDownloads'), {
             title: t.tr('HeaderCancelDownloads'),
             confirmText: t.tr('ButtonStop'),
             destructive: true
-        })).then(function (ok) {
+        }).then(function (ok) {
             if (!ok) return;
             Shared.apiRequest('Queue/Cancel', 'POST')
                 .then(function (result) {
@@ -329,7 +329,7 @@ export default function (view) {
     function buildReplaceList() {
         var host = Shared.getEl('replaceResults');
         if (!host || _replaceList) return;
-        _replaceList = createFilteredList(Object.assign({}, Shared.text.filteredList, {
+        _replaceList = createFilteredList({
             fetch: function (query) {
                 var text = (query.search || '').trim();
                 if (!text) return [];
@@ -355,7 +355,7 @@ export default function (view) {
                 _replaceSongId = ids.length ? ids[0] : null;
                 updateReplaceButton();
             }
-        }));
+        });
         host.appendChild(_replaceList.element);
     }
 
@@ -451,7 +451,7 @@ export default function (view) {
         if (_filePicker && _filePicker.input.getAttribute('accept') === accept) return;
         if (_filePicker) _filePicker.destroy();
         host.innerHTML = '';
-        _filePicker = createFilePicker(Object.assign({}, Shared.text.filePicker, { accept: accept, onChange: resetPlaylistImport }));
+        _filePicker = createFilePicker({ accept: accept, onChange: resetPlaylistImport });
         host.appendChild(_filePicker.element);
         resetPlaylistImport();
     }
@@ -470,7 +470,7 @@ export default function (view) {
         intro.className = 'fieldDescription';
         intro.textContent = t.format('MessageFilePlaylists', playlists.length);
         host.appendChild(intro);
-        _playlistChoices = createCheckboxList(Object.assign({}, Shared.text.checkboxList, {
+        _playlistChoices = createCheckboxList({
             items: playlists,
             idKey: 'Id',
             value: playlists.map(function (p) { return p.Id; }),
@@ -480,7 +480,7 @@ export default function (view) {
                 return { label: p.Name, sublabel: countText(t, p.TrackCount, 'LabelTrackCountOne', 'TrackCount'), note: p.IsLibrary ? t.tr('LabelSongsOnly') : '' };
             },
             onChange: function (ids) { if (btn) btn.disabled = !ids.length; }
-        }));
+        });
         host.appendChild(_playlistChoices.element);
         host.hidden = false;
         if (btn) {
@@ -563,7 +563,7 @@ export default function (view) {
     function buildTargetList() {
         var host = Shared.getEl('playlistTargets');
         if (!host || _targetList) return;
-        _targetList = createFilteredList(Object.assign({}, Shared.text.filteredList, {
+        _targetList = createFilteredList({
             items: [],
             rowKey: 'Id',
             render: renderTarget,
@@ -571,7 +571,7 @@ export default function (view) {
             summary: false,
             actions: [{ id: 'sync', label: t.tr('ButtonAddLibrarySongs'), icon: 'sync', onClick: syncPlaylists }],
             label: t.tr('LabelPlaylistImports')
-        }));
+        });
         host.appendChild(_targetList.element);
     }
 
@@ -594,10 +594,10 @@ export default function (view) {
     // Inputs
     // id [string]: The playlist import.
     function stopPlaylist(id) {
-        confirmDialog(t.tr('ConfirmStopPlaylist'), Object.assign({}, Shared.text.confirm, {
+        confirmDialog(t.tr('ConfirmStopPlaylist'), {
             title: t.tr('HeaderStopPlaylistImport'),
             confirmText: t.tr('ButtonStop')
-        })).then(function (ok) {
+        }).then(function (ok) {
             if (!ok) return;
             Shared.apiRequest('Playlists/' + encodeURIComponent(id), 'DELETE')
                 .catch(function (err) { reportError(err, t.tr('ErrorStopPlaylist')); })

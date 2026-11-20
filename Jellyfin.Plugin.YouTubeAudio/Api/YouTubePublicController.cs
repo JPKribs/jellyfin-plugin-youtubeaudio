@@ -75,7 +75,7 @@ public class YouTubePublicController : ControllerBase
     public ContentResult Page()
     {
         PublicPage.ApplyHardeningHeaders(Response);
-        var language = UserMessages.Language(Request);
+        var language = BaseTranslations.RequestLanguage(Request);
         var html = StatusPage.Render(
             BaseTranslations.Get(TranslationKeys.MessageLoading, language),
             string.Empty,
@@ -95,7 +95,7 @@ public class YouTubePublicController : ControllerBase
     public ContentResult QueuePage()
     {
         PublicPage.ApplyHardeningHeaders(Response);
-        var language = UserMessages.Language(Request);
+        var language = BaseTranslations.RequestLanguage(Request);
         var html = StatusPage.Render(
             BaseTranslations.Get(TranslationKeys.MessageLoading, language),
             string.Empty,
@@ -118,7 +118,7 @@ public class YouTubePublicController : ControllerBase
     {
         PublicPage.ApplyHardeningHeaders(Response);
         var sourceNames = _playlistImportService.GetSources().ToDictionary(s => s.Id, s => s.Name, StringComparer.Ordinal);
-        return Ok(_downloadService.GetPublicQueue(sourceNames, UserMessages.Language(Request)));
+        return Ok(_downloadService.GetPublicQueue(sourceNames, BaseTranslations.RequestLanguage(Request)));
     }
 
     /// <summary>Serves the web client's favicon so the page can reuse the server's real icon at a stable path.</summary>

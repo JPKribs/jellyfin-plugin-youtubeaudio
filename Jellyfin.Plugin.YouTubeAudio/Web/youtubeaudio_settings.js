@@ -56,10 +56,10 @@ export default function (view) {
         if (_approvedUsers) return _approvedUsers;
         var container = Shared.getEl('approvedUsersList');
         if (!container) return null;
-        _approvedUsers = Shared.createUserMultiSelector(Object.assign({}, Shared.text.userMultiSelector, {
+        _approvedUsers = Shared.createUserMultiSelector({
             adminFilter: 'exclude',
             emptyMessage: t.tr('MessageNoOtherUsers')
-        }));
+        });
         container.innerHTML = '';
         container.appendChild(_approvedUsers.element);
         return _approvedUsers;
@@ -168,12 +168,12 @@ export default function (view) {
     function addSaveBar(contentId, savedText, failedText, mutator) {
         var content = Shared.getEl(contentId);
         if (!content) return;
-        var bar = createSaveBar(Object.assign({}, Shared.text.saveBar, {
+        var bar = createSaveBar({
             fill: true,
             savedText: savedText,
             failedText: failedText,
             onSave: function () { return Shared.saveConfigWith(mutator); }
-        }));
+        });
         _saveBars[contentId] = bar;
         content.appendChild(bar.element);
         // A field changed in the section marks it unsaved.
@@ -210,11 +210,11 @@ export default function (view) {
     // resetQueue
     // Stops downloads and clears the queue with its cached files, after a confirm.
     function resetQueue() {
-        confirmDialog(t.tr('ConfirmResetQueue'), Object.assign({}, Shared.text.confirm, {
+        confirmDialog(t.tr('ConfirmResetQueue'), {
             title: t.tr('HeaderResetQueue'),
             confirmText: t.tr('Reset'),
             destructive: true
-        })).then(function (ok) {
+        }).then(function (ok) {
             if (!ok) return;
             Shared.apiRequest('ResetQueue', 'POST')
                 .then(function () { Shared.setStatus('resetStatus', t.tr('MessageQueueReset'), false); })
@@ -225,11 +225,11 @@ export default function (view) {
     // resetCache
     // Stops downloads, deletes every cached file, and clears the queue, after a confirm.
     function resetCache() {
-        confirmDialog(t.tr('ConfirmResetCache'), Object.assign({}, Shared.text.confirm, {
+        confirmDialog(t.tr('ConfirmResetCache'), {
             title: t.tr('HeaderResetCache'),
             confirmText: t.tr('ButtonResetAll'),
             destructive: true
-        })).then(function (ok) {
+        }).then(function (ok) {
             if (!ok) return;
             Shared.apiRequest('ResetCache', 'POST')
                 .then(function () { Shared.setStatus('resetStatus', t.tr('MessageCacheReset'), false); })

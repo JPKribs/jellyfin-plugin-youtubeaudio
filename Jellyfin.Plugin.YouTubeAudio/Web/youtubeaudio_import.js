@@ -131,7 +131,7 @@ export default function (view) {
     function buildList() {
         var host = Shared.getEl('importList');
         if (!host || _list) return;
-        _list = createFilteredList(Object.assign({}, Shared.text.filteredList, {
+        _list = createFilteredList({
             items: [],
             rowKey: 'Id',
             render: renderImportRow,
@@ -146,7 +146,7 @@ export default function (view) {
             emptyText: t.tr('MessageNoDownloads'),
             label: t.tr('LabelDownloadedFiles'),
             onSelectionChange: updateBulkButtons
-        }));
+        });
         host.appendChild(_list.element);
     }
 
@@ -219,7 +219,8 @@ export default function (view) {
     // Output
     // [object]: The picker handle.
     function createCoverPicker(opts) {
-        return createImagePicker(Object.assign({}, Shared.text.imagePicker, {
+        return createImagePicker(Object.assign({
+            emptyText: t.tr('MessageNoCover'),
             shape: 'square',
             crop: true,
             maxSize: 1200,
@@ -291,12 +292,12 @@ export default function (view) {
 
         destroyRowParts(d.Id);
 
-        var player = createAudioPlayer(Object.assign({}, Shared.text.audioPlayer, {
+        var player = createAudioPlayer({
             src: fileUrl(d.Id, 'Audio'),
             size: 'small',
             label: t.tr('Preview'),
             errorText: t.tr('ErrorPlayFile')
-        }));
+        });
         row.querySelector('.yta-player-cell').appendChild(player.element);
 
         var cover = createCoverPicker({
@@ -312,17 +313,17 @@ export default function (view) {
         row._cover = cover;
 
         var artistCell = row.querySelector('.yta-artist-cell');
-        var artistCombo = Shared.createSearchableComboBox(Object.assign({}, Shared.text.comboBox, {
+        var artistCombo = Shared.createSearchableComboBox({
             placeholder: t.tr('PlaceholderSearchArtists'),
             searchFn: _artistSearch,
             onInput: markDirty
-        }));
+        });
         artistCombo.setValue(d.Artist || '');
         artistCell.appendChild(artistCombo.element);
         artistCell._combo = artistCombo;
 
         var albumCell = row.querySelector('.yta-album-cell');
-        var albumCombo = Shared.createSearchableComboBox(Object.assign({}, Shared.text.comboBox, {
+        var albumCombo = Shared.createSearchableComboBox({
             placeholder: t.tr('PlaceholderSearchAlbums'),
             searchFn: createAlbumSearchForArtist(function () { return artistCombo.getValue(); }),
             onInput: markDirty,
@@ -330,7 +331,7 @@ export default function (view) {
                 markDirty();
                 takeAlbumCover(row, value);
             }
-        }));
+        });
         albumCombo.setValue(d.Album || '');
         albumCell.appendChild(albumCombo.element);
         albumCell._combo = albumCombo;
@@ -683,11 +684,11 @@ export default function (view) {
     function deleteSelected(items) {
         var ids = items.map(function (d) { return d.Id; });
         if (!ids.length) return;
-        confirmDialog(countText(t, ids.length, 'ConfirmDeleteFilesOne', 'ConfirmDeleteFilesMany'), Object.assign({}, Shared.text.confirm, {
+        confirmDialog(countText(t, ids.length, 'ConfirmDeleteFilesOne', 'ConfirmDeleteFilesMany'), {
             title: t.tr('HeaderDeleteFiles'),
             confirmText: t.tr('Delete'),
             destructive: true
-        })).then(function (ok) {
+        }).then(function (ok) {
             if (!ok) return;
             Shared.setStatus('importStatus', t.tr('MessageDeleting'), false, { timeout: 0 });
             Shared.apiRequest('Downloads/BatchDelete', 'POST', { Ids: ids })
@@ -722,19 +723,19 @@ export default function (view) {
 
         var bulkArtistCell = Shared.getEl('bulkArtistCell');
         if (bulkArtistCell && !_bulkArtistCombo) {
-            _bulkArtistCombo = Shared.createSearchableComboBox(Object.assign({}, Shared.text.comboBox, {
+            _bulkArtistCombo = Shared.createSearchableComboBox({
                 placeholder: t.tr('PlaceholderSearchArtists'),
                 searchFn: _artistSearch
-            }));
+            });
             bulkArtistCell.appendChild(_bulkArtistCombo.element);
         }
 
         var bulkAlbumCell = Shared.getEl('bulkAlbumCell');
         if (bulkAlbumCell && !_bulkAlbumCombo) {
-            _bulkAlbumCombo = Shared.createSearchableComboBox(Object.assign({}, Shared.text.comboBox, {
+            _bulkAlbumCombo = Shared.createSearchableComboBox({
                 placeholder: t.tr('PlaceholderSearchAlbums'),
                 searchFn: createAlbumSearchForArtist(function () { return _bulkArtistCombo ? _bulkArtistCombo.getValue() : ''; })
-            }));
+            });
             bulkAlbumCell.appendChild(_bulkAlbumCombo.element);
         }
 

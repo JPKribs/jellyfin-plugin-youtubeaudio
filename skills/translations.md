@@ -30,9 +30,9 @@ How this plugin shows its text in the viewer's language. Base builds the strings
     * Markup: `data-str="Key"`, `data-str-title`, `data-str-label`, or `data-str-placeholder`, with the English as the element's own text.
     * Config page script: `t.tr('Key')` or `t.format('Key', value)`, where `t` is `Shared.t`. `createPage` in `youtubeaudio_shared.js` loads the strings with `loadTranslations('YouTubeAudio/Translations')` and applies them to the markup before the page's `bind` runs.
     * A count: `countText(t, count, 'KeyOne', 'KeyMany')`, with the one and the other count as separate keys.
-    * Base component text, such as a Save Bar's lines or a Filtered List's Select All: merge `Shared.text.<component>` into its options.
-    * User pages: they import Base's script and call `loadTranslations('/YouTubeAudio/Translations', { userId })` themselves, with the English as `tr`'s fallback, since they run without the dashboard.
-    * C#: `BaseTranslations.Get(TranslationKeys.Key, language)` or `BaseTranslations.Format(...)`, with the viewer's language from `UserMessages.Language(Request)`. A service throws `UserMessages.Argument`, `NotFound`, or `Conflict` with a key, and the controller answers with `UserMessages.ErrorBody(ex, Request)`. Text for everyone, such as an activity log entry, uses `BaseTranslations.ServerLanguage(config)`.
+    * Base component text, such as a Save Bar's lines or a Filtered List's Select all, comes from Base's own strings. Pass a text option only when it says something different from Base's default.
+    * User pages: they import Base's script and call `loadTranslations('/YouTubeAudio/Translations', { userId })` themselves, with the English as `tr`'s fallback, since they run without the dashboard. Their API calls send `t.language` in the `X-Jellyfin-Plugin-Language` header.
+    * C#: `BaseTranslations.Get(TranslationKeys.Key, language)` or `BaseTranslations.Format(...)`, with the page's language from `BaseTranslations.RequestLanguage(Request)`, which reads `?language=`, then the `X-Jellyfin-Plugin-Language` header Base's `apiRequest` sends, then `Accept-Language`. A service throws `UserMessages.Argument`, `NotFound`, or `Conflict` with a key, and the controller answers with `UserMessages.ErrorBody(ex, Request)`. Text for everyone, such as an activity log entry, uses `BaseTranslations.ServerLanguage(config)`.
 5. Build. Fix every `JPKT` error and warning.
 6. Run `TranslationsTests`, which checks that every key the pages use has a string.
 

@@ -68,13 +68,29 @@ def silence():
     return out.getvalue()
 
 
+BASE_CASING = ['Jellyfin', 'TV', 'ID', 'API', 'URL', 'HTTP', 'HTTPS', 'IP', 'DNS', 'HDR', 'SDR', '4K']
+
+
+def sentence(text):
+    """A one line sentence case for the few Jellyfin strings a Case attribute recases, such as Album Artist."""
+    return text[:1] + text[1:].lower()
+
+
 def translations():
-    """The US English strings the plugin's Translations endpoint serves: the declared Jellyfin strings and the local ones."""
+    """What the plugin's Translations endpoint serves in US English, as BaseTranslations.Serve answers: Base's own strings,
+    the Jellyfin strings Base and the plugin declare, the local strings, and the casing list."""
     csproj = open(os.path.join(PROJECT, 'Jellyfin.Plugin.YouTubeAudio.csproj'), encoding='utf-8').read()
     web = json.load(open(os.path.join(BASEPKG, 'jellyfin', 'web', 'en-us.json'), encoding='utf-8'))
-    strings = {k: web[k] for k in re.findall(r'<JellyfinString Include="(\w+)"', csproj) if k in web}
+    strings = json.load(open(os.path.join(BASEPKG, 'strings', 'en-us.json'), encoding='utf-8'))
+    declared = [(d['key'], d.get('case')) for d in json.load(open(os.path.join(BASEPKG, 'strings', 'jellyfin.json'), encoding='utf-8'))['strings']]
+    declared += re.findall(r'<JellyfinString Include="(\w+)"(?:\s+Case="(\w+)")?', csproj)
+    for key, case in declared:
+        if key in web:
+            strings[key] = sentence(web[key]) if case == 'sentence' else web[key]
     strings.update(json.load(open(os.path.join(PROJECT, 'Localization', 'en-us.json'), encoding='utf-8')))
-    return strings
+    words = os.path.join(PROJECT, 'Localization', 'casing.json')
+    casing = BASE_CASING + (json.load(open(words, encoding='utf-8')) if os.path.exists(words) else [])
+    return {'language': 'en-us', 'strings': strings, 'casing': casing}
 
 
 def fill(text, values):
