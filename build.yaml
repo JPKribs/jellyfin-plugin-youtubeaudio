@@ -1,7 +1,7 @@
 ---
 name: "YouTube Audio"
 guid: "7323ea64-a200-4265-ab8f-e7ae27d06c38"
-version: "12.4.5.0"
+version: "12.4.6.0"
 targetAbi: "12.4.0.0"
 framework: "net10.0"
 overview: "Download YouTube audio into your music library."
@@ -15,16 +15,5 @@ artifacts:
 - "YoutubeDLSharp.dll"
 - "TagLibSharp.dll"
 changelog:
-  added:
-  - Translations, which show the dashboard tabs, the user download page, and the public queue in the viewer's language, with Jellyfin's own words wherever Jellyfin has them
-  changed:
-  - Every label, heading, button, and tab is in sentence case, as Jellyfin writes its own, such as Queue playlist and Embed cover art
-  - Messages from the server, such as a refused link or the yt-dlp update result, follow the language of the page that asked for them
-  - Lists, the Save bar, file and image pickers, the audio player, and dialogs show Base's own translated wording, such as Select all and Drop files here or click to select
   developer:
-  - Uses JPKribs.Jellyfin.Base 12.4.1, after 12.4.0. Base translates its own component text, so the plugin's keys that repeated it are gone, and BaseTranslations.RequestLanguage replaces the plugin's Accept-Language parser
-  - Server messages read the X-Jellyfin-Plugin-Language header, then Accept-Language. The user download page and the public queue send the header
-  - Localization/casing.json lists the words kept as written, such as YouTube, yt-dlp, and MP3, and AlbumArtist, ButtonSignIn, and HeaderDeleteItems take Case="sentence"
-  - GET /YouTubeAudio/Translations answers with BaseTranslations.Serve, as language, strings, and casing
-  - The project is laid out as Api, Configuration, Web, Assets, Localization, Models, Services, and Utilities, with the screenshot kit and the end to end test under tools
-  - skills/translations.md covers strings, casing, and server languages, and a test checks that every key the pages use has a string
+  - Uses JPKribs.Jellyfin.Base 12.4.2, after 12.4.1
