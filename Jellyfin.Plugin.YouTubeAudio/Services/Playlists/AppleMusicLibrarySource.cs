@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Jellyfin.Plugin.YouTubeAudio.Models;
+using Jellyfin.Plugin.YouTubeAudio.Utilities;
+using JPKribs.Jellyfin.Base;
 
 namespace Jellyfin.Plugin.YouTubeAudio.Services.Playlists;
 
@@ -43,7 +45,7 @@ public sealed class AppleMusicLibrarySource : IPlaylistSource
         if (PlistReader.Parse(content) is not Dictionary<string, object?> root
             || root.GetValueOrDefault("Tracks") is not Dictionary<string, object?> trackTable)
         {
-            throw new ArgumentException("The file is not an Apple Music library export.");
+            throw UserMessages.Argument(TranslationKeys.ErrorNotAppleMusicLibrary);
         }
 
         var tracks = new Dictionary<string, PlaylistTrack?>(StringComparer.Ordinal);

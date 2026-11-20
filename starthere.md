@@ -17,6 +17,7 @@ Each guide in [skills](skills/) covers one kind of work. Read the guide that mat
 | [skills/review.md](skills/review.md) | Call any change done. |
 | [skills/release.md](skills/release.md) | Cut a release. |
 | [skills/branches.md](skills/branches.md) | Pick a branch, sync the two, and promote unstable. |
+| [skills/translations.md](skills/translations.md) | Add or change a string a person reads. |
 
 A task that touches several areas needs every matching guide. A new setting, for example, needs the glossary, style, code, testing, documentation, and review guides.
 
@@ -62,6 +63,7 @@ Explain what you would change, why, and what it risks. Wait for an answer before
 | :--- | :--- |
 | `Jellyfin.Plugin.YouTubeAudio/` | The plugin source, laid out as [Layout](skills/code.md#layout) shows. |
 | `Jellyfin.Plugin.YouTubeAudio/Web/` | The dashboard pages and the public pages, as HTML and JS. |
+| `Jellyfin.Plugin.YouTubeAudio/Localization/` | The plugin's own strings, in `en-us.json`. |
 | `Jellyfin.Plugin.YouTubeAudio.Tests/` | Unit, store, and controller tests, with the opt in download tests. |
 | `tools/` | Development tools that never ship, such as the screenshot kit and the end to end test. |
 | `tools/e2e/` | The Docker end to end test that runs the plugin on a throwaway Jellyfin. |

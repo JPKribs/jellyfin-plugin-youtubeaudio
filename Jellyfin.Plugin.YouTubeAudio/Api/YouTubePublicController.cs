@@ -9,6 +9,7 @@ using Jellyfin.Database.Implementations.Enums;
 using Jellyfin.Plugin.YouTubeAudio.Models;
 using Jellyfin.Plugin.YouTubeAudio.Services;
 using Jellyfin.Plugin.YouTubeAudio.Services.Playlists;
+using Jellyfin.Plugin.YouTubeAudio.Utilities;
 using JPKribs.Jellyfin.Base;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Library;
@@ -74,13 +75,14 @@ public class YouTubePublicController : ControllerBase
     public ContentResult Page()
     {
         PublicPage.ApplyHardeningHeaders(Response);
+        var language = UserMessages.Language(Request);
         var html = StatusPage.Render(
-            "Loading…",
+            BaseTranslations.Get(TranslationKeys.MessageLoading, language),
             string.Empty,
-            title: "Download",
+            title: BaseTranslations.Get(TranslationKeys.Download, language),
             buttonText: null,
             showSpinner: true,
-            content: GetContentFragment());
+            content: (_pageHtml ??= ReadResource("youtubeaudio_download_public.html")) ?? Unavailable(language));
         return Content(html, "text/html");
     }
 
@@ -93,13 +95,14 @@ public class YouTubePublicController : ControllerBase
     public ContentResult QueuePage()
     {
         PublicPage.ApplyHardeningHeaders(Response);
+        var language = UserMessages.Language(Request);
         var html = StatusPage.Render(
-            "Loading…",
+            BaseTranslations.Get(TranslationKeys.MessageLoading, language),
             string.Empty,
-            title: "Queue",
+            title: BaseTranslations.Get(TranslationKeys.Queue, language),
             buttonText: null,
             showSpinner: true,
-            content: _queuePageHtml ??= ReadResource("youtubeaudio_queue_public.html", "Queue page unavailable."));
+            content: (_queuePageHtml ??= ReadResource("youtubeaudio_queue_public.html")) ?? Unavailable(language));
         return Content(html, "text/html");
     }
 
@@ -115,7 +118,7 @@ public class YouTubePublicController : ControllerBase
     {
         PublicPage.ApplyHardeningHeaders(Response);
         var sourceNames = _playlistImportService.GetSources().ToDictionary(s => s.Id, s => s.Name, StringComparer.Ordinal);
-        return Ok(_downloadService.GetPublicQueue(sourceNames));
+        return Ok(_downloadService.GetPublicQueue(sourceNames, UserMessages.Language(Request)));
     }
 
     /// <summary>Serves the web client's favicon so the page can reuse the server's real icon at a stable path.</summary>
@@ -160,7 +163,7 @@ public class YouTubePublicController : ControllerBase
             || string.IsNullOrWhiteSpace(request.Album)
             || !request.Year.HasValue)
         {
-            return BadRequest(new { Error = "Artist, album, and year are required." });
+            return BadRequest(UserMessages.MessageBody(TranslationKeys.ErrorDetailsRequired, Request));
         }
 
         try
@@ -183,12 +186,12 @@ public class YouTubePublicController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new { Error = ex.Message });
+            return BadRequest(UserMessages.ErrorBody(ex, Request));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in approved-user submit");
-            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+            return StatusCode(500, UserMessages.MessageBody(TranslationKeys.ErrorInternal, Request));
         }
     }
 
@@ -260,17 +263,18 @@ public class YouTubePublicController : ControllerBase
     private static string NormalizeId(string id)
         => Guid.TryParse(id, out var g) ? g.ToString("N") : id;
 
-    private static string GetContentFragment()
-        => _pageHtml ??= ReadResource("youtubeaudio_download_public.html", "Download page unavailable.");
+    // The page a missing embedded fragment shows in its place.
+    private static string Unavailable(string? language)
+        => "<!DOCTYPE html><html><body>" + BaseTranslations.Get(TranslationKeys.ErrorPageUnavailable, language) + "</body></html>";
 
-    private static string ReadResource(string fileName, string fallback)
+    private static string? ReadResource(string fileName)
     {
         var assembly = typeof(Plugin).Assembly;
         var resourceName = typeof(Plugin).Namespace + ".Web." + fileName;
         using var stream = assembly.GetManifestResourceStream(resourceName);
         if (stream is null)
         {
-            return "<!DOCTYPE html><html><body>" + fallback + "</body></html>";
+            return null;
         }
 
         using var reader = new StreamReader(stream);

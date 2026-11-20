@@ -68,6 +68,15 @@ def silence():
     return out.getvalue()
 
 
+def translations():
+    """The US English strings the plugin's Translations endpoint serves: the declared Jellyfin strings and the local ones."""
+    csproj = open(os.path.join(PROJECT, 'Jellyfin.Plugin.YouTubeAudio.csproj'), encoding='utf-8').read()
+    web = json.load(open(os.path.join(BASEPKG, 'jellyfin', 'web', 'en-us.json'), encoding='utf-8'))
+    strings = {k: web[k] for k in re.findall(r'<JellyfinString Include="(\w+)"', csproj) if k in web}
+    strings.update(json.load(open(os.path.join(PROJECT, 'Localization', 'en-us.json'), encoding='utf-8')))
+    return strings
+
+
 def fill(text, values):
     return re.sub(r'\{\{([A-Z_]+)\}\}', lambda m: values.get(m.group(1), m.group(0)), text)
 
@@ -136,6 +145,8 @@ class H(http.server.BaseHTTPRequestHandler):
             return self.send('["Johann Sebastian Bach"]', 'application/json')
         if lp == '/youtube/download/albums':
             return self.send('["Cello Suites"]', 'application/json')
+        if lp in ('/api/youtubeaudio/translations', '/youtubeaudio/translations'):
+            return self.send(json.dumps(translations()), 'application/json')
         if lp == '/system/info/public':
             return self.send('{"ServerName":"Jellyfin","Id":"s1"}', 'application/json')
         if u.path.startswith('/api/YouTubeAudio/Downloads/'):

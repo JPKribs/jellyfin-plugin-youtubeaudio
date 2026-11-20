@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 using Jellyfin.Plugin.YouTubeAudio.Models;
 using Jellyfin.Plugin.YouTubeAudio.Services;
 using Jellyfin.Plugin.YouTubeAudio.Services.Playlists;
+using Jellyfin.Plugin.YouTubeAudio.Utilities;
+using JPKribs.Jellyfin.Base;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -66,12 +68,12 @@ public class YouTubeAudioController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new { Error = ex.Message });
+            return BadRequest(UserMessages.ErrorBody(ex, Request));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in QueueUrl endpoint");
-            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+            return StatusCode(500, UserMessages.MessageBody(TranslationKeys.ErrorInternal, Request));
         }
     }
 
@@ -103,12 +105,12 @@ public class YouTubeAudioController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new { Error = ex.Message });
+            return BadRequest(UserMessages.ErrorBody(ex, Request));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in QueuePlaylist endpoint");
-            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+            return StatusCode(500, UserMessages.MessageBody(TranslationKeys.ErrorInternal, Request));
         }
     }
 
@@ -138,7 +140,7 @@ public class YouTubeAudioController : ControllerBase
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Error in SyncPlaylists endpoint");
-            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+            return StatusCode(500, UserMessages.MessageBody(TranslationKeys.ErrorInternal, Request));
         }
     }
 
@@ -177,15 +179,15 @@ public class YouTubeAudioController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new { Error = ex.Message });
+            return BadRequest(UserMessages.ErrorBody(ex, Request));
         }
         catch (FileNotFoundException ex)
         {
-            return NotFound(new { Error = ex.Message });
+            return NotFound(UserMessages.ErrorBody(ex, Request));
         }
         catch (InvalidOperationException ex)
         {
-            return Conflict(new { Error = ex.Message });
+            return Conflict(UserMessages.ErrorBody(ex, Request));
         }
     }
 
@@ -205,7 +207,7 @@ public class YouTubeAudioController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in GetQueue endpoint");
-            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+            return StatusCode(500, UserMessages.MessageBody(TranslationKeys.ErrorInternal, Request));
         }
     }
 
@@ -226,7 +228,7 @@ public class YouTubeAudioController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in DeleteQueueItem endpoint");
-            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+            return StatusCode(500, UserMessages.MessageBody(TranslationKeys.ErrorInternal, Request));
         }
     }
 
@@ -262,7 +264,7 @@ public class YouTubeAudioController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in BatchDeleteQueue endpoint");
-            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+            return StatusCode(500, UserMessages.MessageBody(TranslationKeys.ErrorInternal, Request));
         }
     }
 
@@ -284,7 +286,7 @@ public class YouTubeAudioController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in ProcessQueue endpoint");
-            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+            return StatusCode(500, UserMessages.MessageBody(TranslationKeys.ErrorInternal, Request));
         }
     }
 
@@ -305,7 +307,7 @@ public class YouTubeAudioController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in CancelDownloads endpoint");
-            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+            return StatusCode(500, UserMessages.MessageBody(TranslationKeys.ErrorInternal, Request));
         }
     }
 
@@ -327,7 +329,7 @@ public class YouTubeAudioController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in GetDownloads endpoint");
-            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+            return StatusCode(500, UserMessages.MessageBody(TranslationKeys.ErrorInternal, Request));
         }
     }
 
@@ -393,7 +395,7 @@ public class YouTubeAudioController : ControllerBase
         }
         catch (FormatException)
         {
-            return BadRequest(new { Error = "The image could not be read." });
+            return BadRequest(UserMessages.MessageBody(TranslationKeys.ErrorImageUnreadable, Request));
         }
 
         try
@@ -403,11 +405,11 @@ public class YouTubeAudioController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new { Error = ex.Message });
+            return BadRequest(UserMessages.ErrorBody(ex, Request));
         }
         catch (FileNotFoundException)
         {
-            return NotFound(new { Error = "Downloaded file not found." });
+            return NotFound(UserMessages.MessageBody(TranslationKeys.ErrorDownloadedFileNotFound, Request));
         }
     }
 
@@ -440,11 +442,11 @@ public class YouTubeAudioController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new { Error = ex.Message });
+            return BadRequest(UserMessages.ErrorBody(ex, Request));
         }
         catch (FileNotFoundException ex)
         {
-            return NotFound(new { Error = ex.Message });
+            return NotFound(UserMessages.ErrorBody(ex, Request));
         }
     }
 
@@ -466,7 +468,7 @@ public class YouTubeAudioController : ControllerBase
         }
         catch (FileNotFoundException)
         {
-            return NotFound(new { Error = "Downloaded file not found." });
+            return NotFound(UserMessages.MessageBody(TranslationKeys.ErrorDownloadedFileNotFound, Request));
         }
     }
 
@@ -488,16 +490,16 @@ public class YouTubeAudioController : ControllerBase
         }
         catch (FileNotFoundException ex)
         {
-            return NotFound(new { Error = ex.Message });
+            return NotFound(UserMessages.ErrorBody(ex, Request));
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new { Error = ex.Message });
+            return BadRequest(UserMessages.ErrorBody(ex, Request));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in SaveTags endpoint");
-            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+            return StatusCode(500, UserMessages.MessageBody(TranslationKeys.ErrorInternal, Request));
         }
     }
 
@@ -528,12 +530,12 @@ public class YouTubeAudioController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new { Error = ex.Message });
+            return BadRequest(UserMessages.ErrorBody(ex, Request));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in Import endpoint");
-            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+            return StatusCode(500, UserMessages.MessageBody(TranslationKeys.ErrorInternal, Request));
         }
     }
 
@@ -554,7 +556,7 @@ public class YouTubeAudioController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in DeleteDownload endpoint");
-            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+            return StatusCode(500, UserMessages.MessageBody(TranslationKeys.ErrorInternal, Request));
         }
     }
 
@@ -590,7 +592,7 @@ public class YouTubeAudioController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in BatchDeleteDownloads endpoint");
-            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+            return StatusCode(500, UserMessages.MessageBody(TranslationKeys.ErrorInternal, Request));
         }
     }
 
@@ -613,7 +615,7 @@ public class YouTubeAudioController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in SearchArtists endpoint");
-            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+            return StatusCode(500, UserMessages.MessageBody(TranslationKeys.ErrorInternal, Request));
         }
     }
 
@@ -635,7 +637,7 @@ public class YouTubeAudioController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in SearchAlbums endpoint");
-            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+            return StatusCode(500, UserMessages.MessageBody(TranslationKeys.ErrorInternal, Request));
         }
     }
 
@@ -655,7 +657,7 @@ public class YouTubeAudioController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in GetLibraries endpoint");
-            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+            return StatusCode(500, UserMessages.MessageBody(TranslationKeys.ErrorInternal, Request));
         }
     }
 
@@ -672,17 +674,17 @@ public class YouTubeAudioController : ControllerBase
     {
         try
         {
-            var message = await _downloadService.UpdateYtDlpAsync(HttpContext.RequestAborted).ConfigureAwait(false);
+            var message = await _downloadService.UpdateYtDlpAsync(UserMessages.Language(Request), HttpContext.RequestAborted).ConfigureAwait(false);
             return Ok(new { Success = true, Message = message });
         }
         catch (InvalidOperationException ex)
         {
-            return StatusCode(500, new { Error = ex.Message });
+            return StatusCode(500, UserMessages.ErrorBody(ex, Request));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in UpdateYtDlp endpoint");
-            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+            return StatusCode(500, UserMessages.MessageBody(TranslationKeys.ErrorInternal, Request));
         }
     }
 
@@ -702,12 +704,12 @@ public class YouTubeAudioController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return StatusCode(StatusCodes.Status409Conflict, new { Error = ex.Message });
+            return StatusCode(StatusCodes.Status409Conflict, UserMessages.ErrorBody(ex, Request));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in ResetQueue endpoint");
-            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+            return StatusCode(500, UserMessages.MessageBody(TranslationKeys.ErrorInternal, Request));
         }
     }
 
@@ -726,12 +728,24 @@ public class YouTubeAudioController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return StatusCode(StatusCodes.Status409Conflict, new { Error = ex.Message });
+            return StatusCode(StatusCodes.Status409Conflict, UserMessages.ErrorBody(ex, Request));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in ResetCache endpoint");
-            return StatusCode(500, new { Error = "An internal error occurred. Check server logs for details." });
+            return StatusCode(500, UserMessages.MessageBody(TranslationKeys.ErrorInternal, Request));
         }
     }
+
+    /// <summary>
+    /// Gets the plugin's strings in a language, for the dashboard pages and the user pages: the Jellyfin strings the plugin
+    /// declares and its own. Each falls back to the language's base, then to US English.
+    /// </summary>
+    /// <param name="language">The language, such as de or pt-BR, as the web client's display settings keep it.</param>
+    /// <returns>The strings by key, or 304 when the page already has them.</returns>
+    [HttpGet("Translations")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status304NotModified)]
+    public IActionResult Translations([FromQuery] string? language) => BaseTranslations.Serve(language, Request, Response);
 }

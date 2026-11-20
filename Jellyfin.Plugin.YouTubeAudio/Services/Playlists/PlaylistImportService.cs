@@ -5,6 +5,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using Jellyfin.Plugin.YouTubeAudio.Models;
+using Jellyfin.Plugin.YouTubeAudio.Utilities;
 using JPKribs.Jellyfin.Base;
 using MediaBrowser.Controller.Library;
 using Microsoft.Extensions.Logging;
@@ -84,7 +85,7 @@ public sealed class PlaylistImportService
 
         if (string.IsNullOrEmpty(request.Content))
         {
-            throw new ArgumentException("No file was uploaded.");
+            throw UserMessages.Argument(TranslationKeys.ErrorNoFileUploaded);
         }
 
         byte[] bytes;
@@ -94,12 +95,12 @@ public sealed class PlaylistImportService
         }
         catch (FormatException ex)
         {
-            throw new ArgumentException("The uploaded file could not be read.", ex);
+            throw UserMessages.Argument(TranslationKeys.ErrorFileUnreadable, ex);
         }
 
         if (bytes.Length > MaxFileBytes)
         {
-            throw new ArgumentException("The file is too large to be a playlist export.");
+            throw UserMessages.Argument(TranslationKeys.ErrorFileTooLarge);
         }
 
         var fileName = Path.GetFileName(request.FileName ?? string.Empty);
@@ -121,7 +122,7 @@ public sealed class PlaylistImportService
 
         if (selected.All(p => p.Tracks.Count == 0))
         {
-            throw new ArgumentException($"No tracks were found in the {source.Name} export.");
+            throw UserMessages.Argument(TranslationKeys.ErrorNoTracks, source.Name);
         }
 
         var playlistUserId = ResolvePlaylistUser(request.UserId);
@@ -227,7 +228,7 @@ public sealed class PlaylistImportService
 
         if (!Guid.TryParse(userId, out var id) || _userManager.GetUserById(id) == null)
         {
-            throw new ArgumentException("The selected playlist owner is not a Jellyfin user.");
+            throw UserMessages.Argument(TranslationKeys.ErrorOwnerNotUser);
         }
 
         return id.ToString("N");
@@ -248,7 +249,7 @@ public sealed class PlaylistImportService
 
         return requested
             .Select(id => playlists.FirstOrDefault(p => p.Id == id)
-                ?? throw new ArgumentException("A selected playlist is not in the uploaded file."))
+                ?? throw UserMessages.Argument(TranslationKeys.ErrorPlaylistNotInFile))
             .ToList();
     }
 
@@ -258,9 +259,7 @@ public sealed class PlaylistImportService
     internal static (IPlaylistSource Source, List<ParsedPlaylist> Playlists) Parse(IReadOnlyList<IPlaylistSource> sources, string fileName, string content)
     {
         var source = sources.FirstOrDefault(s => s.CanParse(fileName, content))
-            ?? throw new ArgumentException(
-                "This file isn't a supported playlist export. Supported: "
-                + string.Join(", ", sources.Select(s => s.Name)) + ".");
+            ?? throw UserMessages.Argument(TranslationKeys.ErrorUnsupportedExport, string.Join(", ", sources.Select(s => s.Name)));
 
         return (source, source.Parse(fileName, content));
     }
@@ -284,7 +283,7 @@ public sealed class PlaylistImportService
             .ToList();
         if (entries.Count == 0 || entries.Count > MaxArchiveEntries)
         {
-            throw new ArgumentException(entries.Count == 0 ? "The ZIP holds no playlist exports." : "The ZIP holds too many files to be a playlist export.");
+            throw UserMessages.Argument(entries.Count == 0 ? TranslationKeys.ErrorZipEmpty : TranslationKeys.ErrorZipTooManyFiles);
         }
 
         IPlaylistSource? source = null;
@@ -295,7 +294,7 @@ public sealed class PlaylistImportService
             unpacked += entry.Length;
             if (unpacked > MaxFileBytes)
             {
-                throw new ArgumentException("The ZIP is too large to be a playlist export.");
+                throw UserMessages.Argument(TranslationKeys.ErrorZipTooLarge);
             }
 
             using var stream = entry.Open();
@@ -304,7 +303,7 @@ public sealed class PlaylistImportService
             var (entrySource, entryPlaylists) = Parse(sources, entry.Name, DecodeText(buffer.ToArray()));
             if (source != null && source.Id != entrySource.Id)
             {
-                throw new ArgumentException("The ZIP mixes exports from different services.");
+                throw UserMessages.Argument(TranslationKeys.ErrorZipMixed);
             }
 
             source = entrySource;

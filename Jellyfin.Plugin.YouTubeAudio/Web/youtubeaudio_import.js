@@ -1,7 +1,7 @@
 // youtubeaudio_import.js
 // Drives the Import tab, where downloaded songs are tagged, given covers, and imported into the library.
 
-import { createPage, createAudioPlayer, createFilteredList, createImagePicker, confirmDialog } from './configurationpage?name=youtubeaudio_shared.js';
+import { countText, createPage, createAudioPlayer, createFilteredList, createImagePicker, confirmDialog } from './configurationpage?name=youtubeaudio_shared.js';
 
 // normalizeGenre
 // Puts one space after every ";" in a genre list. The server splits on ";" either way.
@@ -15,49 +15,35 @@ function normalizeGenre(value) {
     return (value || '').replace(/\s*;\s*/g, '; ').replace(/;\s*$/, '').trim();
 }
 
-// countLabel
-// Names a count with the right plural.
-//
-// Inputs
-// count [number]: How many.
-// one [string]: The word for one.
-// many [string]: The word for several.
-//
-// Output
-// [string]: Such as "1 file" or "3 files".
-function countLabel(count, one, many) {
-    return count + ' ' + (count === 1 ? one : many);
-}
-
 // importResultMessage
 // Says what an import did.
 //
 // Inputs
+// t [object]: The translations handle.
 // result [object]: The server's ImportResult.
 //
 // Output
 // [string]: The status message.
-function importResultMessage(result) {
+function importResultMessage(t, result) {
     result = result || {};
     var imported = result.ImportedIds ? result.ImportedIds.length : 0;
     var replaced = result.ReplacedIds ? result.ReplacedIds.length : 0;
     var skipped = result.SkippedIds ? result.SkippedIds.length : 0;
     var errors = result.Errors ? result.Errors.length : 0;
     var parts = [];
-    if (imported - replaced > 0) parts.push((imported - replaced) + ' imported');
-    if (replaced > 0) parts.push(replaced + ' replaced');
-    if (skipped > 0) parts.push(skipped + ' skipped as duplicates');
-    if (result.RemovedFiles > 0) parts.push(countLabel(result.RemovedFiles, 'library single', 'library singles') + ' replaced by the album version');
-    if (errors > 0) parts.push(errors + ' could not be imported');
-    if (!parts.length) return 'No files imported.';
-    var text = parts.join(', ') + '.';
-    return text.charAt(0).toUpperCase() + text.slice(1);
+    if (imported - replaced > 0) parts.push(countText(t, imported - replaced, 'MessageImportedOne', 'MessageImportedMany'));
+    if (replaced > 0) parts.push(countText(t, replaced, 'MessageReplacedOne', 'MessageReplacedMany'));
+    if (skipped > 0) parts.push(countText(t, skipped, 'MessageSkippedDuplicatesOne', 'MessageSkippedDuplicatesMany'));
+    if (result.RemovedFiles > 0) parts.push(countText(t, result.RemovedFiles, 'MessageSinglesReplacedOne', 'MessageSinglesReplacedMany'));
+    if (errors > 0) parts.push(countText(t, errors, 'ErrorImportFilesOne', 'ErrorImportFilesMany'));
+    return parts.length ? parts.join(' ') : t.tr('MessageNoFilesImported');
 }
 
 export default function (view) {
     'use strict';
 
     var Shared = null;
+    var t = null;
 
     var _downloads = [];
     var _list = null;
@@ -145,7 +131,7 @@ export default function (view) {
     function buildList() {
         var host = Shared.getEl('importList');
         if (!host || _list) return;
-        _list = createFilteredList({
+        _list = createFilteredList(Object.assign({}, Shared.text.filteredList, {
             items: [],
             rowKey: 'Id',
             render: renderImportRow,
@@ -153,14 +139,14 @@ export default function (view) {
             selectable: 'multiple',
             layout: 'plain',
             bulkActions: [
-                { id: 'import', label: 'Import', icon: 'library_add', variant: 'primary', onClick: importSelected },
-                { id: 'delete', label: 'Delete', icon: 'delete', variant: 'destructive', onClick: deleteSelected }
+                { id: 'import', label: t.tr('Import'), icon: 'library_add', variant: 'primary', onClick: importSelected },
+                { id: 'delete', label: t.tr('Delete'), icon: 'delete', variant: 'destructive', onClick: deleteSelected }
             ],
-            actions: [{ id: 'refresh', label: 'Refresh', icon: 'refresh', onClick: loadDownloads }],
-            emptyText: 'No downloaded files yet. Download songs on the Download tab.',
-            label: 'Downloaded files',
+            actions: [{ id: 'refresh', label: t.tr('Refresh'), icon: 'refresh', onClick: loadDownloads }],
+            emptyText: t.tr('MessageNoDownloads'),
+            label: t.tr('LabelDownloadedFiles'),
             onSelectionChange: updateBulkButtons
-        });
+        }));
         host.appendChild(_list.element);
     }
 
@@ -219,7 +205,7 @@ export default function (view) {
                 canvas.getContext('2d').drawImage(img, 0, 0);
                 resolve(canvas.toDataURL('image/jpeg', 0.9).split(',')[1]);
             };
-            img.onerror = function () { reject(new Error('Could not open that file as a picture.')); };
+            img.onerror = function () { reject(new Error(t.tr('ErrorOpenPicture'))); };
             img.src = value.dataUrl;
         });
     }
@@ -233,13 +219,13 @@ export default function (view) {
     // Output
     // [object]: The picker handle.
     function createCoverPicker(opts) {
-        return createImagePicker(Object.assign({
+        return createImagePicker(Object.assign({}, Shared.text.imagePicker, {
             shape: 'square',
             crop: true,
             maxSize: 1200,
             accept: 'image/jpeg,image/png,image/webp',
             maxBytes: 10485760,
-            wrongTypeText: 'Select a JPEG, PNG, or WebP picture.'
+            wrongTypeText: t.tr('ErrorPictureType')
         }, opts));
     }
 
@@ -260,6 +246,9 @@ export default function (view) {
             return '<div class="base-field yta-import-' + area + '"><label for="' + key + '-' + name + '">' + label + '</label>'
                 + '<input type="' + type + '" id="' + key + '-' + name + '" class="base-edit-input yta-field-' + name + '" value="' + esc(value) + '" placeholder="' + placeholder + '" /></div>';
         }
+        var generate = esc(t.tr('ButtonGenerateCover'));
+        var saveTags = esc(t.tr('ButtonSaveTags'));
+        var artistText = esc(t.tr('Artist'));
         var row = document.createElement('div');
         row.className = 'base-panel yta-import-row';
         row.setAttribute('data-id', d.Id);
@@ -268,22 +257,22 @@ export default function (view) {
             + '<span class="yta-import-name"></span>'
             + '<div class="yta-import-tools">'
             + '<span class="base-edit-secondary">' + esc(Shared.formatSize(d.FileSize)) + '</span>'
-            + (d.InLibrary ? '<span title="The library already has this song. Importing it adds a second copy.">' + Shared.badge('orange', 'In Library') + '</span>' : '')
-            + '<button type="button" class="base-row-btn yta-wand-btn" title="Generate Cover" aria-label="Generate Cover"><span class="material-icons" aria-hidden="true">auto_fix_high</span></button>'
-            + '<button type="button" class="base-row-btn save" title="Save Tags" aria-label="Save Tags"><span class="material-icons" aria-hidden="true">save</span></button>'
+            + (d.InLibrary ? '<span title="' + esc(t.tr('InLibraryHelp')) + '">' + Shared.badge('orange', t.tr('LabelInLibrary')) + '</span>' : '')
+            + '<button type="button" class="base-row-btn yta-wand-btn" title="' + generate + '" aria-label="' + generate + '"><span class="material-icons" aria-hidden="true">auto_fix_high</span></button>'
+            + '<button type="button" class="base-row-btn save" title="' + saveTags + '" aria-label="' + saveTags + '"><span class="material-icons" aria-hidden="true">save</span></button>'
             + '</div>'
             + '</div>'
             + '<div class="base-panel-body yta-import-body">'
             + '<div class="yta-cover-cell"></div>'
             + '<div class="yta-import-fields">'
-            + field('title', 'title', 'Title', 'text', d.MetadataTitle, 'Title')
-            + field('trackNumber', 'track', 'Track', 'number', d.TrackNumber || '', '1')
-            + '<div class="base-field yta-import-artist yta-artist-cell"><label>Artist</label></div>'
-            + field('albumArtist', 'album-artist', 'Album Artist', 'text', d.AlbumArtist, 'Artist')
-            + field('feat', 'feat', 'Featured Artists', 'text', d.FeaturedArtist, 'Artist B; Artist C')
-            + '<div class="base-field yta-import-album yta-album-cell"><label>Album</label></div>'
-            + field('genre', 'genre', 'Genre', 'text', d.Genre, 'Classical; Baroque')
-            + field('year', 'year', 'Year', 'number', d.Year || '', '2024')
+            + field('title', 'title', esc(t.tr('LabelTitle')), 'text', d.MetadataTitle, esc(t.tr('LabelTitle')))
+            + field('trackNumber', 'track', esc(t.tr('Track')), 'number', d.TrackNumber || '', '1')
+            + '<div class="base-field yta-import-artist yta-artist-cell"><label>' + artistText + '</label></div>'
+            + field('albumArtist', 'album-artist', esc(t.tr('AlbumArtist')), 'text', d.AlbumArtist, artistText)
+            + field('feat', 'feat', esc(t.tr('LabelFeaturedArtists')), 'text', d.FeaturedArtist, esc(t.tr('PlaceholderArtists')))
+            + '<div class="base-field yta-import-album yta-album-cell"><label>' + esc(t.tr('Album')) + '</label></div>'
+            + field('genre', 'genre', esc(t.tr('Genre')), 'text', d.Genre, esc(t.tr('PlaceholderGenres')))
+            + field('year', 'year', esc(t.tr('LabelYear')), 'number', d.Year || '', '2024')
             + '</div>'
             + '<div class="yta-player-cell"></div>'
             + '</div>';
@@ -302,19 +291,17 @@ export default function (view) {
 
         destroyRowParts(d.Id);
 
-        var player = createAudioPlayer({
+        var player = createAudioPlayer(Object.assign({}, Shared.text.audioPlayer, {
             src: fileUrl(d.Id, 'Audio'),
             size: 'small',
-            label: 'Preview',
-            errorText: 'Could not play this file in this browser.'
-        });
+            label: t.tr('Preview'),
+            errorText: t.tr('ErrorPlayFile')
+        }));
         row.querySelector('.yta-player-cell').appendChild(player.element);
 
         var cover = createCoverPicker({
             value: d.HasCover ? fileUrl(d.Id, 'Cover') : null,
-            chooseText: 'Set Cover',
-            replaceText: 'Replace',
-            emptyText: 'No cover.',
+            chooseText: t.tr('ButtonSetCover'),
             // An embedded cover is only replaced, so the picker offers no Remove.
             removable: false,
             onChange: function (value) {
@@ -325,25 +312,25 @@ export default function (view) {
         row._cover = cover;
 
         var artistCell = row.querySelector('.yta-artist-cell');
-        var artistCombo = Shared.createSearchableComboBox({
-            placeholder: 'Search artists',
+        var artistCombo = Shared.createSearchableComboBox(Object.assign({}, Shared.text.comboBox, {
+            placeholder: t.tr('PlaceholderSearchArtists'),
             searchFn: _artistSearch,
             onInput: markDirty
-        });
+        }));
         artistCombo.setValue(d.Artist || '');
         artistCell.appendChild(artistCombo.element);
         artistCell._combo = artistCombo;
 
         var albumCell = row.querySelector('.yta-album-cell');
-        var albumCombo = Shared.createSearchableComboBox({
-            placeholder: 'Search albums',
+        var albumCombo = Shared.createSearchableComboBox(Object.assign({}, Shared.text.comboBox, {
+            placeholder: t.tr('PlaceholderSearchAlbums'),
             searchFn: createAlbumSearchForArtist(function () { return artistCombo.getValue(); }),
             onInput: markDirty,
             onSelect: function (value) {
                 markDirty();
                 takeAlbumCover(row, value);
             }
-        });
+        }));
         albumCombo.setValue(d.Album || '');
         albumCell.appendChild(albumCombo.element);
         albumCell._combo = albumCombo;
@@ -423,7 +410,7 @@ export default function (view) {
         Shared.apiRequest('Tags', 'POST', readRowTags(row))
             .then(function () { flashSaved(row); })
             .catch(function (err) {
-                Shared.errorText(err, 'Could not save the tags.').then(function (text) { Shared.setStatus('importStatus', text, true); });
+                Shared.errorText(err, t.tr('ErrorSaveTags')).then(function (text) { Shared.setStatus('importStatus', text, true); });
             });
     }
 
@@ -432,7 +419,7 @@ export default function (view) {
     function applyBulkEdit() {
         var rows = selectedRows();
         if (rows.length === 0) {
-            Shared.setStatus('importStatus', 'Select the files to change.', true);
+            Shared.setStatus('importStatus', t.tr('MessageSelectFiles'), true);
             return;
         }
 
@@ -445,7 +432,7 @@ export default function (view) {
             year: Shared.getEl('bulkYear').value
         };
         if (!bulk.artist && !bulk.feat && !bulk.albumArtist && !bulk.album && !bulk.genre && !bulk.year) {
-            Shared.setStatus('importStatus', 'Enter a value to apply.', true);
+            Shared.setStatus('importStatus', t.tr('MessageEnterValue'), true);
             return;
         }
 
@@ -462,8 +449,8 @@ export default function (view) {
         var errors = 0;
         function saveNext(index) {
             if (index >= rows.length) {
-                var msg = 'Applied to ' + countLabel(saved, 'file', 'files') + '.';
-                if (errors > 0) msg += ' Could not save ' + countLabel(errors, 'file', 'files') + '.';
+                var msg = countText(t, saved, 'MessageAppliedOne', 'MessageAppliedMany');
+                if (errors > 0) msg += ' ' + countText(t, errors, 'ErrorSaveFilesOne', 'ErrorSaveFilesMany');
                 Shared.setStatus('importStatus', msg, errors > 0);
                 return;
             }
@@ -477,7 +464,7 @@ export default function (view) {
                 .then(function () { saveNext(index + 1); });
         }
 
-        Shared.setStatus('importStatus', 'Applying…', false, { timeout: 0 });
+        Shared.setStatus('importStatus', t.tr('MessageApplying'), false, { timeout: 0 });
         saveNext(0);
     }
 
@@ -489,17 +476,17 @@ export default function (view) {
     function importSelected(items) {
         var ids = items.map(function (d) { return d.Id; });
         if (!ids.length) return;
-        Shared.setStatus('importStatus', 'Importing…', false, { timeout: 0 });
+        Shared.setStatus('importStatus', t.tr('MessageImporting'), false, { timeout: 0 });
         Shared.apiRequest('Import', 'POST', { Ids: ids })
             .then(function (result) {
                 var skipped = result && result.SkippedIds ? result.SkippedIds.length : 0;
                 var errors = result && result.Errors ? result.Errors.length : 0;
-                Shared.setStatus('importStatus', importResultMessage(result), errors > 0 || skipped > 0);
+                Shared.setStatus('importStatus', importResultMessage(t, result), errors > 0 || skipped > 0);
                 _list.clearSelection();
                 loadDownloads();
             })
             .catch(function (err) {
-                Shared.errorText(err, 'Could not import the files.').then(function (text) { Shared.setStatus('importStatus', text, true); });
+                Shared.errorText(err, t.tr('ErrorImportFiles')).then(function (text) { Shared.setStatus('importStatus', text, true); });
             });
     }
 
@@ -536,7 +523,7 @@ export default function (view) {
             : colors === 'AlbumArtistYear' ? albumArtist + '|' + year
             : album;
         if (!colorKey.replace(/\|/g, '').trim()) {
-            Shared.setStatus('importStatus', 'Enter an album name to generate its cover.', true);
+            Shared.setStatus('importStatus', t.tr('MessageEnterAlbumForCover'), true);
             return;
         }
 
@@ -647,7 +634,7 @@ export default function (view) {
             .then(function(result) {
                 if (!result || !result.Found) return;
                 showCover(id);
-                Shared.setStatus('importStatus', 'Cover taken from the library album "' + album + '".', false);
+                Shared.setStatus('importStatus', t.format('MessageCoverFromAlbum', album), false);
             })
             .catch(function() { return null; });
     }
@@ -671,12 +658,12 @@ export default function (view) {
     // ids [string[]]: The files.
     // data [string]: The cover as base64 JPEG or PNG.
     function sendCover(ids, data) {
-        Shared.setStatus('importStatus', 'Setting covers…', false, { timeout: 0 });
+        Shared.setStatus('importStatus', t.tr('MessageSettingCovers'), false, { timeout: 0 });
         var failed = 0;
         function next(index) {
             if (index >= ids.length) {
                 var done = ids.length - failed;
-                Shared.setStatus('importStatus', 'Cover set on ' + countLabel(done, 'file', 'files') + '.' + (failed ? ' Could not set it on ' + countLabel(failed, 'file', 'files') + '.' : ''), failed > 0);
+                Shared.setStatus('importStatus', countText(t, done, 'MessageCoverSetOne', 'MessageCoverSetMany') + (failed ? ' ' + countText(t, failed, 'ErrorSetCoverOne', 'ErrorSetCoverMany') : ''), failed > 0);
                 return;
             }
             var id = ids[index];
@@ -696,24 +683,24 @@ export default function (view) {
     function deleteSelected(items) {
         var ids = items.map(function (d) { return d.Id; });
         if (!ids.length) return;
-        confirmDialog('Delete ' + countLabel(ids.length, 'downloaded file', 'downloaded files') + '? This cannot be undone.', {
-            title: 'Delete Files',
-            confirmText: 'Delete',
+        confirmDialog(countText(t, ids.length, 'ConfirmDeleteFilesOne', 'ConfirmDeleteFilesMany'), Object.assign({}, Shared.text.confirm, {
+            title: t.tr('HeaderDeleteFiles'),
+            confirmText: t.tr('Delete'),
             destructive: true
-        }).then(function (ok) {
+        })).then(function (ok) {
             if (!ok) return;
-            Shared.setStatus('importStatus', 'Deleting…', false, { timeout: 0 });
+            Shared.setStatus('importStatus', t.tr('MessageDeleting'), false, { timeout: 0 });
             Shared.apiRequest('Downloads/BatchDelete', 'POST', { Ids: ids })
                 .then(function (result) {
                     var deleted = (result && result.Deleted) || 0;
                     var errors = (result && result.Errors) || 0;
-                    var msg = 'Deleted ' + countLabel(deleted, 'file', 'files') + '.';
-                    if (errors > 0) msg += ' Could not delete ' + countLabel(errors, 'file', 'files') + '.';
+                    var msg = countText(t, deleted, 'MessageDeletedFilesOne', 'MessageDeletedFilesMany');
+                    if (errors > 0) msg += ' ' + countText(t, errors, 'ErrorDeleteFilesOne', 'ErrorDeleteFilesMany');
                     Shared.setStatus('importStatus', msg, errors > 0);
                     _list.clearSelection();
                 })
                 .catch(function (err) {
-                    return Shared.errorText(err, 'Could not delete the files.').then(function (text) { Shared.setStatus('importStatus', text, true); });
+                    return Shared.errorText(err, t.tr('ErrorDeleteFiles')).then(function (text) { Shared.setStatus('importStatus', text, true); });
                 })
                 .then(loadDownloads);
         });
@@ -729,24 +716,25 @@ export default function (view) {
     // bindEvents
     // Builds the list and the bulk editor, and wires the page's controls, once on the first viewshow.
     function bindEvents() {
+        t = Shared.t;
         if (!_artistSearch) _artistSearch = Shared.createDebouncedSearch('Artists', 300);
         buildList();
 
         var bulkArtistCell = Shared.getEl('bulkArtistCell');
         if (bulkArtistCell && !_bulkArtistCombo) {
-            _bulkArtistCombo = Shared.createSearchableComboBox({
-                placeholder: 'Search artists',
+            _bulkArtistCombo = Shared.createSearchableComboBox(Object.assign({}, Shared.text.comboBox, {
+                placeholder: t.tr('PlaceholderSearchArtists'),
                 searchFn: _artistSearch
-            });
+            }));
             bulkArtistCell.appendChild(_bulkArtistCombo.element);
         }
 
         var bulkAlbumCell = Shared.getEl('bulkAlbumCell');
         if (bulkAlbumCell && !_bulkAlbumCombo) {
-            _bulkAlbumCombo = Shared.createSearchableComboBox({
-                placeholder: 'Search albums',
+            _bulkAlbumCombo = Shared.createSearchableComboBox(Object.assign({}, Shared.text.comboBox, {
+                placeholder: t.tr('PlaceholderSearchAlbums'),
                 searchFn: createAlbumSearchForArtist(function () { return _bulkArtistCombo ? _bulkArtistCombo.getValue() : ''; })
-            });
+            }));
             bulkAlbumCell.appendChild(_bulkAlbumCombo.element);
         }
 
@@ -755,7 +743,7 @@ export default function (view) {
 
         var bulkCoverCell = Shared.getEl('bulkCoverCell');
         if (bulkCoverCell && !_bulkCover) {
-            _bulkCover = createCoverPicker({ label: 'Cover', emptyText: 'No cover.', onChange: updateBulkButtons });
+            _bulkCover = createCoverPicker({ label: t.tr('LabelCover'), onChange: updateBulkButtons });
             bulkCoverCell.appendChild(_bulkCover.element);
         }
     }

@@ -1,48 +1,48 @@
 <!-- Content fragment injected into the base JPKribs.Jellyfin.Base status card. -->
 
 <div id="signin" class="hidden">
-    <h1>Sign in required</h1>
-    <p>Sign in to your account to view this page.</p>
-    <a id="signinLink" class="base-btn" href="/">Sign in</a>
+    <h1 data-str="HeaderSignInRequired">Sign in required</h1>
+    <p data-str="MessageSignInToView">Sign in to your account to view this page.</p>
+    <a id="signinLink" class="base-btn" href="/" data-str="ButtonSignIn">Sign In</a>
 </div>
 
 <div id="denied" class="hidden">
-    <h1>Not authorized</h1>
-    <p>Your account doesn't have access to this page.</p>
-    <a id="deniedLink" class="base-btn" href="/">Back to Jellyfin</a>
+    <h1 data-str="HeaderNotAuthorized">Not authorized</h1>
+    <p data-str="MessageNoAccess">Your account doesn't have access to this page.</p>
+    <a id="deniedLink" class="base-btn" href="/" data-str="ButtonBackToJellyfin">Back to Jellyfin</a>
 </div>
 
 <form id="form" class="hidden" autocomplete="off" novalidate>
-    <h1>Request a Download</h1>
-    <p>Paste a YouTube link to a song or a playlist. Audio-only or lyric uploads work best.</p>
+    <h1 data-str="HeaderRequestDownload">Request a Download</h1>
+    <p data-str="RequestDownloadIntro">Paste a YouTube link to a song or a playlist. Audio-only or lyric uploads work best.</p>
 
     <div class="base-fields">
-        <label for="url">YouTube Link</label>
+        <label for="url" data-str="LabelYouTubeLink">YouTube Link</label>
         <input type="url" id="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ" />
 
-        <label for="artist">Artist</label>
-        <input type="text" id="artist" list="artistList" placeholder="Artist" />
+        <label for="artist" data-str="Artist">Artist</label>
+        <input type="text" id="artist" list="artistList" placeholder="Artist" data-str-placeholder="Artist" />
         <datalist id="artistList"></datalist>
 
-        <label for="album">Album</label>
-        <input type="text" id="album" list="albumList" placeholder="Album" />
+        <label for="album" data-str="Album">Album</label>
+        <input type="text" id="album" list="albumList" placeholder="Album" data-str-placeholder="Album" />
         <datalist id="albumList"></datalist>
 
         <div class="base-field-pair">
             <div>
-                <label for="year">Year</label>
+                <label for="year" data-str="LabelYear">Year</label>
                 <input type="text" id="year" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="2018" />
             </div>
             <div>
-                <label for="title">Title <span class="base-hint">(optional)</span></label>
-                <input type="text" id="title" placeholder="From the video if empty" />
+                <label for="title"><span data-str="LabelTitle">Title</span> <span class="base-hint" data-str="LabelOptional">(optional)</span></label>
+                <input type="text" id="title" placeholder="From the video if empty" data-str-placeholder="PlaceholderTitleFromVideo" />
             </div>
         </div>
     </div>
 
-    <button type="submit" id="submit" class="base-submit">Submit</button>
+    <button type="submit" id="submit" class="base-submit" data-str="ButtonSubmit">Submit</button>
     <p id="msg" class="base-note" role="status" aria-live="polite"></p>
-    <a id="queueLink" class="base-btn base-btn-secondary" href="Queue">View the Queue</a>
+    <a id="queueLink" class="base-btn base-btn-secondary" href="Queue" data-str="ButtonViewQueue">View the Queue</a>
 </form>
 
 <script>
@@ -57,6 +57,14 @@
         var root = prefix + '/';
 
         var el = function (id) { return document.getElementById(id); };
+        // The plugin's strings in the viewer's language, or null while they load or when Base cannot load.
+        var t = null;
+        // tr
+        // Reads one string with its {0} filled, or the English given while the strings are missing.
+        function tr(key, english, value) {
+            var text = t ? t.tr(key, english) : english;
+            return value === undefined ? text : text.replace('{0}', value);
+        }
         function show(id) { el(id).classList.remove('hidden'); }
         function val(id) { return (el(id).value || '').trim(); }
         // Shows a result under the form, in the card's red error line when it is an error. An empty message clears it.
@@ -76,12 +84,9 @@
         ['signinLink', 'deniedLink'].forEach(function (id) { var a = el(id); if (a) a.href = root; });
         el('queueLink').href = prefix + '/YouTube/Queue';
 
-        fetch(prefix + '/System/Info/Public', { headers: { 'Accept': 'application/json' } })
-            .then(function (r) { return r.json(); })
-            .then(function (info) { if (info && info.ServerName) { document.title = info.ServerName + ' - Download'; } })
-            .catch(function () { /* keep the default title */ });
-
-        function getToken() {
+        // getServer
+        // Finds the signed in server this browser knows, preferring the one whose address matches this page.
+        function getServer() {
             try {
                 var raw = localStorage.getItem('jellyfin_credentials');
                 if (!raw) return null;
@@ -98,18 +103,33 @@
                     var s = withToken[j];
                     var addrs = [s.ManualAddress, s.LocalAddress, s.RemoteAddress, s.Address];
                     for (var k = 0; k < addrs.length; k++) {
-                        if (addrs[k] && addrs[k].replace(/\/+$/, '').toLowerCase() === origin) return s.AccessToken;
+                        if (addrs[k] && addrs[k].replace(/\/+$/, '').toLowerCase() === origin) return s;
                     }
                 }
-                return withToken.length > 0 ? withToken[0].AccessToken : null;
+                return withToken.length > 0 ? withToken[0] : null;
             } catch (e) { /* no token */ }
             return null;
         }
 
-        var token = getToken();
+        var server = getServer();
+        var token = server ? server.AccessToken : null;
         var authHeader = 'MediaBrowser Token="' + token + '"';
 
-        if (!token) { leaveLoading(); show('signin'); return; }
+        // The strings load once, in the viewer's display language, before any state shows.
+        var strings = import(prefix + '/web/configurationpage?name=youtubeaudio_jpkribs_shared.js')
+            .then(function (kit) { return kit.loadTranslations(prefix + '/YouTubeAudio/Translations', { userId: server ? server.UserId : '' }); })
+            .then(function (loaded) { t = loaded; t.apply(document); })
+            .catch(function () { return null; });
+
+        fetch(prefix + '/System/Info/Public', { headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.json(); })
+            .then(function (info) {
+                if (!info || !info.ServerName) return;
+                strings.then(function () { document.title = info.ServerName + ' - ' + tr('Download', 'Download'); });
+            })
+            .catch(function () { /* keep the default title */ });
+
+        if (!token) { strings.then(function () { leaveLoading(); show('signin'); }); return; }
 
         // suggest
         // Fills a field's list of suggestions from the library as the user types, after a short pause.
@@ -144,8 +164,9 @@
             });
         }
 
-        fetch(infoUrl, { headers: { 'Authorization': authHeader, 'Accept': 'application/json' } })
-            .then(function (r) {
+        Promise.all([fetch(infoUrl, { headers: { 'Authorization': authHeader, 'Accept': 'application/json' } }), strings])
+            .then(function (results) {
+                var r = results[0];
                 if (r.status === 401) { leaveLoading(); show('signin'); return null; }
                 return r.json();
             })
@@ -155,6 +176,7 @@
                 if (info && info.Approved) {
                     suggest('artist', 'artistList', 'Artists');
                     suggest('album', 'albumList', 'Albums', function () { return val('artist'); });
+                    syncTitleForPlaylist();
                     show('form');
                 } else {
                     show('denied');
@@ -167,8 +189,8 @@
             var isPlaylist = /\/playlist/i.test(val('url'));
             var title = el('title');
             title.disabled = isPlaylist;
-            if (isPlaylist) { title.value = ''; title.placeholder = 'Not used for playlists'; }
-            else { title.placeholder = 'From the video if empty'; }
+            if (isPlaylist) { title.value = ''; title.placeholder = tr('PlaceholderNotForPlaylists', 'Not used for playlists'); }
+            else { title.placeholder = tr('PlaceholderTitleFromVideo', 'From the video if empty'); }
         }
         el('url').addEventListener('input', syncTitleForPlaylist);
         syncTitleForPlaylist();
@@ -182,13 +204,13 @@
             var yearRaw = val('year');
             var title = val('title');
 
-            if (!url || !artist || !album || !yearRaw) { status('Add the YouTube link, artist, album and year.', true); return; }
+            if (!url || !artist || !album || !yearRaw) { status(tr('MessageEnterDetails', 'Add the YouTube link, artist, album and year.'), true); return; }
             var year = parseInt(yearRaw, 10);
-            if (isNaN(year)) { status('Enter the year as a number, like 2018.', true); return; }
+            if (isNaN(year)) { status(tr('MessageEnterYear', 'Enter the year as a number, like 2018.'), true); return; }
 
             var btn = el('submit');
             btn.disabled = true;
-            status('Submitting…');
+            status(tr('MessageSubmitting', 'Submitting…'));
 
             fetch(submitUrl, {
                 method: 'POST',
@@ -201,12 +223,12 @@
                 })
                 .then(function (res) {
                     btn.disabled = false;
-                    if (!res.ok) { status((res.data && res.data.Error) || 'The request could not be submitted.', true); return; }
+                    if (!res.ok) { status((res.data && res.data.Error) || tr('ErrorSubmit', 'The request could not be submitted.'), true); return; }
                     var n = (res.data && res.data.Queued) || 0;
-                    status('Queued ' + n + ' track' + (n === 1 ? '' : 's') + ' for download.');
+                    status(n === 1 ? tr('MessageTracksQueuedOne', 'Queued 1 track for download.', n) : tr('MessageTracksQueuedMany', 'Queued {0} tracks for download.', n));
                     el('form').reset();
                 })
-                .catch(function () { btn.disabled = false; status('Could not reach the server. Try again.', true); });
+                .catch(function () { btn.disabled = false; status(tr('ErrorServerUnreachable', 'Could not reach the server. Try again.'), true); });
         });
     })();
 </script>

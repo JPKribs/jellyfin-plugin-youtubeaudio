@@ -3,6 +3,7 @@
 
 import {
     STATUS_STATES,
+    countText,
     createPage,
     createChoiceGroup,
     createMediaCard,
@@ -10,30 +11,26 @@ import {
     createFilePicker,
     createFilteredList,
     confirmDialog,
-    promptDialog
+    fillLinks,
+    promptDialog,
+    statusText
 } from './configurationpage?name=youtubeaudio_shared.js';
 
-// QUEUE_STATES
+// queueStates
 // The queue statuses the Download tab shows, as count card filters colored by meaning.
-var QUEUE_STATES = [
-    { value: '0', label: 'Queued', color: 'orange' },
-    { value: '1', label: 'Downloading', color: 'purple' },
-    { value: '2', label: 'Downloaded', color: 'green' },
-    { value: '4', label: 'Error', color: 'red' }
-];
-
-// countLabel
-// Names a count with the right plural.
 //
 // Inputs
-// count [number]: How many.
-// one [string]: The word for one.
-// many [string]: The word for several.
+// t [object]: The translations handle.
 //
 // Output
-// [string]: Such as "1 song" or "3 songs".
-function countLabel(count, one, many) {
-    return count + ' ' + (count === 1 ? one : many);
+// [object[]]: The filter options.
+function queueStates(t) {
+    return [
+        { value: '0', label: t.tr('StatusQueued'), color: 'orange' },
+        { value: '1', label: t.tr('StatusDownloading'), color: 'purple' },
+        { value: '2', label: t.tr('StatusDownloaded'), color: 'green' },
+        { value: '4', label: t.tr('HeaderError'), color: 'red' }
+    ];
 }
 
 // visibleQueueItems
@@ -52,34 +49,35 @@ function visibleQueueItems(items) {
 // Says what a playlist upload queued and what it left out.
 //
 // Inputs
+// t [object]: The translations handle.
 // result [object]: The server's PlaylistImportResult.
 //
 // Output
 // [string]: The status message.
-function playlistResultMessage(result) {
+function playlistResultMessage(t, result) {
     result = result || {};
     var count = result.Items ? result.Items.length : 0;
-    var msg = 'Added ' + countLabel(count, 'track', 'tracks') + ' from ' + (result.Source || 'the playlist');
-    if (result.PlaylistName) msg += ' (' + result.PlaylistName + ')';
-    msg += '.';
-    var left = [];
-    if (result.AlreadyInLibrary) left.push(result.AlreadyInLibrary + ' already in the library');
-    if (result.AlreadyQueued) left.push(result.AlreadyQueued + ' already queued');
-    if (result.DuplicateTracks) left.push(countLabel(result.DuplicateTracks, 'duplicate or lesser version', 'duplicates or lesser versions'));
-    if (left.length) msg += ' Left out ' + left.join(', ') + '.';
-    if (result.LibraryUpgrades) msg += ' ' + countLabel(result.LibraryUpgrades, 'song replaces', 'songs replace') + ' a library single with the album version.';
-    if (result.PlaylistsTracked) msg += ' ' + countLabel(result.PlaylistsTracked, 'playlist fills', 'playlists fill') + ' in as songs reach the library.';
-    if (result.SkippedRows) msg += ' Skipped ' + countLabel(result.SkippedRows, 'entry', 'entries') + ' with no title.';
-    return msg;
+    var source = result.Source || '';
+    var parts = [result.PlaylistName
+        ? countText(t, count, 'MessageTracksAddedNamedOne', 'MessageTracksAddedNamedMany', source, result.PlaylistName)
+        : countText(t, count, 'MessageTracksAddedOne', 'MessageTracksAddedMany', source)];
+    if (result.AlreadyInLibrary) parts.push(t.format('MessageLeftOutInLibrary', result.AlreadyInLibrary));
+    if (result.AlreadyQueued) parts.push(t.format('MessageLeftOutQueued', result.AlreadyQueued));
+    if (result.DuplicateTracks) parts.push(countText(t, result.DuplicateTracks, 'MessageLeftOutDuplicateOne', 'MessageLeftOutDuplicateMany'));
+    if (result.LibraryUpgrades) parts.push(countText(t, result.LibraryUpgrades, 'MessageLibraryUpgradeOne', 'MessageLibraryUpgradeMany'));
+    if (result.PlaylistsTracked) parts.push(countText(t, result.PlaylistsTracked, 'MessagePlaylistsTrackedOne', 'MessagePlaylistsTrackedMany'));
+    if (result.SkippedRows) parts.push(countText(t, result.SkippedRows, 'MessageSkippedRowsOne', 'MessageSkippedRowsMany'));
+    return parts.join(' ');
 }
 
 export default function (view) {
     'use strict';
 
     var Shared = null;
+    var t = null;
 
     var _allItems = [];
-    var _sourceNames = { replace: 'Replacement' };
+    var _sourceNames = {};
     var _pendingUpload = null;
     var _ownerSelector = null;
     var _filePicker = null;
@@ -148,25 +146,25 @@ export default function (view) {
         if (item.Source) {
             if (item.Artist) title = item.Artist + ' – ' + title;
             var sourceName = _sourceNames[item.Source] || item.Source;
-            sub = sourceName + ' · ' + (item.Url || 'YouTube match is found when downloaded');
+            sub = sourceName + ' · ' + (item.Url || t.tr('MessageMatchPending'));
         }
 
         var failed = item.StatusCode === 4;
         var notes = [];
         if (item.MatchNote && !failed) notes.push(item.MatchNote);
-        if (item.ReplacesFileCount > 0) notes.push('Replaces the single in the library when imported.');
+        if (item.ReplacesFileCount > 0) notes.push(t.tr('MessageReplacesSingle'));
 
         return createMediaCard({
             shape: 'square',
             icon: 'music_note',
             title: title,
             subtitle: sub,
-            badges: item.MatchNote && !failed ? [{ label: 'Check Match', color: 'orange' }] : [],
-            status: { label: item.Status, color: STATUS_STATES[item.StatusCode] || 'Queued' },
+            badges: item.MatchNote && !failed ? [{ label: t.tr('LabelCheckMatch'), color: 'orange' }] : [],
+            status: { label: statusText(t, item.StatusCode), color: STATUS_STATES[item.StatusCode] || 'Queued' },
             detail: notes.join(' ') || null,
             error: failed ? (item.ErrorMessage || null) : null,
             // A song downloading now keeps its link until it finishes.
-            actions: [{ label: 'Change Link', icon: 'link', value: 'link', disabled: item.StatusCode === 1 }],
+            actions: [{ label: t.tr('HeaderChangeLink'), icon: 'link', value: 'link', disabled: item.StatusCode === 1 }],
             onAction: function () { changeLink(item.Id); }
         });
     }
@@ -176,30 +174,30 @@ export default function (view) {
     function buildQueueList() {
         var host = Shared.getEl('queueList');
         if (!host || _queueList) return;
-        _queueList = createFilteredList({
+        _queueList = createFilteredList(Object.assign({}, Shared.text.filteredList, {
             items: [],
             rowKey: 'Id',
             render: renderQueueRow,
-            search: { keys: ['Title', 'Artist', 'Url'], placeholder: 'Search queue', label: 'Search queue' },
+            search: { keys: ['Title', 'Artist', 'Url'], placeholder: t.tr('PlaceholderSearchQueue'), label: t.tr('PlaceholderSearchQueue') },
             filters: [{
                 name: 'Status',
-                label: 'Statuses',
+                label: t.tr('LabelStatuses'),
                 kind: 'cards',
-                options: QUEUE_STATES,
+                options: queueStates(t),
                 test: function (item, values) { return values.indexOf(String(item.StatusCode)) !== -1; }
             }],
             selectable: 'multiple',
             bulkActions: [
-                { id: 'download', label: 'Download', icon: 'download', variant: 'primary', onClick: processQueue },
-                { id: 'delete', label: 'Delete', icon: 'delete', variant: 'destructive', onClick: deleteSelectedQueue }
+                { id: 'download', label: t.tr('Download'), icon: 'download', variant: 'primary', onClick: processQueue },
+                { id: 'delete', label: t.tr('Delete'), icon: 'delete', variant: 'destructive', onClick: deleteSelectedQueue }
             ],
             actions: [
-                { id: 'cancel', label: 'Cancel Downloads', icon: 'stop', variant: 'destructive', onClick: cancelDownloads, visible: isPolling },
-                { id: 'refresh', label: 'Refresh', icon: 'refresh', onClick: loadQueue }
+                { id: 'cancel', label: t.tr('HeaderCancelDownloads'), icon: 'stop', variant: 'destructive', onClick: cancelDownloads, visible: isPolling },
+                { id: 'refresh', label: t.tr('Refresh'), icon: 'refresh', onClick: loadQueue }
             ],
-            emptyText: 'No songs queued yet. Add one above.',
-            label: 'Queue'
-        });
+            emptyText: t.tr('MessageNoSongsQueued'),
+            label: t.tr('Queue')
+        }));
         host.appendChild(_queueList.element);
     }
 
@@ -211,19 +209,19 @@ export default function (view) {
     function changeLink(id) {
         promptDialog([{
             name: 'url',
-            label: 'YouTube URL',
+            label: t.tr('LabelYouTubeUrl'),
             placeholder: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-            description: 'The upload to download instead. The song keeps its details.',
+            description: t.tr('ChangeLinkHelp'),
             required: true
-        }], { title: 'Change Link', submitText: 'Use Link' }).then(function (values) {
+        }], Object.assign({}, Shared.text.confirm, { title: t.tr('HeaderChangeLink'), submitText: t.tr('ButtonUseLink') })).then(function (values) {
             if (!values) return;
             Shared.apiRequest('Queue/' + encodeURIComponent(id) + '/Url', 'POST', { Url: (values.url || '').trim() })
                 .then(function () {
                     _processingGraceUntil = Date.now() + 120000;
-                    Shared.setStatus('queueStatus', 'Link changed. Downloading from the new link.', false);
+                    Shared.setStatus('queueStatus', t.tr('MessageLinkChanged'), false);
                     loadQueue();
                 })
-                .catch(function (err) { reportError(err, 'Could not use that link.'); });
+                .catch(function (err) { reportError(err, t.tr('ErrorUseLink')); });
         });
     }
 
@@ -235,24 +233,23 @@ export default function (view) {
     function deleteSelectedQueue(items) {
         var ids = items.map(function (i) { return i.Id; });
         if (!ids.length) return;
-        var things = countLabel(ids.length, 'item', 'items');
-        confirmDialog('Delete ' + things + ' from the queue? This cannot be undone.', {
-            title: 'Delete Items',
-            confirmText: 'Delete',
+        confirmDialog(countText(t, ids.length, 'ConfirmDeleteItemsOne', 'ConfirmDeleteItemsMany'), Object.assign({}, Shared.text.confirm, {
+            title: t.tr('HeaderDeleteItems'),
+            confirmText: t.tr('Delete'),
             destructive: true
-        }).then(function (ok) {
+        })).then(function (ok) {
             if (!ok) return;
-            Shared.setStatus('queueStatus', 'Deleting…', false, { timeout: 0 });
+            Shared.setStatus('queueStatus', t.tr('MessageDeleting'), false, { timeout: 0 });
             Shared.apiRequest('Queue/BatchDelete', 'POST', { Ids: ids })
                 .then(function (result) {
                     var deleted = (result && result.Deleted) || 0;
                     var errors = (result && result.Errors) || 0;
-                    var msg = 'Deleted ' + countLabel(deleted, 'item', 'items') + '.';
-                    if (errors > 0) msg += ' Could not delete ' + countLabel(errors, 'item', 'items') + '.';
+                    var msg = countText(t, deleted, 'MessageDeletedItemsOne', 'MessageDeletedItemsMany');
+                    if (errors > 0) msg += ' ' + countText(t, errors, 'ErrorDeleteItemsOne', 'ErrorDeleteItemsMany');
                     Shared.setStatus('queueStatus', msg, errors > 0);
                     _queueList.clearSelection();
                 })
-                .catch(function (err) { reportError(err, 'Could not delete the items.'); })
+                .catch(function (err) { reportError(err, t.tr('ErrorDeleteItems')); })
                 .then(loadQueue);
         });
     }
@@ -265,33 +262,33 @@ export default function (view) {
     function processQueue(items) {
         var ids = items.map(function (i) { return i.Id; });
         if (!ids.length) return;
-        Shared.setStatus('queueStatus', 'Starting…', false, { timeout: 0 });
+        Shared.setStatus('queueStatus', t.tr('MessageStarting'), false, { timeout: 0 });
         Shared.apiRequest('Queue/Process', 'POST', { Ids: ids })
             .then(function () {
                 _processingGraceUntil = Date.now() + 120000;
-                Shared.setStatus('queueStatus', 'Download started.', false);
+                Shared.setStatus('queueStatus', t.tr('MessageDownloadStarted'), false);
                 _queueList.clearSelection();
             })
-            .catch(function (err) { reportError(err, 'Could not start the download.'); })
+            .catch(function (err) { reportError(err, t.tr('ErrorStartDownload')); })
             .then(loadQueue);
     }
 
     // cancelDownloads
     // Stops the running batch, after a confirm. Songs not finished stay queued.
     function cancelDownloads() {
-        confirmDialog('Stop the running downloads? Songs that have not finished stay in the queue.', {
-            title: 'Cancel Downloads',
-            confirmText: 'Stop',
+        confirmDialog(t.tr('ConfirmCancelDownloads'), Object.assign({}, Shared.text.confirm, {
+            title: t.tr('HeaderCancelDownloads'),
+            confirmText: t.tr('ButtonStop'),
             destructive: true
-        }).then(function (ok) {
+        })).then(function (ok) {
             if (!ok) return;
             Shared.apiRequest('Queue/Cancel', 'POST')
                 .then(function (result) {
                     _processingGraceUntil = 0;
-                    Shared.setStatus('queueStatus', result && result.Cancelled ? 'Downloads cancelled.' : 'No downloads to cancel.', false);
+                    Shared.setStatus('queueStatus', result && result.Cancelled ? t.tr('MessageDownloadsCancelled') : t.tr('MessageNoDownloadsToCancel'), false);
                     loadQueue();
                 })
-                .catch(function (err) { reportError(err, 'Could not cancel the downloads.'); });
+                .catch(function (err) { reportError(err, t.tr('ErrorCancelDownloads')); });
         });
     }
 
@@ -301,19 +298,19 @@ export default function (view) {
         var input = Shared.getEl('txtYouTubeUrl');
         var url = ((input || {}).value || '').trim();
         if (!url) {
-            Shared.setStatus('queueStatus', 'Enter a YouTube URL.', true);
+            Shared.setStatus('queueStatus', t.tr('MessageEnterYouTubeUrl'), true);
             return;
         }
 
         Shared.apiRequest('Queue', 'POST', { Url: url })
             .then(function (items) {
-                Shared.setStatus('queueStatus', 'Added ' + countLabel(items ? items.length : 0, 'item', 'items') + ' to the queue.', false);
+                Shared.setStatus('queueStatus', countText(t, items ? items.length : 0, 'MessageItemsQueuedOne', 'MessageItemsQueuedMany'), false);
                 input.value = '';
                 var qBtn = Shared.getEl('btnQueue');
                 if (qBtn) qBtn.disabled = true;
                 loadQueue();
             })
-            .catch(function (err) { reportError(err, 'Could not queue the link.'); });
+            .catch(function (err) { reportError(err, t.tr('ErrorQueueLink')); });
     }
 
     // loadPlaylistSources
@@ -332,7 +329,7 @@ export default function (view) {
     function buildReplaceList() {
         var host = Shared.getEl('replaceResults');
         if (!host || _replaceList) return;
-        _replaceList = createFilteredList({
+        _replaceList = createFilteredList(Object.assign({}, Shared.text.filteredList, {
             fetch: function (query) {
                 var text = (query.search || '').trim();
                 if (!text) return [];
@@ -349,16 +346,16 @@ export default function (view) {
                     subtitle: [song.Artist, song.Album].filter(Boolean).join(' · ')
                 });
             },
-            search: { placeholder: 'Search songs', label: 'Library Song' },
+            search: { placeholder: t.tr('PlaceholderSearchSongs'), label: t.tr('LabelLibrarySong') },
             selectable: 'single',
             summary: false,
             maxHeight: 240,
-            emptyText: 'No library songs match.',
+            emptyText: t.tr('MessageNoSongsMatch'),
             onSelectionChange: function (ids) {
                 _replaceSongId = ids.length ? ids[0] : null;
                 updateReplaceButton();
             }
-        });
+        }));
         host.appendChild(_replaceList.element);
     }
 
@@ -380,14 +377,14 @@ export default function (view) {
         if (btn) btn.disabled = true;
         Shared.apiRequest('Queue/Replace', 'POST', { ItemId: _replaceSongId, Url: url.value.trim() })
             .then(function (item) {
-                Shared.setStatus('queueStatus', 'Downloading the replacement for "' + ((item && item.Title) || 'the song') + '". Import it on the Import tab.', false);
+                Shared.setStatus('queueStatus', item && item.Title ? t.format('MessageReplacementQueued', item.Title) : t.tr('MessageReplacementQueuedUntitled'), false);
                 url.value = '';
                 _replaceList.clearSelection();
                 _replaceList.setSearch('');
                 loadQueue();
             })
             .catch(function (err) {
-                reportError(err, 'Could not queue the replacement.');
+                reportError(err, t.tr('ErrorQueueReplacement'));
                 updateReplaceButton();
             });
     }
@@ -437,7 +434,7 @@ export default function (view) {
         }
         var btn = Shared.getEl('btnImportPlaylist');
         if (btn) {
-            btn.querySelector('span').textContent = 'Queue Playlist';
+            btn.querySelector('span').textContent = t.tr('ButtonQueuePlaylist');
             btn.disabled = !chosenFile();
         }
     }
@@ -454,7 +451,7 @@ export default function (view) {
         if (_filePicker && _filePicker.input.getAttribute('accept') === accept) return;
         if (_filePicker) _filePicker.destroy();
         host.innerHTML = '';
-        _filePicker = createFilePicker({ accept: accept, onChange: resetPlaylistImport });
+        _filePicker = createFilePicker(Object.assign({}, Shared.text.filePicker, { accept: accept, onChange: resetPlaylistImport }));
         host.appendChild(_filePicker.element);
         resetPlaylistImport();
     }
@@ -471,23 +468,23 @@ export default function (view) {
         host.innerHTML = '';
         var intro = document.createElement('div');
         intro.className = 'fieldDescription';
-        intro.textContent = 'This file holds ' + playlists.length + ' playlists. Turn off any you do not want.';
+        intro.textContent = t.format('MessageFilePlaylists', playlists.length);
         host.appendChild(intro);
-        _playlistChoices = createCheckboxList({
+        _playlistChoices = createCheckboxList(Object.assign({}, Shared.text.checkboxList, {
             items: playlists,
             idKey: 'Id',
             value: playlists.map(function (p) { return p.Id; }),
             search: false,
             showSelectAll: true,
             renderRow: function (p) {
-                return { label: p.Name, sublabel: countLabel(p.TrackCount, 'track', 'tracks'), note: p.IsLibrary ? 'Songs Only' : '' };
+                return { label: p.Name, sublabel: countText(t, p.TrackCount, 'LabelTrackCountOne', 'TrackCount'), note: p.IsLibrary ? t.tr('LabelSongsOnly') : '' };
             },
             onChange: function (ids) { if (btn) btn.disabled = !ids.length; }
-        });
+        }));
         host.appendChild(_playlistChoices.element);
         host.hidden = false;
         if (btn) {
-            btn.querySelector('span').textContent = 'Queue Selected';
+            btn.querySelector('span').textContent = t.tr('ButtonQueueSelected');
             btn.disabled = false;
         }
     }
@@ -497,7 +494,7 @@ export default function (view) {
     function importPlaylist() {
         var file = chosenFile();
         if (!file) {
-            Shared.setStatus('queueStatus', 'Select a playlist export.', true);
+            Shared.setStatus('queueStatus', t.tr('MessageSelectPlaylistExport'), true);
             return;
         }
 
@@ -511,7 +508,7 @@ export default function (view) {
                 return _pendingUpload;
             });
 
-        Shared.setStatus('queueStatus', 'Reading ' + file.name + '…', false, { timeout: 0 });
+        Shared.setStatus('queueStatus', t.format('MessageReadingFile', file.name), false, { timeout: 0 });
 
         upload
             .then(function (body) {
@@ -528,14 +525,14 @@ export default function (view) {
                     renderPlaylistChoices(result.Playlists || []);
                     return;
                 }
-                Shared.setStatus('queueStatus', playlistResultMessage(result), false);
+                Shared.setStatus('queueStatus', playlistResultMessage(t, result), false);
                 if (_filePicker) _filePicker.clear();
                 resetPlaylistImport();
                 loadQueue();
                 loadPlaylistTargets();
             })
             .catch(function (err) {
-                reportError(err, 'Could not import the playlist.');
+                reportError(err, t.tr('ErrorImportPlaylist'));
                 if (btn) btn.disabled = false;
             });
     }
@@ -544,19 +541,20 @@ export default function (view) {
     // Draws one playlist being filled as a Base media card, with its progress and a Stop action.
     //
     // Inputs
-    // t [object]: The PlaylistTargetDto.
+    // target [object]: The PlaylistTargetDto.
     //
     // Output
     // [object]: The media card handle.
-    function renderTarget(t) {
+    function renderTarget(target) {
+        var progress = target.Total === 1 ? t.format('LabelAddedOfOneSong', target.Added) : t.format('LabelAddedOfSongs', target.Added, target.Total);
         return createMediaCard({
             shape: 'square',
             icon: 'queue_music',
-            title: t.Name,
-            subtitle: t.UserName + ' · ' + t.Added + ' of ' + countLabel(t.Total, 'song', 'songs'),
-            detail: (t.Total - t.Added) + ' waiting for download or import',
-            actions: [{ label: 'Stop', icon: 'stop', value: 'stop' }],
-            onAction: function () { stopPlaylist(t.Id); }
+            title: target.Name,
+            subtitle: target.UserName + ' · ' + progress,
+            detail: t.format('LabelSongsWaiting', target.Total - target.Added),
+            actions: [{ label: t.tr('ButtonStop'), icon: 'stop', value: 'stop' }],
+            onAction: function () { stopPlaylist(target.Id); }
         });
     }
 
@@ -565,15 +563,15 @@ export default function (view) {
     function buildTargetList() {
         var host = Shared.getEl('playlistTargets');
         if (!host || _targetList) return;
-        _targetList = createFilteredList({
+        _targetList = createFilteredList(Object.assign({}, Shared.text.filteredList, {
             items: [],
             rowKey: 'Id',
             render: renderTarget,
             search: false,
             summary: false,
-            actions: [{ id: 'sync', label: 'Add Library Songs', icon: 'sync', onClick: syncPlaylists }],
-            label: 'Playlist Imports'
-        });
+            actions: [{ id: 'sync', label: t.tr('ButtonAddLibrarySongs'), icon: 'sync', onClick: syncPlaylists }],
+            label: t.tr('LabelPlaylistImports')
+        }));
         host.appendChild(_targetList.element);
     }
 
@@ -596,13 +594,13 @@ export default function (view) {
     // Inputs
     // id [string]: The playlist import.
     function stopPlaylist(id) {
-        confirmDialog('Stop adding songs to this playlist? The Jellyfin playlist and its songs are kept.', {
-            title: 'Stop Playlist Import',
-            confirmText: 'Stop'
-        }).then(function (ok) {
+        confirmDialog(t.tr('ConfirmStopPlaylist'), Object.assign({}, Shared.text.confirm, {
+            title: t.tr('HeaderStopPlaylistImport'),
+            confirmText: t.tr('ButtonStop')
+        })).then(function (ok) {
             if (!ok) return;
             Shared.apiRequest('Playlists/' + encodeURIComponent(id), 'DELETE')
-                .catch(function (err) { reportError(err, 'Could not stop the playlist import.'); })
+                .catch(function (err) { reportError(err, t.tr('ErrorStopPlaylist')); })
                 .then(loadPlaylistTargets);
         });
     }
@@ -612,9 +610,9 @@ export default function (view) {
     function syncPlaylists() {
         Shared.apiRequest('Playlists/Sync', 'POST')
             .then(function (result) {
-                Shared.setStatus('queueStatus', 'Added ' + countLabel((result && result.Added) || 0, 'song', 'songs') + ' to playlists.', false);
+                Shared.setStatus('queueStatus', countText(t, (result && result.Added) || 0, 'MessageSongsAddedToPlaylistsOne', 'MessageSongsAddedToPlaylistsMany'), false);
             })
-            .catch(function (err) { reportError(err, 'Could not add songs to the playlists.'); })
+            .catch(function (err) { reportError(err, t.tr('ErrorAddToPlaylists')); })
             .then(loadPlaylistTargets);
     }
 
@@ -644,6 +642,14 @@ export default function (view) {
         showSource(initial);
     }
 
+    // showSpotifyHelp
+    // Translates the Spotify export help, keeping its Exportify link in place.
+    function showSpotifyHelp() {
+        var help = Shared.getEl('spotifyHelp');
+        if (!help || !t.has('SpotifyExportHelp')) return;
+        fillLinks(help, t.tr('SpotifyExportHelp'), [help.querySelector('a')]);
+    }
+
     // loadPage
     // Reloads the queue and playlist progress each time the page shows, with a poller the page stops on viewhide.
     //
@@ -660,6 +666,9 @@ export default function (view) {
     // bindEvents
     // Wires the page's controls once, on the first viewshow.
     function bindEvents() {
+        t = Shared.t;
+        _sourceNames.replace = t.tr('LabelReplacement');
+        showSpotifyHelp();
         buildQueueList();
         buildReplaceList();
         buildTargetList();
@@ -679,7 +688,7 @@ export default function (view) {
         var ownerContainer = Shared.getEl('playlistOwner');
         if (ownerContainer && !_ownerSelector) {
             _ownerSelector = Shared.createUserSelector({
-                emptyLabel: 'Do not create playlists',
+                emptyLabel: t.tr('OptionNoPlaylists'),
                 value: (window.ApiClient && ApiClient.getCurrentUserId) ? ApiClient.getCurrentUserId() : ''
             });
             ownerContainer.appendChild(_ownerSelector.element);

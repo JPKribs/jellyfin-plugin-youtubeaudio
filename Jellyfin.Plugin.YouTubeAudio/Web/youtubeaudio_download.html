@@ -8,44 +8,44 @@
                 <div class="verticalSection verticalSection-extrabottompadding">
 
                     <div class="sectionTitleContainer flex align-items-center">
-                        <h1 class="sectionTitle">Download</h1>
+                        <h1 class="sectionTitle" data-str="Download">Download</h1>
                     </div>
-                    <div class="fieldDescription">Queues songs to download as audio, ready to tag and import on the Import tab.</div>
+                    <div class="fieldDescription" data-str="DownloadIntro">Queues songs to download as audio, ready to tag and import on the Import tab.</div>
 
                     <!-- Sources -->
                     <!-- Picks where songs come from, and shows that source's form below. -->
-                    <div class="base-choice-group yta-source-choices" id="sourceChoices" role="radiogroup" aria-label="Source">
+                    <div class="base-choice-group yta-source-choices" id="sourceChoices" role="radiogroup" aria-label="Source" data-str-label="LabelSource">
                         <label class="base-choice">
                             <input type="radio" name="downloadSource" value="youtube" />
                             <span class="base-choice-name">YouTube</span>
-                            <span class="base-choice-text">Paste a link to a video or a playlist.</span>
+                            <span class="base-choice-text" data-str="SourceYouTubeHelp">Paste a link to a video or a playlist.</span>
                         </label>
                         <label class="base-choice">
                             <input type="radio" name="downloadSource" value="applemusic" />
                             <span class="base-choice-name">Apple Music</span>
-                            <span class="base-choice-text">Upload a playlist or library exported from the Music app.</span>
+                            <span class="base-choice-text" data-str="SourceAppleMusicHelp">Upload a playlist or library exported from the Music app.</span>
                         </label>
                         <label class="base-choice">
                             <input type="radio" name="downloadSource" value="spotify" />
                             <span class="base-choice-name">Spotify</span>
-                            <span class="base-choice-text">Upload playlists exported with Exportify.</span>
+                            <span class="base-choice-text" data-str="SourceSpotifyHelp">Upload playlists exported with Exportify.</span>
                         </label>
                         <label class="base-choice">
                             <input type="radio" name="downloadSource" value="replace" />
-                            <span class="base-choice-name">Replace a Song</span>
-                            <span class="base-choice-text">Swap a library song's audio for a different YouTube upload.</span>
+                            <span class="base-choice-name" data-str="HeaderReplaceSong">Replace a Song</span>
+                            <span class="base-choice-text" data-str="SourceReplaceHelp">Swap a library song's audio for a different YouTube upload.</span>
                         </label>
                     </div>
 
                     <!-- YouTube -->
                     <div class="yta-source-panel" id="panelYouTube" data-source="youtube">
                         <div class="inputContainer">
-                            <label for="txtYouTubeUrl">YouTube URL</label>
+                            <label for="txtYouTubeUrl" data-str="LabelYouTubeUrl">YouTube URL</label>
                             <input is="emby-input" type="text" id="txtYouTubeUrl" placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ" />
-                            <div class="fieldDescription">A video or playlist link. Each video is queued to download as audio.</div>
+                            <div class="fieldDescription" data-str="YouTubeUrlHelp">A video or playlist link. Each video is queued to download as audio.</div>
                         </div>
                         <button is="emby-button" type="button" id="btnQueue" class="raised base-button primary small" disabled>
-                            <span>Queue</span>
+                            <span data-str="Queue">Queue</span>
                         </button>
                     </div>
 
@@ -53,26 +53,26 @@
                     <!-- One export form, with each service's own instructions. -->
                     <div class="yta-source-panel" id="panelPlaylist" data-source="applemusic spotify" hidden>
                         <div class="selectContainer">
-                            <label>Playlist Export</label>
+                            <label data-str="LabelPlaylistExport">Playlist Export</label>
                             <div id="playlistFile"></div>
-                            <div class="fieldDescription yta-source-help" data-source="applemusic">In the Music app, select File &gt; Library &gt; Export Library to pick from every playlist, or export one playlist as XML or text.</div>
-                            <div class="fieldDescription yta-source-help" data-source="spotify" hidden>Export one playlist as a CSV file, or all of them as a ZIP, with <a href="https://github.com/watsonbox/exportify" target="_blank" rel="noopener">Exportify</a>. Liked Songs downloads its songs without becoming a playlist.</div>
-                            <div class="fieldDescription">Each track is matched to a YouTube upload when it downloads, and keeps the export's details as its tags.</div>
+                            <div class="fieldDescription yta-source-help" data-source="applemusic" data-str="AppleMusicExportHelp">In the Music app, select File &gt; Library &gt; Export Library to pick from every playlist, or export one playlist as XML or text.</div>
+                            <div class="fieldDescription yta-source-help" id="spotifyHelp" data-source="spotify" hidden>Export one playlist as a CSV file, or all of them as a ZIP, with <a href="https://github.com/watsonbox/exportify" target="_blank" rel="noopener">Exportify</a>. Liked Songs downloads its songs without becoming a playlist.</div>
+                            <div class="fieldDescription" data-str="PlaylistMatchHelp">Each track is matched to a YouTube upload when it downloads, and keeps the export's details as its tags.</div>
                             <div id="playlistChoices" hidden></div>
                         </div>
                         <div class="selectContainer">
-                            <label>Playlist Owner</label>
+                            <label data-str="LabelPlaylistOwner">Playlist Owner</label>
                             <div id="playlistOwner"></div>
-                            <div class="fieldDescription">Each playlist becomes a private Jellyfin playlist of this user, filled as its songs reach the library. A playlist the user already has with that name gets the songs it is missing.</div>
+                            <div class="fieldDescription" data-str="PlaylistOwnerHelp">Each playlist becomes a private Jellyfin playlist of this user, filled as its songs reach the library. A playlist the user already has with that name gets the songs it is missing.</div>
                         </div>
                         <button is="emby-button" type="button" id="btnImportPlaylist" class="raised base-button primary small" disabled>
-                            <span>Queue Playlist</span>
+                            <span data-str="ButtonQueuePlaylist">Queue Playlist</span>
                         </button>
 
                         <!-- Playlist Imports -->
                         <!-- Jellyfin playlists that fill as their songs reach the library. -->
                         <div id="playlistTargetsSection" hidden>
-                            <h3 class="base-subsection-title">Playlist Imports in Progress</h3>
+                            <h3 class="base-subsection-title" data-str="HeaderPlaylistImports">Playlist Imports in Progress</h3>
                             <div id="playlistTargets"></div>
                         </div>
                     </div>
@@ -81,24 +81,24 @@
                     <!-- Swaps a library song's audio for a different upload. -->
                     <div class="yta-source-panel" id="panelReplace" data-source="replace" hidden>
                         <div class="selectContainer">
-                            <label>Library Song</label>
+                            <label data-str="LabelLibrarySong">Library Song</label>
                             <div id="replaceResults"></div>
-                            <div class="fieldDescription">The song whose audio is wrong. Its file keeps its place in the library, its tags, and its cover.</div>
+                            <div class="fieldDescription" data-str="LibrarySongHelp">The song whose audio is wrong. Its file keeps its place in the library, its tags, and its cover.</div>
                         </div>
                         <div class="inputContainer">
-                            <label for="txtReplaceUrl">YouTube URL</label>
+                            <label for="txtReplaceUrl" data-str="LabelYouTubeUrl">YouTube URL</label>
                             <input is="emby-input" type="text" id="txtReplaceUrl" placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ" />
-                            <div class="fieldDescription">The video with the right audio. Importing it on the Import tab overwrites the song's file.</div>
+                            <div class="fieldDescription" data-str="ReplaceUrlHelp">The video with the right audio. Importing it on the Import tab overwrites the song's file.</div>
                         </div>
                         <button is="emby-button" type="button" id="btnReplace" class="raised base-button primary small" disabled>
-                            <span>Queue Replacement</span>
+                            <span data-str="ButtonQueueReplacement">Queue Replacement</span>
                         </button>
                     </div>
 
                     <!-- Queue -->
                     <!-- Songs waiting to download, downloading, downloaded, or failed. -->
                     <div class="sectionTitleContainer flex align-items-center">
-                        <h2 class="sectionTitle">Queue</h2>
+                        <h2 class="sectionTitle" data-str="Queue">Queue</h2>
                     </div>
                     <span id="queueStatus" class="base-status-text" role="status"></span>
                     <div id="queueList"></div>

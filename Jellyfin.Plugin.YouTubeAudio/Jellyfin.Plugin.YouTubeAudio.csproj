@@ -30,6 +30,47 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Jellyfin strings the pages and messages use, built in by Base in every Jellyfin language -->
+    <JellyfinString Include="Album" />
+    <JellyfinString Include="AlbumArtist" />
+    <JellyfinString Include="All" />
+    <JellyfinString Include="Artist" />
+    <JellyfinString Include="ButtonCancel" />
+    <JellyfinString Include="ButtonPause" />
+    <JellyfinString Include="ButtonRemove" />
+    <JellyfinString Include="ButtonSignIn" />
+    <JellyfinString Include="ButtonStop" />
+    <JellyfinString Include="ButtonSubmit" />
+    <JellyfinString Include="Default" />
+    <JellyfinString Include="Delete" />
+    <JellyfinString Include="Download" />
+    <JellyfinString Include="Genre" />
+    <JellyfinString Include="HeaderDeleteItems" />
+    <JellyfinString Include="HeaderError" />
+    <JellyfinString Include="LabelFailed" />
+    <JellyfinString Include="LabelSource" />
+    <JellyfinString Include="LabelStatus" />
+    <JellyfinString Include="LabelTitle" />
+    <JellyfinString Include="LabelYear" />
+    <JellyfinString Include="Play" />
+    <JellyfinString Include="Preview" />
+    <JellyfinString Include="Refresh" />
+    <JellyfinString Include="Reset" />
+    <JellyfinString Include="Save" />
+    <JellyfinString Include="Search" />
+    <JellyfinString Include="Select" />
+    <JellyfinString Include="SelectAll" />
+    <JellyfinString Include="Settings" />
+    <JellyfinString Include="Track" />
+    <JellyfinString Include="TrackCount" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- An album cover, not the subtitle aspect mode Jellyfin calls Cover -->
+    <JellyfinTextMatch Include="LabelCover" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Jellyfin.Plugin.YouTubeAudio.Tests" />
   </ItemGroup>
 

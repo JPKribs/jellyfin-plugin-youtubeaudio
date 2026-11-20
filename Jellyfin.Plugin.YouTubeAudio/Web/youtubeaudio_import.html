@@ -8,49 +8,49 @@
                 <div class="verticalSection verticalSection-extrabottompadding">
 
                     <div class="sectionTitleContainer flex align-items-center">
-                        <h1 class="sectionTitle">Import</h1>
+                        <h1 class="sectionTitle" data-str="Import">Import</h1>
                     </div>
-                    <div class="fieldDescription">Tags downloaded songs and imports them into the Jellyfin music library.</div>
+                    <div class="fieldDescription" data-str="ImportIntro">Tags downloaded songs and imports them into the Jellyfin music library.</div>
 
                     <span id="importStatus" class="base-status-text" role="status"></span>
 
                     <!-- Bulk Updates -->
                     <!-- Copies the filled fields into every selected file. -->
                     <div class="base-bulk-edit-bar" id="bulkEditBar">
-                        <div class="base-bulk-edit-title">Bulk Updates</div>
+                        <div class="base-bulk-edit-title" data-str="HeaderBulkUpdates">Bulk Updates</div>
                         <div class="base-edit-line">
                             <div class="base-field" id="bulkArtistCell">
-                                <label>Artist</label>
+                                <label data-str="Artist">Artist</label>
                             </div>
                             <div class="base-field">
-                                <label for="bulkAlbumArtist">Album Artist</label>
-                                <input type="text" class="base-edit-input" id="bulkAlbumArtist" placeholder="Artist" />
+                                <label for="bulkAlbumArtist" data-str="AlbumArtist">Album Artist</label>
+                                <input type="text" class="base-edit-input" id="bulkAlbumArtist" placeholder="Artist" data-str-placeholder="Artist" />
                             </div>
                             <div class="base-field">
-                                <label for="bulkFeat">Featured Artists</label>
-                                <input type="text" class="base-edit-input" id="bulkFeat" placeholder="Artist B; Artist C" />
+                                <label for="bulkFeat" data-str="LabelFeaturedArtists">Featured Artists</label>
+                                <input type="text" class="base-edit-input" id="bulkFeat" placeholder="Artist B; Artist C" data-str-placeholder="PlaceholderArtists" />
                             </div>
                         </div>
                         <div class="base-edit-line">
                             <div class="base-field yta-grow-3" id="bulkAlbumCell">
-                                <label>Album</label>
+                                <label data-str="Album">Album</label>
                             </div>
                             <div class="base-field yta-grow-1">
-                                <label for="bulkYear">Year</label>
+                                <label for="bulkYear" data-str="LabelYear">Year</label>
                                 <input type="number" class="base-edit-input" id="bulkYear" placeholder="2024" />
                             </div>
                             <div class="base-field yta-grow-3">
-                                <label for="bulkGenre">Genre</label>
-                                <input type="text" class="base-edit-input" id="bulkGenre" placeholder="Classical; Baroque" />
+                                <label for="bulkGenre" data-str="Genre">Genre</label>
+                                <input type="text" class="base-edit-input" id="bulkGenre" placeholder="Classical; Baroque" data-str-placeholder="PlaceholderGenres" />
                             </div>
                         </div>
                         <div id="bulkCoverCell"></div>
                         <div class="base-edit-line">
                             <button is="emby-button" type="button" id="btnApplyBulk" class="raised base-button primary small" disabled>
-                                <span>Apply to Selected</span>
+                                <span data-str="ButtonApplyToSelected">Apply to Selected</span>
                             </button>
                             <button is="emby-button" type="button" id="btnBulkCover" class="raised base-button secondary small" disabled>
-                                <span>Set Cover on Selected</span>
+                                <span data-str="ButtonSetCoverOnSelected">Set Cover on Selected</span>
                             </button>
                         </div>
                     </div>

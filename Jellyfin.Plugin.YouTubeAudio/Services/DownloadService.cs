@@ -134,13 +134,13 @@ public sealed partial class DownloadService : IDisposable
     {
         if (string.IsNullOrWhiteSpace(url))
         {
-            throw new ArgumentException("URL is required.");
+            throw UserMessages.Argument(TranslationKeys.MessageEnterYouTubeUrl);
         }
 
         // Only the normalized link is used from here on: it is what reaches yt-dlp's command line.
         if (!TryNormalizeYouTubeUrl(url, out var normalizedUrl))
         {
-            throw new ArgumentException("URL must be a valid YouTube URL.");
+            throw UserMessages.Argument(TranslationKeys.ErrorNotYouTubeUrl);
         }
 
         url = normalizedUrl;
@@ -171,8 +171,10 @@ public sealed partial class DownloadService : IDisposable
                 {
                     if (maxPlaylistItems > 0 && fetchResult.Data.Entries.Length > maxPlaylistItems)
                     {
-                        throw new PlaylistTooLargeException(
-                            string.Create(CultureInfo.InvariantCulture, $"This playlist has more than {maxPlaylistItems} videos, the most you can queue at once. Ask an administrator to add it."));
+                        throw UserMessages.Mark(
+                            new PlaylistTooLargeException(BaseTranslations.Format(TranslationKeys.ErrorPlaylistTooLarge, null, maxPlaylistItems)),
+                            TranslationKeys.ErrorPlaylistTooLarge,
+                            maxPlaylistItems);
                     }
 
                     foreach (var entry in fetchResult.Data.Entries)
@@ -474,7 +476,7 @@ public sealed partial class DownloadService : IDisposable
     {
         if (!TryNormalizeYouTubeUrl(url, out var normalizedUrl))
         {
-            throw new ArgumentException("Enter a YouTube link.");
+            throw UserMessages.Argument(TranslationKeys.MessageEnterYouTubeUrl);
         }
 
         url = normalizedUrl;
@@ -482,7 +484,7 @@ public sealed partial class DownloadService : IDisposable
         var path = _libraryService.GetSongPath(itemId);
         if (path == null || !File.Exists(path))
         {
-            throw new FileNotFoundException("That song's file was not found in the library.");
+            throw UserMessages.NotFound(TranslationKeys.ErrorSongFileNotFound);
         }
 
         TagLib.File tagFile;
@@ -493,7 +495,7 @@ public sealed partial class DownloadService : IDisposable
         catch (Exception ex)
         {
             // TagLib throws all sorts for a damaged or unsupported file.
-            throw new ArgumentException("That song's file could not be read.", ex);
+            throw UserMessages.Argument(TranslationKeys.ErrorSongFileUnreadable, ex);
         }
 
         PlaylistTrack track;
@@ -556,18 +558,18 @@ public sealed partial class DownloadService : IDisposable
     {
         if (!TryNormalizeYouTubeUrl(url, out var normalizedUrl))
         {
-            throw new ArgumentException("Enter a YouTube link.");
+            throw UserMessages.Argument(TranslationKeys.MessageEnterYouTubeUrl);
         }
 
         url = normalizedUrl;
 
         var db = _dbProvider.Database;
-        var item = db.GetItemById(id) ?? throw new FileNotFoundException("Queue item not found.");
+        var item = db.GetItemById(id) ?? throw UserMessages.NotFound(TranslationKeys.ErrorQueueItemNotFound);
         if (item.Status is QueueStatus.Downloading or QueueStatus.Imported)
         {
-            throw new InvalidOperationException(item.Status == QueueStatus.Downloading
-                ? "This item is downloading; change its link once it finishes."
-                : "This item is already in the library.");
+            throw UserMessages.Conflict(item.Status == QueueStatus.Downloading
+                ? TranslationKeys.ErrorSongDownloading
+                : TranslationKeys.ErrorSongInLibrary);
         }
 
         if (item.Status == QueueStatus.Downloaded)
@@ -891,7 +893,9 @@ public sealed partial class DownloadService : IDisposable
     /// error details.
     /// </summary>
     /// <param name="sourceNames">Display names for playlist source IDs.</param>
-    public List<PublicQueueItem> GetPublicQueue(IReadOnlyDictionary<string, string> sourceNames)
+    /// <param name="language">The language of the status and source text, or <c>null</c> for US English.</param>
+    /// <returns>The queue items the page shows.</returns>
+    public List<PublicQueueItem> GetPublicQueue(IReadOnlyDictionary<string, string> sourceNames, string? language = null)
     {
         ArgumentNullException.ThrowIfNull(sourceNames);
 
@@ -906,16 +910,16 @@ public sealed partial class DownloadService : IDisposable
                 StatusCode = (int)item.Status,
                 Status = item.Status switch
                 {
-                    QueueStatus.Queued => "Waiting to download",
-                    QueueStatus.Downloading => "Downloading",
-                    QueueStatus.Downloaded => "Downloaded, not yet added",
-                    QueueStatus.Error => "Could not be downloaded",
+                    QueueStatus.Queued => BaseTranslations.Get(TranslationKeys.StatusWaitingToDownload, language),
+                    QueueStatus.Downloading => BaseTranslations.Get(TranslationKeys.StatusDownloading, language),
+                    QueueStatus.Downloaded => BaseTranslations.Get(TranslationKeys.StatusDownloadedNotAdded, language),
+                    QueueStatus.Error => BaseTranslations.Get(TranslationKeys.StatusNotDownloaded, language),
                     _ => item.Status.ToString()
                 },
                 Source = item.Source switch
                 {
                     null => "YouTube",
-                    ReplacementSource => "Replacement",
+                    ReplacementSource => BaseTranslations.Get(TranslationKeys.LabelReplacement, language),
                     _ => sourceNames.GetValueOrDefault(item.Source) ?? item.Source
                 },
                 CreatedAt = item.CreatedAt
@@ -1021,16 +1025,16 @@ public sealed partial class DownloadService : IDisposable
     public void SetCoverArt(string id, byte[] data)
     {
         ArgumentNullException.ThrowIfNull(data);
-        var file = GetPreviewFile(id) ?? throw new FileNotFoundException("Downloaded file not found.");
+        var file = GetPreviewFile(id) ?? throw UserMessages.NotFound(TranslationKeys.ErrorDownloadedFileNotFound);
         if (data.Length > MaxCoverArtBytes)
         {
-            throw new ArgumentException("The image is too large. Use one under 10 MB.");
+            throw UserMessages.Argument(TranslationKeys.ErrorImageTooLarge);
         }
 
-        var info = ImageInfo.Read(data) ?? throw new ArgumentException("Choose a JPEG or PNG image.");
+        var info = ImageInfo.Read(data) ?? throw UserMessages.Argument(TranslationKeys.ErrorImageType);
         if (info.Width != info.Height)
         {
-            throw new ArgumentException("Cover art must be square.");
+            throw UserMessages.Argument(TranslationKeys.ErrorCoverNotSquare);
         }
 
         using var tagFile = TagLib.File.Create(file.Path);
@@ -1162,7 +1166,7 @@ public sealed partial class DownloadService : IDisposable
     /// <exception cref="FileNotFoundException">The item is not a downloaded file.</exception>
     public async Task<bool> SetCoverFromLibraryAlbumAsync(string id, string? album, string? albumArtist, CancellationToken cancellationToken)
     {
-        var file = GetPreviewFile(id) ?? throw new FileNotFoundException("Downloaded file not found.");
+        var file = GetPreviewFile(id) ?? throw UserMessages.NotFound(TranslationKeys.ErrorDownloadedFileNotFound);
         var cover = await GetLibraryAlbumCoverAsync(album, albumArtist, cancellationToken).ConfigureAwait(false);
         if (cover == null)
         {
@@ -1226,12 +1230,12 @@ public sealed partial class DownloadService : IDisposable
 
         var db = _dbProvider.Database;
         var item = db.GetItemById(request.Id)
-            ?? throw new FileNotFoundException($"Queue item not found: {request.Id}");
+            ?? throw UserMessages.NotFound(TranslationKeys.ErrorQueueItemNotFound);
 
         var filePath = Path.Combine(_dbProvider.GetAudioCacheDirectory(), item.FileName);
         if (!File.Exists(filePath))
         {
-            throw new FileNotFoundException($"Audio file not found: {item.FileName}");
+            throw UserMessages.NotFound(TranslationKeys.ErrorDownloadedFileNotFound);
         }
 
         TagLib.File? tagFile = null;
@@ -2141,7 +2145,7 @@ public sealed partial class DownloadService : IDisposable
         CancelDownloads();
         if (!await _downloadLock.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken).ConfigureAwait(false))
         {
-            throw new InvalidOperationException("Downloads are still stopping. Try again in a moment.");
+            throw UserMessages.Conflict(TranslationKeys.ErrorDownloadsStopping);
         }
 
         try
@@ -2340,7 +2344,7 @@ public sealed partial class DownloadService : IDisposable
 
         LastToolUpdateCheckUtc = DateTime.UtcNow;
         await UpdateManagedYtDlpAsync(cancellationToken).ConfigureAwait(false);
-        await UpdateManagedDenoAsync(cancellationToken).ConfigureAwait(false);
+        await UpdateManagedDenoAsync(null, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -2378,8 +2382,10 @@ public sealed partial class DownloadService : IDisposable
     /// Downloads the newest Deno over the plugin-managed copy when its version differs. A Deno
     /// installed on the system is never touched.
     /// </summary>
+    /// <param name="language">The language of the description, or <c>null</c> for US English.</param>
+    /// <param name="cancellationToken">Cancels the check and the download.</param>
     /// <returns>A short description of what happened, for the Update button.</returns>
-    private async Task<string?> UpdateManagedDenoAsync(CancellationToken cancellationToken)
+    private async Task<string?> UpdateManagedDenoAsync(string? language, CancellationToken cancellationToken)
     {
         var managed = GetManagedDenoPath();
         if (managed == null || !File.Exists(managed) || GetDenoTarget() is not { } target)
@@ -2398,14 +2404,14 @@ public sealed partial class DownloadService : IDisposable
 
             _logger.LogInformation("Updating Deno from {Current} to {Latest}", current ?? "an unknown version", latest);
             await ToolDownloads.DownloadDenoAsync(_httpClient, managed, target, latest, cancellationToken).ConfigureAwait(false);
-            return "Deno updated to " + latest + ".";
+            return BaseTranslations.Format(TranslationKeys.MessageDenoUpdated, language, latest);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             // Any failure, including a binary that cannot start (wrong libc, noexec mount),
             // must never fail the downloads that triggered the check.
             _logger.LogWarning(ex, "Could not update Deno; keeping the current copy");
-            return "Deno could not be updated: " + ex.Message;
+            return BaseTranslations.Format(TranslationKeys.MessageDenoNotUpdated, language, ex.Message);
         }
     }
 
@@ -2696,13 +2702,15 @@ public sealed partial class DownloadService : IDisposable
     /// published checksums. Serialized against downloads so a binary is never replaced
     /// mid-download.
     /// </summary>
+    /// <param name="language">The language of the result message, or <c>null</c> for US English.</param>
+    /// <param name="cancellationToken">Cancels the update.</param>
     /// <returns>A human-readable result message.</returns>
     /// <exception cref="InvalidOperationException">Downloads are running, or the update failed.</exception>
-    public async Task<string> UpdateYtDlpAsync(CancellationToken cancellationToken = default)
+    public async Task<string> UpdateYtDlpAsync(string? language = null, CancellationToken cancellationToken = default)
     {
         if (!await _downloadLock.WaitAsync(TimeSpan.Zero, cancellationToken).ConfigureAwait(false))
         {
-            throw new InvalidOperationException("Downloads are in progress. Cancel them on the Download tab, or try again after they finish.");
+            throw UserMessages.Conflict(TranslationKeys.ErrorDownloadsRunning);
         }
 
         try
@@ -2713,17 +2721,17 @@ public sealed partial class DownloadService : IDisposable
             {
                 if (!File.Exists(configPath))
                 {
-                    throw new InvalidOperationException($"Configured yt-dlp path does not exist: {configPath}");
+                    throw UserMessages.Conflict(TranslationKeys.ErrorYtDlpPathMissing, configPath);
                 }
 
                 _logger.LogInformation("Running self-update for configured yt-dlp at {Path}", configPath);
                 var output = await RunProcessAsync(configPath, _selfUpdateArgs, TimeSpan.FromMinutes(2)).ConfigureAwait(false);
-                message = string.IsNullOrWhiteSpace(output) ? "yt-dlp self-update finished." : output;
+                message = string.IsNullOrWhiteSpace(output) ? BaseTranslations.Get(TranslationKeys.MessageYtDlpSelfUpdated, language) : output;
             }
             else
             {
                 var pluginDir = GetPluginDirectory()
-                    ?? throw new InvalidOperationException("Could not determine the plugin directory.");
+                    ?? throw UserMessages.Conflict(TranslationKeys.ErrorPluginDirectory);
 
                 _logger.LogInformation("Downloading latest standalone yt-dlp to {Dir}", pluginDir);
                 try
@@ -2732,20 +2740,20 @@ public sealed partial class DownloadService : IDisposable
                 }
                 catch (Exception ex) when (IsToolDownloadFailure(ex, cancellationToken))
                 {
-                    throw new InvalidOperationException("Failed to update yt-dlp: " + ex.Message, ex);
+                    throw UserMessages.Conflict(TranslationKeys.ErrorUpdateYtDlpReason, ex, ex.Message);
                 }
 
                 var binaryPath = Path.Combine(pluginDir, GetStandaloneBinaryName());
                 var version = await RunProcessAsync(binaryPath, _versionArgs, TimeSpan.FromSeconds(30)).ConfigureAwait(false);
-                message = $"Downloaded latest yt-dlp ({version}).";
+                message = BaseTranslations.Format(TranslationKeys.MessageYtDlpDownloaded, language, version);
             }
 
-            var denoUpdate = await UpdateManagedDenoAsync(cancellationToken).ConfigureAwait(false);
+            var denoUpdate = await UpdateManagedDenoAsync(language, cancellationToken).ConfigureAwait(false);
             var deno = await EnsureDenoAsync(cancellationToken).ConfigureAwait(false);
             LastToolUpdateCheckUtc = DateTime.UtcNow;
-            message += deno != null
-                ? $" Using Deno at {deno}." + (denoUpdate == null ? string.Empty : " " + denoUpdate)
-                : " Deno could not be set up, so YouTube may refuse some downloads.";
+            message += " " + (deno != null
+                ? BaseTranslations.Format(TranslationKeys.MessageUsingDeno, language, deno) + (denoUpdate == null ? string.Empty : " " + denoUpdate)
+                : BaseTranslations.Get(TranslationKeys.MessageDenoMissing, language));
             return message;
         }
         finally

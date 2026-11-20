@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using Jellyfin.Plugin.YouTubeAudio.Models;
+using Jellyfin.Plugin.YouTubeAudio.Utilities;
+using JPKribs.Jellyfin.Base;
 
 namespace Jellyfin.Plugin.YouTubeAudio.Services.Playlists;
 
@@ -76,7 +78,7 @@ public sealed class AppleMusicPlaylistSource : IPlaylistSource
 
         var lines = content.Split(_lineSeparators, StringSplitOptions.None);
         var columns = ResolveColumns(lines.Length > 0 ? lines[0].Split('\t') : [])
-            ?? throw new ArgumentException("The file is not an Apple Music playlist export.");
+            ?? throw UserMessages.Argument(TranslationKeys.ErrorNotAppleMusicPlaylist);
 
         var playlist = new ParsedPlaylist
         {

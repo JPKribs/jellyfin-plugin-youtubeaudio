@@ -10,6 +10,6 @@ The Public Queue is at `/YouTube/Queue` after your server address, such as `http
 * Each row shows the song's title, then its artist, album and source, with its status at the right. The statuses read "Waiting to download", "Downloading", "Downloaded, not yet added" and "Could not be downloaded".
 * The list refreshes every 10 seconds, and the line under it shows when it was last updated.
 
-The page is read only and shows titles, artists, albums and sources only. It shows no links, file names or error details. A visitor who is not signed in sees **Sign in required** with a **Sign in** button. When the queue cannot be loaded, the page shows **Queue unavailable** with **Back to Jellyfin**.
+The page is read only and shows titles, artists, albums and sources only. It shows no links, file names or error details. A visitor who is not signed in sees **Sign in required** with a **Sign In** button. When the queue cannot be loaded, the page shows **Queue unavailable** with **Back to Jellyfin**.
 
 Next: [Approved User Downloads](ApprovedUserDownloads.md).

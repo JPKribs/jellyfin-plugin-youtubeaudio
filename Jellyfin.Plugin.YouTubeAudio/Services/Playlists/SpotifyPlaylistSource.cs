@@ -6,6 +6,8 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using Jellyfin.Plugin.YouTubeAudio.Models;
+using Jellyfin.Plugin.YouTubeAudio.Utilities;
+using JPKribs.Jellyfin.Base;
 
 namespace Jellyfin.Plugin.YouTubeAudio.Services.Playlists;
 
@@ -52,7 +54,7 @@ public sealed partial class SpotifyPlaylistSource : IPlaylistSource
         var rows = ReadCsv(content);
         if (rows.Count == 0)
         {
-            throw new ArgumentException("The file is not a Spotify playlist export.");
+            throw UserMessages.Argument(TranslationKeys.ErrorNotSpotifyExport);
         }
 
         var header = rows[0];
@@ -74,7 +76,7 @@ public sealed partial class SpotifyPlaylistSource : IPlaylistSource
         };
         if (col.Title < 0 || col.Artists < 0)
         {
-            throw new ArgumentException("The file is not a Spotify playlist export.");
+            throw UserMessages.Argument(TranslationKeys.ErrorNotSpotifyExport);
         }
 
         var baseName = Path.GetFileName(fileName ?? string.Empty);

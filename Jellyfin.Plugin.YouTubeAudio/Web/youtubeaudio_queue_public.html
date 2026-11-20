@@ -8,21 +8,21 @@
 </style>
 
 <div id="signin" class="hidden">
-    <h1>Sign in required</h1>
-    <p>Sign in to your account to view this page.</p>
-    <a id="signinLink" class="base-btn" href="/">Sign in</a>
+    <h1 data-str="HeaderSignInRequired">Sign in required</h1>
+    <p data-str="MessageSignInToView">Sign in to your account to view this page.</p>
+    <a id="signinLink" class="base-btn" href="/" data-str="ButtonSignIn">Sign In</a>
 </div>
 
 <div id="unavailable" class="hidden">
-    <h1>Queue unavailable</h1>
-    <p>The queue couldn't be loaded. Try again in a moment.</p>
-    <a id="unavailableLink" class="base-btn" href="/">Back to Jellyfin</a>
+    <h1 data-str="HeaderQueueUnavailable">Queue unavailable</h1>
+    <p data-str="ErrorQueueUnavailable">The queue couldn't be loaded. Try again in a moment.</p>
+    <a id="unavailableLink" class="base-btn" href="/" data-str="ButtonBackToJellyfin">Back to Jellyfin</a>
 </div>
 
 <div id="queue" class="hidden">
-    <h1>Download Queue</h1>
-    <p>Songs waiting to be added to the music library, and where each one stands.</p>
-    <div id="filter" class="base-pill-group" role="group" aria-label="Status"></div>
+    <h1 data-str="HeaderDownloadQueue">Download Queue</h1>
+    <p data-str="QueueIntro">Songs waiting to be added to the music library, and where each one stands.</p>
+    <div id="filter" class="base-pill-group" role="group" aria-label="Status" data-str-label="LabelStatus"></div>
     <div id="list"></div>
     <p id="updated" class="base-note"></p>
 </div>
@@ -36,15 +36,17 @@
         if (prefix === location.pathname) { prefix = ''; }
         var root = prefix + '/';
         var REFRESH_MS = 10000;
-        // Each status as a pill of the list's filter, and the Base badge state that colors it.
+        // Each status as a pill of the list's filter, by the key that names it, and the Base badge state that colors it.
         var STATES = [
-            { value: '0', label: 'Waiting', state: 'Queued' },
-            { value: '1', label: 'Downloading', state: 'Downloading' },
-            { value: '2', label: 'Downloaded', state: 'Downloaded' },
-            { value: '4', label: 'Failed', state: 'Error' }
+            { value: '0', key: 'StatusWaiting', state: 'Queued' },
+            { value: '1', key: 'StatusDownloading', state: 'Downloading' },
+            { value: '2', key: 'StatusDownloaded', state: 'Downloaded' },
+            { value: '4', key: 'LabelFailed', state: 'Error' }
         ];
         var queue = null;
         var kit = null;
+        // The plugin's strings in the viewer's language.
+        var t = null;
 
         var el = function (id) { return document.getElementById(id); };
         function show(id) { el(id).classList.remove('hidden'); }
@@ -60,12 +62,21 @@
 
         ['signinLink', 'unavailableLink'].forEach(function (id) { var a = el(id); if (a) a.href = root; });
 
+        var serverName = null;
         fetch(prefix + '/System/Info/Public', { headers: { 'Accept': 'application/json' } })
             .then(function (r) { return r.json(); })
-            .then(function (info) { if (info && info.ServerName) { document.title = info.ServerName + ' - Queue'; } })
+            .then(function (info) { if (info && info.ServerName) { serverName = info.ServerName; showTitle(); } })
             .catch(function () { /* keep the default title */ });
 
-        function getToken() {
+        // showTitle
+        // Names the tab after the server and the page, once both are known.
+        function showTitle() {
+            if (serverName && t) document.title = serverName + ' - ' + t.tr('Queue');
+        }
+
+        // getServer
+        // Finds the signed in server this browser knows, preferring the one whose address matches this page.
+        function getServer() {
             try {
                 var raw = localStorage.getItem('jellyfin_credentials');
                 if (!raw) return null;
@@ -81,22 +92,22 @@
                     var s = withToken[j];
                     var addrs = [s.ManualAddress, s.LocalAddress, s.RemoteAddress, s.Address];
                     for (var k = 0; k < addrs.length; k++) {
-                        if (addrs[k] && addrs[k].replace(/\/+$/, '').toLowerCase() === origin) return s.AccessToken;
+                        if (addrs[k] && addrs[k].replace(/\/+$/, '').toLowerCase() === origin) return s;
                     }
                 }
-                return withToken.length > 0 ? withToken[0].AccessToken : null;
+                return withToken.length > 0 ? withToken[0] : null;
             } catch (e) { /* no token */ }
             return null;
         }
 
-        var token = getToken();
-        if (!token) { leaveLoading(); show('signin'); return; }
+        var server = getServer();
+        var token = server ? server.AccessToken : null;
         var authHeader = 'MediaBrowser Token="' + token + '"';
 
         var lastItems = [];
         var pills = null;
         var bag = null;
-        var OPTIONS = [{ value: 'all', label: 'All' }].concat(STATES);
+        var OPTIONS = [{ value: 'all', key: 'All' }].concat(STATES);
 
         // badgeNode
         // Draws a status as a Base status badge, a node the record list can hold.
@@ -113,8 +124,8 @@
             queue = kit.createRecordList({
                 items: [],
                 maxHeight: '60vh',
-                emptyText: 'The queue is empty.',
-                label: 'Download Queue'
+                emptyText: t.tr('MessageQueueEmpty'),
+                label: t.tr('HeaderDownloadQueue')
             });
             el('list').appendChild(queue.element);
             bag = kit.createShared(document, '7323ea64-a200-4265-ab8f-e7ae27d06c38', 'YouTube');
@@ -140,13 +151,13 @@
             el('filter').querySelectorAll('.base-pill').forEach(function (pill) {
                 var value = pill.getAttribute('data-value');
                 var o = OPTIONS.filter(function (x) { return x.value === value; })[0];
-                pill.textContent = o.label + ' ' + (value === 'all' ? items.length : counts[value] || 0);
+                pill.textContent = t.tr(o.key) + ' ' + (value === 'all' ? items.length : counts[value] || 0);
             });
             var shown = chosen === 'all' ? items : items.filter(function (i) { return String(i.StatusCode) === chosen; });
             queue.setItems(shown.map(function (i, n) {
                 return {
                     id: [i.CreatedAt, i.Source, i.Artist, i.Title, n].join('|'),
-                    title: i.Title || 'Title not known yet',
+                    title: i.Title || t.tr('LabelTitleUnknown'),
                     secondary: [i.Artist, i.Album, i.Source].filter(Boolean).join(' \u00b7 '),
                     aside: badgeNode(i)
                 };
@@ -166,7 +177,7 @@
                     leaveLoading();
                     hide('unavailable');
                     render(items || []);
-                    el('updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+                    el('updated').textContent = t.format('MessageUpdatedAt', new Date().toLocaleTimeString());
                     show('queue');
                 })
                 .catch(function () {
@@ -178,10 +189,17 @@
         import(prefix + '/web/configurationpage?name=youtubeaudio_jpkribs_shared.js')
             .then(function (mod) {
                 kit = mod;
+                return kit.loadTranslations(prefix + '/YouTubeAudio/Translations', { userId: server ? server.UserId : '' });
+            })
+            .then(function (loaded) {
+                t = loaded;
+                t.apply(document);
+                showTitle();
+                if (!token) { leaveLoading(); show('signin'); return; }
                 buildQueue();
                 load(true);
                 timer = setInterval(function () { if (!document.hidden) load(false); }, REFRESH_MS);
             })
-            .catch(function () { leaveLoading(); show('unavailable'); });
+            .catch(function () { leaveLoading(); show(token ? 'unavailable' : 'signin'); });
     })();
 </script>

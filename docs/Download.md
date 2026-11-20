@@ -18,7 +18,7 @@ The **Queue** under the source cards lists every song that is not yet imported. 
 
 * The status cards above the queue are **Queued**, **Downloading**, **Downloaded** and **Error**, each with its count. Click a card to show only songs with that status, and click it again to show them all. Several cards can be on at once.
 * **Search queue** finds songs by title, artist or link.
-* Select songs with their checkboxes, or with **Select all**, then click **Download** to download them or **Delete** to remove them. A failed song downloads again when you select it and click **Download**.
+* Select songs with their checkboxes, or with **Select All**, then click **Download** to download them or **Delete** to remove them. A failed song downloads again when you select it and click **Download**.
 * **Refresh** reads the queue again. The queue also refreshes every few seconds while songs download.
 * A failed song shows its reason in red on its card. A song worth checking shows a **Check Match** badge and a note, and a song that replaces a library single says "Replaces the single in the library when imported."
 

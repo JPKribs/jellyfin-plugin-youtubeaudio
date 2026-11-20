@@ -257,6 +257,7 @@ Every config page uses Jellyfin's page shell.
 * Show a result in the line under the form. An error takes `base-status-error`, which is red and hides itself when empty, and any other result takes `base-note`.
 * A second action, such as **View the Queue**, is a `base-btn base-btn-secondary` link under the primary one.
 * The Public Queue imports Base's shared CSS and script itself, for its Record List, Pill Group, and status badges. It uses only components that draw no icons.
+* The user download page imports Base's script only for `loadTranslations`, and none of Base's CSS.
 * Hide the template's loading heading and spinner when the page leaves its loading state.
 
 ### Tabs
@@ -513,7 +514,7 @@ Every list, row, card, badge, picker, player, and button in this plugin is a Bas
 
 | Piece | Missing Base option |
 | :--- | :--- |
-| The user page suggests artist and album names through a plain `datalist` | The status template loads no Base script, so `createComboBox` cannot run there |
+| The user page suggests artist and album names through a plain `datalist` | The user download page loads no Base CSS, so `createComboBox` cannot draw there |
 
 ## Checklist
 
