@@ -492,7 +492,7 @@ export default function (view) {
     }
 
     // setBulkCover
-    // Embeds the cover picked in Bulk Updates in every selected file.
+    // Embeds the cover picked in Bulk updates in every selected file.
     function setBulkCover() {
         var value = _bulkCover ? _bulkCover.getValue() : null;
         var ids = _list ? _list.getSelected() : [];
@@ -501,7 +501,7 @@ export default function (view) {
     }
 
     // generateCoverFor
-    // Draws a cover from the row's fields, with the text and colors set under Album Art in Settings, and embeds it.
+    // Draws a cover from the row's fields, with the text and colors set under Album art in Settings, and embeds it.
     //
     // Inputs
     // row [HTMLElement]: The file's row.

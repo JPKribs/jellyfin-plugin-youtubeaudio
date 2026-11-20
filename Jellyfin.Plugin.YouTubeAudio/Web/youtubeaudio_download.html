@@ -32,7 +32,7 @@
                         </label>
                         <label class="base-choice">
                             <input type="radio" name="downloadSource" value="replace" />
-                            <span class="base-choice-name" data-str="HeaderReplaceSong">Replace a Song</span>
+                            <span class="base-choice-name" data-str="HeaderReplaceSong">Replace a song</span>
                             <span class="base-choice-text" data-str="SourceReplaceHelp">Swap a library song's audio for a different YouTube upload.</span>
                         </label>
                     </div>
@@ -53,7 +53,7 @@
                     <!-- One export form, with each service's own instructions. -->
                     <div class="yta-source-panel" id="panelPlaylist" data-source="applemusic spotify" hidden>
                         <div class="selectContainer">
-                            <label data-str="LabelPlaylistExport">Playlist Export</label>
+                            <label data-str="LabelPlaylistExport">Playlist export</label>
                             <div id="playlistFile"></div>
                             <div class="fieldDescription yta-source-help" data-source="applemusic" data-str="AppleMusicExportHelp">In the Music app, select File &gt; Library &gt; Export Library to pick from every playlist, or export one playlist as XML or text.</div>
                             <div class="fieldDescription yta-source-help" id="spotifyHelp" data-source="spotify" hidden>Export one playlist as a CSV file, or all of them as a ZIP, with <a href="https://github.com/watsonbox/exportify" target="_blank" rel="noopener">Exportify</a>. Liked Songs downloads its songs without becoming a playlist.</div>
@@ -61,27 +61,27 @@
                             <div id="playlistChoices" hidden></div>
                         </div>
                         <div class="selectContainer">
-                            <label data-str="LabelPlaylistOwner">Playlist Owner</label>
+                            <label data-str="LabelPlaylistOwner">Playlist owner</label>
                             <div id="playlistOwner"></div>
                             <div class="fieldDescription" data-str="PlaylistOwnerHelp">Each playlist becomes a private Jellyfin playlist of this user, filled as its songs reach the library. A playlist the user already has with that name gets the songs it is missing.</div>
                         </div>
                         <button is="emby-button" type="button" id="btnImportPlaylist" class="raised base-button primary small" disabled>
-                            <span data-str="ButtonQueuePlaylist">Queue Playlist</span>
+                            <span data-str="ButtonQueuePlaylist">Queue playlist</span>
                         </button>
 
-                        <!-- Playlist Imports -->
+                        <!-- Playlist imports -->
                         <!-- Jellyfin playlists that fill as their songs reach the library. -->
                         <div id="playlistTargetsSection" hidden>
-                            <h3 class="base-subsection-title" data-str="HeaderPlaylistImports">Playlist Imports in Progress</h3>
+                            <h3 class="base-subsection-title" data-str="HeaderPlaylistImports">Playlist imports in progress</h3>
                             <div id="playlistTargets"></div>
                         </div>
                     </div>
 
-                    <!-- Replace a Song -->
+                    <!-- Replace a song -->
                     <!-- Swaps a library song's audio for a different upload. -->
                     <div class="yta-source-panel" id="panelReplace" data-source="replace" hidden>
                         <div class="selectContainer">
-                            <label data-str="LabelLibrarySong">Library Song</label>
+                            <label data-str="LabelLibrarySong">Library song</label>
                             <div id="replaceResults"></div>
                             <div class="fieldDescription" data-str="LibrarySongHelp">The song whose audio is wrong. Its file keeps its place in the library, its tags, and its cover.</div>
                         </div>
@@ -91,7 +91,7 @@
                             <div class="fieldDescription" data-str="ReplaceUrlHelp">The video with the right audio. Importing it on the Import tab overwrites the song's file.</div>
                         </div>
                         <button is="emby-button" type="button" id="btnReplace" class="raised base-button primary small" disabled>
-                            <span data-str="ButtonQueueReplacement">Queue Replacement</span>
+                            <span data-str="ButtonQueueReplacement">Queue replacement</span>
                         </button>
                     </div>
 

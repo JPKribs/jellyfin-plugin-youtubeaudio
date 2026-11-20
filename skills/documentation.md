@@ -16,7 +16,7 @@ Documentation describes the release it ships with. It reads as if this version w
 | The Stream option was removed. | Leave it out. |
 | No longer reads older databases. | Reads queue databases from 12.4.1.0 or later. |
 | Fixed an issue where covers were missing. | The album cover is embedded in each downloaded file. |
-| New in 12.4.5.0, Replace a Song swaps... | Replace a Song swaps... |
+| New in 12.4.5.0, Replace a song swaps... | Replace a song swaps... |
 | This release carries no upgrade steps. | Version 12.4.5.0 carries no upgrade steps. |
 
 "Now" and "no longer" are fine when they describe state rather than history. "The song is no longer in the queue" describes what the plugin sees, so it stays.
@@ -31,7 +31,7 @@ Remove compatibility notes for versions the plugin no longer supports. The plugi
 
 * Use present tense and plain declarative sentences.
 * Describe the system in the third person. "YouTube Audio files the song under its album."
-* Address the reader in the second person only in steps. "Select **Queue Playlist**."
+* Address the reader in the second person only in steps. "Select **Queue playlist**."
 * State one fact per sentence. Aim for 20 words or fewer and split anything over 30.
 * Use no contractions. Write "cannot", not "can't".
 * Use no em dashes, en dashes as dashes, or semicolons. Split the sentence, or join it with a comma and "and".
@@ -45,14 +45,14 @@ Remove compatibility notes for versions the plugin no longer supports. The plugi
 
 ### Headings
 
-* Use Title Case for every heading. "## Replace a Song Already in Your Library".
+* Write every heading in sentence case, mirroring Jellyfin. "## Replace a song already in your library".
 * Page titles are `#` and appear once per page.
-* Name the thing, not the action, unless the section is a procedure. "## Settings" and "## Add the Plugin Repository" are both correct.
+* Name the thing, not the action, unless the section is a procedure. "## Settings" and "## Add the plugin repository" are both correct.
 * Never rename a heading without fixing its anchors. `mkdocs build --strict` fails on a broken anchor.
 
 ### UI Names
 
-* Write a label exactly as the page shows it, in bold. **Playlist Limit**.
+* Write a label exactly as the page shows it, in bold. **Playlist limit**.
 * Write a path through the UI with `>` between the steps, in bold. **Dashboard > Plugins > YouTube Audio > Settings**.
 * Write a tab as its label, in bold. **Download**, **Import**, **Settings**.
 * Quote on-screen messages in double quotes. "Download started."
@@ -70,8 +70,8 @@ Keep the nav in this order.
 
 1. **Overview** (`index.md`). What the plugin is and how it works.
 2. **Installation** (`Installation.md`).
-3. **Getting Started**. Settings, Download, Import, Public Queue, and Approved User Downloads, in the order a new user meets them.
-4. **Development**. The End to End Test (`Testing.md`).
+3. **Getting started**. Settings, Download, Import, Public queue, and Approved user downloads, in the order a new user meets them.
+4. **Development**. The end-to-end test (`Testing.md`).
 5. **Reference**. Versioning.
 
 Name page files in PascalCase with no spaces, such as `PublicQueue.md`.
@@ -115,14 +115,14 @@ One sentence on what the route does and who calls it.
 List settings as bullets in the order the page shows them. Start each with the label in bold and follow it with a verb.
 
 ```markdown
-* **Embed Cover Art** adds the album cover to each downloaded file.
+* **Embed cover art** adds the album cover to each downloaded file.
 ```
 
 When a page has many settings with defaults, use a table instead.
 
 | Setting | What it does | Default |
 | :--- | :--- | :--- |
-| **Embed Cover Art** | Adds the album cover to each downloaded file | On |
+| **Embed cover art** | Adds the album cover to each downloaded file | On |
 
 Table cells have no closing period. Keep them to one sentence.
 
@@ -132,7 +132,7 @@ Write trouble as a table of what the reader sees and what to do.
 
 | Reason | What to do |
 | :--- | :--- |
-| No acceptable upload for *title* | Select **Change Link** on its row and paste the right YouTube link |
+| No acceptable upload for *title* | Select **Change link** on its row and paste the right YouTube link |
 
 Put the exact on-screen text in the first column. Use italics for a placeholder inside it, such as *server*.
 
@@ -153,7 +153,7 @@ Give every admonition a short title.
 ### Links
 
 * Link pages relatively with their `.md` name, such as `[Settings](Settings.md#approved-users)`.
-* End a Getting Started page with one "Next" line, such as `Next: [Import](Import.md).`
+* End a Getting started page with one "Next" line, such as `Next: [Import](Import.md).`
 * Link to Base's README for a shared component instead of describing it again.
 
 ## README
@@ -210,8 +210,8 @@ PLAYWRIGHT_CORE=/path/to/node_modules/playwright-core/index.mjs node shoot.mjs
 ### Names and Placement
 
 * Save to `docs/screenshots/`.
-* Name the file in Title Case after what it shows, with a hyphen for a space. `Settings.png`, `User-Download.png`.
-* Link with alt text that names the subject. `![Approved User Downloads](screenshots/User-Download.png)`.
+* Name the file in PascalCase after what it shows, with a hyphen between words. `Settings.png`, `User-Download.png`.
+* Link with alt text that names the subject. `![Approved user downloads](screenshots/User-Download.png)`.
 * Place two related shots side by side in a table whose header row holds the captions.
 
 ```markdown
@@ -272,7 +272,7 @@ Release notes live in the `changelog` of `build.yaml`, under four keys. The publ
 ```yaml
 changelog:
   added:
-    - Replace a Song, which swaps a library song's audio for a different YouTube upload
+    - Replace a song, which swaps a library song's audio for a different YouTube upload
   fixed:
     - A playlist import could queue a song twice. Each song is queued once
 ```
@@ -296,7 +296,7 @@ changelog:
 
 * [ ] Nothing describes an earlier version, a removed feature, or a fixed bug.
 * [ ] Every UI label matches the page exactly and is bold.
-* [ ] Every heading is Title Case.
+* [ ] Every heading is in sentence case.
 * [ ] No em dashes, semicolons, or contractions.
 * [ ] Every screenshot matches the current UI, came from the screenshot kit, and was looked at.
 * [ ] Every term matches [glossary.md](glossary.md).

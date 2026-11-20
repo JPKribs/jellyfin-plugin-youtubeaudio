@@ -30,11 +30,20 @@ How this plugin shows its text in the viewer's language. Base builds the strings
     * Markup: `data-str="Key"`, `data-str-title`, `data-str-label`, or `data-str-placeholder`, with the English as the element's own text.
     * Config page script: `t.tr('Key')` or `t.format('Key', value)`, where `t` is `Shared.t`. `createPage` in `youtubeaudio_shared.js` loads the strings with `loadTranslations('YouTubeAudio/Translations')` and applies them to the markup before the page's `bind` runs.
     * A count: `countText(t, count, 'KeyOne', 'KeyMany')`, with the one and the other count as separate keys.
-    * Base component text, such as a Save Bar's lines or a Filtered List's Select all, comes from Base's own strings. Pass a text option only when it says something different from Base's default.
+    * Base component text, such as a Save Bar's lines or a Filtered List's **Select all**, comes from Base's own strings. Pass a text option only when it says something different from Base's default.
     * User pages: they import Base's script and call `loadTranslations('/YouTubeAudio/Translations', { userId })` themselves, with the English as `tr`'s fallback, since they run without the dashboard. Their API calls send `t.language` in the `X-Jellyfin-Plugin-Language` header.
     * C#: `BaseTranslations.Get(TranslationKeys.Key, language)` or `BaseTranslations.Format(...)`, with the page's language from `BaseTranslations.RequestLanguage(Request)`, which reads `?language=`, then the `X-Jellyfin-Plugin-Language` header Base's `apiRequest` sends, then `Accept-Language`. A service throws `UserMessages.Argument`, `NotFound`, or `Conflict` with a key, and the controller answers with `UserMessages.ErrorBody(ex, Request)`. Text for everyone, such as an activity log entry, uses `BaseTranslations.ServerLanguage(config)`.
 5. Build. Fix every `JPKT` error and warning.
 6. Run `TranslationsTests`, which checks that every key the pages use has a string.
+
+## Casing
+
+Every string is in sentence case, mirroring Jellyfin, such as "Allow media playback".
+
+* Write a local string in `en-us.json` in sentence case. Keep proper nouns as written.
+* Add a word or phrase the plugin writes with special casing, such as a product name or a format, to `Localization/casing.json`. It is a JSON array, and Base's defaults, such as Jellyfin, URL, and TV, need no entry.
+* A Jellyfin string stays as Jellyfin writes it. Add `Case="sentence"` to its `JellyfinString` only when it reads wrong beside its neighbors, such as `AlbumArtist`.
+* Text built at runtime takes `ToSentenceCase` or `ToTitleCase` in C#, and `sentenceCase` or `titleCase` on a page. Each keeps the casing.json words.
 
 ## Add a Language
 
@@ -44,5 +53,6 @@ Add `Localization/<code>.json`, such as `de.json` or `pt-br.json`, with only key
 
 * [ ] No English in a page, script, or server message outside `Localization/en-us.json`.
 * [ ] Jellyfin's string used wherever it has the words.
+* [ ] Every label is in sentence case, and casing.json lists the words kept as written.
 * [ ] The build has no `JPKT` error or warning.
 * [ ] The pages show the strings, checked once in another language such as `de`.

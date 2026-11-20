@@ -14,20 +14,20 @@
 
                     <span id="importStatus" class="base-status-text" role="status"></span>
 
-                    <!-- Bulk Updates -->
+                    <!-- Bulk updates -->
                     <!-- Copies the filled fields into every selected file. -->
                     <div class="base-bulk-edit-bar" id="bulkEditBar">
-                        <div class="base-bulk-edit-title" data-str="HeaderBulkUpdates">Bulk Updates</div>
+                        <div class="base-bulk-edit-title" data-str="HeaderBulkUpdates">Bulk updates</div>
                         <div class="base-edit-line">
                             <div class="base-field" id="bulkArtistCell">
                                 <label data-str="Artist">Artist</label>
                             </div>
                             <div class="base-field">
-                                <label for="bulkAlbumArtist" data-str="AlbumArtist">Album Artist</label>
+                                <label for="bulkAlbumArtist" data-str="AlbumArtist">Album artist</label>
                                 <input type="text" class="base-edit-input" id="bulkAlbumArtist" placeholder="Artist" data-str-placeholder="Artist" />
                             </div>
                             <div class="base-field">
-                                <label for="bulkFeat" data-str="LabelFeaturedArtists">Featured Artists</label>
+                                <label for="bulkFeat" data-str="LabelFeaturedArtists">Featured artists</label>
                                 <input type="text" class="base-edit-input" id="bulkFeat" placeholder="Artist B; Artist C" data-str-placeholder="PlaceholderArtists" />
                             </div>
                         </div>
@@ -47,10 +47,10 @@
                         <div id="bulkCoverCell"></div>
                         <div class="base-edit-line">
                             <button is="emby-button" type="button" id="btnApplyBulk" class="raised base-button primary small" disabled>
-                                <span data-str="ButtonApplyToSelected">Apply to Selected</span>
+                                <span data-str="ButtonApplyToSelected">Apply to selected</span>
                             </button>
                             <button is="emby-button" type="button" id="btnBulkCover" class="raised base-button secondary small" disabled>
-                                <span data-str="ButtonSetCoverOnSelected">Set Cover on Selected</span>
+                                <span data-str="ButtonSetCoverOnSelected">Set cover on selected</span>
                             </button>
                         </div>
                     </div>
@@ -67,7 +67,7 @@
     <link rel="stylesheet" href="configurationpage?name=youtubeaudio_jpkribs_shared.css">
     <style>
         /* yta-grow */
-        /* Shares a Bulk Updates line's width between its fields in a fixed ratio. A number field keeps room for four digits beside its arrows. */
+        /* Shares a Bulk updates line's width between its fields in a fixed ratio. A number field keeps room for four digits beside its arrows. */
         /* Example: <div class="base-field yta-grow-3"></div> */
         #YouTubeAudioImportPage .yta-grow-1 { flex: 1 1 0; min-width: 6.5rem; }
         #YouTubeAudioImportPage .yta-grow-3 { flex: 3 1 0; }
@@ -85,7 +85,7 @@
         #YouTubeAudioImportPage .yta-import-tools { display: flex; align-items: center; gap: var(--base-gap-narrow); margin-left: auto; font-weight: normal; }
 
         /* yta-import-body */
-        /* A file panel's cover beside its tag fields, with its player across the full width under both. The cover cell is as wide as the cover, so Set Cover sits under it, and it takes back the Image Picker's bottom margin, so the cover is one gap from the fields under it. The fields share columns, three equal ones with Track and Year in a narrow last column that keeps four digits. On a tablet the cover moves on top, and on a phone each field takes its own line. */
+        /* A file panel's cover beside its tag fields, with its player across the full width under both. The cover cell is as wide as the cover, so Set cover sits under it, and it takes back the Image Picker's bottom margin, so the cover is one gap from the fields under it. The fields share columns, three equal ones with Track and Year in a narrow last column that keeps four digits. On a tablet the cover moves on top, and on a phone each field takes its own line. */
         /* Example: <div class="base-panel-body yta-import-body"><div class="yta-cover-cell"></div><div class="yta-import-fields"></div><div class="yta-player-cell"></div></div> */
         #YouTubeAudioImportPage .yta-import-body { display: grid; grid-template-columns: min-content minmax(0, 1fr); gap: var(--base-gap-wide); align-items: start; }
         #YouTubeAudioImportPage .yta-cover-cell { width: min-content; margin-bottom: calc(-1 * var(--base-gap-wide)); }

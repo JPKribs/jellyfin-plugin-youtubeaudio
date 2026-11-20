@@ -156,12 +156,12 @@ export function createPage(view, opts) {
 * Do not comment the methods inside a returned handle. List them in the Output line instead.
 * Open each file with a header naming the file and saying what it holds in one sentence. Use no `// ====` banners.
 * Only `youtubeaudio_shared.js` imports Base, by the relative path `./configurationpage?name=youtubeaudio_jpkribs_shared.js`. It exports each Base builder a page uses, and every page imports from `youtubeaudio_shared.js`.
-* The public pages are standalone documents that `YouTubePublicController` serves inside Base's status page template. Both load Base's script from `web/configurationpage?name=youtubeaudio_jpkribs_shared.js` under the server's base path, for `loadTranslations`, and the Public Queue loads Base's CSS beside it.
+* The public pages are standalone documents that `YouTubePublicController` serves inside Base's status page template. Both load Base's script from `web/configurationpage?name=youtubeaudio_jpkribs_shared.js` under the server's base path, for `loadTranslations`, and the public queue loads Base's CSS beside it.
 
 ### HTML
 
 ```html
-<!-- Music Library -->
+<!-- Music library -->
 <!-- The library and folder imports are filed into. -->
 <div class="base-collapsible-section">
 ```

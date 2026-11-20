@@ -43,13 +43,13 @@ markdown_extensions:
 nav:
   - Overview: index.md
   - Installation: Installation.md
-  - Getting Started:
+  - Getting started:
       - Settings: Settings.md
       - Download: Download.md
       - Import: Import.md
-      - Public Queue: PublicQueue.md
-      - Approved User Downloads: ApprovedUserDownloads.md
+      - Public queue: PublicQueue.md
+      - Approved user downloads: ApprovedUserDownloads.md
   - Development:
-      - End-to-End Test: Testing.md
+      - End-to-end test: Testing.md
   - Reference:
       - Versioning: Versioning.md

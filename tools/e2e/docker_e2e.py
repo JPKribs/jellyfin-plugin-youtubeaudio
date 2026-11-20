@@ -331,7 +331,7 @@ def main():
 
     print("== 3b. Public read-only queue")
     page = urllib.request.urlopen(BASE + "/YouTube/Queue", timeout=30).read().decode()
-    check("queue page served without sign-in", "Download Queue" in page and "/Items" in page)
+    check("queue page served without sign-in", "Download queue" in page and "/Items" in page)
     try:
         urllib.request.urlopen(BASE + "/YouTube/Queue/Items", timeout=30)
         anon = 200
@@ -609,7 +609,7 @@ def main():
     check("the song keeps its library item", any(i["Id"] == owned["Id"] for i in call("GET", "/Items?includeItemTypes=Audio&recursive=true")["Items"]))
     check("the song stays in its playlist", [t for t, _ in ltitles(favourites)] == [NEW, OWNED, UPGRADE, TITLE_TRACK], str([t for t, _ in ltitles(favourites)]))
 
-    print("== 11. Cancel a running download; Reset Queue removes cached files")
+    print("== 11. Cancel a running download; Reset queue removes cached files")
     cid = call("POST", "/YouTubeAudio/Queue", {"Url": FIX_URL})[0]["Id"]
     call("POST", "/YouTubeAudio/Queue/Process", {"Ids": [cid]})
     state = wait(lambda: next((i["StatusCode"] for i in queue() if i["Id"] == cid and i["StatusCode"] != 0), None), "download to start", 120, 0.2)
@@ -638,7 +638,7 @@ def main():
     check("downloaded file and info.json are in the cache", sorted(f for f in os.listdir(cache_dir) if f.startswith(stem)) == sorted([item["FileName"], stem + ".info.json"]),
           str([f for f in os.listdir(cache_dir) if f.startswith(stem)]))
     call("POST", "/YouTubeAudio/ResetQueue")
-    check("Reset Queue empties the queue and deletes its cached files", queue() == [] and not [f for f in os.listdir(cache_dir) if f.startswith(stem)],
+    check("Reset queue empties the queue and deletes its cached files", queue() == [] and not [f for f in os.listdir(cache_dir) if f.startswith(stem)],
           str(os.listdir(cache_dir)))
 
     logs = sh("docker", "logs", NAME, check=False) + subprocess.run(["docker", "logs", NAME], capture_output=True, text=True).stderr

@@ -32,17 +32,17 @@
   <ItemGroup>
     <!-- Jellyfin strings the pages and messages use, built in by Base in every Jellyfin language -->
     <JellyfinString Include="Album" />
-    <JellyfinString Include="AlbumArtist" />
+    <JellyfinString Include="AlbumArtist" Case="sentence" />
     <JellyfinString Include="All" />
     <JellyfinString Include="Artist" />
-    <JellyfinString Include="ButtonSignIn" />
+    <JellyfinString Include="ButtonSignIn" Case="sentence" />
     <JellyfinString Include="ButtonStop" />
     <JellyfinString Include="ButtonSubmit" />
     <JellyfinString Include="Default" />
     <JellyfinString Include="Delete" />
     <JellyfinString Include="Download" />
     <JellyfinString Include="Genre" />
-    <JellyfinString Include="HeaderDeleteItems" />
+    <JellyfinString Include="HeaderDeleteItems" Case="sentence" />
     <JellyfinString Include="HeaderError" />
     <JellyfinString Include="LabelFailed" />
     <JellyfinString Include="LabelSource" />

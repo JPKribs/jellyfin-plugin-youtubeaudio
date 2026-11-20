@@ -131,7 +131,7 @@ export default function (view) {
     }
 
     // renderQueueRow
-    // Draws one queue item as a Base media card with its status, its notes, and a Change Link action.
+    // Draws one queue item as a Base media card with its status, its notes, and a Change link action.
     //
     // Inputs
     // item [object]: The queue item.
@@ -360,7 +360,7 @@ export default function (view) {
     }
 
     // updateReplaceButton
-    // Turns on Queue Replacement once a song is picked and a link is entered.
+    // Turns on Queue replacement once a song is picked and a link is entered.
     function updateReplaceButton() {
         var btn = Shared.getEl('btnReplace');
         var url = Shared.getEl('txtReplaceUrl');
@@ -559,7 +559,7 @@ export default function (view) {
     }
 
     // buildTargetList
-    // Builds the playlists being filled as a Base Filtered List, with Add Library Songs beside it.
+    // Builds the playlists being filled as a Base Filtered List, with Add library songs beside it.
     function buildTargetList() {
         var host = Shared.getEl('playlistTargets');
         if (!host || _targetList) return;

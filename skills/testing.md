@@ -132,7 +132,7 @@ The harness is the page the [screenshot kit](documentation.md#screenshot-kit) se
 Click through each changed page like a user, at 1280 and at 375 px wide.
 
 * Type real keystrokes into every picker and lookup, such as part of an artist's name, and check that the list fills.
-* Open every tab, every collapsible, and every dialog, such as **Change Link** and **Delete Files**.
+* Open every tab, every collapsible, and every dialog, such as **Change link** and **Delete files**.
 * Take a screenshot of each state and look at it.
 
 A harness run never makes a change done. It finds problems before the test server does.

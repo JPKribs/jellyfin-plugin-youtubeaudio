@@ -1,4 +1,4 @@
-# End-to-End Test
+# End-to-end test
 
 `tools/e2e/` holds an opt in test that runs the plugin on a disposable Jellyfin container and drives the whole Apple Music import pipeline through the API, including real YouTube downloads. It covers the paths that move or delete library data: duplicate skipping, filing into existing album folders, replacing a library single with its album version, importing into the library, private playlists for a non admin owner, fixing a failed match with a new YouTube link, a container restart, the public queue, and a reimport that must change nothing. Every file in the test library is fingerprinted before and after each stage, so any unexpected change fails the run.
 

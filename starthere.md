@@ -49,7 +49,7 @@ Stop and ask before any of these, even when the task seems to call for it.
 * **The tools.** A change to how yt-dlp and Deno are fetched, checked against their checksums, updated, or run.
 * **The library.** Anything that writes, renames, moves, replaces, or deletes files in a music library, including the duplicate rules and replacing a library single.
 * **The public pages.** A change to `/YouTube/Download` or `/YouTube/Queue`, to who may use them, or to what they show.
-* **Security.** A change to authentication, the approved users check, the accepted YouTube hosts, or the Playlist Limit.
+* **Security.** A change to authentication, the approved users check, the accepted YouTube hosts, or the Playlist limit.
 * **Base.** Any change to Base, since every plugin takes it.
 * **Settings.** Renaming, removing, or changing the default of a setting users already have.
 * **Releases.** Raising the version, publishing, or pushing to `master`.

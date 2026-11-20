@@ -4,7 +4,7 @@
 
 YouTube Audio is a Jellyfin plugin to download audio tracks from YouTube URLs or playlists. Once downloaded, files are tagged using internal metadata and imported into a local Jellyfin music library.
 
-## How It Works
+## How it works
 
 YouTube Audio lets you paste a YouTube video or playlist URL, download the audio using [yt-dlp](https://github.com/yt-dlp/yt-dlp), tag each track with metadata, and import the files directly into your Jellyfin library.
 

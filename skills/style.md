@@ -34,20 +34,22 @@ These rules apply to every string a user can see. That includes HTML, JS, C# mes
 
 ### Casing
 
-| Text | Case | Example |
-| :--- | :--- | :--- |
-| Tab | Title Case, one word | Download |
-| Section and collapsible title | Title Case | Import Behavior |
-| Field label | Title Case | Target Library |
-| Checkbox label | Title Case | Embed Cover Art |
-| Button | Title Case, verb first | Queue Playlist |
-| Dialog title | Title Case | Change Link |
-| Badge and status chip | Title Case | Downloading |
-| Column header | Title Case | Status |
-| Activity log name | Title Case | 3 Songs Imported |
-| Description, message, placeholder sentence | Sentence case | Adds the album cover to each downloaded file. |
+Every string is in sentence case, mirroring Jellyfin, such as "Allow media playback". Capitalize the first word and proper nouns only.
 
-Title Case capitalizes every word except short articles, conjunctions, and prepositions in the middle, such as "a", "and", "of", "to", and "in". Keep acronyms and names as written, such as "API Key", "URL", "GB", and "yt-dlp". Base shows every title exactly as written.
+| Text | Example |
+| :--- | :--- |
+| Tab | Download |
+| Section and collapsible title | Import behavior |
+| Field label | Target library |
+| Checkbox label | Embed cover art |
+| Button, verb first | Queue playlist |
+| Dialog title | Change link |
+| Badge and status chip | Downloading |
+| Column header | Status |
+| Activity log name | 3 songs imported |
+| Description, message, placeholder sentence | Adds the album cover to each downloaded file. |
+
+Words in `Localization/casing.json`, such as YouTube, yt-dlp, and MP3, and Base's defaults, such as Jellyfin and URL, keep their casing. Jellyfin strings stay as Jellyfin writes them. See [translations.md](translations.md#casing).
 
 ### Words to Use
 
@@ -79,7 +81,7 @@ The control names its own result. Deleting a queue item drops its cached file, s
 * Two to four words. Name the thing the field holds, not the action.
 * Put a unit at the end in lowercase parentheses, such as **Timeout (seconds)**. Use symbols for standard units, such as `GB`.
 * No colons, periods, or question marks.
-* A checkbox label names the feature it turns on, never "Enable X". Write **Embed Cover Art**, not **Enable Cover Art Embedding**.
+* A checkbox label names the feature it turns on, never "Enable X". Write **Embed cover art**, not **Enable cover art embedding**.
 
 ### Descriptions
 
@@ -113,8 +115,8 @@ A placeholder shows an example of a valid value. It is never the only place an i
 
 ### Buttons
 
-* A verb, or a verb and a noun. **Save**, **Queue Playlist**, **Import**.
-* Name the object when the page has more than one of that action. **Queue Playlist** and **Queue Replacement** sit on the same page.
+* A verb, or a verb and a noun. **Save**, **Queue playlist**, **Import**.
+* Name the object when the page has more than one of that action. **Queue playlist** and **Queue replacement** sit on the same page.
 * A primary Save is **Save**, even when each section has its own.
 * An icon only button carries a `title` of one to three words, such as `Remove`, `Move Up`, or `Retry`. Never a sentence.
 * A button that runs for a while shows progress in place. See [Progress](#progress).
@@ -145,14 +147,14 @@ A confirm asks one question and states the consequence.
 
 ```js
 confirmDialog('Delete 3 items from the queue? This cannot be undone.', {
-    title: 'Delete Items',
+    title: 'Delete items',
     confirmText: 'Delete',
     destructive: true
 });
 ```
 
 * The message is a question, then one sentence on the consequence. "Delete 3 items? This cannot be undone."
-* The title is the action in Title Case, such as **Delete Items**. Never leave the default **Confirm**.
+* The title is the action in sentence case, such as **Delete items**. Never leave the default **Confirm**.
 * The confirm button repeats the action verb, such as **Delete** or **Stop**. Never **OK** or **Yes**.
 * Set `destructive: true` for anything that loses data.
 * Never "Are you sure you want to". Ask the question directly.
@@ -172,7 +174,7 @@ Give a Base list its sentence as `emptyText`. Use `shared.emptySection(text)` fo
 
 Use `ActivitySummary` and `ActivityText` from Base.
 
-* The name is short and Title Case. "3 Songs Imported".
+* The name is short and in sentence case. "3 songs imported".
 * The overview is one sentence with no closing period, as Base writes it.
 * Use the same verb the UI uses for the action.
 
@@ -181,7 +183,7 @@ Use `ActivitySummary` and `ActivityText` from Base.
 The API returns text that the page shows as is, so it follows the same rules.
 
 * A full sentence that starts with a capital and ends with a period. "Only YouTube links are accepted."
-* Say what is wrong and, when it helps, what to do. "This playlist has more videos than the Playlist Limit. Ask an administrator to add it."
+* Say what is wrong and, when it helps, what to do. "This playlist has more videos than the Playlist limit. Ask an administrator to add it."
 * Never return an exception message, a stack trace, or a type name.
 
 ## Color
@@ -211,10 +213,10 @@ A color means the same thing on every page and in every plugin.
 | :--- | :--- | :--- |
 | Green | Done and healthy | Downloaded |
 | Red | Failed, or about to lose data | Error |
-| Orange | Waiting, or needs attention soon | Queued, Check Match, In Library |
+| Orange | Waiting, or needs attention soon | Queued, Check match, In library |
 | Purple | Working right now | Downloading |
 | Blue | Informational | Imported |
-| Gray | Off or not applicable | Songs Only |
+| Gray | Off or not applicable | Songs only |
 
 * Map a status to a Base badge state through `STATUS_STATES` in `youtubeaudio_shared.js`, which Base colors through `BADGE_STATES`. Never keep a color map in the plugin.
 * Disabled is gray when it means off. Red is only for failure.
@@ -255,15 +257,15 @@ Every config page uses Jellyfin's page shell.
 * Use only the template's classes, `base-status-card`, `base-fields`, `base-field-pair`, `base-hint`, `base-submit`, `base-btn`, `base-btn-secondary`, `base-btn-stack`, `base-status-error`, `base-note`, `base-spinner`, and `base-logo`, and `hidden` to switch states.
 * Never use an icon ligature or glyph. The template has no icon font, so the icon's name shows as text.
 * Show a result in the line under the form. An error takes `base-status-error`, which is red and hides itself when empty, and any other result takes `base-note`.
-* A second action, such as **View the Queue**, is a `base-btn base-btn-secondary` link under the primary one.
-* The Public Queue imports Base's shared CSS and script itself, for its Record List, Pill Group, and status badges. It uses only components that draw no icons.
+* A second action, such as **View the queue**, is a `base-btn base-btn-secondary` link under the primary one.
+* The public queue imports Base's shared CSS and script itself, for its Record List, Pill Group, and status badges. It uses only components that draw no icons.
 * The user download page imports Base's script only for `loadTranslations`, and none of Base's CSS.
 * Hide the template's loading heading and spinner when the page leaves its loading state.
 
 ### Tabs
 
 * One registered page per tab, wired with `createConfigPage` and `setTabs`.
-* Tab names are one Title Case word.
+* Tab names are one word.
 * Keep the tab list in one place, the plugin's shared module, never copied into each page.
 * Order tabs from what is used most to what is set once. YouTube Audio is **Download**, **Import**, **Settings**.
 
@@ -433,7 +435,7 @@ grep -o "export function create[A-Za-z]*" ~/.nuget/packages/jpkribs.jellyfin.bas
 | One number with a label | `createStatCard` |
 
 * Pick the chart by the question it answers. A single used of total bar is a Usage Meter, never a Bar Chart.
-* Name each slice with a glossary term in Title Case, such as **Downloaded**.
+* Name each slice with a glossary term, such as **Downloaded**.
 * Take colors from Base's series colors. Set a color only when it carries a [meaning](#meaning).
 * Give every chart a `label`, and an `emptyText` sentence for when it has nothing to draw.
 * Scope a chart to what the page shows.
@@ -447,16 +449,16 @@ grep -o "export function create[A-Za-z]*" ~/.nuget/packages/jpkribs.jellyfin.bas
 | A cover to set or replace | `createImagePicker` through the Import tab's `createCoverPicker` |
 
 * Every player is Base's Audio Player. Never use a bare `<audio>` element or a hand built play button.
-* A media card action that cannot run now stays in place with `disabled: true`, such as **Change Link** while its song downloads.
+* A media card action that cannot run now stays in place with `disabled: true`, such as **Change link** while its song downloads.
 * An embedded cover can only be replaced, so its Image Picker takes `removable: false` and shows no Remove.
 
 ### Import Panel
 
 Each downloaded file on the Import tab is one `base-panel` drawn by `renderImportRow`.
 
-* The header holds the selection checkbox and the title at the start, then the size, the **In Library** badge, **Generate Cover**, and **Save Tags** at the end. On a phone the end group takes a line of its own.
-* The body is a grid with the cover cell first, as wide as the cover, so **Set Cover** sits under it. The cover cell takes back the Image Picker's bottom margin, so the cover is one gap from the fields.
-* The fields share three equal columns, with **Track** and **Year** in a narrow last column that keeps four digits. The rows are Title and Track, then Artist, Album Artist, and Featured Artists, then Album, Genre, and Year.
+* The header holds the selection checkbox and the title at the start, then the size, the **In library** badge, **Generate cover**, and **Save tags** at the end. On a phone the end group takes a line of its own.
+* The body is a grid with the cover cell first, as wide as the cover, so **Set cover** sits under it. The cover cell takes back the Image Picker's bottom margin, so the cover is one gap from the fields.
+* The fields share three equal columns, with **Track** and **Year** in a narrow last column that keeps four digits. The rows are Title and Track, then Artist, Album artist, and Featured artists, then Album, Genre, and Year.
 * The Audio Player spans the full width under the cover and the fields.
 * At 768 px the cover moves above the fields. At 600 px each field takes its own line.
 * Size the columns in `rem` and `fr` from `--base-gap-wide`, never in pixels or `em`.
@@ -478,7 +480,7 @@ Each downloaded file on the Import tab is one `base-panel` drawn by `renderImpor
 | A dialog already in the page markup | `bindDialog` |
 
 * Build dialogs in JS with `openDialog` and its wrappers. Use `bindDialog` only when the markup is large and static.
-* A dialog title is Title Case and names what the dialog does.
+* A dialog title is in sentence case and names what the dialog does.
 * Buttons read, from left to right, the destructive action, then **Cancel**, then the primary action.
 
 ## Layout
@@ -524,7 +526,7 @@ Run every new or changed string through this list.
 * [ ] No colon at the end of a label, and none in a sentence unless it introduces a list.
 * [ ] One sentence, or two when the second is the fix or the consequence.
 * [ ] Sentences end with a period. Labels, buttons, and titles do not.
-* [ ] Title Case for labels, buttons, titles, tabs, and badges. Sentence case for sentences.
+* [ ] Sentence case for every label, button, title, tab, badge, and sentence, with casing.json words kept as written.
 * [ ] No "please", "successfully", exclamation marks, ALL CAPS, "(s)", or contractions.
 * [ ] The word matches [Words to Use](#words-to-use).
 * [ ] Base's typings were searched before any markup was built by hand.

@@ -12,39 +12,39 @@
                     </div>
                     <div class="fieldDescription" data-str="SettingsIntro">Sets where songs go and how they are downloaded. Each section saves on its own.</div>
 
-                    <!-- Music Library -->
+                    <!-- Music library -->
                     <!-- The library and folder imports are filed into. -->
                     <div class="base-collapsible-section">
                         <button type="button" class="base-collapsible-header collapsed" aria-expanded="false" data-target="libraryContent">
-                            <span class="base-collapsible-title" data-str="HeaderMusicLibrary">Music Library</span>
+                            <span class="base-collapsible-title" data-str="HeaderMusicLibrary">Music library</span>
                             <span class="base-collapsible-icon">&#9660;</span>
                         </button>
                         <div id="libraryContent" class="base-collapsible-content collapsed">
                             <div class="selectContainer">
-                                <label class="selectLabel" for="selMusicLibrary" data-str="LabelTargetLibrary">Target Library</label>
+                                <label class="selectLabel" for="selMusicLibrary" data-str="LabelTargetLibrary">Target library</label>
                                 <select is="emby-select" id="selMusicLibrary" class="emby-select-withcolor">
                                     <option value="" data-str="OptionSelectMusicLibrary">Select a music library</option>
                                 </select>
                                 <div class="fieldDescription" data-str="TargetLibraryHelp">The Jellyfin music library imported files are placed in.</div>
                             </div>
                             <div class="inputContainer">
-                                <label for="txtLibraryPath" data-str="LabelLibraryPath">Library Path</label>
+                                <label for="txtLibraryPath" data-str="LabelLibraryPath">Library path</label>
                                 <input is="emby-input" type="text" id="txtLibraryPath" placeholder="/media/music" />
                                 <div class="fieldDescription" data-str="LibraryPathHelp">Files are filed as Path / Artist / Album (Year) / Song.ext. Selecting a library fills in its first folder.</div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Audio Format -->
+                    <!-- Audio format -->
                     <!-- The file type songs download as. -->
                     <div class="base-collapsible-section">
                         <button type="button" class="base-collapsible-header collapsed" aria-expanded="false" data-target="formatContent">
-                            <span class="base-collapsible-title" data-str="HeaderAudioFormat">Audio Format</span>
+                            <span class="base-collapsible-title" data-str="HeaderAudioFormat">Audio format</span>
                             <span class="base-collapsible-icon">&#9660;</span>
                         </button>
                         <div id="formatContent" class="base-collapsible-content collapsed">
                             <div class="selectContainer">
-                                <label class="selectLabel" for="selAudioFormat" data-str="LabelDownloadFormat">Download Format</label>
+                                <label class="selectLabel" for="selAudioFormat" data-str="LabelDownloadFormat">Download format</label>
                                 <select is="emby-select" id="selAudioFormat" class="emby-select-withcolor">
                                     <option value="Opus">Opus (.opus)</option>
                                     <option value="Mp3">MP3 (.mp3)</option>
@@ -55,66 +55,66 @@
                         </div>
                     </div>
 
-                    <!-- Import Behavior -->
+                    <!-- Import behavior -->
                     <!-- Duplicates, catalog lookups, and cover art. -->
                     <div class="base-collapsible-section">
                         <button type="button" class="base-collapsible-header collapsed" aria-expanded="false" data-target="importBehaviorContent">
-                            <span class="base-collapsible-title" data-str="HeaderImportBehavior">Import Behavior</span>
+                            <span class="base-collapsible-title" data-str="HeaderImportBehavior">Import behavior</span>
                             <span class="base-collapsible-icon">&#9660;</span>
                         </button>
                         <div id="importBehaviorContent" class="base-collapsible-content collapsed">
                             <div class="checkboxContainer checkboxContainer-withDescription">
                                 <label class="emby-checkbox-label">
                                     <input type="checkbox" is="emby-checkbox" id="chkReplaceDuplicates" checked />
-                                    <span class="checkboxLabel" data-str="LabelReplaceDuplicates">Replace Duplicate Files</span>
+                                    <span class="checkboxLabel" data-str="LabelReplaceDuplicates">Replace duplicate files</span>
                                 </label>
                                 <div class="fieldDescription checkboxFieldDescription" data-str="ReplaceDuplicatesHelp">Overwrites a file the library already has. When off, the duplicate stays in the download cache.</div>
                             </div>
                             <div class="checkboxContainer checkboxContainer-withDescription">
                                 <label class="emby-checkbox-label">
                                     <input type="checkbox" is="emby-checkbox" id="chkLookUpCatalog" checked />
-                                    <span class="checkboxLabel" data-str="LabelLookUpCatalog">Look Up Song Details on Apple Music</span>
+                                    <span class="checkboxLabel" data-str="LabelLookUpCatalog">Look up song details on Apple Music</span>
                                 </label>
                                 <div class="fieldDescription checkboxFieldDescription" data-str="LookUpCatalogHelp">Fills in the album, album artist, year, track number, and genre from Apple's catalog. Only confident matches are used.</div>
                             </div>
                             <div class="checkboxContainer checkboxContainer-withDescription">
                                 <label class="emby-checkbox-label">
                                     <input type="checkbox" is="emby-checkbox" id="chkEmbedCoverArt" checked />
-                                    <span class="checkboxLabel" data-str="LabelEmbedCoverArt">Embed Cover Art</span>
+                                    <span class="checkboxLabel" data-str="LabelEmbedCoverArt">Embed cover art</span>
                                 </label>
                                 <div class="fieldDescription checkboxFieldDescription" data-str="EmbedCoverArtHelp">Adds the album cover from Apple's catalog to each downloaded file.</div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Cache Directory -->
+                    <!-- Cache directory -->
                     <!-- Where downloads wait before they are imported. -->
                     <div class="base-collapsible-section">
                         <button type="button" class="base-collapsible-header collapsed" aria-expanded="false" data-target="cacheContent">
-                            <span class="base-collapsible-title" data-str="HeaderCacheDirectory">Cache Directory</span>
+                            <span class="base-collapsible-title" data-str="HeaderCacheDirectory">Cache directory</span>
                             <span class="base-collapsible-icon">&#9660;</span>
                         </button>
                         <div id="cacheContent" class="base-collapsible-content collapsed">
                             <div class="inputContainer">
-                                <label for="txtCacheOverride" data-str="LabelCacheDirectoryOverride">Cache Directory Override</label>
+                                <label for="txtCacheOverride" data-str="LabelCacheDirectoryOverride">Cache directory override</label>
                                 <input is="emby-input" type="text" id="txtCacheOverride" placeholder="Default" data-str-placeholder="Default" />
                                 <div class="fieldDescription" data-str="CacheDirectoryHelp">Leave blank to cache files in the Jellyfin data directory.</div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Album Art -->
+                    <!-- Album art -->
                     <!-- The text and colors of a generated cover. -->
                     <div class="base-collapsible-section">
                         <button type="button" class="base-collapsible-header collapsed" aria-expanded="false" data-target="albumArtContent">
-                            <span class="base-collapsible-title" data-str="HeaderAlbumArt">Album Art</span>
+                            <span class="base-collapsible-title" data-str="HeaderAlbumArt">Album art</span>
                             <span class="base-collapsible-icon">&#9660;</span>
                         </button>
                         <div id="albumArtContent" class="base-collapsible-content collapsed">
                             <div class="fieldDescription" data-str="AlbumArtIntro">The wand on the Import tab draws a cover for an album with no art. Select the text it shows, top to bottom.</div>
                             <div id="coverTextList"></div>
                             <div class="selectContainer">
-                                <label class="selectLabel" for="selCoverColors" data-str="LabelColorsFrom">Colors From</label>
+                                <label class="selectLabel" for="selCoverColors" data-str="LabelColorsFrom">Colors from</label>
                                 <select is="emby-select" id="selCoverColors" class="emby-select-withcolor">
                                     <option value="Album" data-str="Album">Album</option>
                                     <option value="AlbumYear" data-str="OptionAlbumYear">Album and year</option>
@@ -125,18 +125,18 @@
                         </div>
                     </div>
 
-                    <!-- Approved Users -->
+                    <!-- Approved users -->
                     <!-- Users who may queue downloads from the user page. -->
                     <div class="base-collapsible-section">
                         <button type="button" class="base-collapsible-header collapsed" aria-expanded="false" data-target="approvedUsersContent">
-                            <span class="base-collapsible-title" data-str="HeaderApprovedUsers">Approved Users</span>
+                            <span class="base-collapsible-title" data-str="HeaderApprovedUsers">Approved users</span>
                             <span class="base-collapsible-icon">&#9660;</span>
                         </button>
                         <div id="approvedUsersContent" class="base-collapsible-content collapsed">
                             <div class="fieldDescription" data-str="ApprovedUsersIntro">These users can queue downloads on the user page. They cannot import into the library.</div>
                             <div id="approvedUsersList"></div>
                             <div class="inputContainer">
-                                <label for="txtMaxPublicPlaylistItems" data-str="LabelPlaylistLimit">Playlist Limit</label>
+                                <label for="txtMaxPublicPlaylistItems" data-str="LabelPlaylistLimit">Playlist limit</label>
                                 <input is="emby-input" type="number" id="txtMaxPublicPlaylistItems" min="0" step="1" />
                                 <div class="fieldDescription" data-str="PlaylistLimitHelp">The most videos an approved user can queue from one playlist link. 0 is no limit, and administrators are never limited.</div>
                             </div>
@@ -161,7 +161,7 @@
                                 <a href="https://deno.com" target="_blank" rel="noopener">Deno</a> runtime it needs, checks each against its published checksum, and updates them every 12 hours.
                             </div>
                             <div class="inputContainer">
-                                <label for="txtYtDlpPath" data-str="LabelYtDlpPathOverride">yt-dlp Path Override</label>
+                                <label for="txtYtDlpPath" data-str="LabelYtDlpPathOverride">yt-dlp path override</label>
                                 <input is="emby-input" type="text" id="txtYtDlpPath" placeholder="/opt/homebrew/bin/yt-dlp" />
                                 <div class="fieldDescription" data-str="YtDlpPathHelp">The absolute path of your own yt-dlp. Leave blank to use the plugin's copy.</div>
                             </div>
@@ -186,7 +186,7 @@
                             <div class="base-reset-group">
                                 <div class="base-reset-row">
                                     <div class="base-reset-info">
-                                        <div data-str="HeaderResetQueue">Reset Queue</div>
+                                        <div data-str="HeaderResetQueue">Reset queue</div>
                                         <div class="fieldDescription" data-str="ResetQueueHelp">Clears the download queue and deletes the cached files of every item not yet imported.</div>
                                     </div>
                                     <button is="emby-button" type="button" id="btnResetQueue" class="raised base-button destructive small">
@@ -195,11 +195,11 @@
                                 </div>
                                 <div class="base-reset-row base-reset-row-nuclear">
                                     <div class="base-reset-info">
-                                        <div data-str="HeaderResetCache">Reset Cache</div>
+                                        <div data-str="HeaderResetCache">Reset cache</div>
                                         <div class="fieldDescription" data-str="ResetCacheHelp">Deletes every file in the download cache and clears the download queue.</div>
                                     </div>
                                     <button is="emby-button" type="button" id="btnResetCache" class="raised base-button destructive small">
-                                        <span data-str="ButtonResetAll">Reset All</span>
+                                        <span data-str="ButtonResetAll">Reset all</span>
                                     </button>
                                 </div>
                             </div>
