@@ -1,7 +1,7 @@
 ---
 name: "YouTube Audio"
 guid: "7323ea64-a200-4265-ab8f-e7ae27d06c38"
-version: "12.4.6.0"
+version: "12.4.6.1"
 targetAbi: "12.4.0.0"
 framework: "net10.0"
 overview: "Download YouTube audio into your music library."
@@ -16,8 +16,6 @@ artifacts:
 - "TagLibSharp.dll"
 changelog:
   changed:
-  - The Queue unavailable and Not authorized messages on the user pages read without contractions
-  - Refresh on the Queue and Import is an icon at the end of the bar with Select all, as on the other plugins
   - The server log stays quieter, with each download, match, import, and cover written at Debug
   developer:
-  - Uses JPKribs.Jellyfin.Base 12.4.3, after 12.4.1
+  - skills/logging.md sets how activity entries and server log lines are written
