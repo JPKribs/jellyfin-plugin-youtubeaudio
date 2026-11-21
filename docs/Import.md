@@ -17,7 +17,7 @@ Tag your downloaded files and bring them into your library.
 4. To add or replace a file's cover, click **Set cover** or **Replace** under it, or drop a picture on it. A cover can be replaced but not removed. To give several files the same cover, choose it under **Cover** in **Bulk updates**, select the files, and click **Set cover on selected**. Pictures are cropped to a centered square of at most 1200 pixels. Choosing an album your library already has takes that album's cover.
 5. For an album with no art, click the wand in the panel's header to generate a cover. It is a soft blend of three colors drawn from the album name, with the name in the middle. **Album art** in [Settings](Settings.md#album-art) sets which text it shows and what its colors are drawn from.
 6. Save each file's changes with the save button in its header before you import. The button turns orange while a file has unsaved changes.
-7. Select the files you want to import, with their checkboxes or **Select all**, and click **Import**. **Delete** deletes the selected files from the download cache after you confirm, and **Refresh** reads the list again.
+7. Select the files you want to import, with their checkboxes or **Select all**, and click **Import**. **Delete** deletes the selected files from the download cache after you confirm, and the refresh icon at the end of that bar reads the list again.
 
 ## Where files go
 

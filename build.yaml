@@ -17,5 +17,6 @@ artifacts:
 changelog:
   changed:
   - The Queue unavailable and Not authorized messages on the user pages read without contractions
+  - Refresh on the Queue and Import is an icon at the end of the bar with Select all, as on the other plugins
   developer:
-  - Uses JPKribs.Jellyfin.Base 12.4.2, after 12.4.1
+  - Uses JPKribs.Jellyfin.Base 12.4.3, after 12.4.1

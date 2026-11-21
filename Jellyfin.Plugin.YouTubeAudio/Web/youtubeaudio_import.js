@@ -56,10 +56,13 @@ export default function (view) {
 
     // loadDownloads
     // Reads the downloaded files and hands them to the list.
+    //
+    // Output
+    // [Promise]: Settles once the list is drawn.
     function loadDownloads() {
         if (!_artistSearch) _artistSearch = Shared.createDebouncedSearch('Artists', 300);
 
-        Shared.apiRequest('Downloads', 'GET')
+        return Shared.apiRequest('Downloads', 'GET')
             .then(function (response) { _downloads = (response && response.Items) || response || []; })
             .catch(function () { _downloads = []; })
             .then(renderImportList);
@@ -142,7 +145,8 @@ export default function (view) {
                 { id: 'import', label: t.tr('Import'), icon: 'library_add', variant: 'primary', onClick: importSelected },
                 { id: 'delete', label: t.tr('Delete'), icon: 'delete', variant: 'destructive', onClick: deleteSelected }
             ],
-            actions: [{ id: 'refresh', label: t.tr('Refresh'), icon: 'refresh', onClick: loadDownloads }],
+            onReload: loadDownloads,
+            reloadText: t.tr('Refresh'),
             emptyText: t.tr('MessageNoDownloads'),
             label: t.tr('LabelDownloadedFiles'),
             onSelectionChange: updateBulkButtons

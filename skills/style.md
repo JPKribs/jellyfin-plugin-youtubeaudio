@@ -369,6 +369,7 @@ grep -o "export function create[A-Za-z]*" ~/.nuget/packages/jpkribs.jellyfin.bas
 | Action that belongs with a save | `raised base-button secondary fill` in the `base-button-row` above the Save Bar |
 | Icon and label in a toolbar | `raised base-button` holding a `material-icons` span and a label |
 | Icon only in a row | `base-row-btn`, with `.dirty` for unsaved and `.success` after saving |
+| Reload a list | The Filtered List's `onReload`, with `reloadText` set to **Refresh**. Never a Refresh action beside the search |
 
 * Every button is `<button is="emby-button" type="button">`.
 * Icons are `<span class="material-icons" aria-hidden="true">name</span>`.
@@ -383,7 +384,7 @@ grep -o "export function create[A-Za-z]*" ~/.nuget/packages/jpkribs.jellyfin.bas
 | Move up and down | `keyboard_arrow_up`, `keyboard_arrow_down` |
 | Drag | `drag_indicator` |
 | Expand | `expand_more` |
-| Retry | `refresh` |
+| Retry and refresh | `refresh` |
 | Open | `chevron_right` |
 | Import and export | `upload`, `download` |
 | Show | `visibility` |

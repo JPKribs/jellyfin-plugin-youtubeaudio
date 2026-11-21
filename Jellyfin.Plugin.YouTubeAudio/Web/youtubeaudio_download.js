@@ -192,9 +192,10 @@ export default function (view) {
                 { id: 'delete', label: t.tr('Delete'), icon: 'delete', variant: 'destructive', onClick: deleteSelectedQueue }
             ],
             actions: [
-                { id: 'cancel', label: t.tr('HeaderCancelDownloads'), icon: 'stop', variant: 'destructive', onClick: cancelDownloads, visible: isPolling },
-                { id: 'refresh', label: t.tr('Refresh'), icon: 'refresh', onClick: loadQueue }
+                { id: 'cancel', label: t.tr('HeaderCancelDownloads'), icon: 'stop', variant: 'destructive', onClick: cancelDownloads, visible: isPolling }
             ],
+            onReload: loadQueue,
+            reloadText: t.tr('Refresh'),
             emptyText: t.tr('MessageNoSongsQueued'),
             label: t.tr('Queue')
         });
