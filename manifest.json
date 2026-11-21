@@ -9,6 +9,14 @@
     "category": "Music",
     "versions": [
       {
+        "version": "12.4.6.0",
+        "changelog": "\n## Changed\n- The Queue unavailable and Not authorized messages on the user pages read without contractions\n- Refresh on the Queue and Import is an icon at the end of the bar with Select all, as on the other plugins\n\n## Developer\n- Uses JPKribs.Jellyfin.Base 12.4.3, after 12.4.1",
+        "targetAbi": "12.4.0.0",
+        "sourceUrl": "https://github.com/JPKribs/jellyfin-plugin-youtubeaudio/releases/download/v12.4.6.0/jellyfin-plugin-youtubeaudio-12.4.6.0.zip",
+        "checksum": "ab82ba9b764c4eb862ffc7bfa745cf54",
+        "timestamp": "2026-11-21T02:15:26Z"
+      },
+      {
         "version": "12.4.5.0",
         "changelog": "\n## Added\n- Translations, which show the dashboard tabs, the user download page, and the public queue in the viewer's language, with Jellyfin's own words wherever Jellyfin has them\n\n## Changed\n- Every label, heading, button, and tab is in sentence case, as Jellyfin writes its own, such as Queue playlist and Embed cover art\n- Messages from the server, such as a refused link or the yt-dlp update result, follow the language of the page that asked for them\n- Lists, the Save bar, file and image pickers, the audio player, and dialogs show Base's own translated wording, such as Select all and Drop files here or click to select\n\n## Developer\n- Uses JPKribs.Jellyfin.Base 12.4.1, after 12.4.0. Base translates its own component text, so the plugin's keys that repeated it are gone, and BaseTranslations.RequestLanguage replaces the plugin's Accept-Language parser\n- Server messages read the X-Jellyfin-Plugin-Language header, then Accept-Language. The user download page and the public queue send the header\n- Localization/casing.json lists the words kept as written, such as YouTube, yt-dlp, and MP3, and AlbumArtist, ButtonSignIn, and HeaderDeleteItems take Case=\"sentence\"\n- GET /YouTubeAudio/Translations answers with BaseTranslations.Serve, as language, strings, and casing\n- The project is laid out as Api, Configuration, Web, Assets, Localization, Models, Services, and Utilities, with the screenshot kit and the end to end test under tools\n- skills/translations.md covers strings, casing, and server languages, and a test checks that every key the pages use has a string",
         "targetAbi": "12.4.0.0",
