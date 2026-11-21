@@ -213,6 +213,10 @@ def main():
     else:
         for f in ("Jellyfin.Plugin.YouTubeAudio.dll", "YoutubeDLSharp.dll", "TagLibSharp.dll"):
             shutil.copy(os.path.join(PLUGIN_DIR, f), os.path.join(WORK, "config/plugins/YouTubeAudio", f))
+    # The plugin's Debug lines go to the server log too, since the retry check reads them there.
+    os.makedirs(os.path.join(WORK, "config", "config"), exist_ok=True)
+    with open(os.path.join(WORK, "config", "config", "logging.json"), "w") as f:
+        json.dump({"Serilog": {"MinimumLevel": {"Override": {"Jellyfin.Plugin.YouTubeAudio": "Debug"}}}}, f)
 
     print("== Pre-existing library")
     tag(ALBUM_DIR + OWNED + ".opus", OWNED, ARTIST, LIBRARY_ALBUM, YEAR, 2)
