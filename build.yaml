@@ -15,5 +15,7 @@ artifacts:
 - "YoutubeDLSharp.dll"
 - "TagLibSharp.dll"
 changelog:
+  changed:
+  - The Queue unavailable and Not authorized messages on the user pages read without contractions
   developer:
   - Uses JPKribs.Jellyfin.Base 12.4.2, after 12.4.1
