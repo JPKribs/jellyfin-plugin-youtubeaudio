@@ -46,7 +46,7 @@ Every string is in sentence case, mirroring Jellyfin, such as "Allow media playb
 | Dialog title | Change link |
 | Badge and status chip | Downloading |
 | Column header | Status |
-| Activity log name | 3 songs imported |
+| Activity log name | Songs imported |
 | Description, message, placeholder sentence | Adds the album cover to each downloaded file. |
 
 Words in `Localization/casing.json`, such as YouTube, yt-dlp, and MP3, and Base's defaults, such as Jellyfin and URL, keep their casing. Jellyfin strings stay as Jellyfin writes them. See [translations.md](translations.md#casing).
@@ -174,7 +174,7 @@ Give a Base list its sentence as `emptyText`. Use `shared.emptySection(text)` fo
 
 Use `ActivitySummary` and `ActivityText` from Base.
 
-* The name is short and in sentence case. "3 songs imported".
+* The name is short and in sentence case, with no count, per [logging.md](logging.md#the-name). "Songs imported".
 * The overview is one sentence with no closing period, as Base writes it.
 * Use the same verb the UI uses for the action.
 

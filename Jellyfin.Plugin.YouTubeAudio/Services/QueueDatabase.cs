@@ -72,7 +72,7 @@ public sealed class QueueDatabase : IDisposable
         // Also create cache subdirectory
         Directory.CreateDirectory(Path.Combine(dbDir, "cache"));
 
-        _logger.LogInformation("Queue database path: {DbPath}", _dbPath);
+        _logger.LogDebug("Queue database path: {DbPath}", _dbPath);
 
         InitializeDatabase();
     }
@@ -602,7 +602,7 @@ public sealed class QueueDatabase : IDisposable
         }
         catch (SqliteException ex) when (ex.SqliteErrorCode == 11) // SQLITE_CORRUPT
         {
-            _logger.LogError(ex, "Database CORRUPT detected during read '{Operation}'. Database may need to be reset.", callerName);
+            _logger.LogError(ex, "Database read '{Operation}' found the queue database corrupt, so it may need to be reset", callerName);
             return fallbackValue;
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("connection", StringComparison.OrdinalIgnoreCase))
@@ -678,14 +678,13 @@ public sealed class QueueDatabase : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to initialize database, attempting recovery");
+            _logger.LogWarning(ex, "Failed to initialize database, attempting recovery");
             try
             {
                 RecreateDatabase();
             }
             catch (Exception recreateEx)
             {
-                _logger.LogError(recreateEx, "Failed to recreate database");
                 throw new InvalidOperationException("Unable to initialize or recover queue database", recreateEx);
             }
         }
@@ -820,7 +819,7 @@ public sealed class QueueDatabase : IDisposable
 
         OpenFreshDatabase();
 
-        _logger.LogInformation("Queue database recreated successfully");
+        _logger.LogInformation("Queue database recreated");
     }
 
     private static QueueItem ReadQueueItem(SqliteDataReader reader)

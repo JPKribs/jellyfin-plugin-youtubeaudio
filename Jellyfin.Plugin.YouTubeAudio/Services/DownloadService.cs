@@ -210,7 +210,7 @@ public sealed partial class DownloadService : IDisposable
                         createdItems.Add(item);
                     }
 
-                    _logger.LogInformation("Queued {Count} items from playlist {Url}", createdItems.Count, FormatUtilities.SanitizeForLog(url));
+                    _logger.LogDebug("Queued {Count} items from playlist {Url}", createdItems.Count, FormatUtilities.SanitizeForLog(url));
                 }
                 else
                 {
@@ -427,7 +427,7 @@ public sealed partial class DownloadService : IDisposable
                         await ApplyCatalogMetadataAsync(item, outputPath, cancellationToken).ConfigureAwait(false);
 
                         db.UpdateStatus(item.Id, QueueStatus.Downloaded);
-                        _logger.LogInformation("Downloaded {Url} as {FileName}", FormatUtilities.SanitizeForLog(item.Url), item.FileName);
+                        _logger.LogDebug("Downloaded {Url} as {FileName}", FormatUtilities.SanitizeForLog(item.Url), item.FileName);
                     }
                     else
                     {
@@ -435,7 +435,7 @@ public sealed partial class DownloadService : IDisposable
                         DeleteCachedFiles(item);
                         var errors = string.Join("; ", runResult.ErrorOutput ?? Array.Empty<string>());
                         db.UpdateStatus(item.Id, QueueStatus.Error, "Download failed: " + errors);
-                        _logger.LogWarning("Download failed for {Url}: {Errors}", FormatUtilities.SanitizeForLog(item.Url), errors);
+                        _logger.LogWarning("Download failed for {Url}: {Errors}", FormatUtilities.SanitizeForLog(item.Url), FormatUtilities.SanitizeForLog(errors));
                     }
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -444,7 +444,7 @@ public sealed partial class DownloadService : IDisposable
                     // in the queue so it can be downloaded again.
                     DeleteCachedFiles(item);
                     db.UpdateStatus(item.Id, QueueStatus.Queued);
-                    _logger.LogInformation("Download cancelled for {Url}", FormatUtilities.SanitizeForLog(item.Url));
+                    _logger.LogDebug("Download cancelled for {Url}", FormatUtilities.SanitizeForLog(item.Url));
                     break;
                 }
                 catch (Exception ex)
@@ -541,7 +541,7 @@ public sealed partial class DownloadService : IDisposable
             SourceTrack = track
         };
         _dbProvider.Database.AddItem(item);
-        _logger.LogInformation("Queued {Url} to replace {Path}", FormatUtilities.SanitizeForLog(url), path);
+        _logger.LogDebug("Queued {Url} to replace {Path}", FormatUtilities.SanitizeForLog(url), path);
         return item.ToDto();
     }
 
@@ -579,7 +579,7 @@ public sealed partial class DownloadService : IDisposable
 
         db.UpdateResolvedUrl(item.Id, url, null);
         db.UpdateStatus(item.Id, QueueStatus.Queued);
-        _logger.LogInformation("Changed the YouTube link of {Id} to {Url}", id, FormatUtilities.SanitizeForLog(url));
+        _logger.LogDebug("Changed the YouTube link of {Id} to {Url}", id, FormatUtilities.SanitizeForLog(url));
 
         return db.GetItemById(id)!.ToDto();
     }
@@ -629,14 +629,14 @@ public sealed partial class DownloadService : IDisposable
         {
             var errors = string.Join("; ", search.ErrorOutput ?? Array.Empty<string>());
             db.UpdateStatus(item.Id, QueueStatus.Error, "YouTube search failed: " + errors);
-            _logger.LogWarning("YouTube search failed for {Query}: {Errors}", FormatUtilities.SanitizeForLog(query), errors);
+            _logger.LogWarning("YouTube search failed for {Query}: {Errors}", FormatUtilities.SanitizeForLog(query), FormatUtilities.SanitizeForLog(errors));
             return false;
         }
 
         if (match == null)
         {
             db.UpdateStatus(item.Id, QueueStatus.Error, $"No matching YouTube upload found for \"{query}\".");
-            _logger.LogInformation("No YouTube match for {Query}", FormatUtilities.SanitizeForLog(query));
+            _logger.LogDebug("No YouTube match for {Query}", FormatUtilities.SanitizeForLog(query));
             return false;
         }
 
@@ -654,7 +654,7 @@ public sealed partial class DownloadService : IDisposable
         _dbProvider.Database.UpdateResolvedUrl(item.Id, url, note);
         item.Url = url;
         item.MatchNote = note;
-        _logger.LogInformation("Matched {Query} to {Url} ({Title})", FormatUtilities.SanitizeForLog(query), url, FormatUtilities.SanitizeForLog(match.Candidate.Title));
+        _logger.LogDebug("Matched {Query} to {Url} ({Title})", FormatUtilities.SanitizeForLog(query), url, FormatUtilities.SanitizeForLog(match.Candidate.Title));
     }
 
     /// <summary>
@@ -724,7 +724,7 @@ public sealed partial class DownloadService : IDisposable
         var match = YouTubeMatcher.PickBest(track, candidates);
         if (match != null)
         {
-            _logger.LogInformation("Found {Title} through YouTube Music", FormatUtilities.SanitizeForLog(track.Title));
+            _logger.LogDebug("Found {Title} through YouTube Music", FormatUtilities.SanitizeForLog(track.Title));
         }
 
         return match;
@@ -752,7 +752,7 @@ public sealed partial class DownloadService : IDisposable
                 break;
             }
 
-            _logger.LogInformation("Retrying {What} in {Seconds}s after a transient failure", FormatUtilities.SanitizeForLog(what), delay.TotalSeconds);
+            _logger.LogDebug("Retrying {What} in {Seconds}s after a transient failure", FormatUtilities.SanitizeForLog(what), delay.TotalSeconds);
             await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
             result = await run().ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
@@ -853,7 +853,7 @@ public sealed partial class DownloadService : IDisposable
         cancelled.Cancel();
         if (busy)
         {
-            _logger.LogInformation("Downloads cancelled");
+            _logger.LogDebug("Downloads cancelled");
         }
 
         return busy;
@@ -1040,7 +1040,7 @@ public sealed partial class DownloadService : IDisposable
         using var tagFile = TagLib.File.Create(file.Path);
         tagFile.Tag.Pictures = new TagLib.IPicture[] { CreateCover(data, info.MimeType) };
         tagFile.Save();
-        _logger.LogInformation("Cover art set for queue item {Id}", id);
+        _logger.LogDebug("Cover art set for queue item {Id}", id);
     }
 
     /// <summary>
@@ -1063,7 +1063,7 @@ public sealed partial class DownloadService : IDisposable
         }
 
         tag.Pictures = new TagLib.IPicture[] { CreateCover(cover, "image/jpeg") };
-        _logger.LogInformation("Added the YouTube Music cover for video {Id}", info.VideoId);
+        _logger.LogDebug("Added the YouTube Music cover for video {Id}", info.VideoId);
         return true;
     }
 
@@ -1176,7 +1176,7 @@ public sealed partial class DownloadService : IDisposable
         using var tagFile = TagLib.File.Create(file.Path);
         tagFile.Tag.Pictures = new TagLib.IPicture[] { CreateCover(cover, "image/jpeg") };
         tagFile.Save();
-        _logger.LogInformation("Cover of library album {Album} set for queue item {Id}", FormatUtilities.SanitizeForLog(album), id);
+        _logger.LogDebug("Cover of library album {Album} set for queue item {Id}", FormatUtilities.SanitizeForLog(album), id);
         return true;
     }
 
@@ -1198,7 +1198,7 @@ public sealed partial class DownloadService : IDisposable
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
         {
-            _logger.LogWarning("Could not download the cover {Url}: {Message}", FormatUtilities.SanitizeForLog(url), ex.Message);
+            _logger.LogWarning(ex, "Could not download the cover {Url}", FormatUtilities.SanitizeForLog(url));
             return null;
         }
     }
@@ -1245,7 +1245,7 @@ public sealed partial class DownloadService : IDisposable
         }
         catch (Exception ex) when (ex is ArgumentNullException or TagLib.CorruptFileException)
         {
-            _logger.LogWarning("TagLib failed to read {File}, attempting ffmpeg remux", item.FileName);
+            _logger.LogDebug(ex, "TagLib failed to read {File}, attempting ffmpeg remux", item.FileName);
             if (await TryRemuxContainerAsync(filePath, cancellationToken).ConfigureAwait(false))
             {
                 tagFile = TagLib.File.Create(filePath);
@@ -1290,7 +1290,7 @@ public sealed partial class DownloadService : IDisposable
         // Embedded cover art (from the catalog lookup) is kept.
         tagFile.Save();
 
-        _logger.LogInformation("Tags saved for queue item {Id} ({FileName})", request.Id, item.FileName);
+        _logger.LogDebug("Tags saved for queue item {Id} ({FileName})", request.Id, item.FileName);
     }
 
     /// <summary>
@@ -1348,7 +1348,7 @@ public sealed partial class DownloadService : IDisposable
             }
 
             tagFile.Save();
-            _logger.LogInformation("Applied submitted metadata to {FileName}", item.FileName);
+            _logger.LogDebug("Applied submitted metadata to {FileName}", item.FileName);
         }
         catch (Exception ex)
         {
@@ -1399,7 +1399,7 @@ public sealed partial class DownloadService : IDisposable
             var song = await _catalog.FindSongAsync(artist, title, duration, cancellationToken).ConfigureAwait(false);
             if (song == null)
             {
-                _logger.LogInformation("No Apple Music match for {Artist} - {Title}", FormatUtilities.SanitizeForLog(artist), FormatUtilities.SanitizeForLog(title));
+                _logger.LogDebug("No Apple Music match for {Artist} - {Title}", FormatUtilities.SanitizeForLog(artist), FormatUtilities.SanitizeForLog(title));
                 if (await EmbedYouTubeMusicCoverAsync(tag, info, cancellationToken).ConfigureAwait(false))
                 {
                     tagFile.Save();
@@ -1470,7 +1470,7 @@ public sealed partial class DownloadService : IDisposable
 
             await EmbedYouTubeMusicCoverAsync(tag, info, cancellationToken).ConfigureAwait(false);
             tagFile.Save();
-            _logger.LogInformation("Matched {Artist} - {Title} to {Album} ({Year}) on Apple Music", FormatUtilities.SanitizeForLog(artist), FormatUtilities.SanitizeForLog(title), FormatUtilities.SanitizeForLog(song.AlbumName), song.Year);
+            _logger.LogDebug("Matched {Artist} - {Title} to {Album} ({Year}) on Apple Music", FormatUtilities.SanitizeForLog(artist), FormatUtilities.SanitizeForLog(title), FormatUtilities.SanitizeForLog(song.AlbumName), song.Year);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -1636,7 +1636,7 @@ public sealed partial class DownloadService : IDisposable
                 }
                 catch (Exception ex) when (ex is ArgumentNullException or TagLib.CorruptFileException)
                 {
-                    _logger.LogWarning("TagLib failed to read {File}, attempting ffmpeg remux: {Msg}", item.FileName, ex.Message);
+                    _logger.LogDebug(ex, "TagLib failed to read {File}, attempting ffmpeg remux", item.FileName);
                     if (await TryRemuxContainerAsync(sourcePath, cancellationToken).ConfigureAwait(false))
                     {
                         tagFile = TagLib.File.Create(sourcePath);
@@ -1721,7 +1721,7 @@ public sealed partial class DownloadService : IDisposable
                 if (isDuplicate && !Config.ReplaceDuplicates && item.SourceTrack?.ReplaceInPlace != true)
                 {
                     result.SkippedIds.Add(id);
-                    _logger.LogInformation("Skipped duplicate {Title} at {Dest}", title, destPath);
+                    _logger.LogDebug("Skipped duplicate {Title} at {Dest}", title, destPath);
                     continue;
                 }
 
@@ -1766,11 +1766,11 @@ public sealed partial class DownloadService : IDisposable
                 if (isDuplicate)
                 {
                     result.ReplacedIds.Add(id);
-                    _logger.LogInformation("Replaced {Title} at {Dest}", title, destPath);
+                    _logger.LogDebug("Replaced {Title} at {Dest}", title, destPath);
                 }
                 else
                 {
-                    _logger.LogInformation("Imported {Title} to {Dest}", title, destPath);
+                    _logger.LogDebug("Imported {Title} to {Dest}", title, destPath);
                 }
             }
             catch (Exception ex)
@@ -1929,7 +1929,7 @@ public sealed partial class DownloadService : IDisposable
                 File.Delete(full);
                 changedPaths.Add(full);
                 removed++;
-                _logger.LogInformation("Removed {Path}, replaced by the album version at {Kept}", full, kept);
+                _logger.LogDebug("Removed {Path}, replaced by the album version at {Kept}", full, kept);
 
                 // Drop the album folder, then the artist folder, if nothing is left in them.
                 var dir = Path.GetDirectoryName(full);
@@ -2031,7 +2031,7 @@ public sealed partial class DownloadService : IDisposable
         {
             DeleteCachedFiles(item);
             db.DeleteItem(id);
-            _logger.LogInformation("Deleted cached file for queue item {Id}", id);
+            _logger.LogDebug("Deleted cached file for queue item {Id}", id);
         }
     }
 
@@ -2622,7 +2622,7 @@ public sealed partial class DownloadService : IDisposable
         var found = commonPaths.FirstOrDefault(File.Exists);
         if (found != null)
         {
-            _logger.LogInformation("Found yt-dlp at common location: {Path}", found);
+            _logger.LogDebug("Found yt-dlp at common location: {Path}", found);
         }
 
         return found;
@@ -2942,7 +2942,7 @@ public sealed partial class DownloadService : IDisposable
             }
             catch (Exception ex) when (ex is ArgumentNullException or TagLib.CorruptFileException)
             {
-                _logger.LogWarning("TagLib failed to read {File}, attempting ffmpeg remux", Path.GetFileName(filePath));
+                _logger.LogDebug(ex, "TagLib failed to read {File}, attempting ffmpeg remux", Path.GetFileName(filePath));
                 if (await TryRemuxContainerAsync(filePath, cancellationToken).ConfigureAwait(false))
                 {
                     tagFile = TagLib.File.Create(filePath);
@@ -3146,11 +3146,11 @@ public sealed partial class DownloadService : IDisposable
             if (process.ExitCode == 0 && File.Exists(tempPath))
             {
                 File.Move(tempPath, filePath, overwrite: true);
-                logger.LogInformation("Remuxed audio container: {File}", Path.GetFileName(filePath));
+                logger.LogDebug("Remuxed audio container: {File}", Path.GetFileName(filePath));
                 return true;
             }
 
-            logger.LogWarning("ffmpeg remux failed with exit code {Code}: {Errors}", process.ExitCode, errors.Length > 500 ? errors[..500] : errors);
+            logger.LogWarning("ffmpeg remux of {File} failed with exit code {Code}: {Errors}", Path.GetFileName(filePath), process.ExitCode, FormatUtilities.SanitizeForLog(errors.Length > 500 ? errors[..500] : errors));
             return false;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

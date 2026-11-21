@@ -139,7 +139,7 @@ public sealed class PlaylistImportService
 
         if (plan.StaleQueueIds.Count > 0)
         {
-            _logger.LogInformation("Removed {Count} queued or failed songs the library now has", plan.StaleQueueIds.Count);
+            _logger.LogDebug("Removed {Count} queued or failed songs the library now has", plan.StaleQueueIds.Count);
         }
 
         var playlistName = string.Join(", ", selected.Select(p => p.Name).Where(n => !string.IsNullOrEmpty(n)));
@@ -167,7 +167,7 @@ public sealed class PlaylistImportService
             }
         }
 
-        _logger.LogInformation(
+        _logger.LogDebug(
             "Queued {Count} tracks from {Source} playlist(s) {Name}: {InLibrary} already in library, {Queued} already queued, {Duplicates} duplicates, {Upgrades} replacing library singles, {Skipped} unreadable",
             items.Count,
             source.Name,

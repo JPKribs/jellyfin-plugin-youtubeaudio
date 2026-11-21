@@ -83,7 +83,7 @@ public sealed class AppleCatalogClient : IDisposable
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
         {
-            _logger.LogWarning("Could not download cover art: {Message}", ex.Message);
+            _logger.LogWarning(ex, "Could not download cover art");
             return null;
         }
     }
@@ -148,7 +148,7 @@ public sealed class AppleCatalogClient : IDisposable
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
             {
                 // Not cached: a later lookup may succeed.
-                _logger.LogWarning("Apple catalog lookup failed for {Term}: {Message}", FormatUtilities.SanitizeForLog(term), ex.Message);
+                _logger.LogWarning(ex, "Apple catalog lookup failed for {Term}", FormatUtilities.SanitizeForLog(term));
             }
             finally
             {

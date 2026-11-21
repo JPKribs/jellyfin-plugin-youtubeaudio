@@ -332,7 +332,7 @@ public sealed class PlaylistSyncService : IHostedService, IDisposable
                     Public = false
                 }).ConfigureAwait(false);
                 _dbProvider.Database.SetJellyfinPlaylistId(target.Id, created.Id);
-                _logger.LogInformation("Created playlist {Name} with {Count} songs", FormatUtilities.SanitizeForLog(target.Name), itemIds.Count);
+                _logger.LogDebug("Created playlist {Name} with {Count} songs", FormatUtilities.SanitizeForLog(target.Name), itemIds.Count);
             }
             else
             {
@@ -342,7 +342,7 @@ public sealed class PlaylistSyncService : IHostedService, IDisposable
                     _dbProvider.Database.SetJellyfinPlaylistId(target.Id, playlist.Id.ToString("N"));
                 }
 
-                _logger.LogInformation("Added {Count} songs to playlist {Name}", itemIds.Count, FormatUtilities.SanitizeForLog(target.Name));
+                _logger.LogDebug("Added {Count} songs to playlist {Name}", itemIds.Count, FormatUtilities.SanitizeForLog(target.Name));
             }
         }
 
@@ -400,7 +400,7 @@ public sealed class PlaylistSyncService : IHostedService, IDisposable
 
         if (moves > 0)
         {
-            _logger.LogInformation("Re-ordered {Count} songs in playlist {Name}", moves, FormatUtilities.SanitizeForLog(target.Name));
+            _logger.LogDebug("Re-ordered {Count} songs in playlist {Name}", moves, FormatUtilities.SanitizeForLog(target.Name));
         }
     }
 
